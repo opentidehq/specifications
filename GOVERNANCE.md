@@ -1,8 +1,13 @@
+---
+title: Governance
+description: How OpenTide specifications are proposed, reviewed, versioned, and published.
+---
+
 # Governance
 
 ## Purpose
 
-This repository is the **normative source** for OpenTide specifications. The [opentide](https://github.com/OpenTide/opentide) implementation follows these specs; it does not define them.
+This repository is the **normative source** for OpenTide specifications. The [opentide](https://github.com/OpenTideHQ/opentide) implementation follows these specs; it does not define them.
 
 ## Authority model
 

@@ -1,3 +1,12 @@
+---
+title: Agent guide
+description: How AI agents should read, propose, and apply OpenTide normative specifications.
+---
+
+<Callout type="info">
+This guide targets contributors to the [specifications](https://github.com/OpenTideHQ/specifications) repository. Detection engineers reading [opentide.org](https://opentide.org) should start with [Specifications](/docs/specifications/) and [Usage](/docs/usage/).
+</Callout>
+
 # Agent guide — OpenTide specifications
 
 Instructions for AI agents working in this repository.
