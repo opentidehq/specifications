@@ -29,13 +29,16 @@
           { "type": "string" },
           {
             "type": "object",
-            "required": ["id"],
             "properties": {
               "id": { "type": "string" },
               "name": { "type": "string" },
               "description": { "type": "string" },
               "icon": { "type": "string" }
-            }
+            },
+            "anyOf": [
+              { "required": ["id"] },
+              { "required": ["name"] }
+            ]
           }
         ]
       }

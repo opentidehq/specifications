@@ -49,3 +49,12 @@ flowchart LR
 - **Spec authors** — Propose changes via issue + RFC.
 - **Maintainers** — Accept RFCs, merge spec PRs, ensure fixtures and index stay current.
 - **Implementers** — Update opentide after spec merges; vocabulary sync is an opentide build concern.
+
+## CI
+
+Pull requests run [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+
+- Validate all `vocabularies/*.vocab.toml` against `schemas/vocabulary.schema.json`
+- Confirm required conformance fixtures exist
+
+Run locally: `python3 -m venv .venv && .venv/bin/pip install jsonschema && .venv/bin/python scripts/validate.py`
