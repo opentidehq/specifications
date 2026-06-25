@@ -1,0 +1,77 @@
+name: Spec change proposal
+description: Propose a change to OpenTide normative specifications
+title: "[Spec] "
+labels: ["spec-change"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to propose changes to normative specs in the `specifications` repo.
+        See [GOVERNANCE.md](../GOVERNANCE.md) for the full change process.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What problem does this change solve? Who is affected?
+      placeholder: Describe the gap, pain point, or incorrect behavior in the current spec.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: affected_specs
+    attributes:
+      label: Affected specs
+      description: Select all specs that would change
+      options:
+        - label: versioning
+        - label: metadata
+        - label: threat (1.0)
+        - label: objective (1.0)
+        - label: rule (1.0)
+        - label: workspace
+        - label: configuration
+        - label: vocabulary format / catalog
+        - label: deployment
+        - label: metaschema-keywords
+        - label: platforms
+        - label: validation
+        - label: new spec (describe in problem statement)
+
+  - type: dropdown
+    id: change_type
+    attributes:
+      label: Change type
+      description: Breaking changes require a new spec file version and an RFC
+      options:
+        - Clarification (no behavior change)
+        - Additive (backward compatible)
+        - Breaking (new schema revision or removed requirement)
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      description: How will we know the spec change is complete?
+      placeholder: |
+        - [ ] Spec text updated with MUST/SHOULD requirements
+        - [ ] Fixtures added or updated
+        - [ ] SPECS.md and CHANGELOG.md updated
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: draft_rfc
+    attributes:
+      label: RFC assistance
+      options:
+        - label: Draft RFC for me (agent should create rfcs/NNNN-*.md PR)
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Links, examples, opentide implementation notes
+      placeholder: Optional

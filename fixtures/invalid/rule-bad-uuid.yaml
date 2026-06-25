@@ -1,0 +1,11 @@
+name: Rule With Bad UUID
+
+metadata:
+  uuid: not-a-valid-uuid
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+
+description: metadata.uuid must be UUIDv4.

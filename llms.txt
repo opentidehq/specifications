@@ -1,0 +1,54 @@
+# OpenTide Specifications
+
+> Normative specification library for OpenTide. Not a documentation website.
+
+## Governance
+
+- GOVERNANCE.md: Change process (Issue → RFC → spec → opentide)
+- AGENTS.md: Instructions for AI agents
+- SPECS.md: Index of active spec versions
+- rfcs/0001-authority-model.md: Authority model (spec → Pydantic → JSON Schema)
+
+## Normative specs (specs/)
+
+- specs/versioning.md
+- specs/metadata.md
+- specs/workspace.md
+- specs/configuration.md
+- specs/deployment.md
+- specs/metaschema-keywords.md
+- specs/platforms.md
+- specs/validation.md
+
+## Object specs (specs/objects/)
+
+- specs/objects/threat-1.0.md (schema_id: threat::1.0)
+- specs/objects/objective-1.0.md (schema_id: objective::1.0)
+- specs/objects/rule-1.0.md (schema_id: rule::1.0)
+
+## Vocabulary specs (specs/vocabularies/)
+
+- specs/vocabularies/format.md
+- specs/vocabularies/catalog.md
+
+## Data
+
+- vocabularies/*.vocab.toml: Canonical vocabulary TOML (36 files)
+- schemas/vocabulary.schema.json: Vocabulary file JSON Schema
+- fixtures/valid/: Valid conformance YAML
+- fixtures/invalid/: Invalid conformance YAML
+- fixtures/cross-object/: Cross-reference conformance YAML
+
+## RFCs
+
+- rfcs/README.md
+- rfcs/0000-template.md
+- rfcs/0001-authority-model.md
+
+## Agent skills
+
+- .agents/skills/publish-rfc/SKILL.md
+
+## License
+
+CC-BY-4.0 (see LICENSE)

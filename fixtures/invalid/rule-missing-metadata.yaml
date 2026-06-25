@@ -1,0 +1,15 @@
+name: Rule Without Metadata
+
+description: Missing required metadata block — invalid per rule::1.0 spec.
+status: STAGING
+severity: High
+
+configurations:
+  sentinel:
+    enabled: true
+    query: SecurityEvent | take 1
+    scheduling:
+      frequency: PT1H
+      lookback: PT2H
+    alert:
+      title: Incomplete rule

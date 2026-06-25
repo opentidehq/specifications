@@ -1,0 +1,27 @@
+name: Rule Linked To Objective
+
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000002
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+
+description: |
+  Rule implementing objective 00000000-0000-4000-8002-000000000001
+  (see valid/objective-1.0.yaml or cross-object/objective-references-threat.yaml).
+status: STAGING
+severity: High
+detection_model: 00000000-0000-4000-8002-000000000001
+
+configurations:
+  sentinel:
+    enabled: true
+    name: Rule Linked To Objective
+    query: SecurityEvent | take 1
+    scheduling:
+      frequency: PT1H
+      lookback: PT2H
+    alert:
+      title: Rule Linked To Objective
