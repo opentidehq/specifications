@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opentide.dev/schemas/inflight.shard.1.0.schema.json",
+  "title": "OpenTide inflight preview shard",
+  "description": "Envelope for a per-object preview overlay written under .opentide/inflight/ during open pull requests or merge requests.",
+  "type": "object",
+  "required": ["schema", "written_at", "object", "change"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "inflight.shard::1.0"
+    },
+    "written_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "object": {
+      "type": "object",
+      "description": "Full parsed threat, objective, or rule document.",
+      "required": ["metadata"],
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "required": ["uuid", "schema", "version"],
+          "properties": {
+            "uuid": { "type": "string", "format": "uuid" },
+            "schema": {
+              "type": "string",
+              "pattern": "^(threat|objective|rule)::\\d+\\.\\d+$"
+            },
+            "version": {
+              "oneOf": [
+                { "type": "integer", "minimum": 1 },
+                { "type": "string", "minLength": 1 }
+              ]
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "change": {
+      "type": "object",
+      "required": [
+        "platform",
+        "number",
+        "url",
+        "title",
+        "head_ref",
+        "base_ref",
+        "head_sha",
+        "source_path",
+        "recorded_at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": ["github", "gitlab", "azure", "local"]
+        },
+        "number": {
+          "oneOf": [
+            { "type": "integer" },
+            { "type": "string" },
+            { "type": "null" }
+          ]
+        },
+        "url": {
+          "oneOf": [{ "type": "string", "format": "uri" }, { "type": "null" }]
+        },
+        "title": {
+          "oneOf": [{ "type": "string" }, { "type": "null" }]
+        },
+        "head_ref": {
+          "oneOf": [{ "type": "string" }, { "type": "null" }]
+        },
+        "base_ref": {
+          "oneOf": [{ "type": "string" }, { "type": "null" }]
+        },
+        "head_sha": {
+          "oneOf": [{ "type": "string" }, { "type": "null" }]
+        },
+        "source_path": {
+          "type": "string",
+          "pattern": "^objects/(threats|objectives|rules)/[^/]+\\.(ya?ml)$"
+        },
+        "recorded_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}
