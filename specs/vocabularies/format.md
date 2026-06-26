@@ -16,6 +16,7 @@ OpenTide vocabularies are TOML files (`.vocab.toml`) defining allowed enum value
 
 - Every vocabulary file MUST validate against [schemas/vocabulary.schema.json](../../schemas/vocabulary.schema.json).
 - Every vocabulary file MUST declare `name` and `field` at the top level.
+- Every vocabulary file MUST declare a top-level `version` string in `major.minor` format (for example, `1.0`).
 - Entry keys MUST be declared in `[[keys]]` tables unless using `stages` for scoped vocabularies.
 - Clients MUST NOT override vocabulary files in `.opentide/configurations/`; extensions use `schema.toml` `[[vocabulary.*]]` entries only.
 - The `field` value MUST match the YAML/JSON field path the vocabulary constrains (e.g. `tlp`, `att&ck`, `detection.methodology`).
@@ -29,6 +30,7 @@ OpenTide vocabularies are TOML files (`.vocab.toml`) defining allowed enum value
 |----------|------|----------|-------------|
 | `name` | string | yes | Human-readable vocabulary name |
 | `field` | string | yes | Field path this vocabulary applies to |
+| `version` | string (`major.minor`) | yes | Vocabulary contract version used for deterministic schema pinning |
 | `description` | string | no | Vocabulary description |
 | `icon` | string | no | Display icon for UI/schema generation |
 | `key` | `"name"` \| `"id"` | no | Whether entries are keyed by `name` or `id` (default: name-based) |
@@ -58,6 +60,7 @@ Entries MAY be scoped to lifecycle stages via `tide.vocab.stages`. Metaschema fi
 ```toml
 name = "Traffic Light Protocol"
 field = "tlp"
+version = "1.0"
 description = "TLP classification for information sharing."
 key = "name"
 
@@ -102,4 +105,5 @@ Vocabulary sync is performed by opentide repository build scripts (for example `
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-06-26 | Added required top-level vocabulary `version` (`major.minor`) |
 | 1.0 | 2026-06-25 | Initial spec from opentide `vocabulary.schema.json` |

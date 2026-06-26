@@ -15,6 +15,7 @@ Request for Comments (RFCs) document significant specification changes before th
 | RFC | Title | Status |
 |-----|-------|--------|
 | [0001](0001-authority-model.md) | Authority model and change process | accepted |
+| [0002](0002-vocabulary-versioning.md) | Vocabulary identifier versioning and schema pins | proposed |
 
 ## Numbering
 

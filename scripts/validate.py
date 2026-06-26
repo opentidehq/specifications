@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import tomllib
 from pathlib import Path
@@ -13,6 +14,7 @@ VOCAB_DIR = ROOT / "vocabularies"
 VOCAB_SCHEMA = ROOT / "schemas" / "vocabulary.schema.json"
 FIXTURES = ROOT / "fixtures"
 VOCAB_SUFFIX = ".vocab.toml"
+VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+$")
 
 
 def _load_json_schema() -> dict:
@@ -30,6 +32,14 @@ def _validate_vocab_file(path: Path, schema: dict) -> list[str]:
     field = doc.get("field")
     if field != stem:
         errors.append(f"{path}: field '{field}' does not match filename stem '{stem}'")
+
+    version = doc.get("version")
+    if version is None:
+        errors.append(f"{path}: missing required top-level 'version' field")
+    elif not isinstance(version, str):
+        errors.append(f"{path}: version must be a string in major.minor format")
+    elif not VERSION_RE.match(version):
+        errors.append(f"{path}: version '{version}' is not in major.minor format")
 
     try:
         import jsonschema
