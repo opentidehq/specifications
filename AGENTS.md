@@ -64,7 +64,7 @@ Sections (fixed order): Summary, Requirements, Definition, Relationships, Defaul
 
 ## Vocabulary sync
 
-Canonical `.vocab.toml` files live here. opentide copies them at build into `data/vocabulary/`. Sync direction: **specifications → opentide**. Document the interface in [specs/vocabularies/format.md](specs/vocabularies/format.md).
+Canonical `.vocab.toml` files live here. opentide copies them at build into `data/vocabulary/` using repository build scripts such as `scripts/build/sync_vocabularies.py` (not a PyPI `opentide build` CLI command). Sync direction: **specifications → opentide**. Document the interface in [specs/vocabularies/format.md](specs/vocabularies/format.md).
 
 ## Issue and PR templates
 

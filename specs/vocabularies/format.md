@@ -88,9 +88,10 @@ description = "Recipients can spread this to the world."
 |----------|------|
 | `specifications/vocabularies/` | Canonical source (this repo) |
 | `opentide/src/opentide/data/vocabulary/` | Runtime bundle (copied at build) |
+| `opentide/scripts/build/sync_vocabularies.py` | Maintainer sync script (repository build workflow) |
 | `schemas/vocabulary.schema.json` | Validation schema for TOML files |
 
-The sync script is an opentide build concern; this spec defines the data contract only.
+Vocabulary sync is performed by opentide repository build scripts (for example `scripts/build/sync_vocabularies.py`), not by a PyPI `opentide build` CLI command. This spec defines the data contract only.
 
 ## Examples
 
