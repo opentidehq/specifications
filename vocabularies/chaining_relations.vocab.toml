@@ -22,6 +22,7 @@ name = "Supportive"
 description = "TVMs which successful execution allows other TVMs to be more easily performed,\nor produce larger impact.\n"
 
 [[keys]]
+version = "1.0"
 name = "preceeds"
 
 "tide.vocab.stages" = "sequence"
@@ -29,6 +30,7 @@ name = "preceeds"
 description = "The following TVM is occuring **AFTER** this TVM object has been performed.\n"
 
 [[keys]]
+version = "1.0"
 name = "succeeds"
 
 "tide.vocab.stages" = "sequence"
@@ -36,6 +38,7 @@ name = "succeeds"
 description = "The following TVM is occuring **BEFORE** this TVM object has been performed.\n"
 
 [[keys]]
+version = "1.0"
 name = "implemented"
 
 "tide.vocab.stages" = "atomicity"
@@ -43,6 +46,7 @@ name = "implemented"
 description = "The following TVM is being performed in this TVM object in a more specific way\n"
 
 [[keys]]
+version = "1.0"
 name = "implements"
 
 "tide.vocab.stages" = "atomicity"
@@ -50,6 +54,7 @@ name = "implements"
 description = "The following TVM is performing this TVM object in a more specific way\n"
 
 [[keys]]
+version = "1.0"
 name = "enabled"
 
 "tide.vocab.stages" = "support"
@@ -57,6 +62,7 @@ name = "enabled"
 description = "The following TVM is allowed by this TVM object to be more easily performed\n"
 
 [[keys]]
+version = "1.0"
 name = "enabling"
 
 "tide.vocab.stages" = "support"
@@ -64,6 +70,7 @@ name = "enabling"
 description = "The following TVM is allowing this TVM object to be more easily performed\n"
 
 [[keys]]
+version = "1.0"
 name = "synergize"
 
 "tide.vocab.stages" = "support"

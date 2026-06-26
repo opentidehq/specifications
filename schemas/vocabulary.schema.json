@@ -15,11 +15,23 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name"],
+        "required": ["version"],
         "properties": {
           "id": { "type": "string" },
-          "name": { "type": "string" }
-        }
+          "name": { "type": "string" },
+          "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+$"
+          },
+          "removed": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+$"
+          }
+        },
+        "anyOf": [
+          { "required": ["name"] },
+          { "required": ["id"] }
+        ]
       }
     },
     "stages": {
@@ -43,6 +55,9 @@
         ]
       }
     }
+  },
+  "not": {
+    "required": ["version"]
   },
   "additionalProperties": true
 }
