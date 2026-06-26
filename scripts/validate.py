@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 VOCAB_DIR = ROOT / "vocabularies"
 VOCAB_SCHEMA = ROOT / "schemas" / "vocabulary.schema.json"
+INFLIGHT_SHARD_SCHEMA = ROOT / "schemas" / "inflight.shard.1.0.schema.json"
 PINS_DIR = ROOT / "schemas" / "pins"
 FIXTURES = ROOT / "fixtures"
 VOCAB_SUFFIX = ".vocab.toml"
@@ -125,10 +126,31 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "valid" / "objective-1.0.yaml",
         FIXTURES / "invalid" / "rule-missing-metadata.yaml",
         FIXTURES / "cross-object" / "rule-references-objective.yaml",
+        FIXTURES / "inflight" / "example-shard.json",
     ]
     for path in required:
         if not path.is_file():
             errors.append(f"missing required fixture: {path.relative_to(ROOT)}")
+    return errors
+
+
+def _validate_inflight_fixture() -> list[str]:
+    errors: list[str] = []
+    fixture = FIXTURES / "inflight" / "example-shard.json"
+    if not fixture.is_file() or not INFLIGHT_SHARD_SCHEMA.is_file():
+        return errors
+    try:
+        import jsonschema
+
+        doc = json.loads(fixture.read_text(encoding="utf-8"))
+        schema = json.loads(INFLIGHT_SHARD_SCHEMA.read_text(encoding="utf-8"))
+        jsonschema.validate(doc, schema)
+    except ImportError:
+        errors.append("jsonschema package required: pip install jsonschema")
+    except json.JSONDecodeError as exc:
+        errors.append(f"{fixture}: JSON parse error: {exc}")
+    except jsonschema.ValidationError as exc:
+        errors.append(f"{fixture}: schema validation failed: {exc.message}")
     return errors
 
 
@@ -150,6 +172,7 @@ def main() -> int:
 
     errors.extend(_validate_pin_files())
     errors.extend(_check_fixtures())
+    errors.extend(_validate_inflight_fixture())
 
     if errors:
         print("validation failed:", file=sys.stderr)

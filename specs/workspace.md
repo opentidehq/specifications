@@ -43,7 +43,7 @@ Registered objects list: `threat`, `objective`, `rule`.
 | `.opentide/schemas/` | Generated JSON Schema | No |
 | `.opentide/templates/` | Generated YAML templates | No |
 | `.opentide/exports/` | Generated exports | No |
-| `.opentide/inflight/` | CI preview shards (future) | No |
+| `.opentide/inflight/` | CI preview shards for open PR/MR object changes | No |
 
 ### Documentation mirror paths
 
@@ -63,6 +63,9 @@ Registered objects list: `threat`, `objective`, `rule`.
 | rule | `rule.1.0.schema.json` |
 | visibility | `visibility.1.0.schema.json` |
 | router | `opentide.schema.json` |
+| inflight shard | `inflight.shard.1.0.schema.json` |
+
+Inflight shard schema source of truth: [schemas/inflight.shard.1.0.schema.json](../schemas/inflight.shard.1.0.schema.json). Generated copies MAY be emitted to `.opentide/schemas/` by `opentide generate schemas` when supported.
 
 ### Generated template artifacts
 
@@ -114,6 +117,37 @@ detection-repo/
 ├── README.md
 └── .gitignore
 ```
+
+### Inflight preview shards
+
+CI writes one JSON file per changed object UUID under `.opentide/inflight/<uuid>.json` on pull requests and merge requests. Shards use schema `inflight.shard::1.0` and wrap the parsed object document plus PR/MR metadata:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `schema` | string | Always `inflight.shard::1.0` |
+| `written_at` | string (ISO-8601) | When the shard was written |
+| `object` | object | Full parsed threat, objective, or rule document |
+| `change` | object | PR/MR provenance (`platform`, `number`, `url`, `title`, `head_ref`, `base_ref`, `head_sha`, `source_path`, `recorded_at`) |
+
+Consumers overlay shards onto the committed registry when the shard object `metadata.version` is greater than the committed version, or equal with a wrapped shard (preview wins on ties). After merge to the default branch, `opentide generate inflight prune` removes shards superseded by committed YAML.
+
+#### CI metadata sources
+
+| Platform | Detected when | Primary env vars |
+|----------|---------------|------------------|
+| GitHub Actions | `GITHUB_ACTIONS` set | `GITHUB_EVENT_PATH` (pull_request payload), `GITHUB_HEAD_REF`, `GITHUB_BASE_REF`, `GITHUB_SHA` |
+| GitLab CI | `CI` set (and not GitHub/Azure) | `CI_MERGE_REQUEST_IID`, `CI_PROJECT_URL`, `CI_MERGE_REQUEST_TITLE`, `CI_MERGE_REQUEST_SOURCE_BRANCH_NAME`, `CI_MERGE_REQUEST_TARGET_BRANCH_NAME`, `CI_COMMIT_SHA` |
+| Azure Pipelines | `TF_BUILD` set | `SYSTEM_PULLREQUEST_PULLREQUESTNUMBER` or `SYSTEM_PULLREQUEST_PULLREQUESTID`, `SYSTEM_PULLREQUEST_PULLREQUESTURI`, `SYSTEM_PULLREQUEST_PULLREQUESTTITLE`, `SYSTEM_PULLREQUEST_SOURCEBRANCH`, `SYSTEM_PULLREQUEST_TARGETBRANCH`, `BUILD_SOURCEVERSION` |
+| Local | none of the above | `INFLIGHT_CHANGE_JSON` optional override |
+
+`change.source_path` is the object YAML path relative to the workspace root (`OPENTIDE_REPO_ROOT`).
+
+#### CI jobs
+
+| Job id | Trigger | Command |
+|--------|---------|---------|
+| `inflight_shards` | pull request / merge request | `opentide generate inflight` |
+| `inflight_prune` | push to default branch | `opentide generate inflight prune` |
 
 ## Relationships
 

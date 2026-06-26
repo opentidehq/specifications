@@ -15,6 +15,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Objective object | 1.0 | `objective::1.0` | normative | [specs/objects/objective-1.0.md](specs/objects/objective-1.0.md) |
 | Rule object | 1.0 | `rule::1.0` | normative | [specs/objects/rule-1.0.md](specs/objects/rule-1.0.md) |
 | Workspace layout | 1.0 | — | normative | [specs/workspace.md](specs/workspace.md) |
+| Inflight preview shard | 1.0 | `inflight.shard::1.0` | normative | [specs/workspace.md](specs/workspace.md#inflight-preview-shards) |
 | Configuration | 1.0 | — | normative | [specs/configuration.md](specs/configuration.md) |
 | Vocabulary format | 1.0 | — | normative | [specs/vocabularies/format.md](specs/vocabularies/format.md) |
 | Vocabulary catalog | 1.0 | — | normative | [specs/vocabularies/catalog.md](specs/vocabularies/catalog.md) |
