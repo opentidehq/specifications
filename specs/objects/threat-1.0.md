@@ -19,7 +19,8 @@ A threat vector describes an adversary capability or scenario: severity, impact,
 - `threat` body MUST be present with all required subfields.
 - `threat.att&ck` MUST be a non-empty list of ATT&CK technique references (YAML key `att&ck`; aliased as `att_ck` in Pydantic).
 - `references` MAY be omitted.
-- `threat.chaining` entries MUST reference valid chaining relation vocabulary values when present.
+- `threat.terrain` MUST be a non-empty list of `surface::1.0` vocabulary values.
+- The deprecated `domains`, `platforms`, and `targets` vocabularies MUST NOT appear on threat objects.
 
 ## Definition
 
@@ -42,7 +43,7 @@ A threat vector describes an adversary capability or scenario: severity, impact,
 | `impact` | string | yes | — | Impact vocabulary |
 | `leverage` | string | yes | — | Leverage vocabulary |
 | `viability` | string | yes | — | Viability vocabulary |
-| `terrain` | string | yes | — | Threat surface / terrain |
+| `terrain` | list[string] | yes | — | Threat surface vocabulary values (`surface::1.0`) |
 | `att&ck` | list[string] | yes | — | MITRE ATT&CK technique IDs |
 | `actors` | list[string] | no | null | Threat actor vocabulary values |
 | `killchain` | string \| list[string] | no | null | Kill chain stage(s) |
