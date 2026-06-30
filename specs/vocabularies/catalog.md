@@ -65,9 +65,9 @@ The following threat-scoping vocabularies were superseded by `surface.vocab.toml
 
 | Former file | Field | Replacement |
 |-------------|-------|-------------|
-| `domains.vocab.toml` | `domains` | `threat.terrain` → `surface::1.0` |
-| `platforms.vocab.toml` | `platforms` | `threat.terrain` → `surface::1.0` |
-| `targets.vocab.toml` | `targets` | `threat.terrain` → `surface::1.0` |
+| `domains.vocab.toml` | `domains` | `threat.surface` → `surface::1.0` |
+| `platforms.vocab.toml` | `platforms` | `threat.surface` → `surface::1.0` |
+| `targets.vocab.toml` | `targets` | `threat.surface` → `surface::1.0` |
 
 **Total:** 36 vocabulary files.
 
