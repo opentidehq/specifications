@@ -59,16 +59,6 @@ Index of canonical vocabulary files bundled with OpenTide. Each file lives in `v
 | `viability.vocab.toml` | Vector Viability | `viability` |
 | `violation.vocab.toml` | Policy, mandate or governance violations | `violation` |
 
-### Deprecated (removed)
-
-The following threat-scoping vocabularies were superseded by `surface.vocab.toml` and MUST NOT be used on `threat::1.0` objects:
-
-| Former file | Field | Replacement |
-|-------------|-------|-------------|
-| `domains.vocab.toml` | `domains` | `threat.surface` → `surface::1.0` |
-| `platforms.vocab.toml` | `platforms` | `threat.surface` → `surface::1.0` |
-| `targets.vocab.toml` | `targets` | `threat.surface` → `surface::1.0` |
-
 **Total:** 36 vocabulary files.
 
 ## Relationships

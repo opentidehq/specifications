@@ -21,7 +21,7 @@ A threat vector describes an adversary capability or scenario: severity, impact,
 - `references` MAY be omitted.
 - `threat.terrain` MUST be a non-empty explanatory string describing where and how the threat operates.
 - `threat.surface` MUST be a non-empty list of `surface::1.0` vocabulary values.
-- The deprecated `domains`, `platforms`, and `targets` vocabularies MUST NOT appear on threat objects.
+- `threat.chaining` entries MUST reference valid chaining relation vocabulary values when present.
 
 ## Definition
 
