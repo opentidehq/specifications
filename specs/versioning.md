@@ -41,12 +41,25 @@ OpenTide separates **structural schema revisions** from **object instance versio
 
 ### Runtime routing
 
-1. **Registry** — maps `rule::1.0` → validation model (single source of truth in opentide).
-2. **Load** — reads `metadata.schema`, resolves model, optionally migrates via `SchemaVersionChain`, validates with Pydantic.
-3. **Validate** — `opentide validate` checks every object against its declared schema identifier.
-4. **Index** — scans `.opentide/schemas/*.schema.json` into `framework_schemas` and `json_schemas` keyed by identifier.
+An implementation MUST route objects to validation by their declared identifier:
 
-Each per-version JSON Schema pins `metadata.schema` as a `const` for IDE discrimination.
+1. **Resolve** — read `metadata.schema` and select the validation model registered for that identifier.
+2. **Migrate (optional)** — an object MAY be migrated from an older revision to a newer one before validation.
+3. **Validate** — check the object against the model for its declared identifier.
+4. **Index** — expose the generated `.opentide/schemas/*.schema.json` artifacts keyed by identifier.
+
+Each per-revision JSON Schema MUST pin `metadata.schema` as a `const` so editors and the router can discriminate objects by revision.
+
+### Multi-version coexistence
+
+Schema revisions are additive; two revisions of a family MAY be active in one workspace at once. When a new revision such as `rule::1.1` ships:
+
+1. A new validation model is registered for `rule::1.1` alongside the existing `rule::1.0`.
+2. A migration path from `rule::1.0` to `rule::1.1` MAY be provided by the implementation.
+3. `opentide generate schemas` emits **both** artifacts, and the IDE router adds a branch per identifier.
+4. Objects opt in individually by setting `metadata.schema`; objects still declaring `rule::1.0` continue to validate against `1.0` until migrated.
+
+A schema upgrade therefore MUST NOT require a repository-wide migration in a single step.
 
 ## Relationships
 

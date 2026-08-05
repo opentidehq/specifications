@@ -6,6 +6,7 @@
   "pages": [
     "index",
     "SPECS",
+    "conformance",
     "---Core---",
     "specs/versioning",
     "specs/metadata",
@@ -23,9 +24,6 @@
     "specs/vocabularies/format",
     "specs/vocabularies/catalog",
     "---Governance---",
-    "GOVERNANCE",
-    "AGENTS",
-    "---RFCs---",
-    "rfcs/0001-authority-model"
+    "GOVERNANCE"
   ]
 }

@@ -27,6 +27,14 @@ This document is the **exemplar spec** — all object specs follow the same sect
 - `references` MAY be omitted.
 - Registry-backed methods (`deploy`, `validate`, `document`) require a bound opentide registry at runtime — not part of static YAML validation.
 
+<Callout type="info">
+**"Deployable rule" defined.** A rule is *deployable* when it contains at least one platform block (under `configurations` or legacy `platforms`) with `enabled: true`. A rule with no enabled platform block is still **valid** — for example a rule in `DESIGN` status being drafted — it simply will not deploy. Static validation never requires a platform block; only deployment does.
+</Callout>
+
+<Callout type="info">
+**`configurations` vs `platforms`.** `configurations` is the typed, preferred form: each key (`sentinel`, `splunk`, …) maps to a validated platform model. `platforms` is a legacy flat dict kept for backward compatibility. New rules SHOULD use `configurations`; existing rules using the legacy `platforms` dict SHOULD be migrated to typed `configurations` blocks. Do not declare the same platform in both blocks.
+</Callout>
+
 ## Definition
 
 ### Top level (DetectionRule)
@@ -121,6 +129,37 @@ See [platforms.md](../platforms.md) for per-platform required fields and capabil
 Vocabulary files are canonical in `vocabularies/` — not overridable. See [configuration.md](../configuration.md).
 
 ## Examples
+
+```yaml
+name: Sentinel KQL Rule
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000001
+  schema: rule::1.0
+  version: 1
+  tlp: clear
+description: Detects credential access via suspicious process creation
+status: STAGING
+severity: High
+techniques: [T1059]
+detection_model: 00000000-0000-4000-8002-000000000001   # → objective UUID
+response:
+  alert_severity: High
+configurations:
+  sentinel:                          # typed, preferred form
+    enabled: true
+    name: Sentinel KQL Rule
+    status: STAGING
+    query: |
+      SecurityEvent
+      | where EventID == 4688
+      | take 1
+    scheduling:
+      frequency: PT1H
+      lookback: PT2H
+    alert:
+      title: Sentinel KQL Rule
+      suppression: false
+```
 
 ### Valid fixtures
 

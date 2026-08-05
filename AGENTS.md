@@ -25,8 +25,8 @@ When answering questions or implementing spec changes:
 
 1. [SPECS.md](SPECS.md) — find the active spec version and path
 2. Relevant file under `specs/` — normative requirements
-3. [GOVERNANCE.md](GOVERNANCE.md) — change process
-4. [rfcs/0001-authority-model.md](rfcs/0001-authority-model.md) — authority chain details
+3. [GOVERNANCE.md](GOVERNANCE.md) — authority model and change process (canonical)
+4. `rfcs/` — accepted proposals kept for provenance (not normative; GOVERNANCE supersedes)
 5. `fixtures/` — concrete YAML examples
 6. `vocabularies/` — enum data referenced by specs
 7. opentide source — implementation reference only when verifying accuracy

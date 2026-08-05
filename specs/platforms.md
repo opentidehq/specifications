@@ -58,23 +58,63 @@ Excluded: `crowdstrike`, `harfanglab`
 enabled = false
 identifier = "sentinel"
 name = "Microsoft Sentinel"
-description = "..."
-flags = [""]
+description = "Microsoft Sentinel analytics rules"
+flags = []                 # optional platform flags; empty by default
 ```
 
 Enable a platform by setting `enabled = true` under `[platform]` or `[tide]`.
 
-### Per-platform rule configuration highlights
+### Per-platform rule configuration
+
+Every platform block shares the fields defined in [rule-1.0.md → Platform block](objects/rule-1.0.md) (`enabled`, `name`, `schema`, `status`, `flags`, `tenants`, `contributors`) and adds platform-specific fields. The authoritative per-field contract for each platform is the generated `platform::<identifier>::1.0` JSON Schema; the required fields below are what a rule MUST provide for an enabled block.
 
 | Platform | Required fields (when enabled) |
 |----------|-------------------------------|
 | `sentinel` | `query`, `scheduling`, `alert` |
 | `defender_for_endpoint` | `query`, `alert`, `impacted_entities`, `scheduling` |
-| `splunk` | `query` or legacy `search` |
+| `splunk` | `query` (legacy `search` accepted) |
 | `sentinel_one` | `condition` |
 | `crowdstrike` | `details`, `schedule`, `query` |
-| `harfanglab` | `sigma` and/or `yara` (at least one detection format) |
-| `carbon_black_cloud` | platform-specific query block |
+| `harfanglab` | at least one of `sigma`, `yara` |
+| `carbon_black_cloud` | platform query block (Lucene) |
+
+#### Sentinel block (`platform::sentinel::1.0`)
+
+The canonical example. A Sentinel block declares the analytics rule query, its schedule, and alert presentation.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `enabled` | boolean | yes | Activate this platform block |
+| `query` | string (KQL) | yes | The detection query |
+| `scheduling.frequency` | ISO 8601 duration | yes | How often the rule runs (e.g. `PT1H`) |
+| `scheduling.lookback` | ISO 8601 duration | yes | Time window queried (e.g. `PT2H`) |
+| `alert.title` | string | yes | Alert display title |
+| `alert.suppression` | boolean | no | Suppress duplicate alerts |
+| `grouping` | object | no | Event/alert grouping behaviour |
+
+```yaml
+configurations:
+  sentinel:
+    enabled: true
+    name: Sentinel KQL Rule
+    status: STAGING
+    query: |
+      SecurityEvent
+      | where EventID == 4688
+      | take 1
+    scheduling:
+      frequency: PT1H
+      lookback: PT2H
+    alert:
+      title: Sentinel KQL Rule
+      suppression: false
+    grouping:
+      event: SingleAlert
+      alert:
+        enabled: false
+```
+
+Other platforms follow the same pattern with their own query language and required fields; consult the generated `platform::<identifier>::1.0` schema in `.opentide/schemas/` for the exact contract.
 
 ### Entry points
 

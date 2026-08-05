@@ -67,6 +67,8 @@ Registered objects list: `threat`, `objective`, `rule`.
 
 Inflight shard schema source of truth: [schemas/inflight.shard.1.0.schema.json](../schemas/inflight.shard.1.0.schema.json). Generated copies MAY be emitted to `.opentide/schemas/` by `opentide generate schemas` when supported.
 
+`visibility.1.0.schema.json` is **not** an object family — there are no `visibility` objects under `objects/`. It is the schema used to validate the client `visibility.toml` [configuration](configuration.md), emitted here alongside the object schemas. `opentide.schema.json` is the IDE router that dispatches object YAML to the correct object schema by `metadata.schema`.
+
 ### Generated template artifacts
 
 | Family | Template filename |

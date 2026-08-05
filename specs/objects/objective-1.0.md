@@ -41,6 +41,10 @@ A detection objective defines what to detect: prioritized signals, composition s
 | `strategy` | string | yes | Detection composition strategy vocabulary |
 | `description` | string | yes | How signals compose |
 
+<Callout type="info">
+**Why composition appears twice.** The strategy is declared at the top level (`composition`) so it is visible without descending into the objective body, and mirrored inside `objective.composition` where the signals it governs live. The two blocks MUST carry the same `strategy` and `description`. Author both with identical values.
+</Callout>
+
 ### `objective` (ObjectiveBody)
 
 | Field | Type | Required | Default | Description |
@@ -108,6 +112,37 @@ A detection objective defines what to detect: prioritized signals, composition s
 No object-level configuration overrides. See [configuration.md](../configuration.md).
 
 ## Examples
+
+```yaml
+name: Credential Access Objective
+metadata:
+  uuid: 00000000-0000-4000-8002-000000000001
+  schema: objective::1.0
+  version: 1
+  tlp: clear
+composition:                          # top-level: mirrors objective.composition
+  strategy: synergetic
+  description: Compose signals for credential access detection
+objective:
+  priority: High
+  type: Threat
+  description: Detect credential access techniques
+  composition:                        # same strategy + description as above
+    strategy: synergetic
+    description: Compose signals for credential access detection
+  threats:
+    - 00000000-0000-4000-8001-000000000001   # → threat UUID
+  signals:
+    - name: Suspicious logon signal
+      uuid: 00000000-0000-4000-8099-000000000001
+      description: Suspicious authentication activity
+      severity: Medium
+      methodology: analytics
+      entities: [host]
+      data:
+        availability: Complete
+        requirements: Security event logs
+```
 
 - Valid: [fixtures/valid/objective-1.0.yaml](../../fixtures/valid/objective-1.0.yaml)
 - Invalid (no signals): [fixtures/invalid/objective-no-signals.yaml](../../fixtures/invalid/objective-no-signals.yaml)

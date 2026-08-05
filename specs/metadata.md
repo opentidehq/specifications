@@ -67,6 +67,16 @@ No client overrides for metadata structure. Template generation MAY pre-fill dat
 
 ## Examples
 
+```yaml
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000001   # UUIDv4, unique across the repo
+  schema: rule::1.0                             # registered schema identifier
+  version: 1                                    # instance content version
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear                                    # from the `tlp` vocabulary
+```
+
 - Valid metadata on a rule: [fixtures/valid/rule-1.0.yaml](../fixtures/valid/rule-1.0.yaml)
 - Invalid UUID: [fixtures/invalid/rule-bad-uuid.yaml](../fixtures/invalid/rule-bad-uuid.yaml)
 
