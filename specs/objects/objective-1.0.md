@@ -42,7 +42,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 | `description` | string | yes | How signals compose |
 
 <Callout type="info">
-**Why composition appears twice.** The strategy is declared at the top level (`composition`) so it is visible without descending into the objective body, and mirrored inside `objective.composition` where the signals it governs live. The two blocks MUST carry the same `strategy` and `description`; the validator enforces this. Author both with identical values.
+**Why composition appears twice.** The strategy is declared at the top level (`composition`) so it is visible without descending into the objective body, and mirrored inside `objective.composition` where the signals it governs live. The two blocks MUST carry the same `strategy` and `description`. Author both with identical values.
 </Callout>
 
 ### `objective` (ObjectiveBody)
