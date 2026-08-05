@@ -15,6 +15,8 @@ Defines rule deployment statuses, promotion strategy, proxy settings, and debug 
 ## Requirements
 
 - Every rule `status` value MUST match a configured status `name` in merged `deployment.toml`.
+- The set of statuses is configuration, not specification: implementations MUST NOT assume the bundled status names exist.
+- Status ordering is NOT normative. No transition graph is defined or enforced; any configured status MAY be set directly.
 - Status promotion MUST respect `[promotion]` settings when `promotion.enabled` is true.
 - Deprecated statuses MUST NOT be used for new rules (opentide emits warnings).
 - Platform-specific `status` on configuration blocks MUST also be valid deployment statuses when set.
@@ -54,25 +56,27 @@ The `strategy` on a status determines what `opentide deploy` does with a rule in
 | `DISABLEMENT` | Any active deployment of the rule is disabled (kept but inactive) |
 | `DELETION` | The rule is removed from platforms |
 
-### Lifecycle transitions
+### Status changes and promotion
 
-Statuses form a progression from design to production and on to retirement. Promotion moves a rule forward; a rule MAY also be disabled or removed from any active state.
+There is **no lifecycle state machine**. Statuses are a flat, configurable set: the only constraint enforced on a rule is that its `status` matches a configured status `name`. Any status MAY be set directly in YAML, in any order, and no transition is validated.
+
+Promotion, when `promotion.enabled` is true, is a single jump — not a step along a progression:
+
+| Status strategy | Effect of promotion |
+|-----------------|---------------------|
+| `RELEASE`, `DISABLEMENT`, `DELETION` | Non-promotable; the status is left unchanged |
+| Any other strategy (e.g. `INERT`, `PREVIEW`) | Rewritten **directly** to `promotion.promotion_target` |
 
 ```mermaid
-stateDiagram-v2
-  [*] --> DESIGN
-  DESIGN --> DEVELOPMENT
-  DEVELOPMENT --> IMPROVING
-  IMPROVING --> STAGING
-  STAGING --> ACCEPTANCE
-  ACCEPTANCE --> PRODUCTION
-  PRODUCTION --> DISABLED
-  DISABLED --> PRODUCTION
-  DISABLED --> REMOVED
-  REMOVED --> [*]
+flowchart LR
+  D["opentide deploy<br/>promotion.enabled = true"] --> Q{"status strategy"}
+  Q -->|"RELEASE / DISABLEMENT / DELETION"| U["status unchanged"]
+  Q -->|"any other strategy"| T["status := promotion_target<br/>(default PRODUCTION)"]
 ```
 
-Promotion targets are governed by `[promotion]`; the default target is `PRODUCTION`. The transition graph itself is a convention of the bundled lifecycle — clients that override `deployment.toml` define their own statuses and therefore their own progression.
+Intermediate statuses are not stepped through: a rule in the bundled `DESIGN` status promotes straight to `PRODUCTION`. Promotion rewrites the `status` values inside a rule's platform `configurations` blocks.
+
+The bundled status names in the table above suggest an editorial workflow (design → build → stage → release → retire), but that ordering is **convention only** and applies solely to the bundled configuration. Clients that override `deployment.toml` define their own statuses, and any progression between them is enforced by their own process, not by OpenTide.
 
 ### `[promotion]`
 
