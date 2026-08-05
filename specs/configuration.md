@@ -31,7 +31,8 @@ OpenTide merges bundled package configuration with optional client overrides fro
 | 2. Bundled platforms | `configurations/platforms/*.toml` | Merged into `platforms` / `systems` |
 | 3. Client workspace | `.opentide/configurations/` | Deep-merged on top |
 | 4. Parent instance | `../.opentide/configurations/` | When workspace is nested |
-| 5. Test fixture | `tests/fixtures/...` | Only when `OPENTIDE_TIDE_WORKSPACE` is set |
+
+An additional implementation-only layer applies during opentide's own test suite (selected by `OPENTIDE_TIDE_WORKSPACE`); it is not part of a normal client workspace and authors can ignore it.
 
 If bundled config lacks `global`, `paths` is aliased to `global`. If `platforms` is absent, `systems` is used as fallback.
 
@@ -55,7 +56,7 @@ If bundled config lacks `global`, `paths` is aliased to `global`. If `platforms`
 
 ### Path resolution
 
-`resolve_paths()` returns absolute `Path` objects from merged configuration, including legacy aliases (`tide` and `core` path groups).
+Path values in merged configuration MUST resolve to absolute paths, including legacy aliases (the `tide` and `core` path groups map onto their modern equivalents).
 
 ## Relationships
 

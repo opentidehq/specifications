@@ -1,65 +1,72 @@
 ---
 title: Governance
-description: How OpenTide specifications are proposed, reviewed, versioned, and published.
+description: How OpenTide specifications are proposed, reviewed, versioned, and published — and why the model is shaped this way.
 ---
 
 # Governance
 
-## Purpose
+The specifications are the **normative source** for OpenTide. This page explains who controls them, how they change, and why the model is built this way. It is written for anyone reading the specs; the repository mechanics contributors need live in the [specifications repository](https://github.com/OpenTideHQ/specifications).
 
-This repository is the **normative source** for OpenTide specifications. The [opentide](https://github.com/OpenTideHQ/opentide) implementation follows these specs; it does not define them.
+## Why specifications exist
+
+OpenTide previously mixed architecture notes, Python models, and generated JSON Schema with no single normative source, so authors, agents, and implementers had no clear precedence order. The specifications repository fixes that: it is a language-neutral, agent-friendly contract that evolves through a lightweight, transparent process.
 
 ## Authority model
 
 ```
-spec markdown (here) → Pydantic models (opentide) → JSON Schema (generated artifact)
-vocabulary TOML (here) → vocabulary bundle (opentide build)
+spec markdown (here)  →  validation models (opentide)  →  JSON Schema (generated artifact)
+vocabulary TOML (here) →  vocabulary bundle (opentide build)
 ```
 
-Specs win on conflict. Generated JSON Schema is for IDE validation and tooling — not for authoring normative changes.
+Specs win on conflict. Generated JSON Schema is for editor and router validation — never for authoring normative changes. How to read the requirement keywords (MUST/SHOULD/MAY) is defined in [Conformance](conformance.md).
 
-## Change process
+| Layer | Role | Source of truth? |
+|-------|------|:---------------:|
+| Spec markdown | Requirements and field semantics | Yes |
+| Vocabulary TOML | Canonical allowed values | Yes |
+| Validation models (opentide) | Runtime validation | No — implements specs |
+| JSON Schema | Editor / router validation | No — generated |
+
+## How specifications change
 
 ```mermaid
 flowchart LR
-  Issue["GitHub issue"] --> RFC["rfcs/NNNN.md"]
-  RFC --> Spec["specs/ updated"]
-  Spec --> Impl["opentide PR"]
+  Issue["Issue: problem + affected specs"] --> Proposal["Proposal / RFC (for breaking or non-trivial change)"]
+  Proposal --> Spec["specs/ + fixtures updated"]
+  Spec --> Impl["opentide implementation PR"]
 ```
 
-1. **Issue** — Open a spec-change issue describing the problem, affected specs, and acceptance criteria. Use the [spec-change issue template](.github/ISSUE_TEMPLATE/spec-change.yml).
-2. **RFC** — For non-trivial or breaking changes, draft an RFC under `rfcs/`. Number sequentially (`0002`, `0003`, …). Use the [publish-rfc skill](.agents/skills/publish-rfc/SKILL.md) or write manually from [0000-template.md](rfcs/0000-template.md).
-3. **Review** — Maintainers accept or reject the RFC. Breaking changes MUST reference an accepted RFC in the PR.
-4. **Spec merge** — Update affected spec files, fixtures, `SPECS.md`, and `CHANGELOG.md`. Bump per-spec `version` in frontmatter; breaking object changes get a new file (e.g. `rule-1.1.md`) with the old file marked `deprecated`.
-5. **Implementation** — A separate PR in opentide aligns Pydantic models, generation, and tests. Spec and implementation PRs may proceed in parallel after RFC acceptance but spec changes merge first for breaking work.
+1. **Raise an issue** describing the problem, the affected specs, and acceptance criteria.
+2. **Write a proposal** for non-trivial or breaking changes (an RFC). Maintainers accept or reject it; breaking changes must reference an accepted proposal.
+3. **Update the specs** — the affected spec files, conformance fixtures, and the [spec index](SPECS.md). Bump each spec's `version` in frontmatter; a breaking object change gets a new spec file (e.g. `rule-1.1.md`) and the old file is marked `deprecated`, never deleted.
+4. **Implement** in a separate opentide PR that aligns the validation models, generation, and tests.
 
-## What belongs here
-
-| In scope | Out of scope |
-|----------|--------------|
-| Normative markdown under `specs/` | CLI how-to guides (opentide Docs) |
-| Canonical `vocabularies/*.vocab.toml` | Generated `.opentide/schemas/` |
-| Conformance `fixtures/` | Detection content corpus |
-| RFCs and governance | Website build (Nextra, MkDocs, GitHub Pages) |
+Contributors: issue and PR templates, the RFC template, and CI live in the [specifications repository](https://github.com/OpenTideHQ/specifications) under `.github/` and `rfcs/`.
 
 ## Versioning rules
 
-- No repository-wide semver (no "specifications v1.0").
-- Each spec file has its own `version:` in frontmatter.
-- Object schema revisions use `metadata.schema` (`rule::1.0`) and map to `specs/objects/rule-1.0.md`.
-- Instance content versions use semver in `metadata.version`.
+- No repository-wide version (there is no "specifications v1.0").
+- Each spec file carries its own `version` in frontmatter.
+- Object schema revisions use `metadata.schema` (e.g. `rule::1.0`) and map to `specs/objects/rule-1.0.md`.
+- Object instance content uses semver in `metadata.version`; git is the authoritative history.
 
-## Roles
+See [Versioning](specs/versioning.md) for the full contract, including how multiple revisions coexist.
 
-- **Spec authors** — Propose changes via issue + RFC.
-- **Maintainers** — Accept RFCs, merge spec PRs, ensure fixtures and index stay current.
-- **Implementers** — Update opentide after spec merges; vocabulary sync is an opentide build concern.
+## Design rationale
 
-## CI
+Why this shape, and not the obvious alternatives:
 
-Pull requests run [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+- **JSON Schema as the source of truth** — rejected: poor authoring ergonomics and hard to diff intent.
+- **Python (Pydantic) models as the source of truth** — rejected: couples normative definitions to one implementation language.
+- **A single monorepo** — deferred: a separate specifications repository keeps the contract language-neutral and agent-friendly.
 
-- Validate all `vocabularies/*.vocab.toml` against `schemas/vocabulary.schema.json`
-- Confirm required conformance fixtures exist
+Open questions the maintainers are still working through include automated drift detection between spec field tables and implementation models, and a bulk object-migration path. These are tracked as issues, not settled here.
 
-Run locally: `python3 -m venv .venv && .venv/bin/pip install jsonschema && .venv/bin/python scripts/validate.py`
+## What belongs where
+
+| In the specifications | Elsewhere |
+|-----------------------|-----------|
+| Normative specs (`specs/`) | CLI/SDK how-to guides ([Usage](/docs/usage/)) |
+| Canonical vocabularies | Generated `.opentide/schemas/` |
+| Conformance fixtures | Detection content itself |
+| Governance and proposals | The published website build |

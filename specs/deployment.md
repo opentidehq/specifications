@@ -44,13 +44,35 @@ Defines rule deployment statuses, promotion strategy, proxy settings, and debug 
 
 ### Strategy semantics
 
-| Strategy | Meaning |
-|----------|---------|
-| `INERT` | No deployment |
-| `PREVIEW` | Staging/preview environments |
-| `RELEASE` | Production release |
-| `DISABLEMENT` | Disable active deployments |
-| `DELETION` | Remove from platforms |
+The `strategy` on a status determines what `opentide deploy` does with a rule in that status:
+
+| Strategy | Deploy behaviour |
+|----------|------------------|
+| `INERT` | Rule is not deployed to any platform |
+| `PREVIEW` | Rule is deployed to staging/preview targets only |
+| `RELEASE` | Rule is deployed to production targets |
+| `DISABLEMENT` | Any active deployment of the rule is disabled (kept but inactive) |
+| `DELETION` | The rule is removed from platforms |
+
+### Lifecycle transitions
+
+Statuses form a progression from design to production and on to retirement. Promotion moves a rule forward; a rule MAY also be disabled or removed from any active state.
+
+```mermaid
+stateDiagram-v2
+  [*] --> DESIGN
+  DESIGN --> DEVELOPMENT
+  DEVELOPMENT --> IMPROVING
+  IMPROVING --> STAGING
+  STAGING --> ACCEPTANCE
+  ACCEPTANCE --> PRODUCTION
+  PRODUCTION --> DISABLED
+  DISABLED --> PRODUCTION
+  DISABLED --> REMOVED
+  REMOVED --> [*]
+```
+
+Promotion targets are governed by `[promotion]`; the default target is `PRODUCTION`. The transition graph itself is a convention of the bundled lifecycle — clients that override `deployment.toml` define their own statuses and therefore their own progression.
 
 ### `[promotion]`
 

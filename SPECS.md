@@ -24,12 +24,10 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Platforms | 1.0 | — | normative | [specs/platforms.md](specs/platforms.md) |
 | Validation | 1.0 | — | normative | [specs/validation.md](specs/validation.md) |
 
+## Reading the specs
+
+New to the object model? Start with the [overview](index.md), then [Conformance](conformance.md) for how MUST/SHOULD/MAY are used. Changes follow [Governance](GOVERNANCE.md).
+
 ## Fixtures
 
-Conformance examples live under [`fixtures/`](fixtures/) and are referenced from object specs.
-
-## RFCs
-
-| RFC | Title | Status |
-|-----|-------|--------|
-| [0001](rfcs/0001-authority-model.md) | Authority model and change process | accepted |
+Conformance examples live under [`fixtures/`](https://github.com/OpenTideHQ/specifications/tree/main/fixtures) and are referenced from object specs.

@@ -37,13 +37,15 @@ OpenTide validates detection content through a structured pipeline: ID uniquenes
 
 ### Schema check sub-steps
 
-When `schema` is enabled, for each in-scope object:
+When `schema` is enabled, for each in-scope object the implementation MUST, in order:
 
-1. **Pydantic load** — `load_object_for_validation()` using declared `metadata.schema`
-2. **Vocabulary** — `validate_object_vocab_from_metaschema()` against indexed metaschemas
-3. **Deprecation** — `validate_deprecated_fields_from_metaschema()` (warnings)
-4. **References** — `check_references_for_object()` resolves `references` links
-5. **Chaining** — `check_chaining_for_object()` for threat vectors only
+1. **Load and model-validate** — resolve the object's `metadata.schema` and validate it against the registered model.
+2. **Vocabulary** — check controlled-vocabulary fields against the indexed metaschema vocabulary annotations.
+3. **Deprecation** — flag deprecated fields as warnings.
+4. **References** — resolve `references` links to existing objects.
+5. **Chaining** — resolve chaining relationships (threat vectors only).
+
+Steps 4 and 5 resolve cross-object links; they run whenever the `schema` check runs against a full workspace scope where the referenced objects are present.
 
 ### Validation scope
 
@@ -52,7 +54,7 @@ When `schema` is enabled, for each in-scope object:
 | `full` | All objects in the workspace index |
 | `narrow` | Filter by `--file`, `--uuid`, and/or `--type` |
 
-Empty narrow scope with filters MUST emit a `scope_no_match` error.
+When `--file`, `--uuid`, or `--type` filters match no objects, validation MUST emit a `scope_no_match` error rather than silently passing — a filter that selects nothing is treated as a mistake, not a success.
 
 ### Query validation
 

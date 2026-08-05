@@ -51,6 +51,8 @@ A threat vector describes an adversary capability or scenario: severity, impact,
 | `killchain` | string \| list[string] | no | null | Kill chain stage(s) |
 | `chaining` | list[ChainingEntry] | no | null | Vector chaining relationships |
 
+`terrain` and `surface` are complementary: `terrain` is free-form prose for humans; `surface` is the controlled vocabulary used for filtering and coverage. Do not put vocabulary tokens in `terrain`.
+
 ### `chaining` entry
 
 | Field | Type | Required | Description |
@@ -69,6 +71,27 @@ A threat vector describes an adversary capability or scenario: severity, impact,
 No object-level configuration overrides. Vocabulary values are canonical in `vocabularies/`. See [configuration.md](../configuration.md).
 
 ## Examples
+
+```yaml
+name: Simulated Actor
+criticality: High
+metadata:
+  uuid: 00000000-0000-4000-8001-000000000001
+  schema: threat::1.0
+  version: 1
+  tlp: clear
+threat:
+  description: Simulated threat actor exercising credential access
+  severity: High
+  impact: Data Breach
+  leverage: High
+  viability: High
+  terrain: Endpoint workstations and user devices.
+  surface:
+    - Windows::Desktop
+  att&ck:
+    - T1059
+```
 
 - Valid: [fixtures/valid/threat-1.0.yaml](../../fixtures/valid/threat-1.0.yaml)
 - Invalid (missing threat body): [fixtures/invalid/threat-missing-body.yaml](../../fixtures/invalid/threat-missing-body.yaml)

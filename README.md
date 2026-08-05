@@ -9,7 +9,7 @@ This repository defines **normative OpenTide specifications** — not a document
 | Conformance fixtures | [`fixtures/`](fixtures/) |
 | Change proposals | [`rfcs/`](rfcs/) |
 
-The [opentide](https://github.com/OpenTide/opentide) implementation consumes these specs. JSON Schema is generated from Pydantic models in opentide; it is an artifact, not the source of truth.
+The [opentide](https://github.com/OpenTideHQ/opentide) implementation consumes these specs. JSON Schema is generated from Pydantic models in opentide; it is an artifact, not the source of truth.
 
 Published reading experience (opentide.org) lives in a separate **website** repo. This repo is a versioned specification library for authors, maintainers, and agents.
 
