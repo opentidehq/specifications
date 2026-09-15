@@ -5,6 +5,8 @@
 - **Author:** Amine Besson
 - **Status:** draft
 - **Created:** 2026-09-15
+- **Issue:** [#10](https://github.com/OpenTideHQ/specifications/issues/10)
+- **PR:** [#9](https://github.com/OpenTideHQ/specifications/pull/9)
 
 > Numbering note: [issue #8](https://github.com/OpenTideHQ/specifications/issues/8) reserved **RFC 0004** for the Sysdig Falco deployer. That RFC file is not in this repository yet. This proposal takes **0005** to avoid colliding with that reservation.
 
@@ -649,6 +651,8 @@ Fixtures MUST NOT contain live API keys.
 
 ## References
 
+- Spec-change issue: [specifications#10](https://github.com/OpenTideHQ/specifications/issues/10)
+- RFC PR: [specifications#9](https://github.com/OpenTideHQ/specifications/pull/9)
 - Governance: [GOVERNANCE.md](../GOVERNANCE.md), [RFC 0001](0001-authority-model.md)
 - Existing MISP vocabulary keys: [specs/vocabularies/format.md](../specs/vocabularies/format.md) (`[[keys]].misp`), `vocabularies/tlp.vocab.toml`, `vocabularies/pap.vocab.toml`, `vocabularies/maturity.vocab.toml`, `vocabularies/rsit.vocab.toml`, `vocabularies/killchain.vocab.toml`
 - Analogous target matrix: [specs/platforms.md](../specs/platforms.md), [specs/deployment.md](../specs/deployment.md)
