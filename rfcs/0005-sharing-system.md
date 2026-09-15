@@ -698,6 +698,8 @@ Fixtures MUST NOT contain live API keys.
 
 - Spec-change issue: [specifications#10](https://github.com/OpenTideHQ/specifications/issues/10)
 - RFC PR: [specifications#9](https://github.com/OpenTideHQ/specifications/pull/9)
+- opentide implementation issue: [opentide#184](https://github.com/OpenTideHQ/opentide/issues/184)
+- Linear: [SUP-7](https://linear.app/supertide/issue/SUP-7/spec-sharing-system-and-misp-connector-rfc-0005)
 - Governance: [GOVERNANCE.md](../GOVERNANCE.md), [RFC 0001](0001-authority-model.md)
 - Existing MISP vocabulary keys: [specs/vocabularies/format.md](../specs/vocabularies/format.md) (`[[keys]].misp`), `vocabularies/tlp.vocab.toml`, `vocabularies/pap.vocab.toml`, `vocabularies/maturity.vocab.toml`, `vocabularies/rsit.vocab.toml`, `vocabularies/killchain.vocab.toml`
 - Analogous target matrix: [specs/platforms.md](../specs/platforms.md), [specs/deployment.md](../specs/deployment.md)
