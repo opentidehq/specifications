@@ -17,6 +17,8 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0001](0001-authority-model.md) | Authority model and change process | accepted |
 | [0002](0002-vocabulary-versioning.md) | Vocabulary identifier versioning and schema pins | proposed |
 | [0003](0003-per-key-vocabulary-versioning.md) | Per-key vocabulary versioning and schema pins | proposed |
+| [0004](https://github.com/OpenTideHQ/specifications/issues/8) | Sysdig Falco deployer (reserved by issue #8; file not yet in tree) | reserved |
+| [0005](0005-sharing-system.md) | Sharing system and MISP connector | draft |
 
 ## Numbering
 

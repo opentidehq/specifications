@@ -45,6 +45,9 @@
 - rfcs/README.md
 - rfcs/0000-template.md
 - rfcs/0001-authority-model.md
+- rfcs/0002-vocabulary-versioning.md
+- rfcs/0003-per-key-vocabulary-versioning.md
+- rfcs/0005-sharing-system.md
 
 ## Agent skills
 
