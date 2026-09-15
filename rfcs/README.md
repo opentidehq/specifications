@@ -4,7 +4,7 @@ Request for Comments (RFCs) document significant specification changes before th
 
 ## Process
 
-1. Open a [spec-change issue](../.github/ISSUE_TEMPLATE/spec-change.yml)
+1. Open a GitHub [spec-change issue](../.github/ISSUE_TEMPLATE/spec-change.yml) (never Linear; OpenTide tracking is public GitHub only)
 2. Draft an RFC from [0000-template.md](0000-template.md)
 3. Maintainer review and acceptance
 4. Implement spec + fixture updates in a follow-up PR

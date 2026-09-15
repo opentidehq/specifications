@@ -36,7 +36,7 @@ flowchart LR
   Spec --> Impl["opentide implementation PR"]
 ```
 
-1. **Raise an issue** describing the problem, the affected specs, and acceptance criteria.
+1. **Raise a GitHub issue** in [OpenTideHQ/specifications](https://github.com/OpenTideHQ/specifications) describing the problem, the affected specs, and acceptance criteria. OpenTide tracking is **public GitHub only** — never Linear or other private trackers. Implementation follow-up belongs in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide).
 2. **Write a proposal** for non-trivial or breaking changes (an RFC). Maintainers accept or reject it; breaking changes must reference an accepted proposal.
 3. **Update the specs** — the affected spec files, conformance fixtures, and the [spec index](SPECS.md). Bump each spec's `version` in frontmatter; a breaking object change gets a new spec file (e.g. `rule-1.1.md`) and the old file is marked `deprecated`, never deleted.
 4. **Implement** in a separate opentide PR that aligns the validation models, generation, and tests.

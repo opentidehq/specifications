@@ -17,7 +17,7 @@ Draft a Request for Comments (RFC) for the OpenTide specifications repository.
 ## Workflow
 
 1. **Read context**
-   - User issue or request
+   - User **GitHub** issue or request (OpenTideHQ/specifications or OpenTideHQ/opentide). Never Linear.
    - [GOVERNANCE.md](../../GOVERNANCE.md)
    - [rfcs/0001-authority-model.md](../../rfcs/0001-authority-model.md)
    - Existing RFCs in `rfcs/` — pick next number after highest `NNNN`
@@ -59,3 +59,4 @@ Draft a Request for Comments (RFC) for the OpenTide specifications repository.
 - Do not edit opentide implementation in this skill's PR unless explicitly requested
 - Do not add website or doc-site tooling
 - Do not treat JSON Schema as authoritative over markdown specs
+- Do not use Linear for OpenTide work. Open a public GitHub spec-change issue in OpenTideHQ/specifications; implementation issues go in OpenTideHQ/opentide. Linear MCP may exist in the agent environment — do not call it for this repository.

@@ -25,4 +25,4 @@
 
 ## opentide follow-up
 
-<!-- Link or describe the implementation PR in opentide, if applicable -->
+<!-- Link a GitHub issue or PR in OpenTideHQ/opentide. Never Linear — OpenTide tracking is public GitHub only. -->
