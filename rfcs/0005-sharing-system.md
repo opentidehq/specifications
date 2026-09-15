@@ -249,16 +249,16 @@ timeout_seconds = 30
 [misp]
 mode = "api"                 # api | file
 publish = false              # call /events/publish after upsert
-distribution = "this-community"  # see enum below
+distribution = "this-community"  # clamped to the TLP allowed set (§7.1); amber without a sharing group → 0
 sharing_group_id = 0         # required when distribution = "sharing-group"
 sharing_group_uuid = ""      # preferred over numeric id when set
 event_mode = "per-object"    # per-object | bundle
-threat_level_source = "criticality"  # criticality | severity | undefined
+threat_level_source = "family"  # family | criticality | severity | alert_severity | undefined
 analysis = "completed"       # initial | ongoing | completed
 tag_namespace = "opentide"
 attach_attack_galaxy = true
 attach_actor_galaxy = true
-include_object_yaml = false  # attach original YAML as attachment-like attribute
+include_object_yaml = false  # attach a *redacted* YAML copy; never raw on-disk YAML (see §7.6)
 verify_event_org = true      # refuse to edit an existing UUID owned by another org
 
 [misp.tags]
@@ -284,25 +284,25 @@ directory = ".opentide/exports/sharing/misp"
 
 | Config value | MISP `distribution` | When to use |
 |--------------|---------------------|-------------|
-| `your-organization` | `0` | Default for `amber+strict` if the target does not set a sharing group |
-| `this-community` | `1` | Typical `green` / `amber` community instance |
-| `connected-communities` | `2` | Wider sync mesh |
-| `all-communities` | `3` | Only appropriate for `clear` |
-| `sharing-group` | `4` | **Requires** `sharing_group_uuid` or non-zero `sharing_group_id` |
+| `your-organization` | `0` | Org-only; the only allowed value for `amber+strict` and `red` |
+| `this-community` | `1` | Typical `green` community instance |
+| `connected-communities` | `2` | Wider sync mesh; `clear` / `green` only |
+| `all-communities` | `3` | `clear` only |
+| `sharing-group` | `4` | Named channel (not a point on the 0–3 width scale). **Requires** `sharing_group_uuid` or non-zero `sharing_group_id` |
 
 If `distribution = "sharing-group"` and neither sharing-group identifier is set, the target is misconfigured: push MUST fail for that target before any event is written.
 
-**Suggested TLP → distribution default** (used only when `[misp].distribution` is omitted):
+**TLP → allowed distributions.** MISP `sharing-group` (4) is a membership list, not a width between 0 and 3, so resolution is a **set membership** check rather than `min()` on integers. For each object, compute the allowed set from `metadata.tlp`. If `[misp].distribution` is omitted, use the default in that row. If it is set and **in** the allowed set, use it. If it is set and **not** in the allowed set, use the row default (do not fail the object solely for this clamp).
 
-| Object `metadata.tlp` | Default distribution |
-|-----------------------|----------------------|
-| `clear` | `all-communities` (3) |
-| `green` | `this-community` (1) |
-| `amber` | `sharing-group` (4) if a group is configured, else `your-organization` (0) |
-| `amber+strict` | `your-organization` (0) |
-| `red` | not shared unless `--allow-tlp-red`; then `your-organization` (0) |
+| Object `metadata.tlp` | Allowed `[misp].distribution` values | Default (config omitted) |
+|-----------------------|--------------------------------------|--------------------------|
+| `clear` | `your-organization`, `this-community`, `connected-communities`, `all-communities`, `sharing-group` | `all-communities` (3) |
+| `green` | `your-organization`, `this-community`, `connected-communities`, `sharing-group` | `this-community` (1) |
+| `amber` | `your-organization`, `sharing-group` | `sharing-group` (4) if a group is configured, else `your-organization` (0) |
+| `amber+strict` | `your-organization` | `your-organization` (0) |
+| `red` | `your-organization` | not shared unless `--allow-tlp-red`; then `your-organization` (0) |
 
-A configured `[misp].distribution` is a **ceiling**, not a floor: an object MAY be published more narrowly than the target default (e.g. target default `this-community` but TLP amber+strict still forces `your-organization`). An object MUST NOT be published more widely than the TLP default table above.
+Examples: target `distribution = "this-community"` with TLP `amber` clamps to `your-organization` (1 is not allowed for amber). Target `distribution = "all-communities"` with TLP `green` clamps to `this-community`. Target `distribution = "sharing-group"` with TLP `amber+strict` clamps to `your-organization`.
 
 **`event_mode`**
 
@@ -346,7 +346,7 @@ Connectors MUST resolve vocabulary `misp` fields from canonical `vocabularies/*.
 |-----------------|---------------|
 | `metadata.tlp` | Event tag = that key’s `misp` value (`tlp:clear`, `tlp:green`, `tlp:amber`, `tlp:amber+strict`, `tlp:red`) |
 | Target default PAP (optional config) | Event tag `PAP:WHITE` / `PAP:GREEN` / `PAP:AMBER` / `PAP:RED` |
-| `criticality` / `severity` | Optional `priority-level:*` / threat_level_id; plus tags when `misp` is present |
+| `criticality` / `severity` / `alert_severity` | Event `threat_level_id` per §7.4 (family-default source); plus taxonomy tags when the source key has a `misp` field |
 | `maturity` | Tag `DML:n` when sharing a rule that carries maturity (if the object has no maturity field, skip) |
 | `killchain` | Tags from `killchain.vocab.toml` `misp` strings |
 | `threat.actors` | If `attach_actor_galaxy`: MISP threat-actor galaxy cluster matching the actor id/name; actors with `tide.vocab.stages = "misp"` SHOULD attach directly |
@@ -378,16 +378,57 @@ Connectors MUST resolve vocabulary `misp` fields from canonical `vocabularies/*.
 | `published` | false on add; publish is a separate call |
 | `extends_uuid` | In `per-object` mode, a rule Event MAY set this to the linked objective UUID; an objective Event MAY set this to the first linked threat UUID. MAY be omitted if the parent is not being shared in the same run. |
 
-**`threat_level_id`** (MISP: 1 High, 2 Medium, 3 Low, 4 Undefined):
+**`threat_level_id`** (MISP: 1 High, 2 Medium, 3 Low, 4 Undefined).
 
-When `threat_level_source = "criticality"` (threat objects) or `"severity"` (rules/objectives):
+`[misp].threat_level_source` selects which Tide field is mapped. The default `family` picks a field that **exists on that object family** — do not use a single global `criticality` source (rules and objectives have no `criticality`).
 
-| OpenTide value (name, case-insensitive) | `threat_level_id` |
-|-----------------------------------------|-------------------|
-| `emergency`, `severe`, `critical`, `high` | `1` |
-| `medium` | `2` |
-| `low`, `minor`, `informational`, `negligible` | `3` |
+| `threat_level_source` | Threat | Objective | Rule |
+|-----------------------|--------|-----------|------|
+| `family` (default) | top-level `criticality` | `objective.priority` | top-level `severity`; if absent, `response.alert_severity` |
+| `criticality` | `criticality` | none → `4` | none → `4` |
+| `severity` | `threat.severity` | highest `signals[].severity` | top-level `severity` |
+| `alert_severity` | none → `4` | none → `4` | `response.alert_severity` |
+| `undefined` | always `4` | always `4` | always `4` |
+
+Match the selected field’s value to the **exact vocabulary `name`** (case-sensitive first; if no hit, case-insensitive equality). Do not substring-match (`minor` must not match `Baseline - Minor` via a token list of `minor` alone — use the full name).
+
+**`criticality` vocabulary → `threat_level_id`**
+
+| `criticality` name | `threat_level_id` |
+|--------------------|-------------------|
+| `Emergency` | `1` |
+| `Severe` | `1` |
+| `High` | `1` |
+| `Medium` | `2` |
+| `Low` | `3` |
+| `Baseline - Minor` | `3` |
+| `Baseline - Negligible` | `3` |
 | anything else / missing | `4` |
+
+**MDR / alert-style names** (rule `severity` as used in fixtures, `response.alert_severity`, `objective.priority` when it uses the same tokens) **→ `threat_level_id`**
+
+| Name | `threat_level_id` |
+|------|-------------------|
+| `Critical` | `1` |
+| `High` | `1` |
+| `Medium` | `2` |
+| `Low` | `3` |
+| `Informational` | `3` |
+| anything else / missing | `4` |
+
+**Threat `severity` vocabulary** (NCSC incident categories on `threat.severity` only, when that field is the selected source) **→ `threat_level_id`**
+
+| `severity` name | `threat_level_id` |
+|-----------------|-------------------|
+| `National cyber emergency` | `1` |
+| `Highly significant incident` | `1` |
+| `Significant incident` | `1` |
+| `Substantial incident` | `2` |
+| `Moderate incident` | `3` |
+| `Localised incident` | `3` |
+| anything else / missing | `4` |
+
+The §7.8 rule example uses `severity: High` on a **rule**, so with `family` source it maps through the MDR table to `threat_level_id` `1` — not through `criticality`.
 
 #### 7.5 Object-family mapping
 
@@ -425,7 +466,7 @@ Map to the stock [`detection`](https://github.com/MISP/misp-objects/blob/main/ob
 |-----------------------|-----------------------|-------------|
 | `analytic-title` | yes | `name` |
 | `id` | yes | `metadata.uuid` |
-| `status` | yes | `experimental` unless a rule in PRODUCTION implements this objective in the same workspace **and** is in selection; then `test` or `production` per §7.5 rule status map. If that lookup is expensive, v1 MAY always use `experimental` for objectives — MUST be documented. **Proposal:** always `experimental` for objectives in v1. |
+| `status` | yes | Exact MISP `values_list` token: `Experimental`, `Test`, `Production`, or `Deprecated` (case-sensitive). v1 **proposal:** always `Experimental` for objectives. Alternative (unresolved): if a rule in `PRODUCTION` implements this objective and is in selection, use `Production`; if any implementing rule is in a `PREVIEW` strategy status, use `Test`. |
 | `hypothesis` | yes | `objective.description` |
 | `description` | no | `objective.description` (duplicate is acceptable) |
 | `version` | no | `metadata.version` as string |
@@ -463,6 +504,8 @@ Best-fit stock object. Template required fields:
 
 **Rule status → `detection.status`**
 
+Emitted values MUST be the exact MISP object `values_list` strings (`Experimental`, `Test`, `Production`, `Deprecated`). Implementations MUST NOT emit lowercase variants.
+
 | OpenTide deployment status (bundled names) | MISP `detection.status` |
 |--------------------------------------------|-------------------------|
 | `DESIGN`, `DEVELOPMENT` | `Experimental` |
@@ -471,7 +514,7 @@ Best-fit stock object. Template required fields:
 | `DISABLED`, `REMOVED` | `Deprecated` |
 | unknown client status | `Experimental` |
 
-Workspaces that override `deployment.toml` SHOULD still hit this table by **strategy**: `INERT`→Experimental, `PREVIEW`→Test, `RELEASE`→Production, `DISABLEMENT`/`DELETION`→Deprecated.
+Workspaces that override `deployment.toml` SHOULD still hit this table by **strategy**: `INERT`→`Experimental`, `PREVIEW`→`Test`, `RELEASE`→`Production`, `DISABLEMENT`/`DELETION`→`Deprecated`.
 
 **Queries (`include_queries = true` only)**
 
@@ -503,6 +546,8 @@ The following MUST NOT be shared when `include_queries` is false (default):
 TLP:RED payloads MUST NOT include queries even if `include_queries` is true.
 
 Preview output MUST use the same redaction as push.
+
+**`include_object_yaml`.** When true, the connector MAY attach a YAML **copy of the mapped object after the redaction in this section** (for example a MISP `attachment` or `text` attribute with comment `opentide-yaml`). It MUST NOT attach the on-disk source file unmodified. The copy MUST omit every field that this policy forbids for the current flags and TLP (queries, `references.internal`, `tenants`, secrets). `include_object_yaml = true` MUST NOT override `include_queries`, `include_internal_references`, or `include_tenant_identifiers`. For TLP:RED, YAML attachment is MUST NOT (even redacted), so detection logic cannot leak via a full-document dump. If redaction cannot be applied reliably (unknown nested query keys), omit the attachment and record `skipped_yaml` on the share report.
 
 #### 7.7 Retract
 
@@ -545,7 +590,7 @@ configurations:
       | where EventID == 4688
 ```
 
-Emitted MISP Event JSON (informative, `include_queries = false`, `distribution` resolved to 0 because TLP amber and no sharing group):
+Emitted MISP Event JSON (informative, `include_queries = false`). `distribution` is `0` because TLP `amber`’s allowed set is `{your-organization, sharing-group}` and no sharing group is configured, so target `this-community` clamps to `your-organization`. `threat_level_id` is `1` because `threat_level_source = family` reads the **rule** `severity: High` (MDR table), not `criticality`.
 
 ```json
 {
@@ -638,7 +683,7 @@ Fixtures MUST NOT contain live API keys.
 
 ## Unresolved questions
 
-1. **Objective `detection.status` in v1:** always `Experimental`, or derived from implementing rules’ statuses?
+1. **Objective `detection.status` in v1:** always `Experimental`, or derived from implementing rules’ statuses (`Test` / `Production`)? Tokens MUST remain MISP Title Case.
 2. **`bundle` event UUID algorithm:** confirm UUID v5 namespace URI `https://opentide.dev/sharing/misp/bundle` (or switch to a documented OID).
 3. **Should `opentide share` refuse to run outside a git workspace** so `metadata.version` + git history stay aligned, or is that opentide-only policy?
 4. **PAP:** add optional `metadata.pap` in a metadata 1.1 revision, vs target-default PAP tags only?
