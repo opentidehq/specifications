@@ -111,7 +111,7 @@ rule_statuses = ["PRODUCTION"]
 | `enabled` | bool | no | `false` | Master switch. `opentide share` MUST refuse to push when false (preview/status MAY still run). |
 | `require_validation` | bool | no | `true` | When true, push MUST run the default [validation](../specs/validation.md) checks on in-scope objects and MUST NOT share objects that raise errors. Warnings do not block. |
 | `default_targets` | list[string] | no | `[]` | Target identifiers used when `--target` is omitted. Empty list means every target with `enabled = true`. |
-| `max_tlp` | string | no | `amber` | MUST be a `tlp` vocabulary `name`. Objects whose `metadata.tlp` exceeds this ceiling are skipped (error in the share report, not a silent omit). TLP order for comparison: `clear` < `green` < `amber` < `amber+strict` < `red`. |
+| `max_tlp` | string | no | `amber` | MUST be a `tlp` vocabulary `name`. Objects whose `metadata.tlp` exceeds this ceiling are `skipped_tlp` in the share report (not a silent omit, and not exit `1`). TLP order for comparison: `clear` < `green` < `amber` < `amber+strict` < `red`. |
 | `allow_tlp_red` | bool | no | `false` | Even if `max_tlp = "red"`, TLP:RED MUST NOT be shared unless this is true **and** the operator passes `--allow-tlp-red`. |
 | `include_internal_references` | bool | no | `false` | When false, `references.internal` MUST NOT be emitted. |
 | `include_queries` | bool | no | `false` | When false, platform query/search/condition/sigma/yara bodies MUST NOT be emitted. |
@@ -167,7 +167,7 @@ Scope rules MUST match [validation](../specs/validation.md): `--file` / `--uuid`
 
 Exit status (whole command, not per target; object-level outcomes live in the share report). Implementations MUST choose **exactly one** code using this order:
 
-1. Preflight (validation, policy misconfiguration, `sharing_group_unresolved` before any Event is written, `scope_no_match`) → `1`.
+1. Preflight (validation, policy misconfiguration, `sharing_group_unresolved` before any Event is written, file-mode `sharing-group` with `sharing_group_id = 0`, `scope_no_match`) → `1`.
 2. Else if at least one object action succeeded (`created` / `updated` / `unchanged` / `retracted`) **and** at least one object or target `failed` → `3`.
 3. Else if no object `failed` → `0`. Policy skips (`skipped_tlp`, `skipped_status`) are not `failed`. An all-skip run is `0`.
 4. Else (at least one `failed`, no successful object action): if every `failed` is authentication or connectivity → `2`; otherwise → `1`.
@@ -178,6 +178,8 @@ Exit status (whole command, not per target; object-level outcomes live in the sh
 | `1` | Preflight error, **or** total failure that is not solely auth/connectivity (every object `failed` with `org_mismatch`, HTTP 5xx, `sharing_group_unresolved` on the sole target, and similar). |
 | `2` | No successful object action, and every `failed` is authentication or connectivity. If any object succeeded while another had auth failure, use `3` (step 2). |
 | `3` | Partial success: at least one successful object action **and** at least one `failed` object or target. Includes mixed objects on **one** target (parent `failed` after children were sent) and mixed targets. |
+
+This order is a partition: a sole-target run of only `org_mismatch` / HTTP 5xx is `1`; only auth/connectivity is `2`; mixed success and failure is `3`; policy skips with no `failed` remain `0`.
 
 Stdout SHOULD be a structured share report (human table by default; `--json` MAY be offered). The report MUST include, per object per target: action (`created`, `updated`, `unchanged`, `skipped_tlp`, `skipped_status`, `retracted`, `failed`), remote identifier, and reason on skip/fail.
 
@@ -295,7 +297,10 @@ directory = ".opentide/exports/sharing/misp"
 | `all-communities` | `3` | `clear` only |
 | `sharing-group` | `4` | Named channel (not a point on the 0–3 width scale). Requires a sharing-group identifier; **how** is mode-specific (table below) |
 
-If `distribution = "sharing-group"` and neither sharing-group identifier is set, the target is misconfigured: push MUST fail for that target before any event is written.
+If `distribution = "sharing-group"`, fail that target **before** any event is written when the mode-specific identifier rule is not met:
+
+- `api`: neither `sharing_group_uuid` nor a non-zero `sharing_group_id` is set.
+- `file`: `sharing_group_id` is 0 (a UUID alone is not enough; see the `file` row below).
 
 Sharing-group identifier resolution depends on `mode` (MISP Event JSON uses numeric `sharing_group_id` when `distribution` is 4):
 
@@ -365,15 +370,15 @@ Connectors MUST resolve vocabulary `misp` fields from canonical `vocabularies/*.
 | `threat.att&ck` / objective `attack` / rule `techniques` | If `attach_attack_galaxy`: MITRE ATT&CK galaxy clusters for each technique id (and parent technique when a sub-technique is used) |
 | RSIT / sectors | Emit tags only when those fields exist on the object (threat sector etc. as specs evolve) |
 
-**OpenTide bookkeeping tags** (always, using `tag_namespace`, default `opentide`):
+**OpenTide bookkeeping tags** (using `tag_namespace`, default `opentide`):
 
-| Tag | Example |
-|-----|---------|
-| `<ns>:family` | `opentide:family="rule"` |
-| `<ns>:schema` | `opentide:schema="rule::1.0"` |
-| `<ns>:version` | `opentide:version="1"` |
-| `<ns>:uuid` | `opentide:uuid="<uuid>"` (optional duplicate of Event UUID; useful in bundle mode) |
-| `<ns>:status` | rules only, e.g. `opentide:status="PRODUCTION"` |
+| Tag | Required? | Example |
+|-----|-----------|---------|
+| `<ns>:family` | always | `opentide:family="rule"` |
+| `<ns>:schema` | always | `opentide:schema="rule::1.0"` |
+| `<ns>:version` | always | `opentide:version="1"` |
+| `<ns>:uuid` | optional (useful in `bundle` mode; omit in `per-object` when Event `uuid` already is the Tide UUID) | `opentide:uuid="<uuid>"` |
+| `<ns>:status` | rules only, always | `opentide:status="PRODUCTION"` |
 
 #### 7.4 Event envelope (every family, `per-object` mode)
 
@@ -487,7 +492,7 @@ Field types follow `threat::1.0` as corrected in [specifications#11](https://git
 | `references.internal` | omitted unless `include_internal_references` | — |
 | `metadata.author` / `organisation.name` | Attribute `text` comments `author` / `organisation` | yes |
 
-Chaining targets SHOULD be expressed as MISP **related events** when the target threat is also shared (`per-object`), using the chained UUID.
+Chaining targets SHOULD be expressed as MISP **related events** when the chained threat Event is **present** (§7.4), using the chained UUID. MUST NOT emit a related-event link when that threat is not present.
 
 ##### Objective (`objective::1.0`) → MISP object `detection` (partial) + Event
 
@@ -504,7 +509,8 @@ Map to the stock [`detection`](https://github.com/MISP/misp-objects/blob/main/ob
 | `author` | no | `metadata.author` |
 | `date-created` / `date-modified` | no | metadata dates |
 | `mitre-attack-technique` | no | `objective.attack[]` |
-| `data-source` / `data-event` | no | concatenated unique `signals[].data` fields when present |
+| `data-source` | no | Unique `signals[].data.logsources[]` tokens when present (MITRE data-source refs). One MISP attribute per token. `signals[].data` is a `SignalData` object (`availability`, `requirements`, optional `logsources`) — MUST NOT stringify or concatenate the mapping. |
+| `data-event` | no | omitted in v1 (no Tide field maps to it) |
 | `investigation-steps` | no | omitted at objective level |
 
 Signals: one `text` attribute per signal, comment `signal:<uuid>`, value `name — description`, correlation disabled. Signal example queries MUST NOT be emitted unless `include_queries` is true.
@@ -519,7 +525,7 @@ Best-fit stock object. Template required fields:
 |-----------------------|-------------|
 | `analytic-title` | `name` |
 | `id` | `metadata.uuid` |
-| `status` | map `status` / platform status — see below |
+| `status` | map top-level rule `status` (bundled names or overridden `deployment.toml` **strategy**) — see below |
 | `hypothesis` | `description` (rules have no separate hypothesis field) |
 | `description` | `description` |
 | `version` | `metadata.version` |
@@ -700,7 +706,7 @@ Fixtures MUST NOT contain live API keys.
 - `per-object` Events fragment the threat→objective→rule graph across Events (`extends_uuid` / related events are weaker than in-event object references).
 - `bundle` mode is harder to retract piecemeal (one Event holds many objects).
 - TLP→distribution mapping will not match every ISAC’s SOP; targets must override.
-- Sharing PRODUCTION-only by default means DESIGN threats never reach MISP unless selection is widened — easy to misconfigure.
+- Sharing PRODUCTION-only **rules** by default (`selection.rule_statuses`) means DESIGN/non-PRODUCTION **rules** never reach MISP unless selection is widened — easy to misconfigure. Threats and objectives ignore `rule_statuses` and are not filtered by DESIGN.
 - File mode can still leak if an operator sets `include_queries` and commits export JSON.
 
 ## Alternatives
@@ -721,6 +727,7 @@ Resolved in this revision:
 6. **Sharing group UUID vs numeric id** — `api` mode MUST resolve UUID via `GET /sharing_groups`; numeric id is fallback when the UUID is empty. `file` mode MUST NOT call the API and REQUIRES a non-zero numeric id for `sharing-group`.
 7. **Partial object graphs** — MUST omit `extends_uuid` when the parent Event is not **present** (§7.4). Presence is the pre-HTTP share plan, or a live remote view — not `state.json` alone and not MISP `published`. §7.8 example follows that rule.
 8. **CI dry-run Action** — usage-guide only; not a spec requirement.
+11. **CLI exit codes** — implementations MUST pick exactly one of `0`/`1`/`2`/`3` via the ordered table in §4. Total non-auth failure with no successes is `1`; auth-only total failure is `2`; mixed object or target outcomes are `3`. Policy skips without `failed` remain `0`.
 
 Still open (need maintainer input before the spec follow-up):
 
