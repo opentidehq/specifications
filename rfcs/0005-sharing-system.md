@@ -165,14 +165,19 @@ Shared flags (push / preview / retract):
 
 Scope rules MUST match [validation](../specs/validation.md): `--file` / `--uuid` / `--type` that match nothing MUST fail with `scope_no_match` rather than succeeding vacuously.
 
-Exit status (whole command, not per target; object-level outcomes live in the share report):
+Exit status (whole command, not per target; object-level outcomes live in the share report). Implementations MUST choose **exactly one** code using this order:
+
+1. Preflight (validation, policy misconfiguration, `sharing_group_unresolved` before any Event is written, `scope_no_match`) → `1`.
+2. Else if at least one object action succeeded (`created` / `updated` / `unchanged` / `retracted`) **and** at least one object or target `failed` → `3`.
+3. Else if no object `failed` → `0`. Policy skips (`skipped_tlp`, `skipped_status`) are not `failed`. An all-skip run is `0`.
+4. Else (at least one `failed`, no successful object action): if every `failed` is authentication or connectivity → `2`; otherwise → `1`.
 
 | Code | Meaning |
 |------|---------|
-| `0` | Every selected target completed with no object `failed`. Policy skips (`skipped_tlp`, `skipped_status`) are reported and do not fail the run. |
-| `1` | Validation errors, policy misconfiguration, or `scope_no_match` (no remote mutation) |
-| `2` | Authentication / connectivity failed for a selected target **and** no selected target produced a successful object action (`created` / `updated` / `unchanged` / `retracted`). If another target did succeed, use `3`. |
-| `3` | Partial success: at least one object action succeeded **and** at least one object or target `failed`. This includes mixed objects on **one** target (for example a parent `failed` after children were sent) as well as mixed targets. |
+| `0` | Preflight passed and no object `failed`. Policy skips are reported and do not fail the run. |
+| `1` | Preflight error, **or** total failure that is not solely auth/connectivity (every object `failed` with `org_mismatch`, HTTP 5xx, `sharing_group_unresolved` on the sole target, and similar). |
+| `2` | No successful object action, and every `failed` is authentication or connectivity. If any object succeeded while another had auth failure, use `3` (step 2). |
+| `3` | Partial success: at least one successful object action **and** at least one `failed` object or target. Includes mixed objects on **one** target (parent `failed` after children were sent) and mixed targets. |
 
 Stdout SHOULD be a structured share report (human table by default; `--json` MAY be offered). The report MUST include, per object per target: action (`created`, `updated`, `unchanged`, `skipped_tlp`, `skipped_status`, `retracted`, `failed`), remote identifier, and reason on skip/fail.
 
