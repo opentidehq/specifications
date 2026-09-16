@@ -290,7 +290,7 @@ directory = ".opentide/exports/sharing/misp"
 | `all-communities` | `3` | `clear` only |
 | `sharing-group` | `4` | Named channel (not a point on the 0–3 width scale). **Requires** `sharing_group_uuid` or non-zero `sharing_group_id` |
 
-If `distribution = "sharing-group"` and neither sharing-group identifier is set, the target is misconfigured: push MUST fail for that target before any event is written.
+If `distribution = "sharing-group"` and neither sharing-group identifier is set, the target is misconfigured: push MUST fail for that target before any event is written. When `sharing_group_uuid` is set, implementations MUST resolve it to a numeric id via `GET /sharing_groups` on each run (do not require operators to paste server-local numeric ids). `sharing_group_id` is a fallback when the UUID is empty.
 
 **TLP → allowed distributions.** MISP `sharing-group` (4) is a membership list, not a width between 0 and 3, so resolution is a **set membership** check rather than `min()` on integers. For each object, compute the allowed set from `metadata.tlp`. If `[misp].distribution` is omitted, use the default in that row. If it is set and **in** the allowed set, use it. If it is set and **not** in the allowed set, use the row default (do not fail the object solely for this clamp).
 
@@ -349,7 +349,7 @@ Connectors MUST resolve vocabulary `misp` fields from canonical `vocabularies/*.
 | `criticality` / `severity` / `alert_severity` | Event `threat_level_id` per §7.4 (family-default source); plus taxonomy tags when the source key has a `misp` field |
 | `maturity` | Tag `DML:n` when sharing a rule that carries maturity (if the object has no maturity field, skip) |
 | `killchain` | Tags from `killchain.vocab.toml` `misp` strings |
-| `threat.actors` | If `attach_actor_galaxy`: MISP threat-actor galaxy cluster matching the actor id/name; actors with `tide.vocab.stages = "misp"` SHOULD attach directly |
+| `threat.actors[]` | If `attach_actor_galaxy`: each `ThreatActor.name` is a scoped `actors::1.0` value (`att&ck::<id>` or `misp::<id>` — [specifications#11](https://github.com/OpenTideHQ/specifications/issues/11)). `att&ck::` attaches the MITRE ATT&CK *group* galaxy cluster for `<id>`; `misp::` attaches the MISP threat-actor galaxy cluster for `<id>`. Bare strings and unscoped ids MUST NOT be coerced. Optional `sighting` / `references` become Event attributes (`text` / `link`, comments `actor-sighting` / `actor-reference`, correlation off) |
 | `threat.att&ck` / objective `attack` / rule `techniques` | If `attach_attack_galaxy`: MITRE ATT&CK galaxy clusters for each technique id (and parent technique when a sub-technique is used) |
 | RSIT / sectors | Emit tags only when those fields exist on the object (threat sector etc. as specs evolve) |
 
@@ -376,7 +376,7 @@ Connectors MUST resolve vocabulary `misp` fields from canonical `vocabularies/*.
 | `threat_level_id` | See table below |
 | `analysis` | `[misp].analysis` mapping: `initial→0`, `ongoing→1`, `completed→2` |
 | `published` | false on add; publish is a separate call |
-| `extends_uuid` | In `per-object` mode, a rule Event MAY set this to the linked objective UUID; an objective Event MAY set this to the first linked threat UUID. MAY be omitted if the parent is not being shared in the same run. |
+| `extends_uuid` | In `per-object` mode, a rule Event MAY set this to the linked objective UUID **only when that objective is in the same share selection and is actually published**; an objective Event MAY set this to the first linked threat UUID under the same rule. MUST be omitted when the parent is not shared in this run (no dangling MISP `extends_uuid`). |
 
 **`threat_level_id`** (MISP: 1 High, 2 Medium, 3 Low, 4 Undefined).
 
@@ -436,6 +436,8 @@ The §7.8 rule example uses `severity: High` on a **rule**, so with `family` sou
 
 No stock MISP object captures TVM fields (`terrain`, `surface`, `leverage`, `viability`, chaining). v1 MUST emit **typed attributes** on the Event (not a required custom template). A follow-up MAY contribute `opentide-threat` to [MISP/misp-objects](https://github.com/MISP/misp-objects).
 
+Field types follow `threat::1.0` as corrected in [specifications#11](https://github.com/OpenTideHQ/specifications/issues/11) / [#12](https://github.com/OpenTideHQ/specifications/issues/12): `impact` and `leverage` are non-empty `list[string]`; `actors` is `list[ThreatActor]`. Semicolon-packed strings and bare actor string lists MUST NOT be split or coerced here — invalid objects fail `require_validation` instead.
+
 | Tide field | MISP | `disable_correlation` |
 |------------|------|------------------------|
 | `name` | Event `info` | n/a |
@@ -444,12 +446,14 @@ No stock MISP object captures TVM fields (`terrain`, `surface`, `leverage`, `via
 | `threat.surface[]` | Attribute `text` (one per value), comment `surface` | yes |
 | `criticality` | Attribute `text` + taxonomy tag via `misp` | yes |
 | `threat.severity` | Attribute `text` + optional tag | yes |
-| `threat.impact` | Attribute `text` | yes |
-| `threat.leverage` | Attribute `text` | yes |
+| `threat.impact[]` | Attribute `text` (**one per list value**), comment `impact` | yes |
+| `threat.leverage[]` | Attribute `text` (**one per list value**), comment `leverage` | yes |
 | `threat.viability` | Attribute `text` + `misp` tag when present | yes |
 | `threat.killchain` | Tags from vocabulary | n/a |
 | `threat.att&ck[]` | ATT&CK galaxy | n/a |
-| `threat.actors[]` | Actor galaxy | n/a |
+| `threat.actors[].name` | Actor galaxy from the scoped token (see §7.3); no string-list form | n/a |
+| `threat.actors[].sighting` | Attribute `text`, comment `actor-sighting` | yes |
+| `threat.actors[].references[]` | Attribute `link`, comment `actor-reference` | no |
 | `threat.chaining[]` | Attribute `text` JSON or `comment` per relation; correlation off | yes |
 | `references.public` | Attribute `link` | no |
 | `references.reports[]` | Attribute `link` | no |
@@ -466,7 +470,7 @@ Map to the stock [`detection`](https://github.com/MISP/misp-objects/blob/main/ob
 |-----------------------|-----------------------|-------------|
 | `analytic-title` | yes | `name` |
 | `id` | yes | `metadata.uuid` |
-| `status` | yes | Exact MISP `values_list` token: `Experimental`, `Test`, `Production`, or `Deprecated` (case-sensitive). v1 **proposal:** always `Experimental` for objectives. Alternative (unresolved): if a rule in `PRODUCTION` implements this objective and is in selection, use `Production`; if any implementing rule is in a `PREVIEW` strategy status, use `Test`. |
+| `status` | yes | Exact MISP `values_list` token: `Experimental`, `Test`, `Production`, or `Deprecated` (case-sensitive). **v1 decision:** always `Experimental` for objectives (no graph walk). Deriving `Test`/`Production` from implementing rules is a later revision. |
 | `hypothesis` | yes | `objective.description` |
 | `description` | no | `objective.description` (duplicate is acceptable) |
 | `version` | no | `metadata.version` as string |
@@ -478,7 +482,7 @@ Map to the stock [`detection`](https://github.com/MISP/misp-objects/blob/main/ob
 
 Signals: one `text` attribute per signal, comment `signal:<uuid>`, value `name — description`, correlation disabled. Signal example queries MUST NOT be emitted unless `include_queries` is true.
 
-`objective.threats[]` → Event `extends_uuid` (first) plus related-event links for each threat UUID that was shared.
+`objective.threats[]` → Event `extends_uuid` (first threat that **is** in this share selection) plus related-event links for each threat UUID that was shared. MUST NOT set `extends_uuid` to a threat that is not published in this run.
 
 ##### Rule (`rule::1.0`) → MISP object `detection`
 
@@ -500,7 +504,7 @@ Best-fit stock object. Template required fields:
 | `response-remediation-steps` | `response.procedure.containment` |
 | `triage-steps` | omitted unless later spec adds one |
 | `detection-logic` | **only if** `include_queries` — see query policy |
-| `data-platform` | enabled configuration keys (`sentinel`, `splunk`, …) |
+| `data-source` | enabled configuration **keys** (`sentinel`, `splunk`, …). This is the OpenTide platform identifier, which matches the MISP attribute’s “EDR / Sysmon / Zeek” examples better than `data-platform` (that attribute is OS/architecture: Windows, Linux, Network). Omit `data-platform` in v1 unless a later spec adds an OS/surface on the rule. Emitting the key name is metadata, not a platform block: it is allowed even when `include_platform_blocks` is false. Queries, tenants, and config structure stay redacted. |
 
 **Rule status → `detection.status`**
 
@@ -526,7 +530,7 @@ Workspaces that override `deployment.toml` SHOULD still hit this table by **stra
 
 If `include_queries` is false, `detection-logic` is omitted (allowed: not in the template’s `required` list). `include_platform_blocks` does not imply queries.
 
-`detection_model` (objective UUID) → `extends_uuid` + related event when that objective is shared.
+`detection_model` (objective UUID) → `extends_uuid` + related event **only when** that objective is shared in this run. MUST omit `extends_uuid` otherwise.
 
 `response.playbook` / `response.responders` → attributes `text`, comments `playbook` / `responders`.
 
@@ -590,7 +594,7 @@ configurations:
       | where EventID == 4688
 ```
 
-Emitted MISP Event JSON (informative, `include_queries = false`). `distribution` is `0` because TLP `amber`’s allowed set is `{your-organization, sharing-group}` and no sharing group is configured, so target `this-community` clamps to `your-organization`. `threat_level_id` is `1` because `threat_level_source = family` reads the **rule** `severity: High` (MDR table), not `criticality`.
+Emitted MISP Event JSON (informative, `include_queries = false`). `distribution` is `0` because TLP `amber`’s allowed set is `{your-organization, sharing-group}` and no sharing group is configured, so target `this-community` clamps to `your-organization`. `threat_level_id` is `1` because `threat_level_source = family` reads the **rule** `severity: High` (MDR table), not `criticality`. `extends_uuid` is **omitted**: the linked objective is not in this example’s share selection (dangling MISP extends are forbidden).
 
 ```json
 {
@@ -602,7 +606,6 @@ Emitted MISP Event JSON (informative, `include_queries = false`). `distribution`
     "threat_level_id": 1,
     "analysis": 2,
     "published": false,
-    "extends_uuid": "00000000-0000-4000-8002-000000000001",
     "Tag": [
       {"name": "tlp:amber"},
       {"name": "opentide:family=\"rule\""},
@@ -626,7 +629,7 @@ Emitted MISP Event JSON (informative, `include_queries = false`). `distribution`
           {"object_relation": "alert-severity-default", "value": "High", "type": "text"},
           {"object_relation": "investigation-steps", "value": "Confirm parent/child process chain and account context.", "type": "text"},
           {"object_relation": "response-remediation-steps", "value": "Isolate host if confirmed malicious.", "type": "text"},
-          {"object_relation": "data-platform", "value": "sentinel", "type": "text"}
+          {"object_relation": "data-source", "value": "sentinel", "type": "text"}
         ]
       }
     ]
@@ -683,14 +686,19 @@ Fixtures MUST NOT contain live API keys.
 
 ## Unresolved questions
 
-1. **Objective `detection.status` in v1:** always `Experimental`, or derived from implementing rules’ statuses (`Test` / `Production`)? Tokens MUST remain MISP Title Case.
+Resolved in this revision:
+
+1. **Objective `detection.status` in v1** — always `Experimental` (Title Case). Deriving `Test`/`Production` from implementing rules is a later revision.
+3. **Git workspace requirement** — opentide-only policy, not this spec.
+6. **Sharing group UUID vs numeric id** — MUST resolve UUID via API each run; numeric id is fallback.
+7. **Partial object graphs** — MUST omit `extends_uuid` when the parent is not in this share selection (no dangling extends). §7.8 example follows that rule.
+8. **CI dry-run Action** — usage-guide only; not a spec requirement.
+
+Still open (need maintainer input before the spec follow-up):
+
 2. **`bundle` event UUID algorithm:** confirm UUID v5 namespace URI `https://opentide.dev/sharing/misp/bundle` (or switch to a documented OID).
-3. **Should `opentide share` refuse to run outside a git workspace** so `metadata.version` + git history stay aligned, or is that opentide-only policy?
 4. **PAP:** add optional `metadata.pap` in a metadata 1.1 revision, vs target-default PAP tags only?
 5. **Galaxy attach vs tags-only** when the MISP instance lacks the ATT&CK galaxy: fall back to `mitre-attack-technique` text attributes (already on `detection`) and warn, or fail the object?
-6. **Numeric sharing group id vs UUID:** resolve UUID via API each run (preferred) vs requiring operators to paste ids that drift between MISP servers.
-7. **Partial object graphs:** if a rule is selected but its objective is not, is `extends_uuid` still set (dangling) or omitted?
-8. **CI:** is a GitHub Action `opentide share push --dry-run` a spec concern or usage-guide only?
 9. **Custom `opentide-threat` / `opentide-objective` templates:** contribute upstream in parallel with v1, or wait until the attribute mapping is field-tested?
 10. **Event `info` prefix:** some communities want `[OpenTide]` or an org acronym prefix; should that be a target setting `info_prefix`?
 
@@ -698,6 +706,7 @@ Fixtures MUST NOT contain live API keys.
 
 - Spec-change issue: [specifications#10](https://github.com/OpenTideHQ/specifications/issues/10)
 - RFC PR: [specifications#9](https://github.com/OpenTideHQ/specifications/pull/9)
+- Threat field-type corrections consumed by this mapping: [specifications#11](https://github.com/OpenTideHQ/specifications/issues/11), [specifications#12](https://github.com/OpenTideHQ/specifications/issues/12), [specifications#13](https://github.com/OpenTideHQ/specifications/pull/13)
 - opentide implementation issue: [opentide#184](https://github.com/OpenTideHQ/opentide/issues/184)
 - Governance: [GOVERNANCE.md](../GOVERNANCE.md), [RFC 0001](0001-authority-model.md)
 - Tracking: public GitHub only (`OpenTideHQ/specifications`, `OpenTideHQ/opentide`). Never Linear.
