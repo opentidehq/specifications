@@ -250,8 +250,8 @@ timeout_seconds = 30
 mode = "api"                 # api | file
 publish = false              # call /events/publish after upsert
 distribution = "this-community"  # clamped to the TLP allowed set (§7.1); amber without a sharing group → 0
-sharing_group_id = 0         # required when distribution = "sharing-group"
-sharing_group_uuid = ""      # preferred over numeric id when set
+sharing_group_id = 0         # required for distribution 4 in file mode; API fallback if UUID empty
+sharing_group_uuid = ""      # preferred in api mode; resolved via GET /sharing_groups (not in file mode)
 event_mode = "per-object"    # per-object | bundle
 threat_level_source = "family"  # family | criticality | severity | alert_severity | undefined
 analysis = "completed"       # initial | ongoing | completed
@@ -292,12 +292,12 @@ directory = ".opentide/exports/sharing/misp"
 
 If `distribution = "sharing-group"` and neither sharing-group identifier is set, the target is misconfigured: push MUST fail for that target before any event is written.
 
-Sharing-group identifier resolution depends on `mode`:
+Sharing-group identifier resolution depends on `mode` (MISP Event JSON uses numeric `sharing_group_id` when `distribution` is 4):
 
 | Mode | Rule |
 |------|------|
-| `api` | `sharing_group_uuid` is preferred. When it is set, implementations MUST resolve it to a numeric id via `GET /sharing_groups` on each run (do not require operators to paste server-local numeric ids). `sharing_group_id` is used only when the UUID is empty. |
-| `file` | MUST NOT call `/sharing_groups` (`url` / `api_key` are not required). A non-zero `sharing_group_id` is **required** so the Event JSON can set MISP's numeric `sharing_group_id`. A UUID-only file target is misconfigured and MUST fail before any file is written. The UUID MAY be copied into export metadata; it MUST NOT be treated as resolved. |
+| `api` | `sharing_group_uuid` is preferred. When it is set, implementations MUST resolve it via `GET /sharing_groups` on each run (UUID wins if both are set). If the UUID is empty, use non-zero `sharing_group_id`. If the UUID is set and not found, fail the target (`sharing_group_unresolved`). |
+| `file` | MUST NOT call `/sharing_groups` (`url` / `api_key` are not required). A non-zero `sharing_group_id` is **required** so the Event JSON can set MISP's numeric `sharing_group_id`. UUID-only file config (`sharing_group_id = 0`) MUST fail before any file is written (`sharing_group_id required in file mode`). The UUID MAY be copied into export metadata; it MUST NOT be treated as resolved. |
 
 **TLP → allowed distributions.** MISP `sharing-group` (4) is a membership list, not a width between 0 and 3, so resolution is a **set membership** check rather than `min()` on integers. For each object, compute the allowed set from `metadata.tlp`. If `[misp].distribution` is omitted, use the default in that row. If it is set and **in** the allowed set, use it. If it is set and **not** in the allowed set, use the row default (do not fail the object solely for this clamp).
 
@@ -320,7 +320,7 @@ Examples: target `distribution = "this-community"` with TLP `amber` clamps to `y
 
 v1 implementations MUST support `per-object`. `bundle` MAY ship in the same version; if unimplemented, setting `event_mode = "bundle"` MUST error clearly rather than silently fall back.
 
-**`mode = "file"`** writes one JSON document per event under `[misp.file].directory` (created if missing). Filenames SHOULD be `<event-uuid>.json`. File mode MUST still apply TLP/query redaction. It MUST NOT require `api_key` and MUST NOT perform HTTP (including sharing-group UUID lookup). For `distribution = "sharing-group"`, see the file-mode row in the identifier table above.
+**`mode = "file"`** writes one JSON document per event under `[misp.file].directory` (created if missing). Filenames SHOULD be `<event-uuid>.json`. File mode MUST still apply TLP/query redaction. It MUST NOT require `url` or `api_key` and MUST NOT perform HTTP (including sharing-group UUID lookup). For `distribution = "sharing-group"`, see the file-mode row in the identifier table above.
 
 #### 7.2 HTTP API (normative subset)
 
@@ -339,7 +339,7 @@ Auth: every request MUST send the API key as MISP expects (`Authorization: <key>
 | Delete event | `DELETE /events/<id>` | Retract `--delete` |
 | Add object | `POST /objects/add/<event_id>` | When objects are added after event create |
 | Attach galaxy cluster | MISP galaxy attach API used by PyMISP `attach_galaxy_cluster` / tag-as-galaxy | ATT&CK + actors |
-| List sharing groups | `GET /sharing_groups` | Resolve UUID → numeric id |
+| List sharing groups | `GET /sharing_groups` | Resolve UUID → numeric id (`mode = api` only) |
 
 PyMISP is the **recommended** opentide implementation library; the spec is HTTP/JSON, not Python. Any client that speaks this subset conforms.
 
@@ -383,9 +383,17 @@ Connectors MUST resolve vocabulary `misp` fields from canonical `vocabularies/*.
 | `threat_level_id` | See table below |
 | `analysis` | `[misp].analysis` mapping: `initial→0`, `ongoing→1`, `completed→2` |
 | `published` | false on add; MISP `/events/publish` is a separate call and is **not** the parent-link gate |
-| `extends_uuid` | In `per-object` mode, set only when the parent is **in-run** (definition below). Rule → linked objective UUID; objective → first in-run threat UUID. MUST be omitted otherwise. |
+| `extends_uuid` | See **Parent Event link** below. MUST NOT depend on MISP `published`. |
 
-**In-run parent (normative).** A parent Tide object is *in-run* for this target when it is in the current share selection **and** this run's share report action for that parent is `created`, `updated`, or `unchanged` — a payload was produced. `skipped_tlp`, `skipped_status`, and `failed` do **not** count. Preview, `push --dry-run`, and `mode = "file"` produce payloads and therefore count. MISP Event `published` and `[misp].publish` MUST NOT be used as this gate (`publish` defaults to false; preview never publishes).
+**Parent Event link (`extends_uuid`).** In `per-object` mode, a rule Event MAY set `extends_uuid` to `detection_model` (objective UUID). An objective Event MAY set `extends_uuid` to the first UUID in `objective.threats[]` whose Event is **present**. Related-event links use the same presence test.
+
+The parent Event is **present** for this target when any of:
+
+1. **In-run:** the parent is in the current share selection **and** this run’s share report action for that parent is `created`, `updated`, or `unchanged` (a payload was produced). `skipped_tlp`, `skipped_status`, and `failed` do **not** count. Preview, `push --dry-run`, and `mode = file` produce payloads and therefore count;
+2. Local `state.json` already records `remote_event_uuid` for that parent on this target; or
+3. `mode = api` and `GET /events/view/<parent-uuid>` succeeds.
+
+MUST omit `extends_uuid` when the parent Event is not present (no dangling MISP extends). MISP Event `published`, `/events/publish`, `[misp].publish`, and `state.json` `published` MUST NOT be this gate (`publish` defaults to false; preview never publishes). Unpublished Events still exist and MAY be extended.
 
 **`threat_level_id`** (MISP: 1 High, 2 Medium, 3 Low, 4 Undefined).
 
@@ -491,7 +499,7 @@ Map to the stock [`detection`](https://github.com/MISP/misp-objects/blob/main/ob
 
 Signals: one `text` attribute per signal, comment `signal:<uuid>`, value `name — description`, correlation disabled. Signal example queries MUST NOT be emitted unless `include_queries` is true.
 
-`objective.threats[]` → Event `extends_uuid` (first **in-run** threat) plus related-event links for each in-run threat UUID. MUST NOT set `extends_uuid` or a related-event link to a threat that is not in-run.
+`objective.threats[]` → Event `extends_uuid` (first threat whose Event is **present**, §7.4) plus related-event links for each threat UUID whose Event is present. MUST NOT set `extends_uuid` or a related-event link to a threat that is not present.
 
 ##### Rule (`rule::1.0`) → MISP object `detection`
 
@@ -539,7 +547,7 @@ Workspaces that override `deployment.toml` SHOULD still hit this table by **stra
 
 If `include_queries` is false, `detection-logic` is omitted (allowed: not in the template’s `required` list). `include_platform_blocks` does not imply queries.
 
-`detection_model` (objective UUID) → `extends_uuid` + related event **only when** that objective is in-run. MUST omit `extends_uuid` otherwise.
+`detection_model` (objective UUID) → `extends_uuid` + related event **only when** that objective Event is **present** (§7.4). MUST omit `extends_uuid` otherwise.
 
 `response.playbook` / `response.responders` → attributes `text`, comments `playbook` / `responders`.
 
@@ -603,7 +611,7 @@ configurations:
       | where EventID == 4688
 ```
 
-Emitted MISP Event JSON (informative, `include_queries = false`). `distribution` is `0` because TLP `amber`’s allowed set is `{your-organization, sharing-group}` and no sharing group is configured, so target `this-community` clamps to `your-organization`. `threat_level_id` is `1` because `threat_level_source = family` reads the **rule** `severity: High` (MDR table), not `criticality`. `extends_uuid` is **omitted**: the linked objective is not in-run in this single-rule example.
+Emitted MISP Event JSON (informative, `include_queries = false`). `distribution` is `0` because TLP `amber`’s allowed set is `{your-organization, sharing-group}` and no sharing group is configured, so target `this-community` clamps to `your-organization`. `threat_level_id` is `1` because `threat_level_source = family` reads the **rule** `severity: High` (MDR table), not `criticality`. `extends_uuid` is **omitted**: the linked objective Event is not **present** (not in this example’s share selection; no prior state).
 
 ```json
 {
@@ -656,7 +664,7 @@ With `include_queries = true`, an extra attribute `text` / comment `query:sentin
 
 - Target `connector` + `schema` known
 - `mode = "api"` implies resolvable `url` and resolvable `api_key` (env var set)
-- `distribution = "sharing-group"` implies group id/uuid
+- `distribution = "sharing-group"`: `mode = api` implies UUID or non-zero id; `mode = file` implies non-zero `sharing_group_id` (UUID-only is invalid)
 - `max_tlp` is a valid `tlp` name
 - Target policy is not weaker than global policy
 
@@ -670,7 +678,8 @@ This is configuration validation, not object-schema validation.
 | `fixtures/valid/sharing-event-rule-amber.json` | Golden Event for the rule fixture with default redaction |
 | `fixtures/valid/sharing-event-threat-clear.json` | Threat → attributes + TLP tag `tlp:clear` |
 | `fixtures/invalid/sharing-tlp-red-without-override.toml` | Policy: red object not shareable |
-| `fixtures/invalid/sharing-distribution-sg-missing.toml` | `sharing-group` without id |
+| `fixtures/invalid/sharing-distribution-sg-missing.toml` | `sharing-group` without id or uuid |
+| `fixtures/invalid/sharing-file-sg-uuid-only.toml` | `mode = file` + `sharing-group` with UUID and `sharing_group_id = 0` |
 
 Fixtures MUST NOT contain live API keys.
 
@@ -700,7 +709,7 @@ Resolved in this revision:
 1. **Objective `detection.status` in v1** — always `Experimental` (Title Case). Deriving `Test`/`Production` from implementing rules is a later revision.
 3. **Git workspace requirement** — opentide-only policy, not this spec.
 6. **Sharing group UUID vs numeric id** — `api` mode MUST resolve UUID via `GET /sharing_groups`; numeric id is fallback when the UUID is empty. `file` mode MUST NOT call the API and REQUIRES a non-zero numeric id for `sharing-group`.
-7. **Partial object graphs** — MUST omit `extends_uuid` when the parent is not in this share selection (no dangling extends). §7.8 example follows that rule.
+7. **Partial object graphs** — MUST omit `extends_uuid` when the parent Event is not **present** (§7.4). Presence is in-run payload / prior state / remote lookup — not MISP `published`. §7.8 example follows that rule.
 8. **CI dry-run Action** — usage-guide only; not a spec requirement.
 
 Still open (need maintainer input before the spec follow-up):
