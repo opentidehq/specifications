@@ -165,14 +165,14 @@ Shared flags (push / preview / retract):
 
 Scope rules MUST match [validation](../specs/validation.md): `--file` / `--uuid` / `--type` that match nothing MUST fail with `scope_no_match` rather than succeeding vacuously.
 
-Exit status:
+Exit status (whole command, not per target; object-level outcomes live in the share report):
 
 | Code | Meaning |
 |------|---------|
-| `0` | All selected targets completed; skipped-by-policy objects are reported but do not fail the run |
-| `1` | Validation errors, policy misconfiguration, or `scope_no_match` |
-| `2` | Authentication / connectivity failure on a selected target (if any target succeeded, see `3`) |
-| `3` | Partial success: at least one target succeeded and at least one failed |
+| `0` | Every selected target completed with no object `failed`. Policy skips (`skipped_tlp`, `skipped_status`) are reported and do not fail the run. |
+| `1` | Validation errors, policy misconfiguration, or `scope_no_match` (no remote mutation) |
+| `2` | Authentication / connectivity failed for a selected target **and** no selected target produced a successful object action (`created` / `updated` / `unchanged` / `retracted`). If another target did succeed, use `3`. |
+| `3` | Partial success: at least one object action succeeded **and** at least one object or target `failed`. This includes mixed objects on **one** target (for example a parent `failed` after children were sent) as well as mixed targets. |
 
 Stdout SHOULD be a structured share report (human table by default; `--json` MAY be offered). The report MUST include, per object per target: action (`created`, `updated`, `unchanged`, `skipped_tlp`, `skipped_status`, `retracted`, `failed`), remote identifier, and reason on skip/fail.
 
@@ -398,7 +398,7 @@ The parent Event is **present** for this target only as follows (evaluate in ord
 
 MUST omit `extends_uuid` when the parent Event is not present (no dangling MISP extends). MISP Event `published`, `/events/publish`, `[misp].publish`, and `state.json` `published` MUST NOT be this gate (`publish` defaults to false; preview never publishes). Unpublished Events still exist and MAY be extended.
 
-`--workers` MAY parallelize upserts but MUST use the same plan for every object. Implementations SHOULD still upsert in topological order (threat → objective → rule) so a parent that `failed` after the plan said `emit` can omit `extends_uuid` on children not yet sent. Children already sent with a now-dangling extend are a partial-success case (exit `3`); retry repairs them.
+`--workers` MAY parallelize upserts but MUST use the same plan for every object. Implementations SHOULD still upsert in topological order (threat → objective → rule) so a parent that `failed` after the plan said `emit` can omit `extends_uuid` on children not yet sent. Children already sent with a now-dangling extend are mixed object outcomes on that target: exit `3` (CLI table). Retry repairs them.
 
 **`threat_level_id`** (MISP: 1 High, 2 Medium, 3 Low, 4 Undefined).
 
