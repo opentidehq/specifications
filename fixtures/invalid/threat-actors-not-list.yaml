@@ -1,8 +1,8 @@
-name: Simulated Actor
+name: Threat Actors Not A List
 criticality: High
 
 metadata:
-  uuid: 00000000-0000-4000-8001-000000000001
+  uuid: 00000000-0000-4000-8001-000000000023
   schema: threat::1.0
   version: 1
   created: "2026-01-01"
@@ -10,14 +10,12 @@ metadata:
   tlp: clear
 
 threat:
-  description: Simulated threat actor for conformance fixtures
+  description: actors MUST be a YAML list of ThreatActor objects
   severity: Significant incident
   impact:
     - Data Breach
-    - Identity Theft
   leverage:
     - Elevation of privilege
-    - Repudiation
   viability: Likely
   terrain: Endpoint workstations and user devices.
   surface:
@@ -25,8 +23,4 @@ threat:
   att&ck:
     - T1059
   actors:
-    - name: att&ck::G0007
-    - name: misp::5b4ee3ea-eee3-4c8e-8323-85ae32658754
-      sighting: "2024-11-02"
-      references:
-        - https://attack.mitre.org/groups/G0007
+    name: att&ck::G0007
