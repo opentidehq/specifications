@@ -1,0 +1,23 @@
+---
+description: OpenTide tracking is public GitHub only — never Linear
+alwaysApply: true
+---
+
+# OpenTide tracking is GitHub-only
+
+Never use Linear for OpenTide work. All OpenTide planning, issues, RFCs, and implementation tracking is **public on GitHub**.
+
+Do **not**:
+
+- Create, update, comment on, or search Linear issues for OpenTideHQ work
+- Mirror GitHub issues into Linear
+- Put Linear URLs in specs, RFCs, PR bodies, or GitHub issue bodies
+- Call Linear MCP tools (`save_issue`, `save_comment`, etc.) while working in this repository or `OpenTideHQ/opentide`
+
+Do:
+
+- Open GitHub issues in [OpenTideHQ/specifications](https://github.com/OpenTideHQ/specifications) for spec/RFC work (use `.github/ISSUE_TEMPLATE/spec-change.yml`)
+- Open GitHub issues in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide) for implementation follow-up
+- Link those GitHub URLs from RFCs and PRs
+
+A Linear MCP server may be available in the agent environment. Ignore it for OpenTide. SuperTide/private Linear work is out of scope for this repository.

@@ -4,8 +4,9 @@
 
 ## Governance
 
-- GOVERNANCE.md: Change process (Issue → RFC → spec → opentide)
-- AGENTS.md: Instructions for AI agents
+- GOVERNANCE.md: Change process (GitHub Issue → RFC → spec → opentide)
+- AGENTS.md: Instructions for AI agents (tracking is public GitHub only; never Linear)
+- Tracking: OpenTideHQ/specifications and OpenTideHQ/opentide issues. Never Linear.
 - SPECS.md: Index of active spec versions
 - rfcs/0001-authority-model.md: Authority model (spec → Pydantic → JSON Schema)
 
@@ -45,10 +46,14 @@
 - rfcs/README.md
 - rfcs/0000-template.md
 - rfcs/0001-authority-model.md
+- rfcs/0002-vocabulary-versioning.md
+- rfcs/0003-per-key-vocabulary-versioning.md
+- rfcs/0005-sharing-system.md
 
 ## Agent skills
 
 - .agents/skills/publish-rfc/SKILL.md
+- .cursor/rules/github-only-tracking.mdc: Never Linear; public GitHub only
 
 ## License
 
