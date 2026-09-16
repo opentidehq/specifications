@@ -9,6 +9,12 @@ import sys
 import tomllib
 from pathlib import Path
 
+from object_fixtures import (
+    EXPECTED_INVALID_CODES,
+    load_vocabularies,
+    validate_fixture_file,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 VOCAB_DIR = ROOT / "vocabularies"
 VOCAB_SCHEMA = ROOT / "schemas" / "vocabulary.schema.json"
@@ -114,6 +120,8 @@ def _validate_pin_files() -> list[str]:
                     errors.append(
                         f"{path}: [{section}] {field_path!r} contract revision invalid: {contract!r}"
                     )
+        if path.name == "threat.toml":
+            errors.extend(_validate_threat_pins(path, doc))
 
     return errors
 
@@ -125,12 +133,78 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "valid" / "threat-1.0.yaml",
         FIXTURES / "valid" / "objective-1.0.yaml",
         FIXTURES / "invalid" / "rule-missing-metadata.yaml",
+        FIXTURES / "invalid" / "threat-missing-body.yaml",
+        FIXTURES / "invalid" / "threat-impact-as-string.yaml",
+        FIXTURES / "invalid" / "threat-leverage-semicolon.yaml",
+        FIXTURES / "invalid" / "threat-leverage-semicolon-list-item.yaml",
+        FIXTURES / "invalid" / "threat-impact-empty.yaml",
+        FIXTURES / "invalid" / "threat-actors-string-list.yaml",
+        FIXTURES / "invalid" / "threat-actor-missing-name.yaml",
+        FIXTURES / "invalid" / "threat-actor-unscoped.yaml",
         FIXTURES / "cross-object" / "rule-references-objective.yaml",
         FIXTURES / "inflight" / "example-shard.json",
     ]
     for path in required:
         if not path.is_file():
             errors.append(f"missing required fixture: {path.relative_to(ROOT)}")
+    return errors
+
+
+def _validate_threat_pins(path: Path, doc: dict) -> list[str]:
+    errors: list[str] = []
+    for section in ("threat::1.0", "threat::2.1"):
+        pins = doc.get(section)
+        if not isinstance(pins, dict):
+            continue
+        if "threat.actors" in pins:
+            errors.append(
+                f"{path}: [{section}] pin 'threat.actors' is invalid; "
+                "actors are objects — pin 'threat.actors.name'"
+            )
+        if pins.get("threat.actors.name") != "actors::1.0":
+            errors.append(
+                f"{path}: [{section}] must pin threat.actors.name = 'actors::1.0'"
+            )
+    return errors
+
+
+def _validate_object_fixtures() -> list[str]:
+    errors: list[str] = []
+    try:
+        vocabs = load_vocabularies(VOCAB_DIR)
+    except Exception as exc:  # noqa: BLE001
+        return [f"failed to load vocabularies for fixture checks: {exc}"]
+
+    for directory, must_pass in (
+        (FIXTURES / "valid", True),
+        (FIXTURES / "cross-object", True),
+    ):
+        for path in sorted(directory.glob("*.yaml")):
+            issues = validate_fixture_file(path, vocabs)
+            if must_pass and issues:
+                rel = path.relative_to(ROOT)
+                for issue in issues:
+                    errors.append(issue.format(str(rel)))
+
+    invalid_dir = FIXTURES / "invalid"
+    seen: set[str] = set()
+    for path in sorted(invalid_dir.glob("*.yaml")):
+        seen.add(path.name)
+        issues = validate_fixture_file(path, vocabs)
+        rel = path.relative_to(ROOT)
+        if not issues:
+            errors.append(f"{rel}: expected to fail but passed")
+            continue
+        expected = EXPECTED_INVALID_CODES.get(path.name)
+        if expected and not any(issue.code == expected for issue in issues):
+            codes = ", ".join(sorted({issue.code for issue in issues}))
+            errors.append(
+                f"{rel}: expected error code {expected!r}, got {codes or 'none'}"
+            )
+
+    missing_expectations = sorted(set(EXPECTED_INVALID_CODES) - seen)
+    for name in missing_expectations:
+        errors.append(f"missing invalid fixture for expected code: {name}")
     return errors
 
 
@@ -172,6 +246,7 @@ def main() -> int:
 
     errors.extend(_validate_pin_files())
     errors.extend(_check_fixtures())
+    errors.extend(_validate_object_fixtures())
     errors.extend(_validate_inflight_fixture())
 
     if errors:

@@ -108,8 +108,12 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 | Fixture | Expected result |
 |---------|-----------------|
 | [fixtures/valid/rule-1.0.yaml](../fixtures/valid/rule-1.0.yaml) | Passes schema + UUID checks |
+| [fixtures/valid/threat-1.0.yaml](../fixtures/valid/threat-1.0.yaml) | Passes `threat::1.0` lists (`impact`, `leverage`) and `list[ThreatActor]` |
 | [fixtures/invalid/rule-bad-uuid.yaml](../fixtures/invalid/rule-bad-uuid.yaml) | Fails `uuid-format` |
 | [fixtures/invalid/rule-unknown-schema.yaml](../fixtures/invalid/rule-unknown-schema.yaml) | Fails `schema` |
+| [fixtures/invalid/threat-impact-as-string.yaml](../fixtures/invalid/threat-impact-as-string.yaml) | Fails schema (`impact` not a list) |
+| [fixtures/invalid/threat-leverage-semicolon.yaml](../fixtures/invalid/threat-leverage-semicolon.yaml) | Fails schema (semicolon-packed `leverage`) |
+| [fixtures/invalid/threat-actors-string-list.yaml](../fixtures/invalid/threat-actors-string-list.yaml) | Fails schema (`actors` not objects) |
 | [fixtures/cross-object/rule-references-objective.yaml](../fixtures/cross-object/rule-references-objective.yaml) | Passes when sibling objective fixture present |
 
 ## History

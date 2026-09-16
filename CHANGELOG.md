@@ -12,6 +12,8 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## threat 1.0
 
+- Correct `threat.impact` and `threat.leverage` to non-empty `list[string]`; semicolon-packed strings are invalid ([#12](https://github.com/OpenTideHQ/specifications/issues/12)).
+- Correct `threat.actors` to `list[ThreatActor]` with scoped `name`; pin path is `threat.actors.name` ([#11](https://github.com/OpenTideHQ/specifications/issues/11)).
 - Initial normative spec bootstrapped from opentide `models/threat.py`.
 
 ## objective 1.0

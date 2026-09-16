@@ -16,7 +16,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install validators
-        run: pip install jsonschema
+        run: pip install jsonschema pyyaml
 
       - name: Validate vocabularies and fixtures
         run: python scripts/validate.py
+
+      - name: Unit tests
+        run: python -m unittest discover -s scripts -p 'test_*.py' -v
