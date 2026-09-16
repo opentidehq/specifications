@@ -288,9 +288,16 @@ directory = ".opentide/exports/sharing/misp"
 | `this-community` | `1` | Typical `green` community instance |
 | `connected-communities` | `2` | Wider sync mesh; `clear` / `green` only |
 | `all-communities` | `3` | `clear` only |
-| `sharing-group` | `4` | Named channel (not a point on the 0–3 width scale). **Requires** `sharing_group_uuid` or non-zero `sharing_group_id` |
+| `sharing-group` | `4` | Named channel (not a point on the 0–3 width scale). Requires a sharing-group identifier; **how** is mode-specific (table below) |
 
-If `distribution = "sharing-group"` and neither sharing-group identifier is set, the target is misconfigured: push MUST fail for that target before any event is written. When `sharing_group_uuid` is set, implementations MUST resolve it to a numeric id via `GET /sharing_groups` on each run (do not require operators to paste server-local numeric ids). `sharing_group_id` is a fallback when the UUID is empty.
+If `distribution = "sharing-group"` and neither sharing-group identifier is set, the target is misconfigured: push MUST fail for that target before any event is written.
+
+Sharing-group identifier resolution depends on `mode`:
+
+| Mode | Rule |
+|------|------|
+| `api` | `sharing_group_uuid` is preferred. When it is set, implementations MUST resolve it to a numeric id via `GET /sharing_groups` on each run (do not require operators to paste server-local numeric ids). `sharing_group_id` is used only when the UUID is empty. |
+| `file` | MUST NOT call `/sharing_groups` (`url` / `api_key` are not required). A non-zero `sharing_group_id` is **required** so the Event JSON can set MISP's numeric `sharing_group_id`. A UUID-only file target is misconfigured and MUST fail before any file is written. The UUID MAY be copied into export metadata; it MUST NOT be treated as resolved. |
 
 **TLP → allowed distributions.** MISP `sharing-group` (4) is a membership list, not a width between 0 and 3, so resolution is a **set membership** check rather than `min()` on integers. For each object, compute the allowed set from `metadata.tlp`. If `[misp].distribution` is omitted, use the default in that row. If it is set and **in** the allowed set, use it. If it is set and **not** in the allowed set, use the row default (do not fail the object solely for this clamp).
 
@@ -313,7 +320,7 @@ Examples: target `distribution = "this-community"` with TLP `amber` clamps to `y
 
 v1 implementations MUST support `per-object`. `bundle` MAY ship in the same version; if unimplemented, setting `event_mode = "bundle"` MUST error clearly rather than silently fall back.
 
-**`mode = "file"`** writes one JSON document per event under `[misp.file].directory` (created if missing). Filenames SHOULD be `<event-uuid>.json`. File mode MUST still apply TLP/query redaction. It MUST NOT require `api_key`.
+**`mode = "file"`** writes one JSON document per event under `[misp.file].directory` (created if missing). Filenames SHOULD be `<event-uuid>.json`. File mode MUST still apply TLP/query redaction. It MUST NOT require `api_key` and MUST NOT perform HTTP (including sharing-group UUID lookup). For `distribution = "sharing-group"`, see the file-mode row in the identifier table above.
 
 #### 7.2 HTTP API (normative subset)
 
@@ -375,8 +382,10 @@ Connectors MUST resolve vocabulary `misp` fields from canonical `vocabularies/*.
 | `sharing_group_id` | When distribution is 4 |
 | `threat_level_id` | See table below |
 | `analysis` | `[misp].analysis` mapping: `initial→0`, `ongoing→1`, `completed→2` |
-| `published` | false on add; publish is a separate call |
-| `extends_uuid` | In `per-object` mode, a rule Event MAY set this to the linked objective UUID **only when that objective is in the same share selection and is actually published**; an objective Event MAY set this to the first linked threat UUID under the same rule. MUST be omitted when the parent is not shared in this run (no dangling MISP `extends_uuid`). |
+| `published` | false on add; MISP `/events/publish` is a separate call and is **not** the parent-link gate |
+| `extends_uuid` | In `per-object` mode, set only when the parent is **in-run** (definition below). Rule → linked objective UUID; objective → first in-run threat UUID. MUST be omitted otherwise. |
+
+**In-run parent (normative).** A parent Tide object is *in-run* for this target when it is in the current share selection **and** this run's share report action for that parent is `created`, `updated`, or `unchanged` — a payload was produced. `skipped_tlp`, `skipped_status`, and `failed` do **not** count. Preview, `push --dry-run`, and `mode = "file"` produce payloads and therefore count. MISP Event `published` and `[misp].publish` MUST NOT be used as this gate (`publish` defaults to false; preview never publishes).
 
 **`threat_level_id`** (MISP: 1 High, 2 Medium, 3 Low, 4 Undefined).
 
@@ -482,7 +491,7 @@ Map to the stock [`detection`](https://github.com/MISP/misp-objects/blob/main/ob
 
 Signals: one `text` attribute per signal, comment `signal:<uuid>`, value `name — description`, correlation disabled. Signal example queries MUST NOT be emitted unless `include_queries` is true.
 
-`objective.threats[]` → Event `extends_uuid` (first threat that **is** in this share selection) plus related-event links for each threat UUID that was shared. MUST NOT set `extends_uuid` to a threat that is not published in this run.
+`objective.threats[]` → Event `extends_uuid` (first **in-run** threat) plus related-event links for each in-run threat UUID. MUST NOT set `extends_uuid` or a related-event link to a threat that is not in-run.
 
 ##### Rule (`rule::1.0`) → MISP object `detection`
 
@@ -530,7 +539,7 @@ Workspaces that override `deployment.toml` SHOULD still hit this table by **stra
 
 If `include_queries` is false, `detection-logic` is omitted (allowed: not in the template’s `required` list). `include_platform_blocks` does not imply queries.
 
-`detection_model` (objective UUID) → `extends_uuid` + related event **only when** that objective is shared in this run. MUST omit `extends_uuid` otherwise.
+`detection_model` (objective UUID) → `extends_uuid` + related event **only when** that objective is in-run. MUST omit `extends_uuid` otherwise.
 
 `response.playbook` / `response.responders` → attributes `text`, comments `playbook` / `responders`.
 
@@ -594,7 +603,7 @@ configurations:
       | where EventID == 4688
 ```
 
-Emitted MISP Event JSON (informative, `include_queries = false`). `distribution` is `0` because TLP `amber`’s allowed set is `{your-organization, sharing-group}` and no sharing group is configured, so target `this-community` clamps to `your-organization`. `threat_level_id` is `1` because `threat_level_source = family` reads the **rule** `severity: High` (MDR table), not `criticality`. `extends_uuid` is **omitted**: the linked objective is not in this example’s share selection (dangling MISP extends are forbidden).
+Emitted MISP Event JSON (informative, `include_queries = false`). `distribution` is `0` because TLP `amber`’s allowed set is `{your-organization, sharing-group}` and no sharing group is configured, so target `this-community` clamps to `your-organization`. `threat_level_id` is `1` because `threat_level_source = family` reads the **rule** `severity: High` (MDR table), not `criticality`. `extends_uuid` is **omitted**: the linked objective is not in-run in this single-rule example.
 
 ```json
 {
@@ -690,7 +699,7 @@ Resolved in this revision:
 
 1. **Objective `detection.status` in v1** — always `Experimental` (Title Case). Deriving `Test`/`Production` from implementing rules is a later revision.
 3. **Git workspace requirement** — opentide-only policy, not this spec.
-6. **Sharing group UUID vs numeric id** — MUST resolve UUID via API each run; numeric id is fallback.
+6. **Sharing group UUID vs numeric id** — `api` mode MUST resolve UUID via `GET /sharing_groups`; numeric id is fallback when the UUID is empty. `file` mode MUST NOT call the API and REQUIRES a non-zero numeric id for `sharing-group`.
 7. **Partial object graphs** — MUST omit `extends_uuid` when the parent is not in this share selection (no dangling extends). §7.8 example follows that rule.
 8. **CI dry-run Action** — usage-guide only; not a spec requirement.
 
