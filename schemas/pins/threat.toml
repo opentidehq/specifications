@@ -15,6 +15,9 @@
 "threat.killchain" = "killchain::1.0"
 "threat.chaining" = "chaining_relations::1.0"
 
+# Reserved pin table: there is no specs/objects/threat-2.1.md yet, and
+# vocabularies/killchain.vocab.toml currently publishes only 1.0 keys.
+# Do not treat this section as a live schema_id.
 ["threat::2.1"]
 "metadata.tlp" = "tlp::1.0"
 "criticality" = "criticality::1.0"

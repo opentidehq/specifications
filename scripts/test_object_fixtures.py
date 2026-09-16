@@ -110,6 +110,16 @@ class ThreatFixtureTests(unittest.TestCase):
         doc["threat"]["impact"] = []
         self.assertIn("empty_vocab_list", _codes(validate_threat(doc, self.vocabs)))
 
+    def test_empty_leverage_list_is_rejected(self) -> None:
+        doc = copy.deepcopy(self.valid)
+        doc["threat"]["leverage"] = []
+        self.assertIn("empty_vocab_list", _codes(validate_threat(doc, self.vocabs)))
+
+    def test_impact_semicolon_packed_scalar_is_rejected(self) -> None:
+        doc = copy.deepcopy(self.valid)
+        doc["threat"]["impact"] = "Data Breach; Identity Theft"
+        self.assertIn("packed_vocab_string", _codes(validate_threat(doc, self.vocabs)))
+
     def test_unknown_impact_token_is_rejected(self) -> None:
         doc = copy.deepcopy(self.valid)
         doc["threat"]["impact"] = ["High"]
@@ -120,18 +130,49 @@ class ThreatFixtureTests(unittest.TestCase):
         doc["threat"]["leverage"] = ["High"]
         self.assertIn("unknown_vocab_value", _codes(validate_threat(doc, self.vocabs)))
 
-    def test_first_token_collapse_is_not_accepted_as_the_list(self) -> None:
-        """Library semicolon strings must not collapse to a single vocab token."""
-        packed = "Elevation of privilege; Repudiation; Tampering"
-        first = packed.split(";", 1)[0].strip()
+    def test_unknown_severity_high_is_rejected(self) -> None:
         doc = copy.deepcopy(self.valid)
-        doc["threat"]["leverage"] = packed
-        errors = validate_threat(doc, self.vocabs)
-        self.assertIn("packed_vocab_string", _codes(errors))
-        doc["threat"]["leverage"] = [first]
-        self.assertEqual(validate_threat(doc, self.vocabs), [])
-        doc["threat"]["leverage"] = packed
-        self.assertNotEqual(validate_threat(doc, self.vocabs), [])
+        doc["threat"]["severity"] = "High"
+        self.assertIn("unknown_vocab_value", _codes(validate_threat(doc, self.vocabs)))
+
+    def test_unknown_viability_high_is_rejected(self) -> None:
+        doc = copy.deepcopy(self.valid)
+        doc["threat"]["viability"] = "High"
+        self.assertIn("unknown_vocab_value", _codes(validate_threat(doc, self.vocabs)))
+
+    def test_packed_string_is_not_the_split_token_list(self) -> None:
+        """Packed catalogue strings MUST fail; first-token collapse is a different document."""
+        packed = "Elevation of privilege; Repudiation; Tampering"
+        split_tokens = [token.strip() for token in packed.split(";") if token.strip()]
+        first_only = [split_tokens[0]]
+        packed_doc = copy.deepcopy(self.valid)
+        packed_doc["threat"]["leverage"] = packed
+        self.assertIn("packed_vocab_string", _codes(validate_threat(packed_doc, self.vocabs)))
+
+        collapsed_doc = copy.deepcopy(self.valid)
+        collapsed_doc["threat"]["leverage"] = first_only
+        self.assertEqual(validate_threat(collapsed_doc, self.vocabs), [])
+        self.assertNotEqual(first_only, split_tokens)
+
+        migrated_doc = copy.deepcopy(self.valid)
+        migrated_doc["threat"]["leverage"] = split_tokens
+        self.assertEqual(validate_threat(migrated_doc, self.vocabs), [])
+        self.assertNotEqual(packed_doc["threat"]["leverage"], migrated_doc["threat"]["leverage"])
+
+    def test_null_impact_is_rejected(self) -> None:
+        doc = copy.deepcopy(self.valid)
+        doc["threat"]["impact"] = None
+        self.assertIn("field_not_list", _codes(validate_threat(doc, self.vocabs)))
+
+    def test_actors_mapping_is_rejected(self) -> None:
+        doc = copy.deepcopy(self.valid)
+        doc["threat"]["actors"] = {"name": "att&ck::G0007"}
+        self.assertIn("actors_not_objects", _codes(validate_threat(doc, self.vocabs)))
+
+    def test_invalid_tlp_is_rejected(self) -> None:
+        doc = copy.deepcopy(self.valid)
+        doc["metadata"]["tlp"] = "not-a-tlp"
+        self.assertIn("unknown_vocab_value", _codes(validate_threat(doc, self.vocabs)))
 
     def test_actors_string_list_is_rejected(self) -> None:
         doc = copy.deepcopy(self.valid)
@@ -226,6 +267,24 @@ class InvalidFixtureRegistryTests(unittest.TestCase):
                 with self.subTest(path=str(path.relative_to(ROOT))):
                     issues = validate_fixture_file(path, self.vocabs)
                     self.assertEqual(issues, [], msg=[item.format() for item in issues])
+
+    def test_invalid_threat_yaml_covers_list_and_actor_encodings(self) -> None:
+        required = {
+            "threat-impact-as-string.yaml",
+            "threat-impact-semicolon.yaml",
+            "threat-leverage-semicolon.yaml",
+            "threat-leverage-semicolon-list-item.yaml",
+            "threat-impact-empty.yaml",
+            "threat-leverage-empty.yaml",
+            "threat-leverage-high.yaml",
+            "threat-actors-string-list.yaml",
+            "threat-actors-not-list.yaml",
+            "threat-actor-missing-name.yaml",
+            "threat-actor-unscoped.yaml",
+            "threat-actor-wrong-stage.yaml",
+        }
+        present = {path.name for path in (FIXTURES / "invalid").glob("threat-*.yaml")}
+        self.assertTrue(required.issubset(present), msg=sorted(required - present))
 
 
 class ValidateScriptTests(unittest.TestCase):

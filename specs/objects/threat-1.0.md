@@ -21,6 +21,7 @@ A threat vector describes an adversary capability or scenario: severity, impact,
 - `threat.impact` MUST be a non-empty `list[string]` of `impact::1.0` vocabulary names.
 - `threat.leverage` MUST be a non-empty `list[string]` of `leverage::1.0` vocabulary names.
 - `threat.impact` and `threat.leverage` MUST be YAML lists of tokens. A scalar string is invalid. Implementations MUST NOT accept semicolon-concatenated strings (for example `Elevation of privilege; Repudiation`) as an encoding of multiple values, neither as the field value nor as a list item.
+- Implementations MUST NOT collapse a packed string to its first token (or any subset) and treat that shorter list as the field value. The packed string is invalid; the compliant encoding is a YAML list that contains every token as its own item.
 - `threat.actors` when present MUST be a `list[ThreatActor]`. A list of bare strings is invalid. There is no string-list alternate form and no coercion from strings to objects.
 - Each `ThreatActor.name` MUST be a scoped `actors::1.0` value (`<stage>::<id>`, for example `att&ck::G0007` or `misp::<uuid>`). Unscoped ids are invalid.
 - `references` MAY be omitted.
@@ -45,10 +46,10 @@ A threat vector describes an adversary capability or scenario: severity, impact,
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `description` | string | yes | — | Narrative description |
-| `severity` | string | yes | — | Threat severity vocabulary |
+| `severity` | string | yes | — | Threat severity vocabulary (`severity::1.0`) |
 | `impact` | list[string] | yes | — | Impact vocabulary names (`impact::1.0`); non-empty |
 | `leverage` | list[string] | yes | — | Leverage vocabulary names (`leverage::1.0`); non-empty |
-| `viability` | string | yes | — | Viability vocabulary |
+| `viability` | string | yes | — | Viability vocabulary (`viability::1.0`) |
 | `terrain` | string | yes | — | Explanatory narrative about where/how the threat operates |
 | `surface` | list[string] | yes | — | Threat surface vocabulary values (`surface::1.0`) |
 | `att&ck` | list[string] | yes | — | MITRE ATT&CK technique IDs |
@@ -58,7 +59,7 @@ A threat vector describes an adversary capability or scenario: severity, impact,
 
 `terrain` and `surface` are complementary: `terrain` is free-form prose for humans; `surface` is the controlled vocabulary used for filtering and coverage. Do not put vocabulary tokens in `terrain`.
 
-`impact` and `leverage` are multi-valued. Catalogue content that packed several tokens into one semicolon-separated string is **non-compliant**; migrate each token to its own list item. Do not collapse a packed string to its first token.
+`impact` and `leverage` are multi-valued. Catalogue content that packed several tokens into one semicolon-separated string is **non-compliant**; migrate each token to its own list item. Implementations MUST NOT collapse a packed string to its first token.
 
 ### `actors[]` (ThreatActor)
 
@@ -149,14 +150,19 @@ threat:
 - Invalid (semicolon-packed `leverage` string): [fixtures/invalid/threat-leverage-semicolon.yaml](../../fixtures/invalid/threat-leverage-semicolon.yaml)
 - Invalid (semicolon-packed list item): [fixtures/invalid/threat-leverage-semicolon-list-item.yaml](../../fixtures/invalid/threat-leverage-semicolon-list-item.yaml)
 - Invalid (empty `impact` list): [fixtures/invalid/threat-impact-empty.yaml](../../fixtures/invalid/threat-impact-empty.yaml)
+- Invalid (empty `leverage` list): [fixtures/invalid/threat-leverage-empty.yaml](../../fixtures/invalid/threat-leverage-empty.yaml)
+- Invalid (semicolon-packed `impact` string): [fixtures/invalid/threat-impact-semicolon.yaml](../../fixtures/invalid/threat-impact-semicolon.yaml)
+- Invalid (`leverage: [High]` — not in `leverage::1.0`): [fixtures/invalid/threat-leverage-high.yaml](../../fixtures/invalid/threat-leverage-high.yaml)
 - Invalid (`actors` as string list): [fixtures/invalid/threat-actors-string-list.yaml](../../fixtures/invalid/threat-actors-string-list.yaml)
+- Invalid (`actors` not a list): [fixtures/invalid/threat-actors-not-list.yaml](../../fixtures/invalid/threat-actors-not-list.yaml)
 - Invalid (`ThreatActor` missing `name`): [fixtures/invalid/threat-actor-missing-name.yaml](../../fixtures/invalid/threat-actor-missing-name.yaml)
 - Invalid (unscoped actor id): [fixtures/invalid/threat-actor-unscoped.yaml](../../fixtures/invalid/threat-actor-unscoped.yaml)
+- Invalid (wrong actor stage): [fixtures/invalid/threat-actor-wrong-stage.yaml](../../fixtures/invalid/threat-actor-wrong-stage.yaml)
 - Cross-reference: [fixtures/cross-object/objective-references-threat.yaml](../../fixtures/cross-object/objective-references-threat.yaml)
 
 ## History
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-09-16 | Correct `impact` and `leverage` to non-empty `list[string]`; forbid semicolon packing ([#12](https://github.com/OpenTideHQ/specifications/issues/12)). Correct `actors` to `list[ThreatActor]` with scoped `name`; pin path is `threat.actors.name` ([#11](https://github.com/OpenTideHQ/specifications/issues/11)). Write-up correction of 1.0 — `schema_id` stays `threat::1.0`. |
+| 1.0 | 2026-09-16 | Correct `impact` and `leverage` to non-empty `list[string]`; forbid semicolon packing and first-token collapse ([#12](https://github.com/OpenTideHQ/specifications/issues/12)). Correct `actors` to `list[ThreatActor]` with scoped `name`; pin path is `threat.actors.name` ([#11](https://github.com/OpenTideHQ/specifications/issues/11)). Write-up correction of 1.0 — `schema_id` stays `threat::1.0`. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `models/threat.py` |

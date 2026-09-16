@@ -305,6 +305,8 @@ def validate_threat(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[Check
     schema = _validate_metadata(doc.get("metadata"), errors)
     if schema and schema != "threat::1.0":
         errors.append(CheckError("unknown_schema", f"threat fixture has schema {schema!r}", "metadata.schema"))
+    tlp = (doc.get("metadata") or {}).get("tlp") if isinstance(doc.get("metadata"), dict) else None
+    _require_vocab_name(tlp, vocabs.get("tlp"), path="metadata.tlp", errors=errors)
 
     body = doc.get("threat")
     if not isinstance(body, dict):
@@ -434,10 +436,15 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "threat-impact-as-string.yaml": "field_not_list",
     "threat-leverage-semicolon.yaml": "packed_vocab_string",
     "threat-leverage-semicolon-list-item.yaml": "packed_vocab_string",
+    "threat-impact-semicolon.yaml": "packed_vocab_string",
     "threat-impact-empty.yaml": "empty_vocab_list",
+    "threat-leverage-empty.yaml": "empty_vocab_list",
+    "threat-leverage-high.yaml": "unknown_vocab_value",
     "threat-actors-string-list.yaml": "actors_not_objects",
+    "threat-actors-not-list.yaml": "actors_not_objects",
     "threat-actor-missing-name.yaml": "actor_missing_name",
     "threat-actor-unscoped.yaml": "actor_unscoped",
+    "threat-actor-wrong-stage.yaml": "actor_unknown",
     "rule-bad-uuid.yaml": "invalid_uuid",
     "rule-unknown-schema.yaml": "unknown_schema",
     "rule-missing-metadata.yaml": "missing_metadata",
