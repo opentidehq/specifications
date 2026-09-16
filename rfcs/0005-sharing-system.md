@@ -161,7 +161,7 @@ Shared flags (push / preview / retract):
 | `--allow-tlp-red` | Required in addition to `allow_tlp_red = true` to share TLP:RED. |
 | `--publish` / `--no-publish` | Override target `publish` for this run (MISP: whether to call publish after upsert). |
 | `--include-queries` | MAY enable query emission **only if** global and target config already allow it. MUST NOT punch through a configured `include_queries = false`. |
-| `--workers` | Optional parallelism across objects; default implementation-defined. |
+| `--workers` | Optional parallelism across **HTTP** upserts; default implementation-defined. MUST NOT skip the share plan in §7.4 (presence is computed before workers start). |
 
 Scope rules MUST match [validation](../specs/validation.md): `--file` / `--uuid` / `--type` that match nothing MUST fail with `scope_no_match` rather than succeeding vacuously.
 
@@ -204,7 +204,7 @@ Additions to [workspace.md](../specs/workspace.md):
 | `published` | Whether the event was published |
 | `shared_at` | ISO-8601 timestamp |
 
-Idempotency: push MUST look up the remote event by UUID (see §7.4). If the stored `content_hash` matches the payload that would be sent, the action is `unchanged`. State MUST NOT be treated as authoritative if the remote lookup disagrees (remote wins; state is repaired).
+Idempotency: push MUST look up the remote event by UUID (see §7.4). If the stored `content_hash` matches the payload that would be sent, the action is `unchanged`. State MUST NOT be treated as authoritative if the remote lookup disagrees (remote wins; state is repaired). A `state.json` `remote_event_uuid` MUST NOT by itself make a parent Event **present** for `extends_uuid` (§7.4).
 
 Generated sharing paths MUST NOT be committed as hand-edited sources (same rule as `.opentide/exports/`). Implementations SHOULD gitignore `state.json`.
 
@@ -387,13 +387,18 @@ Connectors MUST resolve vocabulary `misp` fields from canonical `vocabularies/*.
 
 **Parent Event link (`extends_uuid`).** In `per-object` mode, a rule Event MAY set `extends_uuid` to `detection_model` (objective UUID). An objective Event MAY set `extends_uuid` to the first UUID in `objective.threats[]` whose Event is **present**. Related-event links use the same presence test.
 
-The parent Event is **present** for this target when any of:
+**Share plan (before any upsert).** For each selected target, implementations MUST compute a plan over the **full** share selection before emitting Events or starting `--workers`. For each object the plan is `emit` (a payload will be produced: later report `created` / `updated` / `unchanged`) or `skip` (`skipped_tlp` / `skipped_status`). The plan MUST be local (policy + selection only) and MUST NOT depend on HTTP completion order.
 
-1. **In-run:** the parent is in the current share selection **and** this run’s share report action for that parent is `created`, `updated`, or `unchanged` (a payload was produced). `skipped_tlp`, `skipped_status`, and `failed` do **not** count. Preview, `push --dry-run`, and `mode = file` produce payloads and therefore count;
-2. Local `state.json` already records `remote_event_uuid` for that parent on this target; or
-3. `mode = api` and `GET /events/view/<parent-uuid>` succeeds.
+The parent Event is **present** for this target only as follows (evaluate in order; do not OR stale state with a this-run skip):
+
+1. **Parent is in this run’s selection.** If the plan is `skip`, the parent is **not** present (this-run policy wins, even if `state.json` still has a UUID). If the plan is `emit`, the parent **is** present — including when that parent’s HTTP has not run yet, and including `preview`, `push --dry-run`, and `mode = file`.
+2. **Parent is not in this run’s selection.**
+   - `mode = api`: present only if `GET /events/view/<parent-uuid>` succeeds. `state.json` is a hint, not authority. HTTP `404` → not present; drop or repair the state row. A successful view wins even if `state.json` `published` is false.
+   - `mode = file` (and any preview that does not contact the server): **not** present. Stale export state MUST NOT imply a remote Event.
 
 MUST omit `extends_uuid` when the parent Event is not present (no dangling MISP extends). MISP Event `published`, `/events/publish`, `[misp].publish`, and `state.json` `published` MUST NOT be this gate (`publish` defaults to false; preview never publishes). Unpublished Events still exist and MAY be extended.
+
+`--workers` MAY parallelize upserts but MUST use the same plan for every object. Implementations SHOULD still upsert in topological order (threat → objective → rule) so a parent that `failed` after the plan said `emit` can omit `extends_uuid` on children not yet sent. Children already sent with a now-dangling extend are a partial-success case (exit `3`); retry repairs them.
 
 **`threat_level_id`** (MISP: 1 High, 2 Medium, 3 Low, 4 Undefined).
 
@@ -575,9 +580,9 @@ Preview output MUST use the same redaction as push.
 | Retract mode | MISP action |
 |--------------|-------------|
 | default | `unpublish` if published; leave event in place |
-| `--delete` | delete event (destructive). Implementations SHOULD require `--yes` or equivalent non-interactive confirm flag in CI. |
+| `--delete` | delete event (destructive). Implementations SHOULD require `--yes` or equivalent non-interactive confirm flag in CI. MUST drop the object’s `state.json` row (or clear `remote_event_uuid`) so a later child share cannot treat the deleted Event as **present**. |
 
-Retract is still TLP-scoped: it operates on previously shared records in state/remote, not on objects that were never pushed.
+Retract is still TLP-scoped: it operates on previously shared records in state/remote, not on objects that were never pushed. Default unpublish **leaves** the Event in place; that Event remains present for `extends_uuid` via `GET /events/view` (step 2 in §7.4).
 
 #### 7.8 Example — rule authoring vs emitted Event (preview)
 
@@ -709,7 +714,7 @@ Resolved in this revision:
 1. **Objective `detection.status` in v1** — always `Experimental` (Title Case). Deriving `Test`/`Production` from implementing rules is a later revision.
 3. **Git workspace requirement** — opentide-only policy, not this spec.
 6. **Sharing group UUID vs numeric id** — `api` mode MUST resolve UUID via `GET /sharing_groups`; numeric id is fallback when the UUID is empty. `file` mode MUST NOT call the API and REQUIRES a non-zero numeric id for `sharing-group`.
-7. **Partial object graphs** — MUST omit `extends_uuid` when the parent Event is not **present** (§7.4). Presence is in-run payload / prior state / remote lookup — not MISP `published`. §7.8 example follows that rule.
+7. **Partial object graphs** — MUST omit `extends_uuid` when the parent Event is not **present** (§7.4). Presence is the pre-HTTP share plan, or a live remote view — not `state.json` alone and not MISP `published`. §7.8 example follows that rule.
 8. **CI dry-run Action** — usage-guide only; not a spec requirement.
 
 Still open (need maintainer input before the spec follow-up):
