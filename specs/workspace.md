@@ -18,6 +18,7 @@ Defines the standard detection-repository directory layout scaffolded by `openti
 - Generated artifacts MUST live under `.opentide/` — not committed as hand-edited sources.
 - Client configuration overrides MUST live only under `.opentide/configurations/`.
 - Object YAML files MUST reside in the paths defined by merged `paths.toml` configuration.
+- An object instance MUST be a YAML file placed directly in its family directory (`objects/rules/rule.yaml`, not `objects/rules/team/rule.yaml`). A file in a subdirectory of that directory is not an object instance. Implementations MUST NOT deploy it. Nested folders under a family directory are outside this specification.
 - Object YAML **filenames** SHOULD use dash-case slugs (lowercase, hyphens) ideally aligned with the object `name` field via the same `slugify()` rules the opentide engine uses for documentation paths. The `name` field itself MAY be richer (title case, punctuation, spaces). On slug collision, append a short UUID suffix. This is a soft convention for catalogue hygiene, not a schema validation requirement.
 - `opentide generate schemas` MUST emit schema artifacts to `.opentide/schemas/`.
 - `opentide generate templates` MUST emit templates to `.opentide/templates/`.
@@ -170,3 +171,4 @@ Object fixtures assume the default layout: rules under `objects/rules/`, etc.
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-06-25 | Initial spec from opentide `paths.toml` |
+| 1.0 | 2026-09-23 | Object instances are the YAML files directly in each family directory; nested folders are out of scope and are not deployed |
