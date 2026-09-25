@@ -5,12 +5,12 @@
 - **Author:** OpenTide maintainers
 - **Status:** draft
 - **Created:** 2026-09-25
-- **Issue:** (pending)
+- **Issue:** [OpenTideHQ/specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)
 - **PR:** (pending)
 
 ## Summary
 
-Add an eighth detection platform, `elastic` (display name **Elastic Security**, schema `platform::elastic::1.0`), that deploys OpenTide rules as Elastic Security detection rules through the Kibana detection engine API (`/api/detection_engine/rules`, public API version `2023-10-31`).
+Add a detection platform, `elastic` (display name **Elastic Security**, schema `platform::elastic::1.0`), that deploys OpenTide rules as Elastic Security detection rules through the Kibana detection engine API (`/api/detection_engine/rules`, public API version `2023-10-31`).
 
 Decisions:
 
@@ -708,7 +708,7 @@ This is `POST <elasticsearch_url>/_query` for Example C, sent with the tenant's 
 
 | File | Change |
 |------|--------|
-| `specs/platforms.md` → 1.1 | Add the `elastic` capability row (query languages KQL, Lucene, EQL, and ES\|QL), the required fields (`type`, `query`, plus the type block), and an Elastic block section. Add it to the query-validation allowlist. Change "seven" to "eight". |
+| `specs/platforms.md` → 1.1 | Add the `elastic` capability row (query languages KQL, Lucene, EQL, and ES\|QL), the required fields (`type`, `query`, plus the type block), and an Elastic block section. Add it to the query-validation allowlist. Raise the platform count by one (seven to eight, or eight to nine if [RFC 0004](https://github.com/OpenTideHQ/specifications/issues/8) lands first). |
 | `specs/objects/rule-1.0.md` | Add `elastic` / `ElasticConfig` / `platform::elastic::1.0` to the `configurations` table (additive; `rule::1.0` unchanged) |
 | `specs/validation.md` | Add `elastic` to the query-validation table, with offline and live modes as in §6 |
 | `fixtures/valid/rule-elastic-1.0.yaml`, `fixtures/invalid/rule-elastic-esql-index.yaml` | New conformance fixtures from Examples A and "Invalid block" |
@@ -794,7 +794,7 @@ This is the `POST /_security/api_key` body for 9.5.4. On 8.19.22 the application
 
 ## References
 
-- Issue: (pending)
+- Issue: [OpenTideHQ/specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)
 - Kibana detection engine OpenAPI (`2023-10-31`): [elastic/kibana `security_solution/docs/openapi`](https://github.com/elastic/kibana/tree/main/x-pack/solutions/security/plugins/security_solution/docs/openapi)
 - [Kibana API: Security detections](https://www.elastic.co/docs/api/doc/kibana/group/endpoint-security-detections-api) · [Serverless](https://www.elastic.co/docs/api/doc/serverless/group/endpoint-security-detections-api)
 - [Spaces and Elastic Security](https://www.elastic.co/docs/solutions/security/get-started/spaces-elastic-security)
