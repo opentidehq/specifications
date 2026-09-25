@@ -46,6 +46,8 @@ If bundled config lacks `global`, `paths` is aliased to `global`. If `platforms`
 | `visibility.toml` | Yes | Visibility configuration |
 | `documentation.toml` | Yes | Documentation generation settings |
 | `platforms/*.toml` | Yes | Per-platform connection and behavior |
+| `sharing.toml` | Yes | Sharing policy and every sharing target, in one file |
+| `sharing/targets/*` | **No** | Not a configuration location. Targets are `[targets.<id>]` tables in `sharing.toml`. |
 | Vocabulary `.vocab.toml` | **No** | Canonical in `specifications/vocabularies/` |
 | `.opentide/schemas/*` | **No** | Generated artifacts |
 
@@ -53,6 +55,7 @@ If bundled config lacks `global`, `paths` is aliased to `global`. If `platforms`
 
 - Top-level `.toml` files in a configuration directory map to keys by filename (without `.toml`).
 - Subdirectories (e.g. `platforms/`) map to nested dicts; each file becomes an entry keyed by platform identifier.
+- Sharing is the exception: one `sharing.toml` holds every target as `[targets.<identifier>]`. Implementations MUST NOT treat `.opentide/configurations/sharing/` as a target directory.
 
 ### Path resolution
 
@@ -64,6 +67,7 @@ Path values in merged configuration MUST resolve to absolute paths, including le
 - [deployment.md](deployment.md) — `deployment.toml` semantics
 - [specs/vocabularies/format.md](vocabularies/format.md) — vocabulary extension via `schema.toml`
 - [platforms.md](platforms.md) — platform TOML under `platforms/`
+- [sharing.md](sharing.md) — single-file `sharing.toml`
 
 ## Defaults & overrides
 
@@ -77,4 +81,5 @@ Platform override pattern: `.opentide/configurations/platforms/sentinel.toml` wi
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-09-25 | `sharing.toml` is overridable. `sharing/targets/` is not a configuration location. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `core/files.py` |

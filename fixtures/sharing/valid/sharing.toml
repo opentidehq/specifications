@@ -1,0 +1,63 @@
+# Conformance sharing file: every target is a named table in this one file.
+# selection includes STAGING so the committed object fixtures are in scope.
+# The normative default for rule_statuses remains ["PRODUCTION"].
+
+enabled = false
+default_targets = []
+max_tlp = "amber"
+allow_tlp_red = false
+
+[selection]
+object_types = ["threat", "objective", "rule"]
+rule_statuses = ["PRODUCTION", "STAGING"]
+
+[targets.misp-internal]
+enabled = false
+identifier = "misp-internal"
+name = "Internal MISP"
+connector = "misp"
+schema = "sharing::misp::1.0"
+require_validation = true
+description = "Internal MISP instance"
+
+[targets.misp-internal.connection]
+url = "https://misp.internal.example.org"
+api_key = "${MISP_INTERNAL_API_KEY}"
+verify_ssl = true
+timeout_seconds = 30
+
+[targets.misp-internal.misp]
+organisation_uuid = "00000000-0000-4000-8aaa-000000000001"
+mode = "api"
+publish = false
+distribution = "this-community"
+sharing_group_id = 0
+sharing_group_uuid = ""
+analysis = "completed"
+info_prefix = "[OpenTide] "
+extra_tags = []
+
+[targets.misp-internal.misp.file]
+directory = ".opentide/exports/sharing/misp-internal"
+
+[targets.misp-isac]
+enabled = false
+identifier = "misp-isac"
+name = "Sector ISAC"
+connector = "misp"
+schema = "sharing::misp::1.0"
+require_validation = true
+max_tlp = "green"
+
+[targets.misp-isac.connection]
+url = "https://misp.isac.example.net"
+api_key = "${MISP_ISAC_API_KEY}"
+
+[targets.misp-isac.misp]
+organisation_uuid = "00000000-0000-4000-8aaa-000000000002"
+mode = "api"
+distribution = "sharing-group"
+sharing_group_uuid = "00000000-0000-4000-8bbb-000000000001"
+sharing_group_id = 0
+publish = true
+analysis = "completed"

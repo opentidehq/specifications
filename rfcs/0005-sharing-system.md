@@ -3,9 +3,10 @@
 - **RFC:** 0005
 - **Title:** Sharing system and MISP connector
 - **Author:** Amine Besson
-- **Status:** draft
+- **Status:** accepted
 - **Created:** 2026-09-15
-- **Revised:** 2026-09-17 — document-transport revision, in place (see [Revision history](#revision-history))
+- **Revised:** 2026-09-25 — single `sharing.toml`; pinned `opentide` template version 5 (see [Revision history](#revision-history))
+- **Accepted:** 2026-09-25 — normative text in [specs/sharing.md](../specs/sharing.md) and [specs/sharing/misp-1.0.md](../specs/sharing/misp-1.0.md)
 - **Issue:** [#10](https://github.com/OpenTideHQ/specifications/issues/10)
 - **PR:** [#9](https://github.com/OpenTideHQ/specifications/pull/9)
 
@@ -45,7 +46,8 @@ Without a spec, each workspace would invent its own export script, TLP handling 
 | Date | Change |
 |------|--------|
 | 2026-09-15 | Initial proposal: sharing subsystem, MISP connector with per-family field decomposition into MISP `detection` objects, broad taxonomy tagging, and `include_*` payload filtering. |
-| 2026-09-17 | **This revision.** Replaces the field decomposition with document transport over the upstream `opentide` MISP object; removes payload filtering in favour of TLP, distribution, and sharing-group governance; restricts tags to TLP, PAP, and two galaxies; moves Event identity to MISP-assigned UUIDs with a composite lookup key; makes multi-instance publishing explicit; removes `event_mode`, `threat_level_source`, `verify_event_org`, `tag_namespace`, and the `include_*` family. |
+| 2026-09-17 | Replaces the field decomposition with document transport over the upstream `opentide` MISP object; removes payload filtering in favour of TLP, distribution, and sharing-group governance; restricts tags to TLP, PAP, and two galaxies; moves Event identity to MISP-assigned UUIDs with a composite lookup key; makes multi-instance publishing explicit; removes `event_mode`, `threat_level_source`, `verify_event_org`, `tag_namespace`, and the `include_*` family. |
+| 2026-09-25 | **Accepted.** Targets are named tables in one `sharing.toml`. `sharing/targets/` is not loaded. The pinned template is upstream version 5 (`opentide-type` values `threat`, `objective`, `rule`; required `schema`). Normative requirements live in `specs/sharing.md` and `specs/sharing/misp-1.0.md`. |
 
 Per **Decision D-1** this is an in-place revision, not a superseding RFC. RFC 0005 published no file under `specs/`, so there is no accepted normative text to supersede — only a proposal to correct before it becomes normative. Keeping number `0005`, the filename, the title, and the issue and PR links keeps one discussion thread and one reviewable history for one decision. A second RFC that superseded four subsections of an unimplemented first RFC would split the record without adding provenance. The removals, retentions, and question dispositions are recorded below rather than in a separate file.
 
@@ -54,7 +56,7 @@ Per **Decision D-1** this is an in-place revision, not a superseding RFC. RFC 00
 | Concern | Command | Config | Destination |
 |---------|---------|--------|-------------|
 | Detection runtime | `opentide deploy` | `deployment.toml`, `platforms/*.toml` | SIEM / EDR |
-| Intelligence publication | `opentide share` | `sharing.toml`, `sharing/targets/*.toml` | CTI platforms (MISP first) |
+| Intelligence publication | `opentide share` | `sharing.toml` | CTI platforms (MISP first) |
 
 MISP MUST NOT be added to the [platforms](../specs/platforms.md) capability matrix. A MISP instance is not a query engine and MUST NOT grow a `configurations.misp` block on `rule::1.0`.
 
@@ -96,11 +98,11 @@ Sharing configuration follows the existing [configuration](../specs/configuratio
 
 | File | May override? | Purpose |
 |------|---------------|---------|
-| `sharing.toml` | Yes | Global sharing policy, default targets, selection |
-| `sharing/targets/<id>.toml` | Yes | Per-target connector, connection, identity, and policy |
+| `sharing.toml` | Yes | Global sharing policy, selection, and every target |
+| `sharing/targets/*` | **No** | Not loaded. A subfolder per target was rejected (see Alternatives). |
 | Secrets in TOML | Yes, but values MUST support `${ENV_VAR}` substitution (same pattern as `deployment.toml` proxy passwords) | API keys, optional client cert paths |
 
-Top-level `sharing.toml` maps to config key `sharing`. Each `.toml` file directly under `sharing/targets/` becomes `sharing.targets.<identifier>`, keyed by `[target].identifier` when set and by the filename stem otherwise. Files with another extension, and files nested below `sharing/targets/`, are not loaded as targets. Identifiers are 1–64 characters of lowercase letters, digits, hyphen, and underscore; a duplicate resolved identifier is a configuration error naming every file involved. Because the identifier is resolved **per file before merging**, a client file merges onto the bundled file with the matching *identifier*, not the matching filename.
+Top-level `sharing.toml` maps to config key `sharing`. The file body is that table. Every target is a named table `[targets.<identifier>]` in the same file, with connector tables nested under it (`[targets.<identifier>.connection]`, `[targets.<identifier>.misp]`). The table key is the target identifier. `[targets.<identifier>].identifier`, when set, MUST equal the table key. Identifiers are 1–64 characters of lowercase letters, digits, hyphen, and underscore. An array-of-tables `[[targets]]` MUST NOT be used. Files under `sharing/` MUST NOT be loaded as targets. Deep merge of one `sharing.toml` overrides a single target key without restating the others, which is the property the per-file layout was trying to buy.
 
 Bundled defaults MUST ship with sharing **disabled** (`enabled = false` on `[sharing]` and on every bundled target), matching platforms.
 
@@ -132,23 +134,23 @@ rule_statuses = ["PRODUCTION"]
 
 Two amendments to this section in this revision. `require_validation` moves from `[sharing]` to `[target]` (bundled default `true`), because policy resolution is now defined for exactly two keys and validation is a per-destination decision rather than a ceiling. The five payload-filtering keys (`include_internal_references`, `include_queries`, `include_platform_blocks`, `include_tenant_identifiers`, and the connector-level `include_object_yaml`) are removed outright; see §7.6.
 
-#### 3.3 Target file (`sharing/targets/<id>.toml`)
+#### 3.3 Target table (`[targets.<id>]` in `sharing.toml`)
 
-Every target file MUST contain `[target]` with a known `connector`. Additional tables are connector-specific. An unrecognised **table** is recorded as a warning and does not prevent the target from loading, so a future connector can ship keys before an older CLI learns them — except `connector` itself, which MUST be recognised or the target is skipped with an error. An unrecognised **key** inside a known table is likewise a warning, unless it names a removed option (§7.1), which is an error.
+Every target table MUST contain a known `connector`. Additional tables are connector-specific and live under the same target key. An unrecognised **table** is recorded as a warning and does not prevent the target from loading, so a future connector can ship keys before an older CLI learns them — except `connector` itself, which MUST be recognised or the target is skipped with an error. An unrecognised **key** inside a known table is likewise a warning, unless it names a removed option (§7.1), which is an error.
 
 Common `[target]` fields:
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `enabled` | bool | no | `false` | Participate in share runs |
-| `identifier` | string | no | filename stem | Stable id used by `--target` |
+| `identifier` | string | no | table key | Stable id used by `--target`. MUST match `[targets.<id>]` when set. |
 | `name` | string | no | identifier | Display name |
 | `connector` | string | **yes** | — | Connector id (`misp` for this RFC) |
 | `schema` | string | **yes** for MISP | — | Connector schema id, e.g. `sharing::misp::1.0` |
 | `require_validation` | bool | no | `true` | When true, push MUST run the default [validation](../specs/validation.md) checks on in-scope objects and MUST NOT share objects that raise errors. Warnings do not block. |
 | `description` | string | no | `""` | Human notes |
 
-Nothing in one target file changes the resolved configuration of another. Connection, credentials, publishing organisation, policy, and distribution are all per-target, and each target MAY name a distinct environment variable for the same key.
+Nothing in one target table changes the resolved configuration of another. Connection, credentials, publishing organisation, policy, and distribution are all per-target, and each target MAY name a distinct environment variable for the same key. There is still one file.
 
 ### 4. CLI: `opentide share`
 
@@ -203,8 +205,7 @@ Additions to [workspace.md](../specs/workspace.md):
 
 | Path | Purpose | Client-edited? |
 |------|---------|----------------|
-| `.opentide/configurations/sharing.toml` | Global sharing overrides | Yes |
-| `.opentide/configurations/sharing/targets/` | Per-target TOML | Yes |
+| `.opentide/configurations/sharing.toml` | Global sharing policy and every target | Yes |
 | `.opentide/sharing/state.json` | Last successful share mapping | **No** — generated |
 | `.opentide/exports/sharing/<target id>/` | Preview / `mode = "file"` Event JSON | **No** — generated |
 
@@ -250,10 +251,10 @@ Future connectors (OpenCTI, TAXII 2.1 collections) get their own `sharing::<id>:
 
 ### 7. MISP connector (`sharing::misp::1.0`)
 
-#### 7.1 Target TOML
+#### 7.1 Target tables inside `sharing.toml`
 
 ```toml
-[target]
+[targets.misp-internal]
 enabled = false
 identifier = "misp-internal"
 name = "Internal MISP"
@@ -262,7 +263,7 @@ schema = "sharing::misp::1.0"
 require_validation = true
 description = "Internal MISP instance"
 
-[connection]
+[targets.misp-internal.connection]
 url = "https://misp.internal.example.org"
 api_key = "${MISP_INTERNAL_API_KEY}"
 verify_ssl = true
@@ -271,7 +272,7 @@ timeout_seconds = 30
 # client_cert = "${MISP_CLIENT_CERT}"
 # client_key = "${MISP_CLIENT_KEY}"
 
-[misp]
+[targets.misp-internal.misp]
 organisation_uuid = "00000000-0000-4000-8aaa-000000000001"  # publishing org; half of the lookup key
 mode = "api"                     # api | file
 publish = false                  # call the publish endpoint after upsert
@@ -282,35 +283,35 @@ analysis = "completed"           # initial | ongoing | completed
 info_prefix = "[OpenTide] "      # optional, ≤ 32 characters, prepended to Event info verbatim
 extra_tags = []                  # optional constant tags, ≤ 10 entries of 1–255 characters
 
-[misp.file]
+[targets.misp-internal.misp.file]
 # used when mode = "file"; defaults to .opentide/exports/sharing/<target id>/
 directory = ".opentide/exports/sharing/misp-internal"
 ```
 
-A second target file is a second MISP instance, with its own credentials, its own publishing organisation, and its own — never looser — policy:
+A second target table in the same file is a second MISP instance, with its own credentials, its own publishing organisation, and its own — never looser — policy:
 
 ```toml
-[target]
+[targets.misp-isac]
 enabled = false
 identifier = "misp-isac"
 connector = "misp"
 schema = "sharing::misp::1.0"
+max_tlp = "green"                   # stricter than the global amber; a looser value is an error
 
-[connection]
+[targets.misp-isac.connection]
 url = "https://misp.isac.example.net"
 api_key = "${MISP_ISAC_API_KEY}"    # distinct environment variable per target
 
-[misp]
+[targets.misp-isac.misp]
 organisation_uuid = "00000000-0000-4000-8aaa-000000000002"
 mode = "api"
 distribution = "sharing-group"
 sharing_group_uuid = "00000000-0000-4000-8bbb-000000000001"
 sharing_group_id = 0
 publish = true
-max_tlp = "green"                   # stricter than the global amber; a looser value is an error
 ```
 
-**`[connection]`**
+**`[targets.<id>.connection]`**
 
 | Field | Type | Required | Default | Notes |
 |-------|------|----------|---------|-------|
@@ -320,7 +321,7 @@ max_tlp = "green"                   # stricter than the global amber; a looser v
 | `timeout_seconds` | number | no | `30` | Per-request timeout |
 | `client_cert` / `client_key` | string | no | — | Mutual TLS |
 
-**`[misp].organisation_uuid`** is required for connector `misp`. It is the canonical 36-character UUID of the MISP organisation under which this target publishes, and it is half the lookup key of §7.5. It is resolved independently per target, so two targets may declare two different organisations. Absence or a malformed value is a configuration error that excludes that target from the run while every other target continues.
+**`[targets.<id>.misp].organisation_uuid`** is required for connector `misp`. It is the canonical 36-character UUID of the MISP organisation under which this target publishes, and it is half the lookup key of §7.5. It is resolved independently per target, so two targets may declare two different organisations. Absence or a malformed value is a configuration error that excludes that target from the run while every other target continues.
 
 In `mode = "api"`, before any create or update, the connector MUST read the organisation UUID of the authenticated API key and compare it case-insensitively to the declared value. A mismatch fails that target with `organisation_uuid_mismatch` and writes nothing — because Events created under the key's actual organisation would never match the lookup key and would therefore duplicate on every subsequent run. A read failure fails that target with `organisation_uuid_unverified`; remaining targets continue. In `mode = "file"` the declared UUID is written into the exported document as the intended creator organisation and no verification request is made; a file export carries that risk unverified until the document is imported.
 
@@ -488,10 +489,10 @@ The template is pinned by identity, and this repository commits a copy of the up
 |----------|-------|
 | Name | `opentide` |
 | `uuid` | `892fd46a-f69e-455c-8c4f-843a4b8f4295` |
-| `version` | `4` |
+| `version` | `5` |
 | `meta-category` | `misc` |
-| Required relations | `name`, `opentide-object`, `opentide-type`, `uuid`, `version` |
-| Optional repeatable relation | `opentide-relation` (`multiple: true`) |
+| Required relations | `name`, `opentide-object`, `opentide-type`, `uuid`, `version`, `schema` |
+| Optional repeatable relations | `opentide-relation`, `misp-event-relation` (`multiple: true`) |
 | MISP attribute type on every relation | `text` |
 
 | Relation | Cardinality | Source | `disable_correlation` (from the template) |
@@ -499,19 +500,20 @@ The template is pinned by identity, and this repository commits a copy of the up
 | `name` | exactly 1 | Object top-level `name`, verbatim: no truncation, case change, or whitespace normalisation | `false` |
 | `uuid` | exactly 1 | `metadata.uuid`, verbatim. Never the Event UUID or the MISP object UUID | `false` |
 | `version` | exactly 1 | `metadata.version` as a decimal digit string, no leading zeroes, no quotes, no prefix. The template's `sane_default` of `1` MUST NOT be substituted for a real value | `true` |
-| `opentide-type` | exactly 1 | Family mapping below | `true` |
+| `opentide-type` | exactly 1 | Family name below | `true` |
+| `schema` | exactly 1 | `metadata.schema`, verbatim | `true` |
 | `opentide-object` | exactly 1 | The object document, verbatim (see §7.6) | `false` |
 | `opentide-relation` | 0..n | Parent object UUIDs, below | `false` |
 
 | Object family | `opentide-type` |
 |---------------|-----------------|
-| `threat` | `tvm` |
-| `objective` | `dom` |
-| `rule` | `mdr` |
+| `threat` | `threat` |
+| `objective` | `objective` |
+| `rule` | `rule` |
 
-`tvm`, `dom`, and `mdr` are the only values the upstream template's `values_list` accepts. They are MISP-side legacy names for the OpenTide families and MUST NOT be introduced as OpenTide object identifiers.
+Template version 5 `values_list` is `threat`, `objective`, `rule`. The earlier draft's `tvm`, `dom`, and `mdr` tokens MUST NOT be emitted. `misp-event-relation` is optional on the template and is not emitted: MISP Event UUIDs are server-assigned.
 
-A missing required relation on the target instance's template fails the object with `template_relation_missing`, naming each absent relation. A missing template altogether fails it with `template_missing`. A `template_version` that differs from the pinned `4` while all five required relations are present is an informational note, not a failure — the connector emits the pinned relation set and continues. There is no `template_version_unsupported` reason.
+A missing required relation on the target instance's template fails the object with `template_relation_missing`, naming each absent relation. A missing template altogether fails it with `template_missing`. A `template_version` that differs from the pinned `5` while all six required relations are present is an informational note, not a failure — the connector emits the pinned relation set and continues. There is no `template_version_unsupported` reason.
 
 Updates are confined to the seven envelope fields, the tag set, and the one `opentide` object. Remote objects or Event-level attributes the connector did not emit are left in place with an informational note, and the remote Event `uuid` and creator organisation are never rewritten.
 
@@ -645,12 +647,13 @@ Emitted Event, target `misp-internal` from §7.1 (informative). Every envelope v
         "name": "opentide",
         "meta-category": "misc",
         "template_uuid": "892fd46a-f69e-455c-8c4f-843a4b8f4295",
-        "template_version": 4,
+        "template_version": 5,
         "Attribute": [
           {"object_relation": "name", "type": "text", "value": "Suspicious PowerShell Encoded Command"},
           {"object_relation": "uuid", "type": "text", "value": "00000000-0000-4000-8003-000000000010"},
           {"object_relation": "version", "type": "text", "value": "3"},
-          {"object_relation": "opentide-type", "type": "text", "value": "mdr"},
+          {"object_relation": "opentide-type", "type": "text", "value": "rule"},
+          {"object_relation": "schema", "type": "text", "value": "rule::1.0"},
           {"object_relation": "opentide-object", "type": "text", "value": "name: Suspicious PowerShell Encoded Command\nmetadata:\n  uuid: 00000000-0000-4000-8003-000000000010\n  …the document above, byte for byte, comments included…\n"},
           {"object_relation": "opentide-relation", "type": "text", "value": "00000000-0000-4000-8002-000000000001"}
         ]
@@ -767,6 +770,7 @@ The refresh direction is **upstream MISP → this repository**, which is the *re
 - **Keep the per-family field decomposition** (first draft §7.5). Rejected: lossy for TVM and signal fields, requires placeholders for template-required attributes OpenTide cannot fill, cannot round-trip, and multiplies per-family rules an implementer must reproduce exactly.
 - **Treat MISP as a detection platform** (`configurations.misp` + `opentide deploy`). Rejected: MISP is not a detection runtime; deploy strategies (`INERT`/`PREVIEW`/`RELEASE`) do not map to CTI publication.
 - **One-off `opentide generate misp` export** with no target registry. Rejected: no TLP policy, no idempotent upsert, no multi-server, no retract.
+- **One file per target under `sharing/targets/`.** Rejected: sharing targets are workspace-authored destinations of the same connector, not bundled products. Named tables in `sharing.toml` deep-merge per target and keep every URL, credential reference, and ceiling in one diff. Platform subfolders stay as they are; they are a different registry.
 - **Keep the `include_*` payload filters alongside document transport.** Rejected: two exposure-control systems that can disagree, an emitted shape that depends on flag combinations, and no verifiable conformance target. TLP plus distribution already expresses reach.
 - **Never share TLP:RED** (D-12 option b). Rejected: an org-only distribution is exactly what TLP:RED describes, and a blanket ban would push operators to relabel objects to get them published — worse for accuracy than an explicit double gate.
 - **Canonically re-serialise the object body** (D-11 option b). Rejected: comments are authored content, and a stable hash is not worth discarding them.

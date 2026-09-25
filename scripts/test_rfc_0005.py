@@ -120,32 +120,28 @@ class Rfc0005TextTests(unittest.TestCase):
         text = _rfc_text()
         self.assertIn("MUST choose **exactly one** code using this order", text)
         self.assertIn("total failure that is not solely auth/connectivity", text)
-        self.assertIn("a sole-target run of only `org_mismatch` / HTTP 5xx is `1`", text)
         self.assertIn("only auth/connectivity is `2`", text)
 
-    def test_no_design_threats_drawback(self) -> None:
-        self.assertNotIn("DESIGN threats never reach MISP", _rfc_text())
-        self.assertIn("DESIGN/non-PRODUCTION **rules**", _rfc_text())
-
-    def test_signal_data_is_not_concatenated(self) -> None:
+    def test_targets_live_in_one_sharing_file(self) -> None:
         text = _rfc_text()
-        self.assertNotIn("concatenated unique `signals[].data`", text)
-        self.assertIn("MUST NOT stringify or concatenate the mapping", text)
+        self.assertIn("named table `[targets.<identifier>]`", text)
+        self.assertIn("`sharing/targets/*` | **No**", text)
+        self.assertNotIn("Each `.toml` file directly under `sharing/targets/`", text)
 
-    def test_chaining_uses_presence_not_also_shared(self) -> None:
+    def test_document_transport_not_detection_objects(self) -> None:
         text = _rfc_text()
-        self.assertNotIn("when the target threat is also shared", text)
-        self.assertIn("when the chained threat Event is **present**", text)
+        self.assertIn("exactly one instance of the upstream", text)
+        self.assertIn("Nothing is removed from that document", text)
 
     def test_file_mode_sharing_group_uuid_alone_is_invalid(self) -> None:
         text = _rfc_text()
         self.assertIn("a UUID alone is not enough", text)
         self.assertIn("UUID-only file config (`sharing_group_id = 0`) MUST fail", text)
 
-    def test_extends_uuid_not_gated_on_published(self) -> None:
+    def test_template_version_five(self) -> None:
         text = _rfc_text()
-        self.assertIn("MUST NOT depend on MISP `published`", text)
-        self.assertIn("A `state.json` `remote_event_uuid` MUST NOT by itself make a parent Event **present**", text)
+        self.assertIn("template version 5", text)
+        self.assertIn("`threat`, `objective`, `rule`", text)
 
 
 class Rfc0005GoldenJsonTests(unittest.TestCase):
@@ -158,21 +154,15 @@ class Rfc0005GoldenJsonTests(unittest.TestCase):
     def test_omits_data_platform(self) -> None:
         blob = json.dumps(self.event)
         self.assertNotIn("data-platform", blob)
+        self.assertNotIn("data-source", blob)
 
-    def test_data_source_is_sentinel(self) -> None:
-        attrs = self.event["Object"][0]["Attribute"]
-        sources = [item["value"] for item in attrs if item.get("object_relation") == "data-source"]
-        self.assertEqual(sources, ["sentinel"])
-
-    def test_detection_status_title_case(self) -> None:
-        attrs = self.event["Object"][0]["Attribute"]
-        status = [item["value"] for item in attrs if item.get("object_relation") == "status"]
-        self.assertEqual(status, ["Production"])
-
-    def test_bookkeeping_omits_optional_uuid_tag(self) -> None:
-        names = [tag["name"] for tag in self.event["Tag"]]
-        self.assertTrue(any(name.startswith("opentide:family=") for name in names))
-        self.assertFalse(any("opentide:uuid=" in name for name in names))
+    def test_single_opentide_object(self) -> None:
+        objects = self.event["Object"]
+        self.assertEqual(len(objects), 1)
+        self.assertEqual(objects[0]["name"], "opentide")
+        relations = [item["object_relation"] for item in objects[0]["Attribute"]]
+        self.assertIn("opentide-object", relations)
+        self.assertNotIn("status", relations)
 
     def test_unpublished_amber_clamped_distribution(self) -> None:
         self.assertFalse(self.event["published"])
