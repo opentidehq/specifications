@@ -6,7 +6,7 @@
 - **Status:** draft
 - **Created:** 2026-09-25
 - **Issue:** [OpenTideHQ/specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)
-- **PR:** (pending)
+- **PR:** [OpenTideHQ/specifications#18](https://github.com/OpenTideHQ/specifications/pull/18)
 
 ## Summary
 
