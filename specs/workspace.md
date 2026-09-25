@@ -40,6 +40,9 @@ Registered objects list: `threat`, `objective`, `rule`.
 |------|---------|----------------------------|
 | `.opentide/configurations/` | TOML overrides (paths, deployment, schema, platforms) | Yes |
 | `.opentide/configurations/platforms/` | Per-platform TOML | Yes |
+| `.opentide/configurations/sharing.toml` | Sharing policy and every target | Yes |
+| `.opentide/sharing/state.json` | Generated share state | No |
+| `.opentide/exports/sharing/<target id>/` | Preview and file-mode sharing output | No |
 | `.opentide/schemas/` | Generated JSON Schema | No |
 | `.opentide/templates/` | Generated YAML templates | No |
 | `.opentide/exports/` | Generated exports | No |
@@ -169,4 +172,5 @@ Object fixtures assume the default layout: rules under `objects/rules/`, etc.
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-09-25 | Sharing uses one client file, `sharing.toml`, plus generated state and export paths. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `paths.toml` |

@@ -34,6 +34,7 @@ OpenTide validates detection content through a structured pipeline: ID uniquenes
 | UUID format | `uuid-format` | yes | Every UUID must be valid UUIDv4 |
 | Schema | `schema` | yes | Pydantic model validation + vocab + cross-ref |
 | CVE | `cve` | no | CVE reference integrity (optional flag) |
+| Sharing config | `sharing-config` | no | `sharing.toml` target tables, TLP ceilings, and connector removed keys. On for `opentide share push`. |
 
 ### Schema check sub-steps
 
@@ -95,6 +96,11 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/invalid/rule-unknown-schema.yaml](../fixtures/invalid/rule-unknown-schema.yaml) | `unknown_schema` |
 | [fixtures/invalid/rule-missing-metadata.yaml](../fixtures/invalid/rule-missing-metadata.yaml) | `missing_metadata` |
 | [fixtures/invalid/objective-no-signals.yaml](../fixtures/invalid/objective-no-signals.yaml) | `empty_signals` |
+| [fixtures/sharing/invalid/removed-event-mode.toml](../fixtures/sharing/invalid/removed-event-mode.toml) | `removed_key` |
+| [fixtures/sharing/invalid/loose-max-tlp.toml](../fixtures/sharing/invalid/loose-max-tlp.toml) | `target_policy_looser` |
+| [fixtures/sharing/invalid/file-sharing-group.toml](../fixtures/sharing/invalid/file-sharing-group.toml) | `sharing_group_id_required` |
+| [fixtures/sharing/invalid/missing-org.toml](../fixtures/sharing/invalid/missing-org.toml) | `organisation_uuid_missing` |
+| [fixtures/sharing/invalid/identifier-mismatch.toml](../fixtures/sharing/invalid/identifier-mismatch.toml) | `identifier_mismatch` |
 
 A packed semicolon string that happens to start with a valid token MUST still fail `packed_vocab_string`. Accepting only the first token is lossy and non-compliant.
 
@@ -143,5 +149,6 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-09-25 | `sharing-config` checker codes for the single-file MISP target layout. |
 | 1.0 | 2026-09-16 | Document specifications-repo fixture checker codes for `threat::1.0` list/`ThreatActor` encoding ([#11](https://github.com/OpenTideHQ/specifications/issues/11), [#12](https://github.com/OpenTideHQ/specifications/issues/12)). |
 | 1.0 | 2026-06-25 | Initial spec from opentide `validation/session.py` |

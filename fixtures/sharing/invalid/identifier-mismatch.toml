@@ -1,0 +1,13 @@
+enabled = false
+max_tlp = "amber"
+allow_tlp_red = false
+
+[targets.misp-internal]
+enabled = false
+identifier = "misp-other"
+connector = "misp"
+schema = "sharing::misp::1.0"
+
+[targets.misp-internal.misp]
+organisation_uuid = "00000000-0000-4000-8aaa-000000000001"
+mode = "file"
