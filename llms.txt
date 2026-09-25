@@ -49,6 +49,7 @@
 - rfcs/0002-vocabulary-versioning.md
 - rfcs/0003-per-key-vocabulary-versioning.md
 - rfcs/0005-sharing-system.md
+- rfcs/0006-elastic-security-platform.md
 
 ## Agent skills
 
