@@ -6,6 +6,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `SCHEMA_REVISION.md`.
 
+## metadata 1.1
+
+- Optional `metadata.pap` ([RFC 0005](rfcs/0005-sharing-system.md)). `metadata.organisation.uuid` is the default sharing publishing organisation.
+
 ## metadata 1.0
 
 - Initial normative spec bootstrapped from opentide `models/metadata.py`.
@@ -26,10 +30,12 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## workspace 1.0
 
+- Client sharing file `sharing.toml`, plus one generated ledger, `.opentide/states/sharing.jsonl`. `preview` writes no files.
 - Initial normative spec bootstrapped from opentide `paths.toml`.
 
 ## configuration 1.0
 
+- `sharing.toml` is overridable. Its top-level arrays of tables (`[[misp]]`) merge by `name`; every other array still replaces. `sharing/` is not a configuration location.
 - Initial normative spec bootstrapped from opentide `core/files.py`.
 
 ## vocabulary format 1.0
@@ -52,7 +58,20 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial capability matrix for seven bundled platforms.
 
+## sharing 1.0
+
+- Sharing system ([RFC 0005](rfcs/0005-sharing-system.md)). One `sharing.toml` whose top level holds only integration arrays (`[[misp]]`; `[[opencti]]` reserved for a later connector). Each block carries its own selection and `max_tlp`; there are no global keys. Current share state is `.opentide/states/sharing.jsonl`, one line per object and destination, with a `state` of `synced` or `retracted`.
+
+## sharing-misp 1.0
+
+- MISP connector `sharing::misp::1.0`. Document transport via upstream `opentide` template version 5.
+- Minimal `[[misp]]` block: required `name`, `url`, `api_key`, and `max_tlp`; optional `enabled`, `object_types`, `rule_statuses`, `organisation_uuid`, `publish`, `verify_ssl`.
+- Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
+- Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
+- `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
 ## validation 1.0
 
+- `sharing-config` checker codes and fixtures for `[[misp]]` blocks, including the merge-by-`name` fixture.
 - Document specifications-repo fixture checker codes for `threat::1.0` list and `ThreatActor` encoding ([#11](https://github.com/OpenTideHQ/specifications/issues/11), [#12](https://github.com/OpenTideHQ/specifications/issues/12)).
 - Initial normative spec bootstrapped from opentide validation pipeline.

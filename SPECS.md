@@ -10,7 +10,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Spec | Version | Schema ID | Status | Path |
 |------|---------|-----------|--------|------|
 | Versioning | 1.0 | — | normative | [specs/versioning.md](specs/versioning.md) |
-| Metadata | 1.0 | — | normative | [specs/metadata.md](specs/metadata.md) |
+| Metadata | 1.1 | — | normative | [specs/metadata.md](specs/metadata.md) |
 | Threat object | 1.0 | `threat::1.0` | normative | [specs/objects/threat-1.0.md](specs/objects/threat-1.0.md) |
 | Objective object | 1.0 | `objective::1.0` | normative | [specs/objects/objective-1.0.md](specs/objects/objective-1.0.md) |
 | Rule object | 1.0 | `rule::1.0` | normative | [specs/objects/rule-1.0.md](specs/objects/rule-1.0.md) |
@@ -23,6 +23,8 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Metaschema keywords | 1.0 | — | normative | [specs/metaschema-keywords.md](specs/metaschema-keywords.md) |
 | Platforms | 1.0 | — | normative | [specs/platforms.md](specs/platforms.md) |
 | Validation | 1.0 | — | normative | [specs/validation.md](specs/validation.md) |
+| Sharing | 1.0 | — | normative | [specs/sharing.md](specs/sharing.md) |
+| MISP connector | 1.0 | `sharing::misp::1.0` | normative | [specs/sharing/misp-1.0.md](specs/sharing/misp-1.0.md) |
 
 ## Reading the specs
 

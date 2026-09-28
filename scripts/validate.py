@@ -14,6 +14,7 @@ from object_fixtures import (
     load_vocabularies,
     validate_fixture_file,
 )
+from sharing_fixtures import check_sharing_fixtures
 
 ROOT = Path(__file__).resolve().parents[1]
 VOCAB_DIR = ROOT / "vocabularies"
@@ -253,6 +254,7 @@ def main() -> int:
     errors.extend(_check_fixtures())
     errors.extend(_validate_object_fixtures())
     errors.extend(_validate_inflight_fixture())
+    errors.extend(check_sharing_fixtures())
 
     if errors:
         print("validation failed:", file=sys.stderr)

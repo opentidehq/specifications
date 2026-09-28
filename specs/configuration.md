@@ -46,6 +46,8 @@ If bundled config lacks `global`, `paths` is aliased to `global`. If `platforms`
 | `visibility.toml` | Yes | Visibility configuration |
 | `documentation.toml` | Yes | Documentation generation settings |
 | `platforms/*.toml` | Yes | Per-platform connection and behavior |
+| `sharing.toml` | Yes | Every sharing integration block (`[[misp]]`), in one file |
+| `sharing/*` | **No** | Not a configuration location. Sharing blocks live in `sharing.toml`. |
 | Vocabulary `.vocab.toml` | **No** | Canonical in `specifications/vocabularies/` |
 | `.opentide/schemas/*` | **No** | Generated artifacts |
 
@@ -53,6 +55,7 @@ If bundled config lacks `global`, `paths` is aliased to `global`. If `platforms`
 
 - Top-level `.toml` files in a configuration directory map to keys by filename (without `.toml`).
 - Subdirectories (e.g. `platforms/`) map to nested dicts; each file becomes an entry keyed by platform identifier.
+- Sharing is the exception: one `sharing.toml` holds every destination as a top-level integration array (`[[misp]]`). Implementations MUST NOT treat `.opentide/configurations/sharing/` as a configuration directory.
 
 ### Path resolution
 
@@ -64,10 +67,11 @@ Path values in merged configuration MUST resolve to absolute paths, including le
 - [deployment.md](deployment.md) — `deployment.toml` semantics
 - [specs/vocabularies/format.md](vocabularies/format.md) — vocabulary extension via `schema.toml`
 - [platforms.md](platforms.md) — platform TOML under `platforms/`
+- [sharing.md](sharing.md) — single-file `sharing.toml`, integration arrays merged by `name`
 
 ## Defaults & overrides
 
-Package defaults ship in the PyPI wheel (`get_data_root()`). Clients deep-merge overrides from `.opentide/configurations/`. Scalar values replace; nested tables merge recursively.
+Package defaults ship in the PyPI wheel (`get_data_root()`). Clients deep-merge overrides from `.opentide/configurations/`. Scalar values replace; nested tables merge recursively; arrays replace. The one exception is `sharing.toml`, whose top-level arrays of tables merge entry by entry on `name` ([sharing.md](sharing.md)).
 
 ## Examples
 
@@ -77,4 +81,5 @@ Platform override pattern: `.opentide/configurations/platforms/sentinel.toml` wi
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-09-28 | `sharing.toml` is overridable; its integration arrays (`[[misp]]`) merge by `name`. `sharing/` is not a configuration location. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `core/files.py` |

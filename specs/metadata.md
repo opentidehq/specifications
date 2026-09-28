@@ -1,6 +1,6 @@
 ---
 spec: metadata
-version: "1.0"
+version: "1.1"
 schema_id: null
 status: normative
 supersedes: null
@@ -20,6 +20,7 @@ Shared metadata block present on all Tide objects (threat, objective, rule). Pro
 - `metadata.version` MUST be present (semver string or integer).
 - `metadata.created` and `metadata.modified` MUST be ISO 8601 date or datetime strings (coerced to string on load).
 - `metadata.tlp` MUST be a valid Traffic Light Protocol value from the `tlp` vocabulary.
+- `metadata.pap`, when present, MUST be a `pap` vocabulary `name` (`white`, `green`, `amber`, `red`).
 - `metadata.author`, `metadata.contributors`, and `metadata.organisation` MAY be omitted.
 
 ## Definition
@@ -34,6 +35,7 @@ Shared metadata block present on all Tide objects (threat, objective, rule). Pro
 | `created` | string | yes | Creation date |
 | `modified` | string | yes | Last modification date |
 | `tlp` | string | yes | Traffic Light Protocol classification |
+| `pap` | string | no | Permissible Actions Protocol classification. Omitted means no PAP tag on share. |
 | `author` | string | no | Primary author |
 | `contributors` | list[string] | no | Additional contributors |
 | `organisation` | Organisation | no | Owning organisation |
@@ -42,7 +44,7 @@ Shared metadata block present on all Tide objects (threat, objective, rule). Pro
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `uuid` | string | yes | Organisation UUID |
+| `uuid` | string | yes | Organisation UUID. Sharing uses it as the default publishing organisation. |
 | `name` | string | yes | Organisation display name |
 
 ### `references` (ObjectReferences)
@@ -58,7 +60,8 @@ Optional on threat, objective, and rule objects.
 ## Relationships
 
 - [versioning.md](versioning.md) — `metadata.schema` and `metadata.version` semantics
-- [specs/vocabularies/catalog.md](vocabularies/catalog.md) — `tlp` vocabulary
+- [specs/vocabularies/catalog.md](vocabularies/catalog.md) — `tlp` and `pap` vocabularies
+- [sharing/misp-1.0.md](sharing/misp-1.0.md) — consumes `metadata.tlp`, optional `metadata.pap`, and `metadata.organisation.uuid` as the publishing organisation unless the `[[misp]]` block overrides it
 - Object specs — embed `metadata` as required top-level block
 
 ## Defaults & overrides
@@ -84,4 +87,5 @@ metadata:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-09-28 | Optional `metadata.pap` for sharing ([RFC 0005](../rfcs/0005-sharing-system.md)). Sharing uses `organisation.uuid` as the default publishing organisation. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `models/metadata.py` |

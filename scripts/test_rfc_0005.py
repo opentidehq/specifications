@@ -5,13 +5,20 @@ from __future__ import annotations
 
 import json
 import re
+import tomllib
 import unittest
 from pathlib import Path
 
 from share_exit import share_exit_code
+from sharing_fixtures import _block_errors, _layer_errors
 
 ROOT = Path(__file__).resolve().parents[1]
 RFC = ROOT / "rfcs" / "0005-sharing-system.md"
+SHARING_DOCS = (
+    RFC,
+    ROOT / "specs" / "sharing.md",
+    ROOT / "specs" / "sharing" / "misp-1.0.md",
+)
 
 
 def _rfc_text() -> str:
@@ -60,8 +67,11 @@ class ShareExitPartitionTests(unittest.TestCase):
             1,
         )
 
-    def test_sharing_group_unresolved_before_events_is_one(self) -> None:
+    def test_config_error_before_events_is_one(self) -> None:
         self.assertEqual(share_exit_code(preflight=True, actions=[]), 1)
+
+    def test_type_skips_only_are_zero(self) -> None:
+        self.assertEqual(share_exit_code(actions=["skipped_type", "skipped_tlp"]), 0)
 
     def test_auth_failure_with_no_success_is_two(self) -> None:
         self.assertEqual(
@@ -120,32 +130,57 @@ class Rfc0005TextTests(unittest.TestCase):
         text = _rfc_text()
         self.assertIn("MUST choose **exactly one** code using this order", text)
         self.assertIn("total failure that is not solely auth/connectivity", text)
-        self.assertIn("a sole-target run of only `org_mismatch` / HTTP 5xx is `1`", text)
         self.assertIn("only auth/connectivity is `2`", text)
 
-    def test_no_design_threats_drawback(self) -> None:
-        self.assertNotIn("DESIGN threats never reach MISP", _rfc_text())
-        self.assertIn("DESIGN/non-PRODUCTION **rules**", _rfc_text())
-
-    def test_signal_data_is_not_concatenated(self) -> None:
+    def test_integration_blocks_in_one_sharing_file(self) -> None:
         text = _rfc_text()
-        self.assertNotIn("concatenated unique `signals[].data`", text)
-        self.assertIn("MUST NOT stringify or concatenate the mapping", text)
+        self.assertIn("Its top level holds **only arrays of tables**", text)
+        self.assertIn("every MISP instance is one `[[misp]]` entry", text)
+        self.assertIn("`sharing/*` | **No**", text)
+        self.assertIn("Integration arrays merge across layers **by `name`**", text)
+        self.assertNotIn("Every target is a named table", text)
+        self.assertNotIn("Each `.toml` file directly under `sharing/targets/`", text)
 
-    def test_chaining_uses_presence_not_also_shared(self) -> None:
+    def test_share_state_is_one_jsonl_ledger(self) -> None:
         text = _rfc_text()
-        self.assertNotIn("when the target threat is also shared", text)
-        self.assertIn("when the chained threat Event is **present**", text)
+        self.assertIn(".opentide/states/sharing.jsonl", text)
+        self.assertIn("not a history of pushes", text)
+        self.assertNotIn(".opentide/exports/sharing/", text)
+        self.assertNotIn(".opentide/sharing/state.json", text)
 
-    def test_file_mode_sharing_group_uuid_alone_is_invalid(self) -> None:
+    def test_selection_and_ceiling_are_per_block(self) -> None:
         text = _rfc_text()
-        self.assertIn("a UUID alone is not enough", text)
-        self.assertIn("UUID-only file config (`sharing_group_id = 0`) MUST fail", text)
+        self.assertIn("There are no global keys.", text)
+        self.assertIn("Selection and the TLP ceiling are decided **at the integration block**", text)
 
-    def test_extends_uuid_not_gated_on_published(self) -> None:
+    def test_document_transport_not_detection_objects(self) -> None:
         text = _rfc_text()
-        self.assertIn("MUST NOT depend on MISP `published`", text)
-        self.assertIn("A `state.json` `remote_event_uuid` MUST NOT by itself make a parent Event **present**", text)
+        self.assertIn("exactly one instance of the upstream", text)
+        self.assertIn("Nothing is removed from that document", text)
+
+    def test_distribution_derived_from_tlp(self) -> None:
+        text = _rfc_text()
+        self.assertIn("1.0 has no distribution key", text)
+        self.assertIn("`sharing_group_id` is always `0`", text)
+
+    def test_organisation_consumed_from_object_first(self) -> None:
+        text = _rfc_text()
+        self.assertIn("consumes that value first and lets a block override it", text)
+        block = text.index("| 1 | `[[misp]].organisation_uuid` |")
+        obj = text.index("| 2 | Object `metadata.organisation.uuid` |")
+        self.assertLess(block, obj)
+        self.assertIn("organisation_uuid_missing", text)
+        self.assertNotIn("organisation_from_api_key", text)
+
+    def test_max_tlp_is_required_and_shares_red(self) -> None:
+        text = _rfc_text()
+        self.assertIn("`max_tlp = \"red\"` shares TLP:RED", text)
+        self.assertNotIn("--allow-tlp-red", text)
+
+    def test_template_version_five(self) -> None:
+        text = _rfc_text()
+        self.assertIn("template version 5", text)
+        self.assertIn("`threat`, `objective`, `rule`", text)
 
 
 class Rfc0005GoldenJsonTests(unittest.TestCase):
@@ -158,26 +193,47 @@ class Rfc0005GoldenJsonTests(unittest.TestCase):
     def test_omits_data_platform(self) -> None:
         blob = json.dumps(self.event)
         self.assertNotIn("data-platform", blob)
+        self.assertNotIn("data-source", blob)
 
-    def test_data_source_is_sentinel(self) -> None:
-        attrs = self.event["Object"][0]["Attribute"]
-        sources = [item["value"] for item in attrs if item.get("object_relation") == "data-source"]
-        self.assertEqual(sources, ["sentinel"])
+    def test_single_opentide_object(self) -> None:
+        objects = self.event["Object"]
+        self.assertEqual(len(objects), 1)
+        self.assertEqual(objects[0]["name"], "opentide")
+        relations = [item["object_relation"] for item in objects[0]["Attribute"]]
+        self.assertIn("opentide-object", relations)
+        self.assertNotIn("status", relations)
 
-    def test_detection_status_title_case(self) -> None:
-        attrs = self.event["Object"][0]["Attribute"]
-        status = [item["value"] for item in attrs if item.get("object_relation") == "status"]
-        self.assertEqual(status, ["Production"])
-
-    def test_bookkeeping_omits_optional_uuid_tag(self) -> None:
-        names = [tag["name"] for tag in self.event["Tag"]]
-        self.assertTrue(any(name.startswith("opentide:family=") for name in names))
-        self.assertFalse(any("opentide:uuid=" in name for name in names))
-
-    def test_unpublished_amber_clamped_distribution(self) -> None:
+    def test_unpublished_amber_org_only_distribution(self) -> None:
         self.assertFalse(self.event["published"])
         self.assertEqual(self.event["distribution"], 0)
+        self.assertEqual(self.event["sharing_group_id"], 0)
         self.assertEqual(self.event["threat_level_id"], 1)
+
+    def test_info_is_object_name(self) -> None:
+        name = next(
+            item["value"]
+            for item in self.event["Object"][0]["Attribute"]
+            if item["object_relation"] == "name"
+        )
+        self.assertEqual(self.event["info"], name)
+
+
+class SharingExampleTests(unittest.TestCase):
+    """Every TOML example in the RFC and the sharing specs obeys the checker."""
+
+    def test_examples_are_valid(self) -> None:
+        fence = re.compile(r"```toml\n(.*?)\n```", flags=re.DOTALL)
+        seen = 0
+        for path in SHARING_DOCS:
+            for index, body in enumerate(fence.findall(path.read_text(encoding="utf-8"))):
+                seen += 1
+                with self.subTest(doc=path.name, example=index):
+                    doc = tomllib.loads(body)
+                    self.assertEqual(_layer_errors(doc), [])
+                    complete = all("url" in block for block in doc.get("misp", []))
+                    if complete:
+                        self.assertEqual(_block_errors(doc), [])
+        self.assertGreaterEqual(seen, 5)
 
 
 if __name__ == "__main__":
