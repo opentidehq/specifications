@@ -71,7 +71,13 @@ DEPLOYMENT_VALUES = {"ALWAYS", "STAGING", "PRODUCTION", "MANUAL", "FULL", "DEBUG
 NON_ENTERPRISE_PREFIXES = ("Mobile : ", "Industrial : ")
 RISK_BANDS = {"low": (0, 21), "medium": (22, 47), "high": (48, 73), "critical": (74, 100)}
 UNIT_SECONDS = {"d": 86400, "h": 3600, "m": 60, "s": 1}
+_SHORT_DURATION = re.compile(r"(\d+)([smhd])")
 _ISO_DURATION = re.compile(r"P(?:(\d+)D)?(?:T(?=\d)(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?")
+# Mapping types used by ECS fields (elastic/ecs generated/ecs/ecs_flat.yml, main, 2026-09).
+ECS_FIELD_TYPES = frozenset(
+    """keyword long date boolean object flattened float nested wildcard ip
+    geo_point double scaled_float constant_keyword match_only_text""".split()
+)
 
 
 def _text() -> str:
@@ -149,28 +155,43 @@ def _forbidden_overrides() -> set[str]:
     return _mapping_fields() | _preserved_fields() | {"id", "version"}
 
 
-def iso_seconds(value: str) -> int:
-    match = _ISO_DURATION.fullmatch(value)
-    if not match or value in ("P", "PT"):
+def duration_seconds(value: str) -> int:
+    if short := _SHORT_DURATION.fullmatch(value):
+        total = int(short.group(1)) * UNIT_SECONDS[short.group(2)]
+    elif (match := _ISO_DURATION.fullmatch(value)) and value not in ("P", "PT"):
+        days, hours, minutes, secs = (int(g or 0) for g in match.groups())
+        total = ((days * 24 + hours) * 60 + minutes) * 60 + secs
+    else:
         raise ValueError(value)
-    days, hours, minutes, secs = (int(g or 0) for g in match.groups())
-    total = ((days * 24 + hours) * 60 + minutes) * 60 + secs
     if total <= 0:
         raise ValueError(value)
     return total
 
 
-def elastic_duration(value: str, units: str = "hms") -> tuple[int, str]:
-    total = iso_seconds(value)
+def elastic_duration(value: str, units: str = "dhms") -> tuple[int, str]:
+    total = duration_seconds(value)
     for unit in units:
         if total % UNIT_SECONDS[unit] == 0:
             return total // UNIT_SECONDS[unit], unit
     raise AssertionError("unreachable: seconds always divide")
 
 
-def date_math(value: str, units: str = "hms") -> str:
+def date_math(value: str, units: str = "dhms") -> str:
     amount, unit = elastic_duration(value, units)
     return f"{amount}{unit}"
+
+
+def field_types() -> set[str]:
+    match = re.search(r"FieldType = Literal\[(.*?)\]", _text(), flags=re.DOTALL)
+    if not match:
+        raise AssertionError("RFC 0006 is missing the FieldType literal")
+    return set(re.findall(r'"([a-z_]+)"', match.group(1)))
+
+
+def related_integration(entry: str | dict[str, Any]) -> dict[str, str]:
+    item = {"package": entry} if isinstance(entry, str) else dict(entry)
+    item.setdefault("version", "*")
+    return item
 
 
 def derive_threat(techniques: list[str], vocab: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
@@ -244,7 +265,12 @@ def check_block(block: dict[str, Any]) -> set[str]:
         if rule_type == "threshold":
             if not suppression.get("duration") or group_by:
                 codes.add("suppression_shape")
-        elif not group_by or not 1 <= len(group_by) <= 3:
+        elif (
+            not group_by
+            or not 1 <= len(group_by) <= 3
+            or len(set(group_by)) != len(group_by)
+            or not all(group_by)
+        ):
             codes.add("suppression_shape")
     new_terms = block.get("new_terms")
     if new_terms is not None and not 1 <= len(new_terms.get("fields") or []) <= 3:
@@ -265,7 +291,7 @@ def check_block(block: dict[str, Any]) -> set[str]:
     ]
     for value in filter(None, durations):
         try:
-            iso_seconds(value)
+            duration_seconds(value)
         except ValueError:
             codes.add("duration")
     if set(block.get("overrides") or {}) & _forbidden_overrides():
@@ -300,8 +326,8 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
         "enabled": STATUS_STRATEGY[status] != "DISABLEMENT",
         "severity": severity,
         "risk_score": risk_score,
-        "interval": date_math(scheduling.get("frequency", "PT5M")),
-        "from": "now-" + date_math(scheduling.get("lookback", "PT6M")),
+        "interval": date_math(scheduling.get("frequency", "5m")),
+        "from": "now-" + date_math(scheduling.get("lookback", "6m")),
         "to": "now",
         "language": {"eql": "eql", "esql": "esql"}.get(
             rule_type, block.get("language") or "kuery"
@@ -320,7 +346,7 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
             body["threshold"]["cardinality"] = [threshold["cardinality"]]
     if (new_terms := block.get("new_terms")) is not None:
         body["new_terms_fields"] = list(new_terms["fields"])
-        body["history_window_start"] = "now-" + date_math(new_terms["history_window"], "dhms")
+        body["history_window_start"] = "now-" + date_math(new_terms["history_window"])
     for key, value in (block.get("eql") or {}).items():
         if value is not None:
             body[key] = value
@@ -330,14 +356,20 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
         if rule_type != "threshold":
             compiled["group_by"] = list(suppression["group_by"])
         if suppression.get("duration"):
-            amount, unit = elastic_duration(suppression["duration"])
+            amount, unit = elastic_duration(suppression["duration"], "hms")
             compiled["duration"] = {"value": amount, "unit": unit}
         if rule_type != "threshold":
             compiled["missing_fields_strategy"] = suppression.get("missing_fields", "suppress")
         body["alert_suppression"] = compiled
     if alert.get("investigation_fields"):
         body["investigation_fields"] = {"field_names": list(alert["investigation_fields"])}
-    for key in ("required_fields", "related_integrations", "false_positives", "setup"):
+    if block.get("required_fields"):
+        body["required_fields"] = [
+            {"name": name, "type": block["required_fields"][name]} for name in sorted(block["required_fields"])
+        ]
+    if block.get("related_integrations"):
+        body["related_integrations"] = [related_integration(e) for e in block["related_integrations"]]
+    for key in ("false_positives", "setup"):
         if block.get(key):
             body[key] = copy.deepcopy(block[key])
     if block.get("building_block"):
@@ -433,11 +465,11 @@ class ExampleCompilationTests(unittest.TestCase):
         self.assertEqual({k: v for k, v in compiled.items() if k != "tags"}, without)
         self.assertEqual(base_path(prod), "https://kibana.soc.example.internal:5601/api/detection_engine/rules")
 
-    def test_esql_tenants_declare_elasticsearch_url(self) -> None:
+    def test_tenants_declare_https_elasticsearch_url(self) -> None:
         _, body = _fence("platform-toml")
         for tenant in tomllib.loads(body)["tenants"]:
             with self.subTest(tenant=tenant["name"]):
-                self.assertRegex(tenant["setup"].get("elasticsearch_url", ""), r"^https://")
+                self.assertRegex(tenant["setup"]["elasticsearch_url"], r"^https://")
 
     def test_bodies_use_only_kibana_fields_and_carry_required_ones(self) -> None:
         rules = [_yaml("rule-query"), *(_overlay(a) for a in OVERLAYS)]
@@ -486,7 +518,7 @@ class TableConsistencyTests(unittest.TestCase):
             },
             "threshold_fields": {"type": "threshold", "query": "x", "threshold": {"field": [], "value": 0}},
             "risk_score": {"type": "query", "query": "x", "alert": {"risk_score": 101}},
-            "duration": {"type": "query", "query": "x", "scheduling": {"frequency": "5m"}},
+            "duration": {"type": "query", "query": "x", "scheduling": {"frequency": "5min"}},
             "override_key": {"type": "query", "query": "x", "overrides": {"threat": []}},
         }
         self.assertEqual(table_codes, set(probes))
@@ -538,14 +570,37 @@ class TableConsistencyTests(unittest.TestCase):
 
     def test_duration_table(self) -> None:
         for row in _table("duration-table"):
-            iso = row["ISO 8601"].strip("`")
-            with self.subTest(duration=iso):
+            written = row["Written"].strip("`")
+            with self.subTest(duration=written):
                 interval, from_ = _ticked(row["interval / from"])
-                self.assertEqual(interval, date_math(iso))
-                self.assertEqual(from_, "now-" + date_math(iso))
-                amount, unit = elastic_duration(iso)
+                self.assertEqual(interval, date_math(written))
+                self.assertEqual(from_, "now-" + date_math(written))
+                amount, unit = elastic_duration(written, "hms")
                 self.assertEqual(row["alert_suppression.duration"], f"`{{value: {amount}, unit: {unit}}}`")
-                self.assertEqual(row["history_window_start"].strip("`"), "now-" + date_math(iso, "dhms"))
+                self.assertEqual(row["history_window_start"].strip("`"), "now-" + date_math(written))
+
+    def test_duration_forms(self) -> None:
+        self.assertEqual(duration_seconds("90s"), duration_seconds("PT90S"))
+        self.assertEqual(duration_seconds("14d"), duration_seconds("P14D"))
+        for bad in ("5min", "1w", "0m", "1.5h", "PT", "P", "5"):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                duration_seconds(bad)
+
+    def test_field_types_cover_ecs_and_examples(self) -> None:
+        types = field_types()
+        self.assertLessEqual(ECS_FIELD_TYPES, types)
+        for anchor in ["rule-query", *OVERLAYS]:
+            required = _yaml(anchor)["configurations"]["elastic"].get("required_fields") or {}
+            with self.subTest(example=anchor):
+                self.assertIsInstance(required, dict)
+                self.assertLessEqual(set(required.values()), types)
+
+    def test_related_integration_shorthand(self) -> None:
+        self.assertEqual(related_integration("windows"), {"package": "windows", "version": "*"})
+        self.assertEqual(
+            related_integration({"package": "aws", "integration": "cloudtrail", "version": "^2.0.0"}),
+            {"package": "aws", "integration": "cloudtrail", "version": "^2.0.0"},
+        )
 
 
 class PlatformConfigTests(unittest.TestCase):
