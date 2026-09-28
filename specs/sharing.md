@@ -19,7 +19,7 @@ Sharing publishes Tide objects (threat, objective, rule) to external intelligenc
 - The top level of `sharing.toml` MUST hold only arrays of tables. Any other top-level key, including a `[sharing]` or `[targets.<id>]` table, MUST be a configuration error.
 - Every block MUST carry a `name`. Names MUST be unique across every integration block in the file.
 - Selection and the TLP ceiling MUST be resolved per block. There is no global selection or global ceiling.
-- A block MUST NOT share an object whose `metadata.tlp` exceeds its `max_tlp`. TLP:RED MUST NOT be shared unless the block sets `max_tlp = "red"` **and** the operator passes `--allow-tlp-red`.
+- Every block MUST set `max_tlp`. There is no default ceiling. A block MUST NOT share an object whose `metadata.tlp` exceeds that value, including TLP:RED when the ceiling is below `red`.
 - Bundled defaults MUST ship with no enabled block.
 - `opentide share` with no subcommand MUST mean `push`. Implementations MUST provide `push`, `preview`, `status`, `retract`, and `targets`.
 - MISP MUST NOT be added to the [platforms](platforms.md) capability matrix and MUST NOT appear as `configurations.misp` on `rule::1.0`.
@@ -72,7 +72,7 @@ A two-instance MISP setup is two `[[misp]]` entries. A MISP instance plus an Ope
 |-------|------|----------|---------|-----------|
 | `name` | string | yes | — | Identifier used by `--target`, the share report, and the state ledger. 1–64 characters of lowercase letters, digits, hyphen, and underscore. |
 | `enabled` | bool | no | `false` | Participate in share runs. |
-| `max_tlp` | string | no | `amber` | A `tlp` vocabulary `name`. Objects above this ceiling are `skipped_tlp`. Order: `clear` < `green` < `amber` < `amber+strict` < `red`. |
+| `max_tlp` | string | yes | — | A `tlp` vocabulary `name`. Objects above this ceiling are `skipped_tlp`. Order: `clear` < `green` < `amber` < `amber+strict` < `red`. |
 | `object_types` | list[string] | no | `["threat", "objective", "rule"]` | Families this block shares. |
 | `rule_statuses` | list[string] | no | `["PRODUCTION"]` | Rule statuses this block shares. Values MUST be names from merged `deployment.toml`. Threats and objectives ignore this key. |
 
@@ -109,7 +109,6 @@ enabled = true
 | `--type <family>` | Repeatable. `threat`, `objective`, `rule`. Intersected with each block's `object_types`. |
 | `--file <path>` | Repeatable. Narrow to YAML files. |
 | `--dry-run` | On `push`: same as `preview`. |
-| `--allow-tlp-red` | Required, together with a block `max_tlp = "red"`, to share TLP:RED to that block. |
 | `--publish` / `--no-publish` | Override the block's `publish` for this run. |
 | `--workers` | Optional parallelism across HTTP upserts. MUST NOT change any object's outcome. |
 
@@ -152,7 +151,7 @@ The file is UTF-8 JSON Lines: one JSON object per line, no wrapping array. It is
 | `object_uuid` | Tide `metadata.uuid` |
 | `object_schema` | `metadata.schema` |
 | `object_version` | `metadata.version` at last successful share |
-| `content_hash` | Hash of the emitted object document |
+| `content_hash` | SHA-256 of the verbatim UTF-8 bytes of the emitted object document, lowercase hex |
 | `integration` | Connector id (`misp`, later `opencti`) |
 | `target` | Block `name` |
 | `organisation_uuid` | Publishing organisation observed for the matched remote record |
@@ -185,7 +184,7 @@ A connector spec MUST declare its integration key (the top-level array name), it
 
 ## Defaults & overrides
 
-Bundled `sharing.toml` ships with no enabled block. A block that omits `max_tlp`, `object_types`, or `rule_statuses` shares `amber` and below, all three families, and `PRODUCTION` rules only. Clients declare and enable blocks only in `.opentide/configurations/sharing.toml`.
+Bundled `sharing.toml` ships with no enabled block. A block MUST set `max_tlp`. A block that omits `object_types` or `rule_statuses` shares all three families and `PRODUCTION` rules only. Clients declare and enable blocks only in `.opentide/configurations/sharing.toml`.
 
 ## Examples
 
@@ -197,4 +196,4 @@ Bundled `sharing.toml` ships with no enabled block. A block that omits `max_tlp`
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-09-28 | Initial spec from accepted [RFC 0005](../rfcs/0005-sharing-system.md). Integration blocks are top-level arrays (`[[misp]]`) with per-block selection and `max_tlp`, merged by `name`. Share state is one current-state ledger, `.opentide/states/sharing.jsonl`. `preview` writes no files. |
+| 1.0 | 2026-09-28 | Initial spec from accepted [RFC 0005](../rfcs/0005-sharing-system.md). Integration blocks are top-level arrays (`[[misp]]`) with per-block selection and a required `max_tlp`, merged by `name`. Share state is `.opentide/states/sharing.jsonl`. `preview` writes no files. |

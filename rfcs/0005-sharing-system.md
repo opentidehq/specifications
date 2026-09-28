@@ -148,7 +148,7 @@ There are no global keys. Selection and the TLP ceiling are decided **at the int
 |-------|------|----------|---------|-----------|
 | `name` | string | **yes** | — | Identifier used by `--target`, the share report, and the state ledger. 1–64 characters of lowercase letters, digits, hyphen, and underscore. Unique across every block in the file. |
 | `enabled` | bool | no | `false` | Participate in share runs. |
-| `max_tlp` | string | no | `amber` | MUST be a `tlp` vocabulary `name`. Objects whose `metadata.tlp` exceeds this ceiling are `skipped_tlp` in the share report (not a silent omit, and not exit `1`). TLP order for comparison: `clear` < `green` < `amber` < `amber+strict` < `red`. TLP:RED additionally needs `--allow-tlp-red` on the command line. |
+| `max_tlp` | string | **yes** | — | MUST be a `tlp` vocabulary `name`. No default. Objects whose `metadata.tlp` exceeds this ceiling are `skipped_tlp` in the share report (not a silent omit, and not exit `1`). TLP order for comparison: `clear` < `green` < `amber` < `amber+strict` < `red`. `max_tlp = "red"` shares TLP:RED. |
 | `object_types` | list[string] | no | `["threat", "objective", "rule"]` | Families this block shares. |
 | `rule_statuses` | list[string] | no | `["PRODUCTION"]` | MUST match names from merged `deployment.toml`. Threats and objectives ignore this key. |
 
@@ -177,7 +177,6 @@ Shared flags (push / preview / retract):
 | `--type <family>` | Repeatable. `threat`, `objective`, `rule`. Intersected with each block's `object_types`. |
 | `--file <path>` | Repeatable. Narrow to YAML files. |
 | `--dry-run` | On `push`: same as `preview`. |
-| `--allow-tlp-red` | Required, together with a block `max_tlp = "red"`, to share TLP:RED to that block. |
 | `--publish` / `--no-publish` | Override the block's `publish` for this run (MISP: whether to call publish after upsert). |
 | `--workers` | Optional parallelism across **HTTP** upserts; default implementation-defined. MUST NOT change any object's outcome: each object's payload and policy decision are computed independently of every other object and of completion order. |
 
@@ -222,7 +221,7 @@ The ledger is UTF-8 JSON Lines, one JSON object per line, with no wrapping array
 | `object_uuid` | Tide `metadata.uuid` |
 | `object_schema` | `metadata.schema` |
 | `object_version` | `metadata.version` at last successful share |
-| `content_hash` | Hash of the emitted object document for that block |
+| `content_hash` | SHA-256 of the verbatim UTF-8 bytes of the emitted object document, lowercase hex |
 | `integration` | Connector id (`misp`) |
 | `target` | Block `name` |
 | `organisation_uuid` | Publishing organisation UUID observed for the matched Event |
@@ -288,7 +287,8 @@ The first MISP block is deliberately small: where to connect, what to select, ho
 |-------|--------|-----------|
 | 1 | `[[misp]].organisation_uuid` | Set on the block. Overrides every object for that block. |
 | 2 | Object `metadata.organisation.uuid` | Block value absent |
-| 3 | Organisation of the authenticated API key | Neither is set. The share report notes `organisation_from_api_key`. |
+
+An object where both are absent is `failed` / `organisation_uuid_missing`. The connector MUST NOT fall back to the API key's organisation. |
 
 Before any create or update, the connector MUST read the API key's organisation and compare it case-insensitively to the resolved value. MISP records the key's organisation as the Event creator whatever the payload says, so a mismatched Event would never match the lookup key and would duplicate on every later run. A mismatch therefore writes nothing: when the value came from the block, the block fails with `organisation_uuid_mismatch`; when it came from an object, only that object fails. A read failure fails the block with `organisation_uuid_unverified`; other blocks continue. An object whose `metadata.organisation` names someone else is republished by setting `organisation_uuid` on the block to the publisher's own organisation.
 
@@ -302,7 +302,7 @@ Earlier drafts made `organisation_uuid` mandatory on every target. That duplicat
 | `green` | `1` (this community) |
 | `amber` | `0` (your organisation) |
 | `amber+strict` | `0` (your organisation) |
-| `red` | `0` (your organisation), only when the block sets `max_tlp = "red"` and `--allow-tlp-red` is passed |
+| `red` | `0` (your organisation). Shared only when the block's `max_tlp` is `red`; otherwise the object is `skipped_tlp` |
 
 `sharing_group_id` is always `0`. Each row is the narrowest reach the draft's TLP-to-allowed-distribution table permitted for a community instance: `clear` and `green` stay inside the receiving community rather than syncing onward, and `amber`, which the draft could route to a sharing group, stays organisation-only until sharing groups are specified. Wider distribution and sharing groups are a later revision of the connector (N-4).
 
@@ -515,9 +515,9 @@ The `opentide-object` attribute carries **one** value: the verbatim byte sequenc
 
 Two contracts follow by construction rather than by rule. The emitted document is exactly one YAML document parsing to a mapping at the root, and it passes the `uuid-format` and `schema` checks of [validation.md](../specs/validation.md) against its own `metadata.schema` whenever the source object does — the workspace-scope `id-uniqueness` check and the cross-object `References` and `Chaining` sub-steps are outside the contract, because a single detached document carries no workspace registry. And every authored value, including the top-level key set, is character-for-character equal to the source. Push always runs those checks before payload construction and records an object raising `error`-severity issues as `failed` / `validation_error`; warning-severity issues continue with a note. Earlier drafts let a target switch validation off with `require_validation = false`; 1.0 does not, because an unvalidated document is exactly what a consumer cannot trust.
 
-**Nothing is removed.** No field, key, comment, or value is dropped, emptied, masked, replaced, or truncated for any block, any `metadata.tlp` value, any configuration key, or any run flag. `references.internal`, platform `tenants`, `response.procedure.searches[].query`, and every `query`, `search`, `condition`, `sigma`, `yara`, and hunt `details` value an object carries reach every recipient the resolved distribution permits. TLP:RED is shared on the same terms as any other TLP value where the block sets `max_tlp = "red"` and `--allow-tlp-red` is passed, carrying its complete body (D-12).
+**Nothing is removed.** No field, key, comment, or value is dropped, emptied, masked, replaced, or truncated for any block, any `metadata.tlp` value, any configuration key, or any run flag. `references.internal`, platform `tenants`, `response.procedure.searches[].query`, and every `query`, `search`, `condition`, `sigma`, `yara`, and hunt `details` value an object carries reach every recipient the resolved distribution permits. TLP:RED is shared on the same terms as any other TLP value when the block's `max_tlp` is `red`, carrying its complete body (D-12).
 
-The exposure controls are exactly three: the block's `max_tlp` ceiling, the `--allow-tlp-red` gate for TLP:RED, and the TLP-derived distribution of §7.1. Payload filtering is not among them. Withholding content from a recipient is done by raising the object's `metadata.tlp`, by lowering the block's `max_tlp`, or by leaving the object out of the block's selection — there is no per-field mechanism, and the connector spec carries this consequence in its own text so that an operator learns it before configuring a block.
+The exposure controls are exactly two: the block's `max_tlp` ceiling and the TLP-derived distribution of §7.1. Payload filtering is not among them. Withholding content from a recipient is done by raising the object's `metadata.tlp`, by lowering the block's `max_tlp`, or by leaving the object out of the block's selection — there is no per-field mechanism, and the connector spec carries this consequence in its own text so that an operator learns it before configuring a block.
 
 The first draft's §7.6 is removed wholesale: the `include_queries`, `include_internal_references`, `include_tenant_identifiers`, `include_platform_blocks`, and `include_object_yaml` options; the `skipped_redaction` and `skipped_yaml` report outcomes; and the prohibition on attaching the source document unmodified, which this revision reverses — carrying the verbatim document is now the required behaviour. No replacement option, flag, or default may remove a field.
 
@@ -700,7 +700,7 @@ Acceptance (2026-09-28) kept the document-transport model above and cut the conf
 
 | Draft element | At acceptance |
 |---------------|---------------|
-| Global `[sharing]` table: `enabled`, `default_targets`, `max_tlp`, `allow_tlp_red`, `[sharing.selection]` | Per-block `enabled`, `max_tlp`, `object_types`, `rule_statuses` (§3.3). `--target` or every enabled block. TLP:RED needs block `max_tlp = "red"` plus `--allow-tlp-red`. |
+| Global `[sharing]` table: `enabled`, `default_targets`, `max_tlp`, `allow_tlp_red`, `[sharing.selection]` | Per-block `enabled`, required `max_tlp`, `object_types`, `rule_statuses` (§3.3). `--target` or every enabled block. TLP:RED needs `max_tlp = "red"` and no extra flag. |
 | Strictest-wins resolution of `max_tlp` and `allow_tlp_red` between global and target | One value, on the block |
 | Per-target tables (`[target]`, `[connection]`, `[misp]`, `[misp.file]`) and the keys `identifier`, display name, `connector`, `schema`, `description` | One flat `[[misp]]` entry; the array key is the connector and `name` the identifier |
 | Mandatory per-target `organisation_uuid` | Object `metadata.organisation.uuid`, with an optional block override (§7.1) |
@@ -751,7 +751,7 @@ The refresh direction is **upstream MISP → this repository**, which is the *re
 - **Named tables `[targets.<id>]` under a global `[sharing]` policy.** Rejected at acceptance: the connector was a key inside each table rather than the thing the block belongs to, connection and connector settings needed nested sub-tables, and a global ceiling that targets could only tighten was a second policy layer to resolve by hand. Top-level `[[misp]]` arrays put selection and the ceiling where the destination is declared and leave room for `[[opencti]]` beside them. Arrays of tables do not deep-merge by default, so this layout needs the merge-by-`name` rule of §3.1; that rule is the cost.
 - **Keep distribution and sharing groups configurable in 1.0.** Deferred: a distribution key, its TLP clamp, and UUID-to-id sharing-group resolution (N-4) were most of the draft's configuration surface and most of its failure modes. TLP-derived distribution is a safe floor that a later revision can widen additively.
 - **Keep the `include_*` payload filters alongside document transport.** Rejected: two exposure-control systems that can disagree, an emitted shape that depends on flag combinations, and no verifiable conformance target. TLP plus distribution already expresses reach.
-- **Never share TLP:RED** (D-12 option b). Rejected: an org-only distribution is exactly what TLP:RED describes, and a blanket ban would push operators to relabel objects to get them published — worse for accuracy than an explicit double gate.
+- **Never share TLP:RED** (D-12 option b). Rejected: an org-only distribution is exactly what TLP:RED describes, and a blanket ban would push operators to relabel objects to get them published — worse for accuracy than requiring `max_tlp = "red"`.
 - **Canonically re-serialise the object body** (D-11 option b). Rejected: comments are authored content, and a stable hash is not worth discarding them.
 - **Event UUID equals the object UUID** (first draft §7.4, D-2 option a). Rejected: it makes the second organisation to publish an object collide with the first, in exactly the shared-community setting this connector targets.
 - **Per-target `threat_level_id` constant** (D-3 option a). Rejected: two objects of different severity would arrive indistinguishable.

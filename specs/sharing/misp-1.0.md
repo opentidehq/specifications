@@ -19,9 +19,9 @@ The pinned template is [schemas/misp/opentide.definition.json](../../schemas/mis
 ## Requirements
 
 - Each MISP instance MUST be one `[[misp]]` entry in `sharing.toml`.
-- A `[[misp]]` block MUST set `name`, `url`, and `api_key`. Every other key has a default.
+- A `[[misp]]` block MUST set `name`, `url`, `api_key`, and `max_tlp`. Every other key has a default.
 - A key not listed in this spec MUST be rejected as a configuration error before any instance is contacted.
-- The publishing organisation MUST be resolved from the object's `metadata.organisation.uuid` unless the block sets `organisation_uuid`, and MUST be verified against the API key's organisation before any write.
+- The publishing organisation MUST be the block's `organisation_uuid` when set, otherwise the object's `metadata.organisation.uuid`. An object with neither MUST fail and MUST NOT be written. The resolved value MUST be verified against the API key's organisation before any write.
 - The connector MUST emit exactly one `opentide` object per Event and zero Event-level attributes.
 - The `opentide-object` value MUST be the verbatim UTF-8 YAML bytes of the source document. Comments, key order, indentation, and blank lines MUST be preserved. The connector MUST NOT re-serialise, encode, truncate, split, or wrap that body.
 - No configuration value, API key, authorization header, or `${ENV_VAR}` substitution result MAY be injected into the document, object, envelope, tag set, share report, share state, or CLI output.
@@ -71,7 +71,7 @@ organisation_uuid = "00000000-0000-4000-8aaa-000000000002"
 | `enabled` | bool | no | `false` | |
 | `url` | string (URL) | yes | — | Instance origin. Trailing slash ignored. |
 | `api_key` | string | yes | — | MUST be a `${ENV_VAR}` reference in committed config. An unset or empty variable excludes the block before any request. A literal key SHOULD raise a validation warning and MUST NOT be printed. |
-| `max_tlp` | string | no | `amber` | Highest `metadata.tlp` this block shares |
+| `max_tlp` | string | yes | — | Highest `metadata.tlp` this block shares. No default. |
 | `object_types` | list[string] | no | all three | |
 | `rule_statuses` | list[string] | no | `["PRODUCTION"]` | |
 | `organisation_uuid` | string (UUID) | no | from the object | Override for the publishing organisation. Canonical 36-character UUID. |
@@ -104,7 +104,8 @@ The publishing organisation is half of the Event lookup key. opentide already re
 |-------|--------|-----------|
 | 1 | `[[misp]].organisation_uuid` | Set on the block. Overrides every object for that block. |
 | 2 | Object `metadata.organisation.uuid` | Block value absent |
-| 3 | Organisation of the authenticated API key | Neither is set. The report carries note `organisation_from_api_key`. |
+
+An object where both are absent is `failed` / `organisation_uuid_missing`. Other objects continue. The connector MUST NOT fall back to the API key's organisation.
 
 MISP records the API key's organisation as the Event creator, whatever the payload says. Before any create or update, the connector MUST read that organisation with `GET /users/view/me` and compare it case-insensitively to the resolved value:
 
@@ -117,11 +118,11 @@ MISP records the API key's organisation as the Event creator, whatever the paylo
 
 A mismatch is never written through, because an Event created under another organisation would not match the lookup key on the next run and would duplicate. An object whose `metadata.organisation` belongs to someone else can be republished by setting `organisation_uuid` on the block to the publisher's own organisation.
 
-`preview` makes no request. It resolves the organisation from steps 1 and 2, and notes `organisation_unverified` on every record.
+`preview` makes no request. It resolves the organisation from the same two sources. A resolved value is noted `organisation_unverified`. A missing value is `failed` / `organisation_uuid_missing`, the same as a push.
 
 ### Distribution
 
-1.0 derives distribution from the object's TLP only:
+1.0 derives distribution from the object's TLP only. Objects above the block's `max_tlp` are `skipped_tlp` and never reach this table. `max_tlp = "red"` shares TLP:RED; there is no second flag.
 
 | Object `metadata.tlp` | MISP `distribution` |
 |-----------------------|---------------------|
@@ -129,7 +130,7 @@ A mismatch is never written through, because an Event created under another orga
 | `green` | `1` (this community) |
 | `amber` | `0` (your organisation) |
 | `amber+strict` | `0` (your organisation) |
-| `red` | `0` (your organisation), only when `max_tlp = "red"` and `--allow-tlp-red` is passed |
+| `red` | `0` (your organisation) |
 
 `sharing_group_id` is always `0`. Wider distribution (connected or all communities) and sharing groups are out of scope for 1.0.
 
@@ -294,7 +295,7 @@ lookup key = (Event.Orgc.uuid == resolved publishing organisation)
 | Transport or auth failure | any | `failed` / `remote_lookup_failed` | Leave state unchanged |
 | Update rejected | any | `failed` / `remote_update_rejected` | Never fall back to create |
 
-The content hash covers the emitted object document only, computed locally before any request.
+The content hash is the SHA-256 of the verbatim UTF-8 bytes of the emitted object document, written as lowercase hex. It is computed locally before any request.
 
 If the instance rejects `opentide-object` for length, fail that object with `attribute_too_large` and write nothing. The connector MUST NOT split the document across attributes.
 
@@ -317,7 +318,7 @@ Retract operates on records present in state or on the remote, not on objects th
 
 ### Preflight reasons
 
-These are preflight (exit `1`) for this connector, before the exit rules in [sharing.md](../sharing.md): an unknown key in a `[[misp]]` block, a missing `name`, `url`, or `api_key`, an unset `api_key` variable, a malformed `organisation_uuid`, and `organisation_uuid_mismatch` on every selected block.
+These are preflight (exit `1`) for this connector, before the exit rules in [sharing.md](../sharing.md): an unknown key in a `[[misp]]` block, a missing `name`, `url`, `api_key`, or `max_tlp`, an unset `api_key` variable, a malformed `organisation_uuid`, and `organisation_uuid_mismatch` on every selected block.
 
 ### Validation check `sharing-config`
 
@@ -325,7 +326,7 @@ These are preflight (exit `1`) for this connector, before the exit rules in [sha
 
 | Condition | Checker code |
 |-----------|--------------|
-| `name`, `url`, or `api_key` missing | `missing_field` |
+| `name`, `url`, `api_key`, or `max_tlp` missing | `missing_field` |
 | `name` repeated in one layer, or used by two integrations | `duplicate_name` |
 | `name` outside the allowed characters | `name_invalid` |
 | A key not defined by this spec, or a top-level key that is not an array of tables | `unknown_key` |
@@ -343,7 +344,7 @@ These are preflight (exit `1`) for this connector, before the exit rules in [sha
 
 ## Defaults & overrides
 
-A block needs `name`, `url`, and `api_key`. It ships disabled, shares `amber` and below, selects all three families and `PRODUCTION` rules, takes its organisation from each object, and does not publish.
+A block needs `name`, `url`, `api_key`, and `max_tlp`. It ships disabled, selects all three families and `PRODUCTION` rules, takes its organisation from each object unless the block sets one, and does not publish.
 
 ## Examples
 

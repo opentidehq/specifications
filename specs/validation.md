@@ -102,6 +102,7 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/sharing/invalid/missing-url.toml](../fixtures/sharing/invalid/missing-url.toml) | `missing_field` |
 | [fixtures/sharing/invalid/bad-name.toml](../fixtures/sharing/invalid/bad-name.toml) | `name_invalid` |
 | [fixtures/sharing/invalid/bad-max-tlp.toml](../fixtures/sharing/invalid/bad-max-tlp.toml) | `max_tlp_unknown` |
+| [fixtures/sharing/invalid/missing-max-tlp.toml](../fixtures/sharing/invalid/missing-max-tlp.toml) | `missing_field` |
 | [fixtures/sharing/invalid/bad-organisation-uuid.toml](../fixtures/sharing/invalid/bad-organisation-uuid.toml) | `organisation_uuid_invalid` |
 | [fixtures/sharing/invalid/bad-object-type.toml](../fixtures/sharing/invalid/bad-object-type.toml) | `object_type_unknown` |
 

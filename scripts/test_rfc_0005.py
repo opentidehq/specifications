@@ -168,9 +168,14 @@ class Rfc0005TextTests(unittest.TestCase):
         self.assertIn("consumes that value first and lets a block override it", text)
         block = text.index("| 1 | `[[misp]].organisation_uuid` |")
         obj = text.index("| 2 | Object `metadata.organisation.uuid` |")
-        key = text.index("| 3 | Organisation of the authenticated API key |")
         self.assertLess(block, obj)
-        self.assertLess(obj, key)
+        self.assertIn("organisation_uuid_missing", text)
+        self.assertNotIn("organisation_from_api_key", text)
+
+    def test_max_tlp_is_required_and_shares_red(self) -> None:
+        text = _rfc_text()
+        self.assertIn("`max_tlp = \"red\"` shares TLP:RED", text)
+        self.assertNotIn("--allow-tlp-red", text)
 
     def test_template_version_five(self) -> None:
         text = _rfc_text()

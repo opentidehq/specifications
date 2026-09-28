@@ -65,8 +65,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## sharing-misp 1.0
 
 - MISP connector `sharing::misp::1.0`. Document transport via upstream `opentide` template version 5.
-- Minimal `[[misp]]` block: `name`, `enabled`, `url`, `api_key`, `max_tlp`, `object_types`, `rule_statuses`, optional `organisation_uuid`, `publish`, `verify_ssl`.
-- Publishing organisation from `metadata.organisation.uuid`, overridable per block. Distribution derived from `metadata.tlp`; no sharing groups, file mode, title prefix, or extra tags in 1.0.
+- Minimal `[[misp]]` block: required `name`, `url`, `api_key`, and `max_tlp`; optional `enabled`, `object_types`, `rule_statuses`, `organisation_uuid`, `publish`, `verify_ssl`.
+- Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
+- Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
+- `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
 
 ## validation 1.0
 

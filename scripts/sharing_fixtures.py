@@ -32,7 +32,7 @@ MISP_KEYS = {
     "publish",
     "verify_ssl",
 }
-MISP_REQUIRED = ("name", "url", "api_key")
+MISP_REQUIRED = ("name", "url", "api_key", "max_tlp")
 KNOWN_INTEGRATIONS = {"misp": (MISP_KEYS, MISP_REQUIRED)}
 TLP_DISTRIBUTION = {"clear": 1, "green": 1, "amber": 0, "amber+strict": 0, "red": 0}
 UUID_RE = re.compile(
@@ -49,6 +49,7 @@ EXPECTED_INVALID = {
     "missing-url.toml": "missing_field",
     "bad-name.toml": "name_invalid",
     "bad-max-tlp.toml": "max_tlp_unknown",
+    "missing-max-tlp.toml": "missing_field",
     "bad-organisation-uuid.toml": "organisation_uuid_invalid",
     "bad-object-type.toml": "object_type_unknown",
 }
@@ -101,7 +102,8 @@ def _block_errors(doc: dict) -> list[str]:
             name = block.get("name")
             if isinstance(name, str) and not NAME_RE.match(name):
                 errors.append("name_invalid")
-            if block.get("max_tlp", "amber") not in tlp_names:
+            max_tlp = block.get("max_tlp")
+            if max_tlp is not None and max_tlp not in tlp_names:
                 errors.append("max_tlp_unknown")
             org = block.get("organisation_uuid")
             if org is not None and not (isinstance(org, str) and UUID_RE.match(org)):
