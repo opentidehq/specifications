@@ -41,8 +41,7 @@ Registered objects list: `threat`, `objective`, `rule`.
 | `.opentide/configurations/` | TOML overrides (paths, deployment, schema, platforms) | Yes |
 | `.opentide/configurations/platforms/` | Per-platform TOML | Yes |
 | `.opentide/configurations/sharing.toml` | Every sharing integration block (`[[misp]]`) | Yes |
-| `.opentide/sharing/state.json` | Generated share state | No |
-| `.opentide/exports/sharing/<name>/` | `opentide share preview` output, one directory per block `name` | No |
+| `.opentide/states/sharing.jsonl` | Current sharing synchronization ledger. One JSON object per line. | No |
 | `.opentide/schemas/` | Generated JSON Schema | No |
 | `.opentide/templates/` | Generated YAML templates | No |
 | `.opentide/exports/` | Generated exports | No |
@@ -116,7 +115,9 @@ detection-repo/
 │   ├── schemas/
 │   ├── templates/
 │   ├── exports/
-│   └── inflight/
+│   ├── inflight/
+│   └── states/
+│       └── sharing.jsonl
 ├── .vscode/
 ├── .github/workflows/
 ├── README.md
@@ -172,5 +173,5 @@ Object fixtures assume the default layout: rules under `objects/rules/`, etc.
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-09-28 | Sharing uses one client file, `sharing.toml`, plus generated state and preview paths keyed by block `name`. |
+| 1.0 | 2026-09-28 | Sharing uses one client file, `sharing.toml`, and one generated ledger, `.opentide/states/sharing.jsonl`. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `paths.toml` |

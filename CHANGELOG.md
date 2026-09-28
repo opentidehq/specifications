@@ -30,7 +30,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## workspace 1.0
 
-- Client sharing file `sharing.toml`, plus generated `.opentide/sharing/state.json` and preview output under `.opentide/exports/sharing/<name>/`.
+- Client sharing file `sharing.toml`, plus one generated ledger, `.opentide/states/sharing.jsonl`. `preview` writes no files.
 - Initial normative spec bootstrapped from opentide `paths.toml`.
 
 ## configuration 1.0
@@ -60,7 +60,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## sharing 1.0
 
-- Sharing system ([RFC 0005](rfcs/0005-sharing-system.md)). One `sharing.toml` whose top level holds only integration arrays (`[[misp]]`; `[[opencti]]` reserved for a later connector). Each block carries its own selection and `max_tlp`; there are no global keys.
+- Sharing system ([RFC 0005](rfcs/0005-sharing-system.md)). One `sharing.toml` whose top level holds only integration arrays (`[[misp]]`; `[[opencti]]` reserved for a later connector). Each block carries its own selection and `max_tlp`; there are no global keys. Current share state is `.opentide/states/sharing.jsonl`, one line per object and destination, with a `state` of `synced` or `retracted`.
 
 ## sharing-misp 1.0
 

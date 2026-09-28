@@ -141,6 +141,13 @@ class Rfc0005TextTests(unittest.TestCase):
         self.assertNotIn("Every target is a named table", text)
         self.assertNotIn("Each `.toml` file directly under `sharing/targets/`", text)
 
+    def test_share_state_is_one_jsonl_ledger(self) -> None:
+        text = _rfc_text()
+        self.assertIn(".opentide/states/sharing.jsonl", text)
+        self.assertIn("not a history of pushes", text)
+        self.assertNotIn(".opentide/exports/sharing/", text)
+        self.assertNotIn(".opentide/sharing/state.json", text)
+
     def test_selection_and_ceiling_are_per_block(self) -> None:
         text = _rfc_text()
         self.assertIn("There are no global keys.", text)

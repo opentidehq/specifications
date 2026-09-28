@@ -47,6 +47,7 @@ Without a spec, each workspace would invent its own export script, TLP handling 
 |------|--------|
 | 2026-09-15 | Initial proposal: sharing subsystem, MISP connector with per-family field decomposition into MISP `detection` objects, broad taxonomy tagging, and `include_*` payload filtering. |
 | 2026-09-17 | Replaces the field decomposition with document transport over the upstream `opentide` MISP object; removes payload filtering in favour of TLP, distribution, and sharing-group governance; restricts tags to TLP, PAP, and two galaxies; moves Event identity to MISP-assigned UUIDs with a composite lookup key; makes multi-instance publishing explicit; removes `event_mode`, `threat_level_source`, `verify_event_org`, `tag_namespace`, and the `include_*` family. |
+| 2026-09-28 | Share state is one current-state JSONL ledger, `.opentide/states/sharing.jsonl`, with `state` `synced` or `retracted`. `preview` writes no workspace files. The per-feature sharing directory and the preview export directory are dropped. |
 | 2026-09-28 | **Accepted.** One `sharing.toml` whose top level holds only integration arrays: each MISP instance is one `[[misp]]` block, and `[[opencti]]` is the shape a later connector takes. Selection and `max_tlp` are per block; the global `[sharing]` table, `default_targets`, `allow_tlp_red`, and strictest-wins policy resolution are gone. Arrays merge across configuration layers by `name`. The first MISP block is deliberately small: distribution is derived from TLP, and sharing groups, file mode, `analysis`, `info_prefix`, `extra_tags`, mutual TLS, and `require_validation` are not configurable. The publishing organisation comes from `metadata.organisation.uuid`, which opentide objects already carry, with a per-block override. The pinned template is upstream version 5 (`opentide-type` values `threat`, `objective`, `rule`; required `schema`). Normative requirements live in `specs/sharing.md` and `specs/sharing/misp-1.0.md`. |
 
 Per **Decision D-1** this is an in-place revision, not a superseding RFC. RFC 0005 published no file under `specs/`, so there is no accepted normative text to supersede — only a proposal to correct before it becomes normative. Keeping number `0005`, the filename, the title, and the issue and PR links keeps one discussion thread and one reviewable history for one decision. A second RFC that superseded four subsections of an unimplemented first RFC would split the record without adding provenance. The removals, retentions, and question dispositions are recorded below rather than in a separate file.
@@ -145,7 +146,7 @@ There are no global keys. Selection and the TLP ceiling are decided **at the int
 
 | Field | Type | Required | Default | Semantics |
 |-------|------|----------|---------|-----------|
-| `name` | string | **yes** | — | Identifier used by `--target`, the share report, state, and preview paths. 1–64 characters of lowercase letters, digits, hyphen, and underscore. Unique across every block in the file. |
+| `name` | string | **yes** | — | Identifier used by `--target`, the share report, and the state ledger. 1–64 characters of lowercase letters, digits, hyphen, and underscore. Unique across every block in the file. |
 | `enabled` | bool | no | `false` | Participate in share runs. |
 | `max_tlp` | string | no | `amber` | MUST be a `tlp` vocabulary `name`. Objects whose `metadata.tlp` exceeds this ceiling are `skipped_tlp` in the share report (not a silent omit, and not exit `1`). TLP order for comparison: `clear` < `green` < `amber` < `amber+strict` < `red`. TLP:RED additionally needs `--allow-tlp-red` on the command line. |
 | `object_types` | list[string] | no | `["threat", "objective", "rule"]` | Families this block shares. |
@@ -162,7 +163,7 @@ Normative command family. Implementations MUST provide these subcommands; `opent
 | Command | Purpose |
 |---------|---------|
 | `opentide share` / `opentide share push` | Publish in-scope objects to the selected blocks |
-| `opentide share preview` | Build payloads, apply policy, write nothing to the remote (equivalent to `push --dry-run`) |
+| `opentide share preview` | Build payloads, apply policy, print the share report, and write nothing locally or remotely (equivalent to `push --dry-run`) |
 | `opentide share status` | Show local share state vs object versions (no remote mutation) |
 | `opentide share retract` | Unpublish (default) or delete (`--delete`) remote records for in-scope objects |
 | `opentide share targets` | List blocks: integration, `name`, `enabled`, `max_tlp`, and URL. Never the API key. |
@@ -209,15 +210,15 @@ Additions to [workspace.md](../specs/workspace.md):
 | Path | Purpose | Client-edited? |
 |------|---------|----------------|
 | `.opentide/configurations/sharing.toml` | Every integration block | Yes |
-| `.opentide/sharing/state.json` | Last successful share mapping | **No** — generated |
-| `.opentide/exports/sharing/<name>/` | `preview` Event JSON | **No** — generated |
+| `.opentide/states/sharing.jsonl` | Current synchronization ledger | **No** — generated |
 
-The preview directory is per block, so two blocks never write Event JSON to the same directory. There is no file-export mode in 1.0; `preview` is the offline path.
+There is no sharing export directory and no file-export mode. `preview` prints the share report and writes no file. `.opentide/states/` holds generated synchronization ledgers; sharing has exactly one. A later subsystem gets its own file in that directory. A new connector or a new sync state is another line in `sharing.jsonl`, not another file.
 
-`state.json` is an implementation artifact, not a Tide object. It holds at most one entry per pair of object UUID and block `name`, so one object carries one independent entry per block:
+The ledger is UTF-8 JSON Lines, one JSON object per line, with no wrapping array. It records the **current** synchronization of each object to each block, not a history of pushes. A writer MUST keep at most one line per triple of `object_uuid`, `integration`, and `target`. A reader that finds a duplicate triple keeps the last line. Lines whose `state` an implementation does not understand MUST be preserved on rewrite.
 
 | Field | Description |
 |-------|-------------|
+| `state` | `synced` after a successful create or update. `retracted` after a successful unpublish; the remote Event still exists. Further values MAY be added later. |
 | `object_uuid` | Tide `metadata.uuid` |
 | `object_schema` | `metadata.schema` |
 | `object_version` | `metadata.version` at last successful share |
@@ -227,12 +228,10 @@ The preview directory is per block, so two blocks never write Event JSON to the 
 | `organisation_uuid` | Publishing organisation UUID observed for the matched Event |
 | `remote_event_uuid` | MISP Event UUID **as assigned by the instance** |
 | `remote_event_id` | MISP numeric id, or explicit null when not observed |
-| `published` | Whether the event was published |
-| `shared_at` | ISO-8601 UTC timestamp |
+| `published` | Whether the event is published |
+| `shared_at` | ISO-8601 UTC timestamp of the write |
 
-State is a regenerable cache, not an authority. Push locates the remote Event by the composite key of §7.5, and the remote result wins on any disagreement: differing fields are overwritten with observed values, and an entry is discarded when the lookup finds no Event. Deleting `state.json` changes no outcome except replacing `unchanged` with `updated`.
-
-Generated sharing paths MUST NOT be committed as hand-edited sources (same rule as `.opentide/exports/`). Implementations SHOULD gitignore `state.json`.
+State is a regenerable cache, not an authority. Push locates the remote Event by the composite key of §7.5, and the remote result wins on any disagreement: differing fields are overwritten with observed values, and a line is discarded when the lookup finds no Event. A skip or a failure does not change a line. `unchanged` leaves the line as it is. `retract --delete` removes it. Deleting the file changes no outcome except replacing `unchanged` with `updated`. Implementations SHOULD gitignore it.
 
 ### 6. Connector registry (generic)
 
@@ -706,7 +705,7 @@ Acceptance (2026-09-28) kept the document-transport model above and cut the conf
 | Per-target tables (`[target]`, `[connection]`, `[misp]`, `[misp.file]`) and the keys `identifier`, display name, `connector`, `schema`, `description` | One flat `[[misp]]` entry; the array key is the connector and `name` the identifier |
 | Mandatory per-target `organisation_uuid` | Object `metadata.organisation.uuid`, with an optional block override (§7.1) |
 | `distribution` enum, the TLP set-membership clamp, `sharing_group_id`, `sharing_group_uuid`, `sharing_group_unresolved` | Distribution derived from TLP; sharing groups deferred (N-4) |
-| `mode = "file"` and `[misp.file].directory` | API only; `preview` writes under `.opentide/exports/sharing/<name>/` |
+| `mode = "file"` and `[misp.file].directory` | API only. `preview` prints the share report and writes no file. |
 | `analysis`, `info_prefix`, `extra_tags` | `analysis` fixed at completed; `info` is the object `name`; closed tag set |
 | `timeout_seconds`, `client_cert`, `client_key` | Implementation default timeout; no mutual TLS |
 | `require_validation` | Push always validates |
@@ -741,7 +740,7 @@ The refresh direction is **upstream MISP → this repository**, which is the *re
 - **Distribution is not tunable in 1.0.** `clear` content cannot sync beyond the receiving community, and `amber` content cannot reach a sharing group; it stays organisation-only. Communities that rely on sharing groups for `amber` exchange wait for a later revision (N-4). The trade is a first revision with nothing to misconfigure between TLP and reach.
 - **Dual-repo lag.** Specs land here; the CLI exists only after an opentide PR.
 - **Sharing PRODUCTION-only rules by default** (`rule_statuses`) means non-PRODUCTION rules never reach MISP unless selection is widened. Threats and objectives ignore that key.
-- **Preview output can leak.** `preview` writes complete object documents under `.opentide/exports/sharing/<name>/`; committing that directory publishes them regardless of TLP.
+- **The ledger is local and disposable.** `.opentide/states/sharing.jsonl` speeds up the next push and lets `status` and `retract` work offline from the last observed mapping. It is not a record of what MISP holds; deleting it is safe and only costs an `updated` instead of `unchanged`.
 
 ## Alternatives
 

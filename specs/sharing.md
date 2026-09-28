@@ -70,7 +70,7 @@ A two-instance MISP setup is two `[[misp]]` entries. A MISP instance plus an Ope
 
 | Field | Type | Required | Default | Semantics |
 |-------|------|----------|---------|-----------|
-| `name` | string | yes | — | Identifier used by `--target`, the share report, state, and preview paths. 1–64 characters of lowercase letters, digits, hyphen, and underscore. |
+| `name` | string | yes | — | Identifier used by `--target`, the share report, and the state ledger. 1–64 characters of lowercase letters, digits, hyphen, and underscore. |
 | `enabled` | bool | no | `false` | Participate in share runs. |
 | `max_tlp` | string | no | `amber` | A `tlp` vocabulary `name`. Objects above this ceiling are `skipped_tlp`. Order: `clear` < `green` < `amber` < `amber+strict` < `red`. |
 | `object_types` | list[string] | no | `["threat", "objective", "rule"]` | Families this block shares. |
@@ -97,7 +97,7 @@ enabled = true
 | Command | Purpose |
 |---------|---------|
 | `opentide share` / `opentide share push` | Publish in-scope objects to selected blocks |
-| `opentide share preview` | Build payloads and apply selection and TLP; write nothing remote (`push --dry-run`) |
+| `opentide share preview` | Build payloads and apply selection and TLP; print the share report. Write nothing, locally or remotely (`push --dry-run`) |
 | `opentide share status` | Local share state versus object versions; no remote mutation |
 | `opentide share retract` | Unpublish, or delete with `--delete` |
 | `opentide share targets` | List blocks: integration, `name`, `enabled`, `max_tlp`, and URL. Never the API key. |
@@ -138,26 +138,36 @@ Every in-scope object MUST pass the default [validation](validation.md) checks b
 | Path | Purpose | Client-edited? |
 |------|---------|----------------|
 | `.opentide/configurations/sharing.toml` | Every integration block | Yes |
-| `.opentide/sharing/state.json` | Last successful share mapping | No — generated |
-| `.opentide/exports/sharing/<name>/` | `preview` output | No — generated |
+| `.opentide/states/sharing.jsonl` | Current synchronization ledger | No — generated |
 
-`state.json` holds at most one entry per pair of object UUID and block `name`:
+There is no sharing export directory. `preview` prints the share report and writes no file.
+
+`.opentide/states/` is the directory for generated synchronization ledgers. Sharing has exactly one, `sharing.jsonl`. A later subsystem (deployment, another sync) gets its own file there. Sharing itself does not grow more files when a new connector or a new sync state is added: both are further lines in this file.
+
+The file is UTF-8 JSON Lines: one JSON object per line, no wrapping array. It is the **current** state of what was shared, not a history. A writer MUST keep at most one line per triple of `object_uuid`, `integration`, and `target`, rewriting the file to replace the previous line for that triple. A reader that finds a duplicate triple (a crash between write and replace) MUST keep the last line and ignore the earlier ones. A missing or empty file means no local state. Lines an implementation does not understand MUST be preserved when it rewrites the file, so a newer `state` value survives an older CLI.
 
 | Field | Description |
 |-------|-------------|
+| `state` | Synchronization state. `synced` after a successful create or update. `retracted` after a successful unpublish; the remote record still exists. Further values MAY be added later. |
 | `object_uuid` | Tide `metadata.uuid` |
 | `object_schema` | `metadata.schema` |
 | `object_version` | `metadata.version` at last successful share |
 | `content_hash` | Hash of the emitted object document |
-| `integration` | Connector id (`misp`) |
+| `integration` | Connector id (`misp`, later `opencti`) |
 | `target` | Block `name` |
 | `organisation_uuid` | Publishing organisation observed for the matched remote record |
 | `remote_event_uuid` | Remote identifier assigned by the destination |
 | `remote_event_id` | Remote numeric id, or explicit null when not observed |
-| `published` | Whether the remote record was published |
-| `shared_at` | ISO-8601 UTC timestamp |
+| `published` | Whether the remote record is published |
+| `shared_at` | ISO-8601 UTC timestamp of the write |
 
-State is a regenerable cache. The connector's remote lookup wins on disagreement. Deleting `state.json` changes no outcome except replacing `unchanged` with `updated`. Implementations SHOULD gitignore `state.json`.
+A skip or a failure MUST NOT add, change, or remove a line. `unchanged` leaves the line as it is. `retract --delete` removes the line. A lookup that finds no remote record discards the line.
+
+The ledger is a regenerable cache. The connector's remote lookup wins on disagreement. Deleting the file changes no outcome except replacing `unchanged` with `updated`. Implementations SHOULD gitignore it.
+
+```jsonl
+{"state":"synced","object_uuid":"00000000-0000-4000-8003-000000000001","object_schema":"rule::1.0","object_version":1,"content_hash":"<hash>","integration":"misp","target":"misp-internal","organisation_uuid":"00000000-0000-4000-8aaa-000000000001","remote_event_uuid":"<uuid assigned by MISP>","remote_event_id":42,"published":false,"shared_at":"2026-09-28T11:00:00Z"}
+```
 
 ### Connector contract
 
@@ -187,4 +197,4 @@ Bundled `sharing.toml` ships with no enabled block. A block that omits `max_tlp`
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-09-28 | Initial spec from accepted [RFC 0005](../rfcs/0005-sharing-system.md). Integration blocks are top-level arrays (`[[misp]]`) with per-block selection and `max_tlp`, merged by `name`. |
+| 1.0 | 2026-09-28 | Initial spec from accepted [RFC 0005](../rfcs/0005-sharing-system.md). Integration blocks are top-level arrays (`[[misp]]`) with per-block selection and `max_tlp`, merged by `name`. Share state is one current-state ledger, `.opentide/states/sharing.jsonl`. `preview` writes no files. |

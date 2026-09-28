@@ -87,7 +87,7 @@ These keys are rejected like any other unknown key. They name behaviour this rev
 | Key | Fixed 1.0 behaviour |
 |-----|---------------------|
 | `distribution`, `sharing_group_id`, `sharing_group_uuid` | Distribution derived from `metadata.tlp` (below). No sharing groups. |
-| `mode`, `directory` | API only. `preview` is the offline path. |
+| `mode`, `directory` | API only. `preview` prints the share report and writes no file. |
 | `analysis` | `completed` |
 | `info_prefix` | Event `info` is the object `name` |
 | `extra_tags` | Closed tag set |
@@ -310,8 +310,8 @@ Nothing in the document is removed for any block, TLP value, or flag. Withholdin
 
 | Mode | MISP action |
 |------|-------------|
-| default | `unpublish` if published; leave the event |
-| `--delete` | delete the event. Implementations SHOULD require `--yes` or an equivalent confirm flag. The share-state row MUST be dropped. |
+| default | `unpublish` if published; leave the event. Set the ledger line to `state` `retracted` and `published` `false`. |
+| `--delete` | delete the event. Implementations SHOULD require `--yes` or an equivalent confirm flag. The ledger line MUST be removed. |
 
 Retract operates on records present in state or on the remote, not on objects that were never pushed.
 
