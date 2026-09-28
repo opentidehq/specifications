@@ -775,7 +775,7 @@ Every numbered item from the first draft carries a disposition. Item numbers are
 | 5 | Galaxy attach vs tags-only fallback | **Settled.** No text-attribute fallback exists any more. An unresolvable or ambiguous cluster omits the tag with an informational note and the Event is still emitted (§7.3, D-6). |
 | 6 | Sharing group UUID vs numeric id | **Deferred** at acceptance. Sharing groups are not configurable in `sharing::misp::1.0`; `sharing_group_id` is always `0` (§7.1). The 2026-09-17 policy (UUID resolved in `api` mode, numeric id required in `file` mode) is the starting point for the revision that adds them, together with N-4. |
 | 7 | Partial object graphs | **Moot.** `extends_uuid`, the presence test, and the pre-HTTP share plan are removed. A relation UUID is always emitted, with a note when its object was not shared to that block (§7.5, D-4). |
-| 8 | CI dry-run Action | **Settled.** Usage-guide material, not a spec requirement. |
+| 8 | CI dry-run Action | **Superseded** by [RFC 0006](0006-sharing-ci.md). The pipeline `opentide setup ci` ships runs `opentide share push --changed` on a push to the default branch only. It does not run sharing on a pull request. |
 | 9 | Custom `opentide-threat` / `opentide-objective` templates | **Settled.** Upstream `MISP/misp-objects` ships `opentide`; this connector pins that template and defines no custom or workspace-local template (§7.5). |
 | 10 | Event `info` prefix | **Settled** at acceptance: no prefix. `info` is the object `name`; the creator organisation MISP shows beside each Event carries the publisher marker (§7.4). |
 | 11 | CLI exit codes | **Settled.** The ordered rules of §4 are retained unchanged in order and outcome; only the reason names in the code table changed. |

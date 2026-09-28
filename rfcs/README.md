@@ -19,6 +19,7 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0003](0003-per-key-vocabulary-versioning.md) | Per-key vocabulary versioning and schema pins | proposed |
 | [0004](https://github.com/OpenTideHQ/specifications/issues/8) | Sysdig Falco deployer (reserved by issue #8; file not yet in tree) | reserved |
 | [0005](0005-sharing-system.md) | Sharing system and MISP connector | accepted |
+| [0006](0006-sharing-ci.md) | Sharing on the production merge | accepted |
 
 ## Numbering
 
