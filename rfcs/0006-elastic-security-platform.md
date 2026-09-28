@@ -19,7 +19,7 @@ Decisions:
 3. **Five rule types in v1:** `query`, `eql`, `esql`, `threshold`, `new_terms`. `threat_match` and `machine_learning` are deferred. `saved_query` is excluded.
 4. **Identity is the MDR UUID.** Kibana's user-settable `rule_id` is set to `metadata.uuid`. It is unique per space, so one UUID serves every tenant, and alerts carry it as `kibana.alert.rule.rule_id`. Kibana's internal `id` is never stored, and nothing is written back to the rule file.
 5. **Validation:** offline syntax checks per query language, plus live validation through the rule preview API. Two Elasticsearch checks also run before every deploy, because Kibana accepts a mistyped ES\|QL command or aggregation field and the rule then fails silently ([Elasticsearch checks](#elasticsearch-checks)).
-6. **Kibana's own notation where it helps authors.** Durations are written `5m`, `1h`, `14d`, as in Kibana. `required_fields` is a `{field: type}` map, and `related_integrations` takes package names.
+6. **Kibana's own notation where it helps authors.** Durations are written `5m`, `1h`, `14d`, as in Kibana. `required_fields` is a list of `{name, type}` objects, and `related_integrations` takes package names.
 
 The change is additive: it adds a `configurations.elastic` key and a new platform schema. `rule::1.0` keeps its identifier and every existing rule stays valid.
 
@@ -198,7 +198,7 @@ class ElasticConfig(PlatformConfigBase):
     note: str | None = None                               # investigation guide (markdown)
     setup: str | None = None                              # setup guide (markdown)
     false_positives: list[str] | None = None
-    required_fields: dict[str, FieldType] | None = None   # {field: type}
+    required_fields: list[ElasticRequiredField] | None = None
     related_integrations: list[str | ElasticIntegration] | None = None   # "windows" = {package: windows}
     building_block: bool = False
     overrides: dict[str, Any] | None = None               # unmodelled Kibana fields
@@ -232,6 +232,10 @@ class ElasticEql(TideModel):
     event_category_override: str | None = None
     tiebreaker_field: str | None = None
 
+class ElasticRequiredField(TideModel):
+    name: str
+    type: FieldType
+
 class ElasticIntegration(TideModel):
     package: str                              # Fleet package, e.g. windows, endpoint, aws
     integration: str | None = None            # policy template, e.g. cloudtrail
@@ -256,7 +260,7 @@ class ElasticIntegration(TideModel):
 
 Validation SHOULD warn when `scheduling.lookback` < `scheduling.frequency` (gaps between runs), and when a non-aggregating ES\|QL query (no `STATS`) lacks `METADATA _id` (alerts are not deduplicated).
 
-**Field names are open-ended.** `group_by`, `threshold.field`, `new_terms.fields`, `investigation_fields`, and `required_fields` keys name fields in the tenant's data: ECS, integration-specific, or custom. They cannot be an enum, and Kibana accepts any string for them. The deployer therefore checks aggregation fields against the tenant ([Aggregation field check](#aggregation-field-check)). `FieldType` is closed: it covers the 15 types ECS uses (75% of ECS fields are `keyword`) plus the other common Elasticsearch mapping types. Kibana sets `required_fields[].ecs` only when both the name and the type match ECS.
+**Field names are open-ended.** `group_by`, `threshold.field`, `new_terms.fields`, `investigation_fields`, and `required_fields[].name` name fields in the tenant's data: ECS, integration-specific, or custom. They cannot be an enum, and Kibana accepts any string for them. The deployer therefore checks aggregation fields against the tenant ([Aggregation field check](#aggregation-field-check)). `type` is closed. Of the 2,617 fields in ECS, 75% are `keyword`; the other types are `long`, `date`, `boolean`, `object`, `flattened`, `float`, `nested`, `wildcard`, `ip`, `geo_point`, `double`, `scaled_float`, `constant_keyword`, and `match_only_text`. `FieldType` lists those plus the other common Elasticsearch mapping types. Kibana sets `required_fields[].ecs` only when both the name and the type match ECS.
 
 ### 3. Field mapping
 
@@ -397,7 +401,9 @@ configurations:
         duration: 1h
       investigation_fields: [process.command_line, process.parent.name]
     tags: [Windows]
-    required_fields: {process.name: keyword, process.args: keyword}
+    required_fields:
+      - {name: process.args, type: keyword}
+      - {name: process.name, type: keyword}
     related_integrations: [endpoint]
 ```
 
@@ -829,7 +835,7 @@ This is the `POST /_security/api_key` body for 9.5.4. On 8.19.22 the application
 | `group_by` absent field, text field, duplicate, `""` | not run | all accepted on create; preview: absent field collapses 8 alerts into 1, text field is a run error |
 | `threshold.field` or `new_terms.fields` absent | not run | no alerts, no error |
 | `_field_caps` with the deploy key | not run | absent field missing; `message` `aggregatable: false`; a mapped field with no documents present and aggregatable; data view readable |
-| Examples A–E after the notation change (short durations, `required_fields` map, `related_integrations: [endpoint]`) | not run | Elasticsearch checks pass; create 200; `GET` matches; preview clean |
+| Examples A–E after the notation change (short durations, `required_fields` as `{name, type}` objects, `related_integrations: [endpoint]`) | not run | Elasticsearch checks pass; create 200; `GET` matches; preview clean |
 | Same `rule_id` in spaces `staging` and `prod`; twice in one space | not run | 200 and 200 with different internal `id`s; 409 |
 | Alert document | not run | `kibana.alert.rule.rule_id` is the MDR UUID |
 | Suppression by `host.name`, `user.name` over events from one entity (Basic) | stored; scheduled run `succeeded`, 12 alerts for 12 events | same |

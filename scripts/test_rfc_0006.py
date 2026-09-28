@@ -364,9 +364,10 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
     if alert.get("investigation_fields"):
         body["investigation_fields"] = {"field_names": list(alert["investigation_fields"])}
     if block.get("required_fields"):
-        body["required_fields"] = [
-            {"name": name, "type": block["required_fields"][name]} for name in sorted(block["required_fields"])
-        ]
+        body["required_fields"] = sorted(
+            ({"name": field["name"], "type": field["type"]} for field in block["required_fields"]),
+            key=lambda field: field["name"],
+        )
     if block.get("related_integrations"):
         body["related_integrations"] = [related_integration(e) for e in block["related_integrations"]]
     for key in ("false_positives", "setup"):
@@ -590,10 +591,10 @@ class TableConsistencyTests(unittest.TestCase):
         types = field_types()
         self.assertLessEqual(ECS_FIELD_TYPES, types)
         for anchor in ["rule-query", *OVERLAYS]:
-            required = _yaml(anchor)["configurations"]["elastic"].get("required_fields") or {}
+            required = _yaml(anchor)["configurations"]["elastic"].get("required_fields") or []
             with self.subTest(example=anchor):
-                self.assertIsInstance(required, dict)
-                self.assertLessEqual(set(required.values()), types)
+                self.assertIsInstance(required, list)
+                self.assertLessEqual({field["type"] for field in required}, types)
 
     def test_related_integration_shorthand(self) -> None:
         self.assertEqual(related_integration("windows"), {"package": "windows", "version": "*"})
