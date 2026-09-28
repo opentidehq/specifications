@@ -25,7 +25,7 @@ Sharing publishes Tide objects (threat, objective, rule) to external intelligenc
 - MISP MUST NOT be added to the [platforms](platforms.md) capability matrix and MUST NOT appear as `configurations.misp` on `rule::1.0`.
 - Scope filters and target selection that match nothing MUST fail with `scope_no_match`. A `--changed` run whose diff is empty, and a `--changed` run with no enabled block, MUST exit 0 instead.
 - Secrets MUST NOT appear in logs, reports, preview payloads, or share state. API keys, authorization header values, and values substituted from `${ENV_VAR}` MUST be replaced with a fixed redaction marker. URLs and organisation UUIDs are not credentials and MUST be emitted unredacted.
-- `opentide setup ci` MUST emit one sharing job, and that job MUST run only on a push to the default branch. It MUST run `opentide share push --changed`. It MUST NOT run `opentide share` on a pull request or a merge request.
+- `opentide setup` and `opentide setup ci` MUST offer a sharing stage. The stage defaults off. When selected, it MUST run only on a push to the default branch, and its command MUST be `opentide share push --changed`. The generated pipeline MUST NOT run `opentide share` on a pull request or a merge request.
 - Connectors without `pull` MUST NOT advertise import.
 
 ## Definition
@@ -36,6 +36,21 @@ Sharing publishes Tide objects (threat, objective, rule) to external intelligenc
 |---------|---------|--------|-------------|
 | Detection runtime | `opentide deploy` | `deployment.toml`, `platforms/*.toml` | SIEM / EDR |
 | Intelligence publication | `opentide share` | `sharing.toml` | CTI platforms (MISP first) |
+
+### Surfaces
+
+Four surfaces share `sharing.toml` and `.opentide/states/sharing.jsonl`.
+
+| Surface | Operator entry | Remote write |
+|---------|----------------|--------------|
+| Configuration | `sharing.toml` | None |
+| CLI | `opentide share` | `push` and `retract` write. `preview`, `status`, and `targets` do not. |
+| CI stage | `share` in the pipeline written by setup | `push --changed` on a production release, and only when the stage was selected |
+| Setup | `opentide setup`, `opentide setup ci` | None. Setup writes the pipeline. It does not write `sharing.toml` and it does not ask for API keys. |
+
+**Production release.** A push to the repository default branch. This is the event `opentide deploy --plan PRODUCTION` already uses.
+
+**Sharing stage.** The optional pipeline unit named `share`. It is absent unless setup selects it. Block `enabled` and the sharing stage are separate switches: an enabled block does not add the stage, and a selected stage with no enabled block exits 0.
 
 ### `sharing.toml`
 
@@ -134,25 +149,41 @@ Stdout SHOULD be a share report (human table by default; `--json` MAY be offered
 
 Every in-scope object MUST pass the default [validation](validation.md) checks before it is shared. An object that raises `error` is `failed` / `validation_error`. Warnings do not block.
 
+### Setup
+
+Setup decides whether the pipeline contains the sharing stage. It does not publish.
+
+| Entry | Selection | Default |
+|-------|-----------|---------|
+| `opentide setup` wizard, once a CI platform is chosen | Checkbox under "CI workflow features": "Sharing on the default branch" | Off |
+| `opentide setup --ci <github\|gitlab\|azure>` | `--sharing` / `--no-sharing` | `--no-sharing` |
+| `opentide setup ci <github\|gitlab\|azure>` | `--sharing` / `--no-sharing` | `--no-sharing` |
+
+The wizard MUST show that checkbox only after a CI platform is selected. "Configure later" MUST NOT ask and MUST NOT write a pipeline. `--sharing` without a CI platform MUST NOT write a pipeline and MUST warn that the flag was ignored, as `--no-staging` does today.
+
+The wizard and the flags are one choice. A later run that does not select the stage MUST omit it when it rewrites the pipeline. Setup MUST NOT prompt for a URL, an API key, or a block `name`.
+
 ### Continuous integration
 
-Deployment publishes changed rules when they reach the default branch (`opentide deploy --plan PRODUCTION`). Sharing uses that same production event and no other. `opentide setup ci` MUST add one job, `share`, to each workflow it already writes:
+When the sharing stage is selected, `opentide setup` and `opentide setup ci` MUST add it to the workflow file that platform already uses:
 
-| File | Platform |
-|------|----------|
-| `.github/workflows/opentide.yml` | GitHub Actions |
-| `.gitlab-ci.yml` | GitLab CI |
-| `azure-pipelines.yml` | Azure Pipelines |
+| File | Platform | Unit |
+|------|----------|------|
+| `.github/workflows/opentide.yml` | GitHub Actions | Job `share` |
+| `.gitlab-ci.yml` | GitLab CI | Stage `share`, job `share` |
+| `azure-pipelines.yml` | Azure Pipelines | Stage `Share`, job `share` |
 
-| Platform | Run the job when | Do not run the job when |
-|----------|------------------|-------------------------|
+When the stage is not selected, those files MUST NOT contain `opentide share` and MUST NOT contain that stage or job.
+
+| Platform | Run when | Do not run when |
+|----------|----------|-----------------|
 | GitHub Actions | `github.event_name` is `push`, and the ref is `refs/heads/<default branch>` | `pull_request` |
 | GitLab CI | `CI_COMMIT_BRANCH` equals `CI_DEFAULT_BRANCH`, and `CI_PIPELINE_SOURCE` is not `merge_request_event` | a merge request pipeline |
 | Azure Pipelines | `Build.SourceBranch` is `refs/heads/<default branch>`, and `Build.Reason` is not `PullRequest` | pull request validation |
 
 The command MUST be `opentide share push --changed`. The generated files MUST NOT contain any other `opentide share` command.
 
-The job runs after validation has succeeded. It MUST NOT depend on the staging deploy job, which does not run on a default-branch push. It does not wait on production deploy. The checkout MUST include the history the production diff needs. API keys come from the CI secret store. The generated file MUST NOT embed them.
+The stage starts after generate has succeeded. It depends only on generate. Deploy jobs MUST keep their current dependencies. Adding the stage MUST NOT make deploy wait for share, and MUST NOT make share wait for deploy. The checkout MUST include the history the production diff needs. API keys come from the CI secret store. The generated file MUST NOT embed them.
 
 `--changed` uses the commit range `opentide deploy --plan PRODUCTION` uses:
 
@@ -237,5 +268,5 @@ Bundled `sharing.toml` ships with no enabled block. A block MUST set `max_tlp`. 
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-09-28 | [RFC 0006](../rfcs/0006-sharing-ci.md). `opentide setup ci` runs `opentide share push --changed` only on a push to the default branch. |
+| 1.0 | 2026-09-28 | [RFC 0006](../rfcs/0006-sharing-ci.md). Optional sharing stage, default off, runs `opentide share push --changed` only on a push to the default branch. |
 | 1.0 | 2026-09-28 | Initial spec from accepted [RFC 0005](../rfcs/0005-sharing-system.md). Integration blocks are top-level arrays (`[[misp]]`) with per-block selection and a required `max_tlp`, merged by `name`. Share state is `.opentide/states/sharing.jsonl`. `preview` writes no files. |

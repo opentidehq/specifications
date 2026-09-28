@@ -12,7 +12,7 @@
 
 ## Summary
 
-`opentide setup ci` gains one sharing job. It runs `opentide share push --changed` when commits land on the default branch, the same production release that already runs `opentide deploy --plan PRODUCTION`. The job checks the objects that changed, matches them to existing remote events, and publishes per the sharing spec. The workflow we generate does not run sharing on a pull request or a merge request.
+`opentide setup` and `opentide setup ci` gain an optional sharing stage, default off. When the operator selects it, the stage runs `opentide share push --changed` on a push to the default branch, the same production release that already runs `opentide deploy --plan PRODUCTION`. The stage checks the objects that changed, matches them to existing remote events, and publishes per the sharing spec. It does not run on a pull request or a merge request. An enabled `[[misp]]` block does not turn the stage on; the setup choice does.
 
 ## Motivation
 
@@ -30,19 +30,31 @@ Stakeholders:
 
 Normative text lives in [specs/sharing.md](../specs/sharing.md). [specs/workspace.md](../specs/workspace.md) lists the job next to the inflight jobs. No object schema changes. No fixture changes: this is a pipeline rule, not a new `sharing.toml` shape.
 
-### The job we ship
+### Setup chooses the stage
 
-`opentide setup ci` MUST add one job, `share`, to the GitHub Actions, GitLab CI, and Azure Pipelines files it already writes (`.github/workflows/opentide.yml`, `.gitlab-ci.yml`, `azure-pipelines.yml`).
+The sharing stage is one CI workflow feature, beside staging deploy, inflight shards, promotion, and explorer pages.
+
+| Entry | Selection | Default |
+|-------|-----------|---------|
+| `opentide setup` wizard, after a CI platform is chosen | Checkbox "Sharing on the default branch" under "CI workflow features" | Off |
+| `opentide setup --ci <platform>` | `--sharing` / `--no-sharing` | `--no-sharing` |
+| `opentide setup ci <platform>` | `--sharing` / `--no-sharing` | `--no-sharing` |
+
+"Configure later" does not ask and does not write a pipeline. `--sharing` without a CI platform warns and writes nothing. Setup does not write `sharing.toml` and does not ask for API keys. A later run that leaves the stage unselected removes it from the rewritten pipeline.
+
+### The stage we ship
+
+When the stage is selected, `opentide setup` and `opentide setup ci` MUST add `share` to the GitHub Actions, GitLab CI, and Azure Pipelines files they already write (`.github/workflows/opentide.yml`, `.gitlab-ci.yml`, `azure-pipelines.yml`). GitHub writes a job. GitLab writes a stage and a job. Azure writes a stage `Share` and a job. When the stage is not selected, those files contain no `opentide share` command and no `share` stage.
 
 | Platform | The job runs when | The job does not run when |
 |----------|-------------------|---------------------------|
-| GitHub Actions | `push` and the ref is `refs/heads/<default branch>` | `pull_request` |
+| GitHub Actions | `github.event_name` is `push`, and the ref is `refs/heads/<default branch>` | `pull_request` |
 | GitLab CI | `CI_COMMIT_BRANCH` equals `CI_DEFAULT_BRANCH`, and `CI_PIPELINE_SOURCE` is not `merge_request_event` | merge request pipelines |
 | Azure Pipelines | `Build.SourceBranch` is `refs/heads/<default branch>`, and `Build.Reason` is not `PullRequest` | pull request validation |
 
 The command is `opentide share push --changed`. The generated files MUST NOT contain any other `opentide share` command, and MUST NOT run this command on a pull request or merge request.
 
-The job runs after validation has succeeded. It MUST NOT depend on `deploy_staging`, which does not run on a default-branch push. It does not wait for `deploy_production`; sharing is not a deploy step. The checkout MUST include the history the production diff needs.
+The stage starts after generate has succeeded and depends only on generate. Deploy jobs keep their current dependencies. Adding the stage does not make deploy wait for share, and does not make share wait for deploy. The checkout MUST include the history the production diff needs.
 
 API keys stay in the CI secret store, under the names the blocks already declare as `${ENV_VAR}`. The generated file MUST NOT contain a key.
 
@@ -78,6 +90,7 @@ An empty diff exits 0 with an empty report. It is not `scope_no_match`. A `--cha
 
 ## Alternatives
 
+- **Always emit the sharing stage.** Rejected. Staging and inflight are choices in `opentide setup`. Sharing publishes outside the repository, so the stage defaults off until the operator selects "Sharing on the default branch" or passes `--sharing`.
 - **Also ship `opentide share preview --changed` on pull requests.** Rejected. The pipeline we ship is the production release only. A pull request must not contact the destination, and a preview job would still be a second workflow we have not been asked to generate.
 - **Publish from the `pull_request` closed event when `merged` is true.** Rejected. A merge lands as a push to the default branch, which is the event `deploy_production` already handles, on all three platforms.
 - **Reuse `deploy --plan STAGING` for sharing.** Rejected. Staging is a pull-request deploy into a staging tenant. Sharing has no staging destination.

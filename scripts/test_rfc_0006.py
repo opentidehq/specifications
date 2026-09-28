@@ -30,6 +30,9 @@ class Rfc0006TextTests(unittest.TestCase):
             "**Also ship `opentide share preview --changed` on pull requests.** Rejected.",
             text,
         )
+        self.assertIn("**Always emit the sharing stage.** Rejected.", text)
+        self.assertIn("--sharing` / `--no-sharing`", text)
+        self.assertIn("Sharing on the default branch", text)
 
     def test_shipped_job_is_default_branch_only(self) -> None:
         section = _ci_section()
@@ -54,9 +57,18 @@ class Rfc0006TextTests(unittest.TestCase):
         self.assertIn("A `--changed` run whose diff is empty", text)
         self.assertIn("MUST exit 0 instead", text)
 
+    def test_setup_stage_defaults_off(self) -> None:
+        text = SHARING.read_text(encoding="utf-8")
+        self.assertIn('Checkbox under "CI workflow features": "Sharing on the default branch"', text)
+        self.assertIn("`--sharing` / `--no-sharing`", text)
+        self.assertIn("| `--no-sharing` |", text)
+        self.assertIn("Block `enabled` and the sharing stage are separate switches", text)
+        self.assertIn("Setup MUST NOT prompt for a URL, an API key, or a block `name`", text)
+
     def test_workspace_job_table(self) -> None:
         text = WORKSPACE.read_text(encoding="utf-8")
-        self.assertIn("| `share` | push to the default branch only |", text)
+        self.assertIn("| `share` | push to the default branch only, and only when setup selected the sharing stage |", text)
+        self.assertIn("defaults the stage off", text)
         self.assertIn("MUST NOT emit it", text)
 
     def test_rfc_0005_points_here(self) -> None:
