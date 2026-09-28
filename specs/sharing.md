@@ -10,19 +10,21 @@ supersedes: null
 
 ## Summary
 
-Sharing publishes Tide objects (threat, objective, rule) to external intelligence platforms. It is a sibling of deployment, not a detection platform. `opentide share` reads one workspace file, `sharing.toml`, selects objects, applies TLP policy, and hands each selected object to a connector target named in that file. The first connector is MISP ([sharing/misp-1.0.md](sharing/misp-1.0.md)).
+Sharing publishes Tide objects (threat, objective, rule) to external intelligence platforms. It is a sibling of deployment, not a detection platform. `opentide share` reads one workspace file, `sharing.toml`. Each integration is a top-level array of tables named after its connector — `[[misp]]` today, `[[opencti]]` when that connector is specified. Every block is one destination and carries its own selection and TLP ceiling. The first connector is MISP ([sharing/misp-1.0.md](sharing/misp-1.0.md)).
 
 ## Requirements
 
-- Sharing configuration MUST be a single file, `sharing.toml`. Implementations MUST NOT load per-target files from `sharing/targets/` or any other subdirectory as sharing targets.
-- Every target MUST be a named table `[targets.<identifier>]` inside that file. The table key is the target identifier.
-- `opentide share` with no subcommand MUST mean `push`.
-- Implementations MUST provide `push`, `preview`, `status`, `retract`, and `targets`.
+- Sharing configuration MUST be a single file, `sharing.toml`. Implementations MUST NOT load sharing configuration from `sharing/` or any other subdirectory.
+- Each integration MUST be a top-level array of tables whose key is the connector id (`[[misp]]`). One array entry is one destination.
+- The top level of `sharing.toml` MUST hold only arrays of tables. Any other top-level key, including a `[sharing]` or `[targets.<id>]` table, MUST be a configuration error.
+- Every block MUST carry a `name`. Names MUST be unique across every integration block in the file.
+- Selection and the TLP ceiling MUST be resolved per block. There is no global selection or global ceiling.
+- A block MUST NOT share an object whose `metadata.tlp` exceeds its `max_tlp`. TLP:RED MUST NOT be shared unless the block sets `max_tlp = "red"` **and** the operator passes `--allow-tlp-red`.
+- Bundled defaults MUST ship with no enabled block.
+- `opentide share` with no subcommand MUST mean `push`. Implementations MUST provide `push`, `preview`, `status`, `retract`, and `targets`.
 - MISP MUST NOT be added to the [platforms](platforms.md) capability matrix and MUST NOT appear as `configurations.misp` on `rule::1.0`.
-- Bundled defaults MUST ship with `[sharing]` equivalent `enabled = false` and no enabled target.
-- A target MUST NOT set a looser `max_tlp` or `allow_tlp_red` than the value resolved on `sharing.toml`. A looser value is a configuration error raised before any target is contacted.
 - Scope filters and target selection that match nothing MUST fail with `scope_no_match`.
-- Secrets MUST NOT appear in logs, reports, preview payloads, or share state. API keys, authorization header values, and values substituted from `${ENV_VAR}` MUST be replaced with a fixed redaction marker. Target URLs and organisation UUIDs are not credentials and MUST be emitted unredacted.
+- Secrets MUST NOT appear in logs, reports, preview payloads, or share state. API keys, authorization header values, and values substituted from `${ENV_VAR}` MUST be replaced with a fixed redaction marker. URLs and organisation UUIDs are not credentials and MUST be emitted unredacted.
 - Connectors without `pull` MUST NOT advertise import.
 
 ## Definition
@@ -34,95 +36,90 @@ Sharing publishes Tide objects (threat, objective, rule) to external intelligenc
 | Detection runtime | `opentide deploy` | `deployment.toml`, `platforms/*.toml` | SIEM / EDR |
 | Intelligence publication | `opentide share` | `sharing.toml` | CTI platforms (MISP first) |
 
-Connectors register by connector id (`misp`). A workspace MAY define multiple targets of the same connector (for example `misp-internal` and `misp-isac`). Each target has its own URL, credentials, publishing organisation, sharing group, and TLP ceiling. Nothing in one target changes the resolved configuration of another.
+### `sharing.toml`
 
-Platform files stay one file per bundled product because those identifiers are fixed by the package. Sharing targets are workspace-authored destinations, so they belong in the same file an operator reviews, diffs, and overrides.
-
-### Configuration file
-
-`sharing.toml` maps to config key `sharing`, following [configuration.md](configuration.md): the file body is the `sharing` table. Client overrides live at `.opentide/configurations/sharing.toml` and deep-merge onto the bundled file. A client MAY override one target key without restating every other target.
+The file has no global keys. Its top level holds only integration arrays.
 
 ```toml
-enabled = false
-default_targets = []
+[[misp]]
+name = "misp-internal"
+enabled = true
+url = "https://misp.internal.example.org"
+api_key = "${MISP_INTERNAL_API_KEY}"
 max_tlp = "amber"
-allow_tlp_red = false
-
-[selection]
 object_types = ["threat", "objective", "rule"]
 rule_statuses = ["PRODUCTION"]
 
-[targets.misp-internal]
-enabled = false
-identifier = "misp-internal"
-name = "Internal MISP"
-connector = "misp"
-schema = "sharing::misp::1.0"
-require_validation = true
-description = "Internal MISP instance"
+[[misp]]
+name = "misp-isac"
+enabled = true
+url = "https://misp.isac.example.net"
+api_key = "${MISP_ISAC_API_KEY}"
+max_tlp = "green"
+object_types = ["rule"]
+rule_statuses = ["PRODUCTION"]
+
+# A later connector spec adds its own array, for example:
+# [[opencti]]
+# name = "opencti-sector"
 ```
 
-Connector-specific tables (`[targets.<id>.connection]`, `[targets.<id>.misp]`) are defined by the connector spec. An array-of-tables `[[targets]]` MUST NOT be used: index-based merge cannot address one target. A table key that is not 1–64 characters of lowercase letters, digits, hyphen, and underscore is a configuration error. `[targets.<id>].identifier`, when set, MUST equal `<id>`.
+A two-instance MISP setup is two `[[misp]]` entries. A MISP instance plus an OpenCTI instance is one `[[misp]]` entry and one `[[opencti]]` entry. Nothing in one block changes another.
 
-Files under `.opentide/configurations/sharing/` MUST NOT be read as configuration. Placing a target in a subfolder is not an override.
+#### Keys every integration block carries
 
 | Field | Type | Required | Default | Semantics |
 |-------|------|----------|---------|-----------|
-| `enabled` | bool | no | `false` | Master switch. `push`, `publish`, and `retract` MUST refuse remote mutation when false. `preview` and `status` MAY still run. |
-| `default_targets` | list[string] | no | `[]` | Identifiers used when `--target` is omitted. Empty means every target with `enabled = true`. |
-| `max_tlp` | string | no | `amber` | A `tlp` vocabulary `name`. Objects whose `metadata.tlp` exceeds this ceiling are `skipped_tlp`. Order: `clear` < `green` < `amber` < `amber+strict` < `red`. |
-| `allow_tlp_red` | bool | no | `false` | TLP:RED MUST NOT be shared unless this resolves to `true` and the operator passes `--allow-tlp-red`. |
-| `selection.object_types` | list[string] | no | all three families | Restrict families. |
-| `selection.rule_statuses` | list[string] | no | `["PRODUCTION"]` | Names from merged `deployment.toml`. Threats and objectives ignore this key. |
+| `name` | string | yes | — | Identifier used by `--target`, the share report, state, and preview paths. 1–64 characters of lowercase letters, digits, hyphen, and underscore. |
+| `enabled` | bool | no | `false` | Participate in share runs. |
+| `max_tlp` | string | no | `amber` | A `tlp` vocabulary `name`. Objects above this ceiling are `skipped_tlp`. Order: `clear` < `green` < `amber` < `amber+strict` < `red`. |
+| `object_types` | list[string] | no | `["threat", "objective", "rule"]` | Families this block shares. |
+| `rule_statuses` | list[string] | no | `["PRODUCTION"]` | Rule statuses this block shares. Values MUST be names from merged `deployment.toml`. Threats and objectives ignore this key. |
 
-`max_tlp` and `allow_tlp_red` are the only policy keys resolved both globally and per target. Comparison order is `clear` < `green` < `amber` < `amber+strict` < `red`. A lower `max_tlp` shares fewer objects and is stricter. A target MAY lower `max_tlp` or set `allow_tlp_red = false`. A target MUST NOT raise `max_tlp` or set `allow_tlp_red = true` when the global value is `false`. CLI flags follow strictest-wins, except `--allow-tlp-red`, which may widen a value only where `allow_tlp_red` already resolves to `true` for that target.
+The connector spec defines every other key in its block. Within a known integration, an unrecognised key MUST be a configuration error naming the key and the block `name`, raised before any destination is contacted. A top-level array whose key names no known connector is a warning, and that array is skipped, so a workspace can declare `[[opencti]]` before its CLI supports it.
 
-`require_validation` is per target, default `true`, not a global key.
+#### Merge
 
-### Common target fields
+`sharing.toml` follows the [configuration](configuration.md) merge order: bundled package, then client `.opentide/configurations/sharing.toml`, then parent instance. Integration arrays merge **by `name`**, not by position and not by replacing the array. A later layer's entry with the same integration key and `name` overrides the earlier entry key by key; keys it does not restate are kept, and a list value replaces the earlier list. An entry with a new `name` is appended after the existing entries. A duplicate `name` inside one layer is a configuration error naming every block involved. A `name` used by two different integrations is a configuration error.
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `enabled` | bool | no | `false` | Participate in share runs |
-| `identifier` | string | no | table key | MUST match the table key when present |
-| `name` | string | no | identifier | Display name |
-| `connector` | string | yes | — | Connector id |
-| `schema` | string | yes for MISP | — | Connector schema id, e.g. `sharing::misp::1.0` |
-| `require_validation` | bool | no | `true` | When true, push MUST run default [validation](validation.md) checks and MUST NOT share objects that raise errors. Warnings do not block. |
-| `description` | string | no | `""` | Human notes |
-| `max_tlp` | string | no | global | Stricter ceiling only |
-| `allow_tlp_red` | bool | no | global | May only tighten |
+Required keys and value checks apply to the merged result, so a layer MAY restate only `name` and the keys it changes.
 
-An unrecognised table is a warning and does not prevent the target from loading, except `connector`, which MUST be recognised or the target is skipped with an error. An unrecognised key inside a known table is a warning, unless it names a removed option published by the connector spec, which is an error. The loader MUST reject removed keys before contacting any target.
+A client can therefore enable a bundled block with a two-line override:
+
+```toml
+[[misp]]
+name = "misp-internal"
+enabled = true
+```
 
 ### CLI
 
 | Command | Purpose |
 |---------|---------|
-| `opentide share` / `opentide share push` | Publish in-scope objects to selected targets |
-| `opentide share preview` | Build payloads and apply policy; write nothing remote (`push --dry-run`) |
+| `opentide share` / `opentide share push` | Publish in-scope objects to selected blocks |
+| `opentide share preview` | Build payloads and apply selection and TLP; write nothing remote (`push --dry-run`) |
 | `opentide share status` | Local share state versus object versions; no remote mutation |
 | `opentide share retract` | Unpublish, or delete with `--delete` |
-| `opentide share targets` | List targets, connector, enabled flag, and redacted connection |
+| `opentide share targets` | List blocks: integration, `name`, `enabled`, `max_tlp`, and URL. Never the API key. |
 
 | Flag | Effect |
 |------|--------|
-| `--target <id>` | Repeatable. Unknown id is an error. A disabled target is an error and MUST NOT be re-enabled. |
+| `--target <name>` | Repeatable. Restrict to named blocks. Unknown name is an error. A disabled block is an error and MUST NOT be re-enabled. Omitted means every enabled block across all integrations. |
 | `--uuid <uuid>` | Repeatable. Narrow to objects. |
-| `--type <family>` | Repeatable. `threat`, `objective`, `rule`. |
+| `--type <family>` | Repeatable. `threat`, `objective`, `rule`. Intersected with each block's `object_types`. |
 | `--file <path>` | Repeatable. Narrow to YAML files. |
 | `--dry-run` | On `push`: same as `preview`. |
-| `--allow-tlp-red` | Required in addition to resolved `allow_tlp_red = true` to share TLP:RED. |
-| `--publish` / `--no-publish` | Override target `publish` for this run. |
+| `--allow-tlp-red` | Required, together with a block `max_tlp = "red"`, to share TLP:RED to that block. |
+| `--publish` / `--no-publish` | Override the block's `publish` for this run. |
 | `--workers` | Optional parallelism across HTTP upserts. MUST NOT change any object's outcome. |
 
-An unmatched `--target`, an unmatched `default_targets` entry, and an empty resolved target set are `scope_no_match`.
+CLI filters narrow a block's selection. They never widen it. An unmatched `--target` and an empty resolved block set are `scope_no_match`.
 
 Implementations MUST choose exactly one exit status, in this order:
 
-1. Preflight (validation, policy misconfiguration, connector preflight failures listed by the connector spec, `scope_no_match`) → `1`.
-2. Else if at least one object action succeeded (`created`, `updated`, `unchanged`, `retracted`) and at least one object or target `failed` → `3`.
-3. Else if no object `failed` → `0`. Policy skips (`skipped_tlp`, `skipped_status`) are not `failed`. An all-skip run is `0`.
+1. Preflight (validation, configuration errors, connector preflight failures listed by the connector spec, `scope_no_match`) → `1`.
+2. Else if at least one object action succeeded (`created`, `updated`, `unchanged`, `retracted`) and at least one object or block `failed` → `3`.
+3. Else if no object `failed` → `0`. Policy skips (`skipped_tlp`, `skipped_status`, `skipped_type`) are not `failed`. An all-skip run is `0`.
 4. Else, if every `failed` is authentication or connectivity → `2`; otherwise → `1`.
 
 | Code | Meaning |
@@ -132,26 +129,28 @@ Implementations MUST choose exactly one exit status, in this order:
 | `2` | No successful object action, and every `failed` is authentication or connectivity. |
 | `3` | Partial success: at least one success and at least one failure. |
 
-Stdout SHOULD be a share report (human table by default; `--json` MAY be offered). The report MUST carry exactly one record per pair of object `metadata.uuid` and target identifier, each with exactly one action (`created`, `updated`, `unchanged`, `skipped_tlp`, `skipped_status`, `retracted`, `failed`), the remote identifier where one exists, and a reason on every `skipped_*` and `failed`. Informational notes MAY be attached without changing the action.
+Stdout SHOULD be a share report (human table by default; `--json` MAY be offered). The report MUST carry exactly one record per pair of object `metadata.uuid` and block `name`, each with exactly one action (`created`, `updated`, `unchanged`, `skipped_tlp`, `skipped_status`, `skipped_type`, `retracted`, `failed`), the remote identifier where one exists, and a reason on every `skipped_*` and `failed`. Informational notes MAY be attached without changing the action.
+
+Every in-scope object MUST pass the default [validation](validation.md) checks before it is shared. An object that raises `error` is `failed` / `validation_error`. Warnings do not block.
 
 ### Workspace paths
 
 | Path | Purpose | Client-edited? |
 |------|---------|----------------|
-| `.opentide/configurations/sharing.toml` | The sharing file: global policy and every target | Yes |
+| `.opentide/configurations/sharing.toml` | Every integration block | Yes |
 | `.opentide/sharing/state.json` | Last successful share mapping | No — generated |
-| `.opentide/exports/sharing/<target id>/` | Preview and file-mode output | No — generated |
+| `.opentide/exports/sharing/<name>/` | `preview` output | No — generated |
 
-`state.json` holds at most one entry per pair of object UUID and target identifier:
+`state.json` holds at most one entry per pair of object UUID and block `name`:
 
 | Field | Description |
 |-------|-------------|
 | `object_uuid` | Tide `metadata.uuid` |
 | `object_schema` | `metadata.schema` |
 | `object_version` | `metadata.version` at last successful share |
-| `content_hash` | Hash of the emitted object document for that target |
-| `target_id` | Sharing target identifier |
-| `connector` | Connector id |
+| `content_hash` | Hash of the emitted object document |
+| `integration` | Connector id (`misp`) |
+| `target` | Block `name` |
 | `organisation_uuid` | Publishing organisation observed for the matched remote record |
 | `remote_event_uuid` | Remote identifier assigned by the destination |
 | `remote_event_id` | Remote numeric id, or explicit null when not observed |
@@ -162,28 +161,30 @@ State is a regenerable cache. The connector's remote lookup wins on disagreement
 
 ### Connector contract
 
-A connector spec MUST declare `identifier`, `schema`, and whether `push`, `preview`, `status`, `retract`, and `pull` are supported. It MUST publish its own removed-keys table. Future connectors (OpenCTI, TAXII) get their own `sharing::<id>::1.0` specs and add named targets to the same `sharing.toml`.
+A connector spec MUST declare its integration key (the top-level array name), its `schema` id, the block keys it adds, and whether `push`, `preview`, `status`, `retract`, and `pull` are supported. Future connectors (OpenCTI, TAXII) get their own `sharing::<id>::1.0` specs and their own top-level array in `sharing.toml`.
 
 ## Relationships
 
-- [sharing/misp-1.0.md](sharing/misp-1.0.md) — MISP connector `sharing::misp::1.0`
+- [sharing/misp-1.0.md](sharing/misp-1.0.md) — MISP connector `sharing::misp::1.0`, block `[[misp]]`
 - [configuration.md](configuration.md) — merge order; `sharing.toml` is overridable
 - [workspace.md](workspace.md) — generated sharing paths
-- [validation.md](validation.md) — `sharing-config` check and `require_validation`
-- [metadata.md](metadata.md) — `metadata.tlp`, optional `metadata.pap`
+- [validation.md](validation.md) — `sharing-config` check
+- [metadata.md](metadata.md) — `metadata.tlp`, optional `metadata.pap`, `metadata.organisation`
 - [platforms.md](platforms.md) — deployment targets; MISP is not in this matrix
 - [RFC 0005](../rfcs/0005-sharing-system.md) — accepted proposal
 
 ## Defaults & overrides
 
-Bundled `sharing.toml` ships disabled, with `max_tlp = "amber"`, `allow_tlp_red = false`, and `selection.rule_statuses = ["PRODUCTION"]`. Clients enable sharing and declare targets only in `.opentide/configurations/sharing.toml`.
+Bundled `sharing.toml` ships with no enabled block. A block that omits `max_tlp`, `object_types`, or `rule_statuses` shares `amber` and below, all three families, and `PRODUCTION` rules only. Clients declare and enable blocks only in `.opentide/configurations/sharing.toml`.
 
 ## Examples
 
-Two MISP instances in one file: [fixtures/sharing/valid/sharing.toml](../fixtures/sharing/valid/sharing.toml).
+- Two MISP instances with different selections: [fixtures/sharing/valid/sharing.toml](../fixtures/sharing/valid/sharing.toml)
+- Merge by `name`: [override.toml](../fixtures/sharing/valid/override.toml) applied to that file yields [merged.toml](../fixtures/sharing/valid/merged.toml)
+- The `[targets.<id>]` layout from RFC drafts, rejected: [fixtures/sharing/invalid/legacy-targets-table.toml](../fixtures/sharing/invalid/legacy-targets-table.toml)
 
 ## History
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-09-25 | Initial spec from accepted [RFC 0005](../rfcs/0005-sharing-system.md). Targets are named tables in `sharing.toml`, not files under `sharing/targets/`. |
+| 1.0 | 2026-09-28 | Initial spec from accepted [RFC 0005](../rfcs/0005-sharing-system.md). Integration blocks are top-level arrays (`[[misp]]`) with per-block selection and `max_tlp`, merged by `name`. |

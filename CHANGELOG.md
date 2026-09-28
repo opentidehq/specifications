@@ -8,7 +8,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## metadata 1.1
 
-- Optional `metadata.pap` ([RFC 0005](rfcs/0005-sharing-system.md)).
+- Optional `metadata.pap` ([RFC 0005](rfcs/0005-sharing-system.md)). `metadata.organisation.uuid` is the default sharing publishing organisation.
 
 ## metadata 1.0
 
@@ -30,12 +30,12 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## workspace 1.0
 
-- Client sharing file `sharing.toml`, plus generated `.opentide/sharing/state.json` and `.opentide/exports/sharing/<target id>/`.
+- Client sharing file `sharing.toml`, plus generated `.opentide/sharing/state.json` and preview output under `.opentide/exports/sharing/<name>/`.
 - Initial normative spec bootstrapped from opentide `paths.toml`.
 
 ## configuration 1.0
 
-- `sharing.toml` is overridable. `sharing/targets/` is not a configuration location.
+- `sharing.toml` is overridable. Its top-level arrays of tables (`[[misp]]`) merge by `name`; every other array still replaces. `sharing/` is not a configuration location.
 - Initial normative spec bootstrapped from opentide `core/files.py`.
 
 ## vocabulary format 1.0
@@ -60,14 +60,16 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## sharing 1.0
 
-- Sharing system. Every target is a named table in one `sharing.toml`. `sharing/targets/` is not a configuration location ([RFC 0005](rfcs/0005-sharing-system.md)).
+- Sharing system ([RFC 0005](rfcs/0005-sharing-system.md)). One `sharing.toml` whose top level holds only integration arrays (`[[misp]]`; `[[opencti]]` reserved for a later connector). Each block carries its own selection and `max_tlp`; there are no global keys.
 
 ## sharing-misp 1.0
 
 - MISP connector `sharing::misp::1.0`. Document transport via upstream `opentide` template version 5.
+- Minimal `[[misp]]` block: `name`, `enabled`, `url`, `api_key`, `max_tlp`, `object_types`, `rule_statuses`, optional `organisation_uuid`, `publish`, `verify_ssl`.
+- Publishing organisation from `metadata.organisation.uuid`, overridable per block. Distribution derived from `metadata.tlp`; no sharing groups, file mode, title prefix, or extra tags in 1.0.
 
 ## validation 1.0
 
-- Sharing fixture checker codes for the single-file MISP target layout.
+- `sharing-config` checker codes and fixtures for `[[misp]]` blocks, including the merge-by-`name` fixture.
 - Document specifications-repo fixture checker codes for `threat::1.0` list and `ThreatActor` encoding ([#11](https://github.com/OpenTideHQ/specifications/issues/11), [#12](https://github.com/OpenTideHQ/specifications/issues/12)).
 - Initial normative spec bootstrapped from opentide validation pipeline.

@@ -1,0 +1,5 @@
+[[misp]]
+name = "misp-internal"
+url = "https://misp.internal.example.org"
+api_key = "${MISP_INTERNAL_API_KEY}"
+organisation_uuid = "internal-org"

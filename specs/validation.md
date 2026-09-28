@@ -34,7 +34,7 @@ OpenTide validates detection content through a structured pipeline: ID uniquenes
 | UUID format | `uuid-format` | yes | Every UUID must be valid UUIDv4 |
 | Schema | `schema` | yes | Pydantic model validation + vocab + cross-ref |
 | CVE | `cve` | no | CVE reference integrity (optional flag) |
-| Sharing config | `sharing-config` | no | `sharing.toml` target tables, TLP ceilings, and connector removed keys. On for `opentide share push`. |
+| Sharing config | `sharing-config` | no | `sharing.toml` integration blocks: required keys, unique names, known keys, `max_tlp`, `object_types`, and `organisation_uuid`. On for `opentide share push`. |
 
 ### Schema check sub-steps
 
@@ -96,11 +96,16 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/invalid/rule-unknown-schema.yaml](../fixtures/invalid/rule-unknown-schema.yaml) | `unknown_schema` |
 | [fixtures/invalid/rule-missing-metadata.yaml](../fixtures/invalid/rule-missing-metadata.yaml) | `missing_metadata` |
 | [fixtures/invalid/objective-no-signals.yaml](../fixtures/invalid/objective-no-signals.yaml) | `empty_signals` |
-| [fixtures/sharing/invalid/removed-event-mode.toml](../fixtures/sharing/invalid/removed-event-mode.toml) | `removed_key` |
-| [fixtures/sharing/invalid/loose-max-tlp.toml](../fixtures/sharing/invalid/loose-max-tlp.toml) | `target_policy_looser` |
-| [fixtures/sharing/invalid/file-sharing-group.toml](../fixtures/sharing/invalid/file-sharing-group.toml) | `sharing_group_id_required` |
-| [fixtures/sharing/invalid/missing-org.toml](../fixtures/sharing/invalid/missing-org.toml) | `organisation_uuid_missing` |
-| [fixtures/sharing/invalid/identifier-mismatch.toml](../fixtures/sharing/invalid/identifier-mismatch.toml) | `identifier_mismatch` |
+| [fixtures/sharing/invalid/unknown-distribution.toml](../fixtures/sharing/invalid/unknown-distribution.toml) | `unknown_key` |
+| [fixtures/sharing/invalid/legacy-targets-table.toml](../fixtures/sharing/invalid/legacy-targets-table.toml) | `unknown_key` |
+| [fixtures/sharing/invalid/duplicate-name.toml](../fixtures/sharing/invalid/duplicate-name.toml) | `duplicate_name` |
+| [fixtures/sharing/invalid/missing-url.toml](../fixtures/sharing/invalid/missing-url.toml) | `missing_field` |
+| [fixtures/sharing/invalid/bad-name.toml](../fixtures/sharing/invalid/bad-name.toml) | `name_invalid` |
+| [fixtures/sharing/invalid/bad-max-tlp.toml](../fixtures/sharing/invalid/bad-max-tlp.toml) | `max_tlp_unknown` |
+| [fixtures/sharing/invalid/bad-organisation-uuid.toml](../fixtures/sharing/invalid/bad-organisation-uuid.toml) | `organisation_uuid_invalid` |
+| [fixtures/sharing/invalid/bad-object-type.toml](../fixtures/sharing/invalid/bad-object-type.toml) | `object_type_unknown` |
+
+Sharing fixtures (`scripts/sharing_fixtures.py`) also prove the merge rule: [override.toml](../fixtures/sharing/valid/override.toml) merged by `name` onto [sharing.toml](../fixtures/sharing/valid/sharing.toml) MUST equal [merged.toml](../fixtures/sharing/valid/merged.toml).
 
 A packed semicolon string that happens to start with a valid token MUST still fail `packed_vocab_string`. Accepting only the first token is lossy and non-compliant.
 
@@ -149,6 +154,6 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-09-25 | `sharing-config` checker codes for the single-file MISP target layout. |
+| 1.0 | 2026-09-28 | `sharing-config` checker codes for `[[misp]]` integration blocks. |
 | 1.0 | 2026-09-16 | Document specifications-repo fixture checker codes for `threat::1.0` list/`ThreatActor` encoding ([#11](https://github.com/OpenTideHQ/specifications/issues/11), [#12](https://github.com/OpenTideHQ/specifications/issues/12)). |
 | 1.0 | 2026-06-25 | Initial spec from opentide `validation/session.py` |

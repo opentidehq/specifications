@@ -1,6 +1,4 @@
-# Conformance sharing file: one [[misp]] block per MISP instance.
-# misp-internal selects STAGING rules so the committed object fixtures are in scope.
-# The normative default for rule_statuses remains ["PRODUCTION"].
+# Expected result of merging override.toml onto sharing.toml.
 
 [[misp]]
 name = "misp-internal"
@@ -16,7 +14,12 @@ name = "misp-isac"
 enabled = true
 url = "https://misp.isac.example.net"
 api_key = "${MISP_ISAC_API_KEY}"
-max_tlp = "green"
+max_tlp = "clear"
 object_types = ["rule"]
 publish = true
 organisation_uuid = "00000000-0000-4000-8aaa-000000000002"
+
+[[misp]]
+name = "misp-lab"
+url = "https://misp.lab.example.com"
+api_key = "${MISP_LAB_API_KEY}"

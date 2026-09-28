@@ -44,7 +44,7 @@ Shared metadata block present on all Tide objects (threat, objective, rule). Pro
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `uuid` | string | yes | Organisation UUID |
+| `uuid` | string | yes | Organisation UUID. Sharing uses it as the default publishing organisation. |
 | `name` | string | yes | Organisation display name |
 
 ### `references` (ObjectReferences)
@@ -61,7 +61,7 @@ Optional on threat, objective, and rule objects.
 
 - [versioning.md](versioning.md) — `metadata.schema` and `metadata.version` semantics
 - [specs/vocabularies/catalog.md](vocabularies/catalog.md) — `tlp` and `pap` vocabularies
-- [sharing/misp-1.0.md](sharing/misp-1.0.md) — consumes `metadata.tlp` and optional `metadata.pap`
+- [sharing/misp-1.0.md](sharing/misp-1.0.md) — consumes `metadata.tlp`, optional `metadata.pap`, and `metadata.organisation.uuid` as the publishing organisation unless the `[[misp]]` block overrides it
 - Object specs — embed `metadata` as required top-level block
 
 ## Defaults & overrides
@@ -87,5 +87,5 @@ metadata:
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.1 | 2026-09-25 | Optional `metadata.pap` for sharing ([RFC 0005](../rfcs/0005-sharing-system.md)). |
+| 1.1 | 2026-09-28 | Optional `metadata.pap` for sharing ([RFC 0005](../rfcs/0005-sharing-system.md)). Sharing uses `organisation.uuid` as the default publishing organisation. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `models/metadata.py` |
