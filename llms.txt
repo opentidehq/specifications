@@ -20,6 +20,8 @@
 - specs/metaschema-keywords.md
 - specs/platforms.md
 - specs/validation.md
+- specs/sharing.md
+- specs/sharing/misp-1.0.md (schema_id: sharing::misp::1.0)
 
 ## Object specs (specs/objects/)
 
@@ -37,6 +39,8 @@
 - vocabularies/*.vocab.toml: Canonical vocabulary TOML (36 files)
 - schemas/vocabulary.schema.json: Vocabulary file JSON Schema
 - schemas/inflight.shard.1.0.schema.json: Inflight preview shard envelope JSON Schema
+- schemas/misp/opentide.definition.json: Pinned upstream MISP opentide object template (version 5)
+- fixtures/sharing/: Sharing TOML and golden MISP Event JSON
 - fixtures/valid/: Valid conformance YAML
 - fixtures/invalid/: Invalid conformance YAML
 - fixtures/cross-object/: Cross-reference conformance YAML
