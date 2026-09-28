@@ -154,6 +154,9 @@ Consumers overlay shards onto the committed registry when the shard object `meta
 |--------|---------|---------|
 | `inflight_shards` | pull request / merge request | `opentide generate inflight` |
 | `inflight_prune` | push to default branch | `opentide generate inflight prune` |
+| `share` | push to the default branch only | `opentide share push --changed` |
+
+`share` is the production release. `opentide setup ci` MUST NOT emit it, or any other `opentide share` command, on a pull request or merge request. The trigger and the diff are specified in [sharing.md](sharing.md#continuous-integration).
 
 ## Relationships
 
@@ -173,5 +176,6 @@ Object fixtures assume the default layout: rules under `objects/rules/`, etc.
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-09-28 | CI job `share` runs `opentide share push --changed` on a push to the default branch only. |
 | 1.0 | 2026-09-28 | Sharing uses one client file, `sharing.toml`, and one generated ledger, `.opentide/states/sharing.jsonl`. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `paths.toml` |

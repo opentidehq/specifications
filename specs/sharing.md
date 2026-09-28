@@ -23,8 +23,9 @@ Sharing publishes Tide objects (threat, objective, rule) to external intelligenc
 - Bundled defaults MUST ship with no enabled block.
 - `opentide share` with no subcommand MUST mean `push`. Implementations MUST provide `push`, `preview`, `status`, `retract`, and `targets`.
 - MISP MUST NOT be added to the [platforms](platforms.md) capability matrix and MUST NOT appear as `configurations.misp` on `rule::1.0`.
-- Scope filters and target selection that match nothing MUST fail with `scope_no_match`.
+- Scope filters and target selection that match nothing MUST fail with `scope_no_match`. A `--changed` run whose diff is empty, and a `--changed` run with no enabled block, MUST exit 0 instead.
 - Secrets MUST NOT appear in logs, reports, preview payloads, or share state. API keys, authorization header values, and values substituted from `${ENV_VAR}` MUST be replaced with a fixed redaction marker. URLs and organisation UUIDs are not credentials and MUST be emitted unredacted.
+- `opentide setup ci` MUST emit one sharing job, and that job MUST run only on a push to the default branch. It MUST run `opentide share push --changed`. It MUST NOT run `opentide share` on a pull request or a merge request.
 - Connectors without `pull` MUST NOT advertise import.
 
 ## Definition
@@ -111,8 +112,9 @@ enabled = true
 | `--dry-run` | On `push`: same as `preview`. |
 | `--publish` / `--no-publish` | Override the block's `publish` for this run. |
 | `--workers` | Optional parallelism across HTTP upserts. MUST NOT change any object's outcome. |
+| `--changed` | On `push`: share only the object files in the production diff. See [Continuous integration](#continuous-integration). |
 
-CLI filters narrow a block's selection. They never widen it. An unmatched `--target` and an empty resolved block set are `scope_no_match`.
+CLI filters narrow a block's selection. They never widen it. An unmatched `--target` and an empty resolved block set are `scope_no_match`. A `--changed` run with an empty diff, or with no enabled block, exits 0.
 
 Implementations MUST choose exactly one exit status, in this order:
 
@@ -131,6 +133,44 @@ Implementations MUST choose exactly one exit status, in this order:
 Stdout SHOULD be a share report (human table by default; `--json` MAY be offered). The report MUST carry exactly one record per pair of object `metadata.uuid` and block `name`, each with exactly one action (`created`, `updated`, `unchanged`, `skipped_tlp`, `skipped_status`, `skipped_type`, `retracted`, `failed`), the remote identifier where one exists, and a reason on every `skipped_*` and `failed`. Informational notes MAY be attached without changing the action.
 
 Every in-scope object MUST pass the default [validation](validation.md) checks before it is shared. An object that raises `error` is `failed` / `validation_error`. Warnings do not block.
+
+### Continuous integration
+
+Deployment publishes changed rules when they reach the default branch (`opentide deploy --plan PRODUCTION`). Sharing uses that same production event and no other. `opentide setup ci` MUST add one job, `share`, to each workflow it already writes:
+
+| File | Platform |
+|------|----------|
+| `.github/workflows/opentide.yml` | GitHub Actions |
+| `.gitlab-ci.yml` | GitLab CI |
+| `azure-pipelines.yml` | Azure Pipelines |
+
+| Platform | Run the job when | Do not run the job when |
+|----------|------------------|-------------------------|
+| GitHub Actions | `github.event_name` is `push`, and the ref is `refs/heads/<default branch>` | `pull_request` |
+| GitLab CI | `CI_COMMIT_BRANCH` equals `CI_DEFAULT_BRANCH`, and `CI_PIPELINE_SOURCE` is not `merge_request_event` | a merge request pipeline |
+| Azure Pipelines | `Build.SourceBranch` is `refs/heads/<default branch>`, and `Build.Reason` is not `PullRequest` | pull request validation |
+
+The command MUST be `opentide share push --changed`. The generated files MUST NOT contain any other `opentide share` command.
+
+The job runs after validation has succeeded. It MUST NOT depend on the staging deploy job, which does not run on a default-branch push. It does not wait on production deploy. The checkout MUST include the history the production diff needs. API keys come from the CI secret store. The generated file MUST NOT embed them.
+
+`--changed` uses the commit range `opentide deploy --plan PRODUCTION` uses:
+
+| Platform | Range |
+|----------|-------|
+| GitHub Actions | First parent of `HEAD` through `GITHUB_SHA` |
+| Azure Pipelines | First parent of `HEAD` through `BUILD_SOURCEVERSION` |
+| GitLab CI | `CI_COMMIT_BEFORE_SHA` through `CI_COMMIT_SHA` |
+
+A repository's first commit has no parent. That diff is empty and the run exits 0. A parent that is not in the checkout is a preflight error and MUST NOT be reported as an empty diff.
+
+The paths in that range are `.yaml` and `.yml` files whose parent directory is the configured threat, objective, or rule directory (`paths.objects.threat`, `paths.objects.objective`, `paths.objects.rule`). A file in a subdirectory of those folders is out of scope. Added paths, modified paths, and the destination of a rename are in scope. Deleted paths are not. Deleting an object file MUST NOT retract it.
+
+An edit that does not touch those files, including an edit that only changes `sharing.toml`, is not in the diff. Sharing every other in-scope object is `opentide share push` without `--changed`.
+
+`opentide share push --changed` during a pull request or merge request MUST fail preflight and MUST NOT contact the destination. `--changed` outside GitHub Actions (`GITHUB_ACTIONS`), GitLab CI (`CI` set, and not the other two), and Azure Pipelines (`TF_BUILD`) MUST fail preflight. Platform detection checks Azure, then GitHub, then GitLab.
+
+`preview` is unchanged and is not part of this job. It remains the local dry run.
 
 ### Workspace paths
 
@@ -181,6 +221,7 @@ A connector spec MUST declare its integration key (the top-level array name), it
 - [metadata.md](metadata.md) — `metadata.tlp`, optional `metadata.pap`, `metadata.organisation`
 - [platforms.md](platforms.md) — deployment targets; MISP is not in this matrix
 - [RFC 0005](../rfcs/0005-sharing-system.md) — accepted proposal
+- [RFC 0006](../rfcs/0006-sharing-ci.md) — production-merge sharing job
 
 ## Defaults & overrides
 
@@ -196,4 +237,5 @@ Bundled `sharing.toml` ships with no enabled block. A block MUST set `max_tlp`. 
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-09-28 | [RFC 0006](../rfcs/0006-sharing-ci.md). `opentide setup ci` runs `opentide share push --changed` only on a push to the default branch. |
 | 1.0 | 2026-09-28 | Initial spec from accepted [RFC 0005](../rfcs/0005-sharing-system.md). Integration blocks are top-level arrays (`[[misp]]`) with per-block selection and a required `max_tlp`, merged by `name`. Share state is `.opentide/states/sharing.jsonl`. `preview` writes no files. |
