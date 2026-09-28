@@ -19,7 +19,7 @@ Decisions:
 3. **Every rule type the Security UI can create:** `query`, `saved_query`, `eql`, `esql`, `threshold`, `new_terms`, `threat_match`, and `machine_learning`.
 4. **Identity is the MDR UUID.** Kibana's user-settable `rule_id` is set to `metadata.uuid`. It is unique per space, so one UUID serves every tenant, and alerts carry it as `kibana.alert.rule.rule_id`. Kibana's internal `id` is never stored, and nothing is written back to the rule file.
 5. **Validation:** offline syntax checks per query language, plus live validation through the rule preview API. Two Elasticsearch checks also run before every deploy, because Kibana accepts a mistyped ES\|QL command or aggregation field and the rule then fails silently ([Elasticsearch checks](#elasticsearch-checks)).
-6. **Kibana's own names.** Durations are written `5m`, `1h`, `14d`. `required_fields` is a list of `{name, type}` objects, and a package name may stand for a related integration. Every other key is the Kibana field the create-rule UI writes. `overrides` is only for a field that UI does not show.
+6. **Kibana's own names.** Durations are written `5m`, `1h`, `14d`. `required_fields` is a list of `{name, type}` objects, and a package name may stand for a related integration. `index` and `threat_index` are lists of pattern strings, including a rule with one pattern (`[logs-*]`). Every other key is the Kibana field the create-rule UI writes. `overrides` is only for a field that UI does not show.
 
 The change is additive: it adds a `configurations.elastic` key and a new platform schema. `rule::1.0` keeps its identifier and every existing rule stays valid.
 
@@ -192,8 +192,8 @@ class ElasticConfig(PlatformConfigBase):
     query: QueryText | None = None
     language: Literal["kuery", "lucene"] | None = None
     saved_id: str | None = None
-    index: list[str] | None = None
-    data_view_id: str | None = None
+    index: list[str] | None = None                   # always a list; one pattern is [logs-*]
+    data_view_id: str | None = None                  # one data view; replaces index
     filters: list[dict[str, Any]] | None = None          # the filter objects the UI saves
     interval: Duration = "5m"                            # Runs every
     from_: Duration = "6m"                               # data_key "from": total window, sent as now-<from>
@@ -209,7 +209,7 @@ class ElasticConfig(PlatformConfigBase):
     timestamp_field: str | None = None                   # EQL settings
     event_category_override: str | None = None
     tiebreaker_field: str | None = None
-    threat_index: list[str] | None = None
+    threat_index: list[str] | None = None            # always a list, same as index
     threat_query: str | None = None
     threat_language: Literal["kuery", "lucene"] | None = None
     threat_mapping: list[ElasticThreatGroup] | None = None
@@ -217,7 +217,7 @@ class ElasticConfig(PlatformConfigBase):
     threat_indicator_path: str | None = None             # Indicator prefix override
     concurrent_searches: int | None = None               # API only; not in the create UI
     items_per_search: int | None = None
-    machine_learning_job_id: str | list[str] | None = None
+    machine_learning_job_id: str | list[str] | None = None   # Kibana accepts either
     anomaly_threshold: int | None = None
     rule_name_override: str | None = None
     timestamp_override: str | None = None
@@ -289,6 +289,7 @@ class ElasticThreatEntry(TideModel):
 | `language` | `language` MUST NOT be set for `eql`, `esql`, or `machine_learning` |
 | `esql_source` | `esql` and `machine_learning` MUST NOT set `index` or `data_view_id` |
 | `index_xor_data_view` | `index` and `data_view_id` are mutually exclusive |
+| `index_list` | `index` and `threat_index`, when set, are lists of one or more pattern strings. A single pattern is a one-item list. A string is invalid. |
 | `suppression_shape` | For `threshold`: `alert_suppression.duration` is required and `group_by` is forbidden. For other types: `group_by` is required, with 1–3 distinct, non-empty field names. |
 | `new_terms_fields` | `new_terms_fields` has 1–3 entries |
 | `threshold_fields` | `threshold.field` has 0–5 entries; `threshold.value` >= 1 |
@@ -320,7 +321,7 @@ The deployer compiles each MDR into a Kibana create or update body:
 | `language` | `type`, `language` | `eql` → `eql`, `esql` → `esql`; omitted for `machine_learning`; else `language` or `kuery` |
 | `query` | `query` | trailing whitespace stripped; omitted for `machine_learning` and when `saved_query` has no query |
 | `saved_id` | `saved_id` | verbatim |
-| `index` | block `index`, else tenant `setup.index` | omitted for `esql` and `machine_learning`, when `data_view_id` is set, or when both sources are empty |
+| `index` | block `index`, else tenant `setup.index` | a list of one or more pattern strings. Omitted for `esql` and `machine_learning`, when `data_view_id` is set, or when both sources are empty |
 | `data_view_id`, `filters` | same-named block field | verbatim |
 | `threshold` | `threshold` | `cardinality` is one `{field, value}` and is sent as a one-item list |
 | `new_terms_fields` | `new_terms_fields` | verbatim |
@@ -329,7 +330,7 @@ The deployer compiles each MDR into a Kibana create or update body:
 | `threat_index`, `threat_query`, `threat_language`, `threat_filters`, `threat_indicator_path` | same-named block field | verbatim |
 | `threat_mapping` | `threat_mapping` | an entry with no `type` is sent as `type: mapping` |
 | `concurrent_searches`, `items_per_search` | same-named block field | verbatim. Not in the create UI. On update, an omitted value is kept from the remote rule. |
-| `machine_learning_job_id`, `anomaly_threshold` | same-named block field | verbatim |
+| `machine_learning_job_id`, `anomaly_threshold` | same-named block field | verbatim. `machine_learning_job_id` may be a string or a list; Kibana accepts either |
 | `alert_suppression` | `alert_suppression` | `{group_by, duration?, missing_fields_strategy}`; for threshold `{duration}` only. `duration` is `{value, unit}`. Omitted when tenant `setup.suppression` is `false`. |
 | `investigation_fields` | `investigation_fields` | `{field_names: [...]}` |
 | `required_fields` | `required_fields` | one `{name, type}` per entry, sorted by name |
@@ -727,6 +728,94 @@ risk_score_mapping:
 endpoint_exceptions: true
 filters:
   - {meta: {negate: true}, query: {match_all: {}}}
+```
+
+### Templates
+
+OpenTide generates one rule template, `rule.1.0.template.yaml` ([workspace layout](../specs/workspace.md)). The Elastic block in it is a custom query, the create-rule UI's starting point. Each other rule type keeps this MDR and replaces the Elastic keys shown under it. Metadata, description, and response stay in this one file. The template leaves out the rule's own `status`: deployment reads `configurations.elastic.status`.
+
+<!-- rfc0006:rule-template -->
+```yaml
+name: Rule name
+metadata:
+  uuid: 00000000-0000-4000-8000-000000000000
+  schema: rule::1.0
+  version: 1
+  created: "2026-09-28"
+  modified: "2026-09-28"
+  tlp: clear
+  author: Detection Engineering
+description: |
+  What this rule detects.
+techniques: []
+response:
+  alert_severity: Medium
+configurations:
+  elastic:
+    enabled: true
+    schema: platform::elastic::1.0
+    status: STAGING
+    type: query
+    language: kuery
+    query: 'event.category : "process"'
+    index: [logs-*]          # one pattern; further patterns are further entries
+    interval: 5m             # Runs every
+    from: 6m                 # whole window: Runs every plus one extra minute
+```
+
+Kibana stores `index` as an array of pattern strings on every rule that sets one, including a rule with a single pattern. The YAML value is that array. `threat_index` has the same shape. `threshold.field`, `new_terms_fields`, `investigation_fields`, and `alert_suppression.group_by` are lists of field names in the same way, including a list of one. `data_view_id` is a single string and replaces `index` when the UI is pointed at a data view. `machine_learning_job_id` is the field Kibana accepts as either a string or a list of strings.
+
+The keys that change with the rule type:
+
+```yaml
+# eql — no language
+type: eql
+query: |
+  sequence by host.id with maxspan=1m
+    [process where event.type == "start" and process.name == "x.exe"]
+index: [logs-endpoint.events.process-*]
+tiebreaker_field: event.sequence
+
+# esql — no index and no language; FROM selects the data
+type: esql
+query: |
+  FROM logs-*
+  | STATS count = COUNT(*) BY host.name
+  | WHERE count > 10
+
+# threshold — suppression is a duration, with no group_by
+type: threshold
+query: 'event.category : "authentication" and event.outcome : "failure"'
+index: [logs-*]
+threshold: {field: [source.ip], value: 20}
+alert_suppression: {duration: 1h}
+
+# new_terms
+type: new_terms
+query: 'event.category : "iam"'
+index: [logs-*]
+new_terms_fields: [user.name]
+history_window_start: 14d
+
+# threat_match
+type: threat_match
+query: 'event.category : "file"'
+index: [logs-*]
+threat_index: [logs-ti_*]
+threat_query: '@timestamp >= "now-30d/d"'
+threat_mapping:
+  - entries:
+      - {field: file.hash.sha256, value: threat.indicator.file.hash.sha256}
+
+# machine_learning — no query and no index; a job id may be a string
+type: machine_learning
+machine_learning_job_id: rare_process_by_host
+anomaly_threshold: 50
+
+# saved_query — the saved query supplies the query text
+type: saved_query
+saved_id: 00000000-0000-4000-8000-000000000001
+index: [logs-*]
 ```
 
 **Invalid block.** It violates the constraints named in the comments.

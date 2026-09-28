@@ -290,6 +290,11 @@ def check_block(block: dict[str, Any]) -> set[str]:
         codes.add("esql_source")
     if block.get("index") and block.get("data_view_id"):
         codes.add("index_xor_data_view")
+    for key in ("index", "threat_index"):
+        if key in block and not (
+            isinstance(block[key], list) and block[key] and all(isinstance(p, str) and p for p in block[key])
+        ):
+            codes.add("index_list")
     suppression = block.get("alert_suppression")
     if suppression is not None:
         group_by = suppression.get("group_by")
@@ -371,7 +376,7 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
         body["data_view_id"] = block["data_view_id"]
     elif rule_type not in ("esql", "machine_learning"):
         index = block.get("index") or setup.get("index")
-        if index:
+        if isinstance(index, list) and index:
             body["index"] = list(index)
     if block.get("filters") is not None:
         body["filters"] = copy.deepcopy(block["filters"])
@@ -581,6 +586,16 @@ class ExampleCompilationTests(unittest.TestCase):
             "namespace_type": "agnostic", "type": "endpoint",
         }])
 
+    def test_default_template_is_a_custom_query_with_a_pattern_list(self) -> None:
+        rule = _yaml("rule-template")
+        block = rule["configurations"]["elastic"]
+        self.assertEqual(block["type"], "query")
+        self.assertIsInstance(block["index"], list)
+        self.assertEqual(check_block(block), set())
+        compiled = compile_rule(rule, _staging_setup())
+        self.assertEqual(compiled["index"], ["logs-*"])
+        self.assertNotIn("status", rule)
+
     def test_deployment_status_comes_from_the_elastic_block_only(self) -> None:
         rule = copy.deepcopy(_yaml("rule-query"))
         rule["status"] = "DISABLED"
@@ -606,6 +621,7 @@ class TableConsistencyTests(unittest.TestCase):
             "language": {"type": "eql", "query": "x", "language": "kuery"},
             "esql_source": {"type": "esql", "query": "FROM x", "data_view_id": "d"},
             "index_xor_data_view": {"type": "query", "query": "x", "index": ["a"], "data_view_id": "d"},
+            "index_list": {"type": "query", "query": "x", "index": "logs-*"},
             "suppression_shape": {
                 "type": "threshold",
                 "query": "x",
