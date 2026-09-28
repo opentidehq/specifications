@@ -311,7 +311,7 @@ The deployer compiles each MDR into a Kibana create or update body:
 | `type` | `type` | verbatim |
 | `name` | block `name`, else rule `name` | |
 | `description` | rule `description` | trailing whitespace stripped |
-| `enabled` | block `status` | `false` iff status strategy is `DISABLEMENT`. Always sent, because a `PUT` without it keeps the remote value. |
+| `enabled` | block `status` | `false` iff that status's strategy is `DISABLEMENT`. The rule's own `status` is not read. An omitted block status is `STAGING`. Always sent, because a `PUT` without it keeps the remote value. |
 | `severity`, `risk_score` | block `severity`, else `response.alert_severity`, else `Informational` | [Severity](#severity); block `risk_score` overrides the score |
 | `severity_mapping`, `risk_score_mapping` | same-named block field | verbatim. These are the UI's Severity override and Risk score override. |
 | `interval` | `interval` | [Durations](#durations). This is the UI's Runs every. Default `5m`. |
@@ -421,7 +421,6 @@ metadata:
   author: SOC Detection Engineering
 description: |
   Detects PowerShell started with an encoded command argument.
-status: STAGING
 techniques: [T1059.001]
 references:
   public:
@@ -435,6 +434,7 @@ configurations:
   elastic:
     enabled: true
     schema: platform::elastic::1.0
+    status: STAGING
     type: query
     language: kuery
     query: |

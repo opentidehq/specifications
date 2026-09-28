@@ -338,7 +338,8 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
     block = rule["configurations"]["elastic"]
     rule_type = block["type"]
     response = rule.get("response") or {}
-    status = block.get("status") or rule.get("status", "STAGING")
+    # Deployment status is per platform block. The rule's own status is not read.
+    status = block.get("status") or "STAGING"
     level = block.get("severity") or response.get("alert_severity") or "Informational"
     severity, risk_score = _severity_table()[level]
     if block.get("risk_score") is not None:
@@ -579,6 +580,17 @@ class ExampleCompilationTests(unittest.TestCase):
             "id": "endpoint_list", "list_id": "endpoint_list",
             "namespace_type": "agnostic", "type": "endpoint",
         }])
+
+    def test_deployment_status_comes_from_the_elastic_block_only(self) -> None:
+        rule = copy.deepcopy(_yaml("rule-query"))
+        rule["status"] = "DISABLED"
+        compiled = compile_rule(rule, _staging_setup())
+        self.assertTrue(compiled["enabled"])
+        rule["configurations"]["elastic"]["status"] = "DISABLED"
+        rule["status"] = "PRODUCTION"
+        compiled = compile_rule(rule, _staging_setup())
+        self.assertFalse(compiled["enabled"])
+        self.assertNotIn("status: ", _fence("rule-query")[1].split("configurations:")[0])
 
     def test_invalid_example_hits_exactly_the_declared_constraints(self) -> None:
         _, body = _fence("invalid")
