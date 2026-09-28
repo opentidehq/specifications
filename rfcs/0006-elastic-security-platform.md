@@ -17,8 +17,9 @@ Decisions:
 1. **One platform for every Elastic deployment type.** Self-managed, Elastic Cloud Hosted, and Elastic Cloud Serverless Security expose the same rule API with the same request schemas. The deployment type only changes the tenant URL, credentials, and which features a licence enables. There is no `edition` switch.
 2. **Target the Security detection engine, not generic Kibana alerting.** Detection rules are the only Elastic rules that land in the Security app, write to `.alerts-security.alerts-*`, carry ATT&CK mappings, and support exceptions.
 3. **Five rule types in v1:** `query`, `eql`, `esql`, `threshold`, `new_terms`. `threat_match` and `machine_learning` are deferred. `saved_query` is excluded.
-4. **Identity is the MDR UUID.** Kibana's user-settable `rule_id` is set to `metadata.uuid`, so no platform ID is written back to the rule file.
-5. **Validation:** offline syntax checks per query language, plus live validation through the rule preview API. ES\|QL rules also get a mandatory Elasticsearch parse check before every deploy, because Kibana accepts and runs ES\|QL with a mistyped command ([ES\|QL pre-flight](#esql-pre-flight)).
+4. **Identity is the MDR UUID.** Kibana's user-settable `rule_id` is set to `metadata.uuid`. It is unique per space, so one UUID serves every tenant, and alerts carry it as `kibana.alert.rule.rule_id`. Kibana's internal `id` is never stored, and nothing is written back to the rule file.
+5. **Validation:** offline syntax checks per query language, plus live validation through the rule preview API. Two Elasticsearch checks also run before every deploy, because Kibana accepts a mistyped ES\|QL command or aggregation field and the rule then fails silently ([Elasticsearch checks](#elasticsearch-checks)).
+6. **Kibana's own notation where it helps authors.** Durations are written `5m`, `1h`, `14d`, as in Kibana. `required_fields` is a `{field: type}` map, and `related_integrations` takes package names.
 
 The change is additive: it adds a `configurations.elastic` key and a new platform schema. `rule::1.0` keeps its identifier and every existing rule stays valid.
 
@@ -133,7 +134,7 @@ Bundled defaults ship with `enabled = false` and no tenants, as for every platfo
 |-----------------------|------|----------|---------|---------|
 | `url` | string | yes | — | Kibana base URL, without `/s/<space>` |
 | `api_key` | string | yes | — | Encoded API key (the `encoded` value from `POST /_security/api_key`). MUST be a `$ENV` reference. |
-| `elasticsearch_url` | string | no | null | Elasticsearch base URL of the same deployment. Required for tenants that receive `esql` rules ([ES\|QL pre-flight](#esql-pre-flight)). |
+| `elasticsearch_url` | string | yes | — | Elasticsearch base URL of the same deployment, for the [Elasticsearch checks](#elasticsearch-checks) |
 | `space` | string | no | `default` | Kibana space ID. `default` uses the unprefixed path. |
 | `index` | list[string] | no | null | Index patterns for blocks that set neither `index` nor `data_view_id`. When null, Kibana applies the space's `securitySolution:defaultIndex`. |
 | `tags` | list[string] | no | `[]` | Tags added to every rule deployed to this tenant |
@@ -148,8 +149,8 @@ class Elastic(SystemConfig):
         @dataclass
         class Setup(SystemConfig.Tenant.Setup):
             url: str
+            elasticsearch_url: str
             api_key: str
-            elasticsearch_url: str | None = None
             space: str = "default"
             index: Sequence[str] | None = None
             tags: Sequence[str] | None = None
@@ -160,10 +161,10 @@ class Elastic(SystemConfig):
     tenants: Sequence[Tenant] | None = None
 ```
 
-**API key.** One Elasticsearch API key serves both Kibana and the Elasticsearch pre-flight. Rules run with the privileges of the key that last created or updated them, and revoking that key stops them. Each tenant SHOULD therefore use a dedicated, non-personal key that holds:
+**API key.** One Elasticsearch API key serves both Kibana and the Elasticsearch checks. Rules run with the privileges of the key that last created or updated them, and revoking that key stops them. Each tenant SHOULD therefore use a dedicated, non-personal key that holds:
 
 - Kibana: Security rules management `All` in the tenant's space. This is the `feature_securitySolutionRulesV4.all` application privilege on 9.5, and `feature_siemV2.all` on 8.19. On 9.5, `feature_siemV5.all` alone returns 403 on rule create.
-- Elasticsearch: `read` and `view_index_metadata` on every source index pattern the rules query. The ES\|QL pre-flight needs nothing more, and no cluster privilege is needed.
+- Elasticsearch: `read` and `view_index_metadata` on every source index pattern the rules query. The Elasticsearch checks need nothing more, and no cluster privilege is needed.
 - Live validation only: `read` on `.preview.alerts-security.alerts-<space>` and `.internal.preview.alerts-security.alerts-<space>-*`.
 
 Kibana renames feature privileges between versions (`siemV2` on 8.19; `siemV5` and `securitySolutionRulesV4` on 9.5), so `platforms.md` will not pin them. [Appendix A](#appendix-a-reference-test) shows the tested key.
@@ -171,6 +172,16 @@ Kibana renames feature privileges between versions (`siemV2` on 8.19; `siemV5` a
 ### 2. Rule block (`platform::elastic::1.0`)
 
 ```python
+Duration = str    # "<n>s|m|h|d": 90s, 5m, 1h, 14d. ISO 8601 (PT1H) is also accepted.
+
+FieldType = Literal[                      # Elasticsearch mapping types
+    "keyword", "constant_keyword", "wildcard", "text", "match_only_text",
+    "long", "integer", "short", "byte", "unsigned_long",
+    "double", "float", "half_float", "scaled_float",
+    "date", "date_nanos", "boolean", "ip", "version", "binary",
+    "geo_point", "geo_shape", "object", "flattened", "nested",
+]
+
 class ElasticConfig(PlatformConfigBase):
     __schema_identifier__: ClassVar[str] = "platform::elastic::1.0"
     type: Literal["query", "eql", "esql", "threshold", "new_terms"]
@@ -187,14 +198,14 @@ class ElasticConfig(PlatformConfigBase):
     note: str | None = None                               # investigation guide (markdown)
     setup: str | None = None                              # setup guide (markdown)
     false_positives: list[str] | None = None
-    required_fields: list[ElasticRequiredField] | None = None
-    related_integrations: list[ElasticIntegration] | None = None
+    required_fields: dict[str, FieldType] | None = None   # {field: type}
+    related_integrations: list[str | ElasticIntegration] | None = None   # "windows" = {package: windows}
     building_block: bool = False
     overrides: dict[str, Any] | None = None               # unmodelled Kibana fields
 
 class ElasticScheduling(TideModel):
-    frequency: str = "PT5M"      # ISO 8601 -> interval
-    lookback: str = "PT6M"       # ISO 8601 total window -> from: now-<lookback>
+    frequency: Duration = "5m"   # -> interval
+    lookback: Duration = "6m"    # total window -> from: now-<lookback>
 
 class ElasticAlert(TideModel):
     severity: str | None = None               # alert_severity vocabulary
@@ -203,8 +214,8 @@ class ElasticAlert(TideModel):
     investigation_fields: list[str] | None = None
 
 class ElasticSuppression(TideModel):
-    group_by: list[str] | None = None         # 1–3 fields; not for threshold
-    duration: str | None = None               # ISO 8601; required for threshold
+    group_by: list[str] | None = None         # 1–3 field names; not for threshold
+    duration: Duration | None = None          # required for threshold
     missing_fields: Literal["suppress", "doNotSuppress"] = "suppress"
 
 class ElasticThreshold(TideModel):
@@ -214,21 +225,17 @@ class ElasticThreshold(TideModel):
 
 class ElasticNewTerms(TideModel):
     fields: list[str]                         # 1–3
-    history_window: str                       # ISO 8601 -> history_window_start
+    history_window: Duration                  # -> history_window_start
 
 class ElasticEql(TideModel):
     timestamp_field: str | None = None
     event_category_override: str | None = None
     tiebreaker_field: str | None = None
 
-class ElasticRequiredField(TideModel):
-    name: str
-    type: str
-
 class ElasticIntegration(TideModel):
-    package: str
-    version: str
-    integration: str | None = None
+    package: str                              # Fleet package, e.g. windows, endpoint, aws
+    integration: str | None = None            # policy template, e.g. cloudtrail
+    version: str = "*"                        # semver range, e.g. "^2.0.0"
 ```
 
 **Model constraints.** Validation MUST reject a block that breaks any of these:
@@ -240,14 +247,16 @@ class ElasticIntegration(TideModel):
 | `language` | `language` MUST NOT be set for `eql` or `esql` |
 | `esql_source` | `esql` MUST NOT set `index` or `data_view_id` |
 | `index_xor_data_view` | `index` and `data_view_id` are mutually exclusive |
-| `suppression_shape` | For `threshold`: `suppression.duration` is required and `group_by` is forbidden. For other types: `group_by` is required, with 1–3 fields. |
+| `suppression_shape` | For `threshold`: `suppression.duration` is required and `group_by` is forbidden. For other types: `group_by` is required, with 1–3 distinct, non-empty field names. |
 | `new_terms_fields` | `new_terms.fields` has 1–3 entries |
 | `threshold_fields` | `threshold.field` has 0–5 entries; `threshold.value` >= 1 |
 | `risk_score` | `alert.risk_score` is an integer in 0–100 |
-| `duration` | Every duration is ISO 8601 `P[nD][T[nH][nM][nS]]` with whole seconds, > 0 |
+| `duration` | Every duration is a positive integer followed by `s`, `m`, `h`, or `d`, or ISO 8601 `P[nD][T[nH][nM][nS]]` with whole seconds, and is > 0 |
 | `override_key` | `overrides` MUST NOT contain a key from the [field mapping](#3-field-mapping) or [preserved fields](#5-deployment) tables |
 
 Validation SHOULD warn when `scheduling.lookback` < `scheduling.frequency` (gaps between runs), and when a non-aggregating ES\|QL query (no `STATS`) lacks `METADATA _id` (alerts are not deduplicated).
+
+**Field names are open-ended.** `group_by`, `threshold.field`, `new_terms.fields`, `investigation_fields`, and `required_fields` keys name fields in the tenant's data: ECS, integration-specific, or custom. They cannot be an enum, and Kibana accepts any string for them. The deployer therefore checks aggregation fields against the tenant ([Aggregation field check](#aggregation-field-check)). `FieldType` is closed: it covers the 15 types ECS uses (75% of ECS fields are `keyword`) plus the other common Elasticsearch mapping types. Kibana sets `required_fields[].ecs` only when both the name and the type match ECS.
 
 ### 3. Field mapping
 
@@ -274,7 +283,9 @@ The deployer compiles each MDR into a Kibana create or update body:
 | `timestamp_field`, `event_category_override`, `tiebreaker_field` | `eql.*` | verbatim |
 | `alert_suppression` | `alert.suppression` | `{group_by, duration?, missing_fields_strategy}`; for threshold `{duration}` only. Omitted when tenant `setup.suppression` is `false`. |
 | `investigation_fields` | `alert.investigation_fields` | `{field_names: [...]}` |
-| `required_fields`, `related_integrations`, `false_positives`, `setup` | same-named block field | verbatim |
+| `required_fields` | `required_fields` | one `{name, type}` per entry, sorted by name |
+| `related_integrations` | `related_integrations` | a string `p` becomes `{package: p, version: "*"}`; objects keep `integration`, and `version` defaults to `"*"` (Kibana requires a non-empty version) |
+| `false_positives`, `setup` | same-named block field | verbatim |
 | `building_block_type` | `building_block: true` | `"default"` |
 | `tags` | `"OpenTide"`, tenant `setup.tags`, block `tags` | in that order, de-duplicated |
 | `author` | `metadata.author`, `metadata.contributors` | de-duplicated; omitted if empty |
@@ -300,16 +311,17 @@ The scores follow Elastic's prebuilt-rule convention and sit inside Kibana's ris
 
 #### Durations
 
-ISO 8601 durations convert to the largest unit that divides the value exactly. `interval`, `from`, and suppression use `h`, `m`, or `s`. `history_window_start` also uses `d`.
+Durations use Kibana's own notation: a whole number followed by `s`, `m`, `h`, or `d`. Kibana rejects ISO 8601 (`PT5M`) and weeks (`1w`) in `interval`. ISO 8601 is still accepted on input, for parity with other platform blocks. The deployer converts every duration to the largest unit that divides it exactly. `alert_suppression.duration` has no `d` unit, so days become hours there.
 
 <!-- rfc0006:duration-table -->
-| ISO 8601 | `interval` / `from` | `alert_suppression.duration` | `history_window_start` |
-|----------|---------------------|------------------------------|------------------------|
-| `PT5M` | `5m` / `now-5m` | `{value: 5, unit: m}` | `now-5m` |
-| `PT90S` | `90s` / `now-90s` | `{value: 90, unit: s}` | `now-90s` |
+| Written | `interval` / `from` | `alert_suppression.duration` | `history_window_start` |
+|---------|---------------------|------------------------------|------------------------|
+| `5m` | `5m` / `now-5m` | `{value: 5, unit: m}` | `now-5m` |
+| `90s` | `90s` / `now-90s` | `{value: 90, unit: s}` | `now-90s` |
+| `60m` | `1h` / `now-1h` | `{value: 1, unit: h}` | `now-1h` |
+| `1d` | `1d` / `now-1d` | `{value: 24, unit: h}` | `now-1d` |
+| `14d` | `14d` / `now-14d` | `{value: 336, unit: h}` | `now-14d` |
 | `PT1H` | `1h` / `now-1h` | `{value: 1, unit: h}` | `now-1h` |
-| `P1D` | `24h` / `now-24h` | `{value: 24, unit: h}` | `now-1d` |
-| `P14D` | `336h` / `now-336h` | `{value: 336, unit: h}` | `now-14d` |
 
 #### Threat
 
@@ -377,17 +389,16 @@ configurations:
       process.args : ("-enc" or "-EncodedCommand")
     index: [logs-endpoint.events.process-*, winlogbeat-*]
     scheduling:
-      frequency: PT5M
-      lookback: PT9M
+      frequency: 5m
+      lookback: 9m
     alert:
       suppression:
         group_by: [host.name, user.name]
-        duration: PT1H
+        duration: 1h
       investigation_fields: [process.command_line, process.parent.name]
     tags: [Windows]
-    required_fields:
-      - {name: process.args, type: keyword}
-      - {name: process.name, type: keyword}
+    required_fields: {process.name: keyword, process.args: keyword}
+    related_integrations: [endpoint]
 ```
 
 This is the compiled body for tenant `elastic-staging`. It is sent as `POST https://soc-staging.kb.eu-west-1.aws.elastic.cloud/s/staging/api/detection_engine/rules`:
@@ -418,6 +429,7 @@ This is the compiled body for tenant `elastic-staging`. It is sent as `POST http
     {"name": "process.args", "type": "keyword"},
     {"name": "process.name", "type": "keyword"}
   ],
+  "related_integrations": [{"package": "endpoint", "version": "*"}],
   "tags": ["OpenTide", "Windows"],
   "author": ["SOC Detection Engineering"],
   "references": ["https://attack.mitre.org/techniques/T1059/001"],
@@ -514,7 +526,7 @@ configurations:
       | WHERE event.category == "authentication" AND event.outcome == "failure"
       | STATS failures = COUNT(*), users = COUNT_DISTINCT(user.name) BY source.ip
       | WHERE users >= 10
-    scheduling: {frequency: PT15M, lookback: PT15M}
+    scheduling: {frequency: 15m, lookback: 15m}
 ```
 
 <!-- rfc0006:fragment-esql -->
@@ -557,7 +569,7 @@ configurations:
       field: [user.name, source.ip]
       value: 25
     alert:
-      suppression: {duration: PT30M}
+      suppression: {duration: 30m}
 ```
 
 <!-- rfc0006:fragment-threshold -->
@@ -590,7 +602,7 @@ configurations:
     index: [logs-system.security-*]
     new_terms:
       fields: [host.name, user.name]
-      history_window: P14D
+      history_window: 14d
 ```
 
 <!-- rfc0006:fragment-new-terms -->
@@ -618,7 +630,7 @@ elastic:
   query: FROM logs-* | LIMIT 10
   index: [logs-*]                       # esql_source
   alert:
-    suppression: {duration: PT1H}       # suppression_shape: group_by required
+    suppression: {duration: 1h}         # suppression_shape: group_by required
   overrides: {rule_id: my-own-id}       # override_key
 ```
 
@@ -630,7 +642,7 @@ Headers: `Authorization: ApiKey <api_key>`, `elastic-api-version: 2023-10-31`, `
 
 | Strategy | Calls | Result |
 |----------|-------|--------|
-| `PREVIEW`, `RELEASE` | For `esql`, the [pre-flight](#esql-pre-flight) first. Then `GET ?rule_id=<uuid>`. A 404 leads to `POST` with the compiled body. A 200 leads to `PUT` with the compiled body plus preserved fields, or to `DELETE` then `POST` when the remote `type` differs. | rule created or replaced, `enabled: true` |
+| `PREVIEW`, `RELEASE` | The [Elasticsearch checks](#elasticsearch-checks) first. Then `GET ?rule_id=<uuid>`. A 404 leads to `POST` with the compiled body. A 200 leads to `PUT` with the compiled body plus preserved fields, or to `DELETE` then `POST` when the remote `type` differs. | rule created or replaced, `enabled: true` |
 | `DISABLEMENT` | same as above | rule kept, `enabled: false` |
 | `DELETION` | `DELETE ?rule_id=<uuid>` | 200 or 404 both mean success |
 | `INERT` | none | not deployed (planner) |
@@ -653,7 +665,7 @@ The deployer MUST NOT modify an Elastic prebuilt rule. A prebuilt rule has `rule
 
 Errors:
 
-- 400 or 409 on one rule, or a failed ES\|QL pre-flight: that rule fails with the server's `message`, and the batch continues.
+- 400 or 409 on one rule, or a failed Elasticsearch check: that rule fails with the server's `message`, and the batch continues.
 - 401 or 403: that tenant fails, and the deployer moves to the next tenant.
 - 429 and 5xx: retry up to three times with exponential backoff.
 
@@ -666,7 +678,7 @@ A deployer MAY list managed rules with a single `GET _find?filter=alert.attribut
 | Mode | Behaviour |
 |------|-----------|
 | Offline (`validate query`, default) | Structural checks per language. `kuery`: string, bracket, and `and`/`or`/`not` balance. `lucene`: the existing Lucene checker. `eql`: bracket and string balance, and a `where` or `sequence` form. `esql`: bracket and string balance, first command `FROM`, and no dangling `\|`. |
-| Live (`validate query --live`) | `POST <base>/preview` with the compiled body plus `{"invocationCount": 1, "timeframeEnd": "<now>"}`. `timeframeEnd` MUST be UTC with a `Z` suffix (`2026-09-25T11:10:00.000Z`); Kibana rejects `+00:00` offsets with 400. For `esql`, the [pre-flight](#esql-pre-flight) also runs. |
+| Live (`validate query --live`) | `POST <base>/preview` with the compiled body plus `{"invocationCount": 1, "timeframeEnd": "<now>"}`. `timeframeEnd` MUST be UTC with a `Z` suffix (`2026-09-25T11:10:00.000Z`); Kibana rejects `+00:00` offsets with 400. The [Elasticsearch checks](#elasticsearch-checks) also run. |
 
 Preview outcomes:
 
@@ -677,9 +689,13 @@ Preview outcomes:
 | HTTP 400 | invalid: a rule-level schema error (for example `threshold.value: 0`, four `new_terms` fields) |
 | `isAborted: true` | inconclusive |
 
-Preview executes the rule once against live data and writes only to the preview alerts index. It catches KQL, Lucene, and EQL syntax errors, unknown EQL fields, ES\|QL syntax errors inside a command, unknown ES\|QL columns, and rule-level schema errors. Elasticsearch-only checks (`_validate/query`, `_eql/search`) cannot see the rule-level fields. Preview does not check licence-gated behaviour, and on 9.x it does not catch an unknown ES\|QL command.
+Preview executes the rule once against live data and writes only to the preview alerts index. It catches KQL, Lucene, and EQL syntax errors, unknown EQL fields, ES\|QL syntax errors inside a command, unknown ES\|QL columns, and rule-level schema errors. Elasticsearch-only checks (`_validate/query`, `_eql/search`) cannot see the rule-level fields. Preview does not check licence-gated behaviour, on 9.x it does not catch an unknown ES\|QL command, and it cannot tell a misspelt aggregation field from one with no matches.
 
-#### ES\|QL pre-flight
+#### Elasticsearch checks
+
+Kibana accepts some mistakes that make a rule fail silently. Before every `POST` or `PUT`, and during live validation, the deployer MUST run the two checks below against `elasticsearch_url` with the tenant's API key. HTTP 401, 403, 429, and 5xx follow the [deployment error rules](#5-deployment).
+
+##### ES\|QL pre-flight
 
 Kibana does not parse ES\|QL on create. `FROM logs-* METADATA _id | WHER process.name == "nope.exe"` creates with 200 on both 8.19.22 and 9.5.4, and what happens next depends on the version:
 
@@ -688,7 +704,7 @@ Kibana does not parse ES\|QL on create. `FROM logs-* METADATA _id | WHER process
 
 A one-letter typo therefore becomes a dead rule on 8.19, or a rule that matches everything on 9.5.
 
-Elasticsearch's own parser rejects the query. Before every `POST` or `PUT` of an `esql` rule, and during live validation, the deployer MUST send the query to Elasticsearch with `LIMIT 0` appended:
+Elasticsearch's own parser rejects the query, so the deployer sends every `esql` query to Elasticsearch with `LIMIT 0` appended:
 
 <!-- rfc0006:esql-preflight -->
 ```json
@@ -697,12 +713,26 @@ Elasticsearch's own parser rejects the query. Before every `POST` or `PUT` of an
 }
 ```
 
-This is `POST <elasticsearch_url>/_query` for Example C, sent with the tenant's API key. HTTP 200 means the query parses and resolves. Elasticsearch plans it but reads no documents (`documents_found: 0`). HTTP 400 fails the rule with the Elasticsearch `reason`, for example `mismatched input 'WHER'` or `Unknown column`. 401, 403, 429, and 5xx follow the [deployment error rules](#5-deployment). A tenant without `elasticsearch_url` MUST fail every `esql` rule, and the deployer MUST NOT skip the check.
+This is `POST <elasticsearch_url>/_query` for Example C. HTTP 200 means the query parses and resolves. Elasticsearch plans it but reads no documents (`documents_found: 0`). HTTP 400 fails the rule with the Elasticsearch `reason`, for example `mismatched input 'WHER'` or `Unknown column`.
 
 **Sources not onboarded yet.** Elasticsearch parses before it resolves indices, so a mistyped command returns a `parsing_exception` even when no source index exists. Resolution then fails: a missing concrete index returns `Unknown index`, and a wildcard that matches nothing makes every referenced field an `Unknown column` (both `verification_exception`). Kibana deploys such a rule and warns `Unable to find matching indices` on each run until data arrives. To match that:
 
 - A `parsing_exception` always fails the rule.
 - On a `verification_exception`, the deployer MUST call `GET <elasticsearch_url>/_resolve/index/<FROM sources>?ignore_unavailable=true&allow_no_indices=true`. If `indices`, `aliases`, and `data_streams` are all empty, it deploys the rule with a warning. Otherwise the rule fails.
+
+##### Aggregation field check
+
+Kibana accepts any string as a field name. On 9.5.4, a field that does not exist fails silently, and a text field fails only when the rule runs:
+
+| Field | Absent (for example misspelt) | `text` or `match_only_text` |
+|-------|-------------------------------|------------------------------|
+| `alert.suppression.group_by` | every alert collapses into one per window (`missing_fields: suppress`) | run error |
+| `threshold.field`, `threshold.cardinality.field` | no alerts | run error |
+| `new_terms.fields` | no alerts | run error |
+
+The deployer checks these fields with `GET <elasticsearch_url>/<sources>/_field_caps?fields=<fields>&ignore_unavailable=true&allow_no_indices=true`. `<sources>` is the compiled `index`, or the `title` of the data view from `GET /api/data_views/data_view/<data_view_id>` in the tenant's space. Every field MUST be present with `aggregatable: true`; otherwise the rule fails. For `esql`, the `group_by` fields MUST instead be among the `columns` the pre-flight returns, because ES\|QL suppression groups on result columns.
+
+`_field_caps` reads mappings, not documents, so a field that an integration's index template maps passes before any event carries it. If the response's `indices` list is empty, the sources are not onboarded yet, and the deployer deploys with a warning, as for ES\|QL. A rule with no explicit source (no `index`, `data_view_id`, or tenant `index`) uses the space's default index setting. The deployer skips the check for it with a warning.
 
 ### 7. Spec changes after acceptance
 
@@ -725,7 +755,7 @@ opentide adds an `opentide/platforms/elastic/` package with `client`, `deployer`
 - **API key coupling.** Rules keep running with the deploying key's privileges. Rotating or revoking that key needs a full redeploy, or the rules stop.
 - **Two calls per rule** (`GET` plus `POST` or `PUT`). This is acceptable for hundreds of rules. `_find` pre-fetch halves it. Bulk import is deferred.
 - **Suppression depends on operator configuration.** Kibana ignores suppression on a Basic licence without reporting it, and a least-privilege key cannot read the licence. If a tenant's `suppression` flag is wrong, rules deploy cleanly but alert on every match.
-- **Two endpoints for ES\|QL.** Tenants that receive `esql` rules need `elasticsearch_url` reachable from the deployer, in addition to Kibana.
+- **Two endpoints per tenant.** The deployer needs Elasticsearch (`elasticsearch_url`) as well as Kibana, for checks that Kibana does not do.
 
 ## Alternatives
 
@@ -739,6 +769,8 @@ opentide adds an `opentide/platforms/elastic/` package with `client`, `deployer`
 | Validate only through Elasticsearch (`_validate/query`, `_eql/search`, `_query`) | Cannot check the rule-level fields (threshold, new terms, suppression shape) that preview checks. It is used for ES\|QL only, because Kibana does not parse ES\|QL on create. |
 | Detect the licence instead of a `suppression` flag | Needs the `monitor` cluster privilege (`GET _license`) or Kibana's `/api/licensing/info`, which is internal-only on 9.x. Neither fits a least-privilege deploy key, and Serverless tiers are not licences. |
 | Strip `alert_suppression` from every tenant, never send it | Loses a core noise control on Platinum, Enterprise, and Serverless tenants that support it. |
+| ISO 8601 durations only, as in the Sentinel block | Kibana itself rejects `PT5M`, and authors copy durations from Kibana. ISO 8601 stays accepted on input. |
+| An enum of `group_by` field names | Fields come from each tenant's data, including custom fields. The aggregation field check verifies them against the tenant instead. |
 
 ## Unresolved questions
 
@@ -748,6 +780,7 @@ opentide adds an `opentide/platforms/elastic/` package with `client`, `deployer`
 | Orphan pruning | Report rules tagged `OpenTide` that have no MDR. Deletion stays opt-in in a later revision. |
 | `threat_match` and `machine_learning` | `platform::elastic::1.1` once indicator-index and ML-job references have a tenant-level model |
 | Bulk path for large catalogues | `_import` fast path behind a tenant flag, after per-rule semantics are proven |
+| Deriving `required_fields` and `related_integrations` | Elastic's `detection-rules` builds both at release time from the query AST, bundled ECS and integration schemas, and a package list (`integration = ["windows"]`). A later revision MAY fill `required_fields` from the query and `_field_caps`, leaving the block optional. |
 | Kibana not parsing ES\|QL on create | Report it upstream. A later revision MAY make the pre-flight optional on Kibana versions that reject invalid ES\|QL on create. |
 
 ## Appendix A: reference test
@@ -788,6 +821,17 @@ This is the `POST /_security/api_key` body for 9.5.4. On 8.19.22 the application
 | ES\|QL `… \| WHER …` | create 200; preview error; scheduled runs `failed` | create 200; preview clean; scheduled run `succeeded`, 3 alerts for 3 documents |
 | `_query` pre-flight with `\| LIMIT 0` | 400 for the typo, 200 for Example C | same |
 | Pre-flight on sources with no index | not run | typo: `parsing_exception`; field reference: `Unknown column`; `_resolve/index` empty; Kibana preview warns only |
+| `interval` values | not run | `90s`, `2h`, `1d` accepted; `1w` and `PT5M` rejected (400) |
+| `from` / `history_window_start` values | not run | `now-150m`, `now-1d`, `now-8d`, `now-2w` accepted |
+| Suppression duration unit `d` | not run | 400 (only `s`, `m`, `h`) |
+| `required_fields` without `type`; unknown type; wrong type for an ECS field | not run | 400; accepted with `ecs: false`; accepted with `ecs: false` |
+| `related_integrations` without `version`; `version: ""`; `version: "*"` | not run | 400; 400; accepted |
+| `group_by` absent field, text field, duplicate, `""` | not run | all accepted on create; preview: absent field collapses 8 alerts into 1, text field is a run error |
+| `threshold.field` or `new_terms.fields` absent | not run | no alerts, no error |
+| `_field_caps` with the deploy key | not run | absent field missing; `message` `aggregatable: false`; a mapped field with no documents present and aggregatable; data view readable |
+| Examples A–E after the notation change (short durations, `required_fields` map, `related_integrations: [endpoint]`) | not run | Elasticsearch checks pass; create 200; `GET` matches; preview clean |
+| Same `rule_id` in spaces `staging` and `prod`; twice in one space | not run | 200 and 200 with different internal `id`s; 409 |
+| Alert document | not run | `kibana.alert.rule.rule_id` is the MDR UUID |
 | Suppression by `host.name`, `user.name` over events from one entity (Basic) | stored; scheduled run `succeeded`, 12 alerts for 12 events | same |
 | The same suppression (trial) | — | preview: 1 alert for 6 events |
 | `DELETE` twice | 200, then 404 | same |
