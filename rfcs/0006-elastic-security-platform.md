@@ -16,10 +16,10 @@ Decisions:
 
 1. **One platform for every Elastic deployment type.** Self-managed, Elastic Cloud Hosted, and Elastic Cloud Serverless Security expose the same rule API with the same request schemas. The deployment type only changes the tenant URL, credentials, and which features a licence enables. There is no `edition` switch.
 2. **Target the Security detection engine, not generic Kibana alerting.** Detection rules are the only Elastic rules that land in the Security app, write to `.alerts-security.alerts-*`, carry ATT&CK mappings, and support exceptions.
-3. **Five rule types in v1:** `query`, `eql`, `esql`, `threshold`, `new_terms`. `threat_match` and `machine_learning` are deferred. `saved_query` is excluded.
+3. **Every rule type the Security UI can create:** `query`, `saved_query`, `eql`, `esql`, `threshold`, `new_terms`, `threat_match`, and `machine_learning`.
 4. **Identity is the MDR UUID.** Kibana's user-settable `rule_id` is set to `metadata.uuid`. It is unique per space, so one UUID serves every tenant, and alerts carry it as `kibana.alert.rule.rule_id`. Kibana's internal `id` is never stored, and nothing is written back to the rule file.
 5. **Validation:** offline syntax checks per query language, plus live validation through the rule preview API. Two Elasticsearch checks also run before every deploy, because Kibana accepts a mistyped ES\|QL command or aggregation field and the rule then fails silently ([Elasticsearch checks](#elasticsearch-checks)).
-6. **Kibana's own notation where it helps authors.** Durations are written `5m`, `1h`, `14d`, as in Kibana. `required_fields` is a list of `{name, type}` objects, and `related_integrations` takes package names.
+6. **Kibana's own names.** Durations are written `5m`, `1h`, `14d`. `required_fields` is a list of `{name, type}` objects, and a package name may stand for a related integration. Every other key is the Kibana field the create-rule UI writes. `overrides` is only for a field that UI does not show.
 
 The change is additive: it adds a `configurations.elastic` key and a new platform schema. `rule::1.0` keeps its identifier and every existing rule stays valid.
 
@@ -64,16 +64,20 @@ Spaces isolate rules, alerts, and exceptions, but not source data. A rule in spa
 
 ### Rule types
 
-| Type | Query language | v1 | Kibana fields required beyond the common set |
-|------|----------------|----|-----------------------------------------------|
-| `query` | KQL (`kuery`) or Lucene | yes | — |
-| `eql` | EQL | yes | `language: eql`, `query` |
-| `esql` | ES\|QL | yes | `language: esql`, `query`; no `index` (the `FROM` clause selects data) |
-| `threshold` | KQL or Lucene | yes | `query`, `threshold.field`, `threshold.value` |
-| `new_terms` | KQL or Lucene | yes | `query`, `new_terms_fields` (1–3), `history_window_start` |
-| `threat_match` | KQL | deferred | `threat_index`, `threat_query`, `threat_mapping`: indicator indices are tenant state |
-| `machine_learning` | — | deferred | `machine_learning_job_id`, `anomaly_threshold`: ML jobs are tenant state and need a paid licence |
-| `saved_query` | — | excluded | references a Kibana saved object, so it is not portable |
+| Type | UI name | Query language | Required beyond the common set |
+|------|---------|----------------|------------------------------|
+| `query` | Custom query | KQL (`kuery`) or Lucene | — |
+| `saved_query` | Custom query, saved query loaded on every run | the saved query's | `saved_id` |
+| `eql` | Event correlation | EQL | `query` |
+| `esql` | ES\|QL | ES\|QL | `query`; no `index` (the `FROM` clause selects data) |
+| `threshold` | Threshold | KQL or Lucene | `query`, `threshold.field`, `threshold.value` |
+| `new_terms` | New terms | KQL or Lucene | `query`, `new_terms_fields` (1–3), `history_window_start` |
+| `threat_match` | Indicator match | KQL or Lucene | `query`, `threat_index`, `threat_query`, `threat_mapping` |
+| `machine_learning` | Machine learning | — | `machine_learning_job_id`, `anomaly_threshold` |
+
+**New terms** alerts when a value, or a combination of up to three values, shows up that the rule has not seen in the history window. A rule with `new_terms_fields: [host.name, user.name]` and `history_window_start: 14d` alerts when that host and user appear together in the current run and did not appear together in the previous 14 days. It does not count events. That is what a threshold rule does.
+
+`saved_id`, `threat_index`, and `machine_learning_job_id` are names that exist in one tenant. The block carries them as written; nothing rewrites them into a shared identifier.
 
 The common required set on create is `name`, `description`, `type`, `severity`, and `risk_score`.
 
@@ -184,53 +188,67 @@ FieldType = Literal[                      # Elasticsearch mapping types
 
 class ElasticConfig(PlatformConfigBase):
     __schema_identifier__: ClassVar[str] = "platform::elastic::1.0"
-    type: Literal["query", "eql", "esql", "threshold", "new_terms"]
-    query: QueryText
-    language: Literal["kuery", "lucene"] | None = None   # query / threshold / new_terms
+    type: Literal["query", "saved_query", "eql", "esql", "threshold", "new_terms", "threat_match", "machine_learning"]
+    query: QueryText | None = None
+    language: Literal["kuery", "lucene"] | None = None
+    saved_id: str | None = None
     index: list[str] | None = None
     data_view_id: str | None = None
-    scheduling: ElasticScheduling = ElasticScheduling()
-    alert: ElasticAlert = ElasticAlert()
-    threshold: ElasticThreshold | None = None             # type: threshold
-    new_terms: ElasticNewTerms | None = None              # type: new_terms
-    eql: ElasticEql | None = None                         # type: eql
-    tags: list[str] | None = None
-    note: str | None = None                               # investigation guide (markdown)
-    setup: str | None = None                              # setup guide (markdown)
-    false_positives: list[str] | None = None
-    required_fields: list[ElasticRequiredField] | None = None
-    related_integrations: list[str | ElasticIntegration] | None = None   # "windows" = {package: windows}
-    building_block: bool = False
-    overrides: dict[str, Any] | None = None               # unmodelled Kibana fields
-
-class ElasticScheduling(TideModel):
-    frequency: Duration = "5m"   # -> interval
-    lookback: Duration = "6m"    # total window -> from: now-<lookback>
-
-class ElasticAlert(TideModel):
-    severity: str | None = None               # alert_severity vocabulary
-    risk_score: int | None = None             # 0–100, overrides the severity default
-    suppression: ElasticSuppression | None = None
-    investigation_fields: list[str] | None = None
-
-class ElasticSuppression(TideModel):
-    group_by: list[str] | None = None         # 1–3 field names; not for threshold
-    duration: Duration | None = None          # required for threshold
-    missing_fields: Literal["suppress", "doNotSuppress"] = "suppress"
-
-class ElasticThreshold(TideModel):
-    field: list[str] = []                     # 0–5 fields; [] counts all matches
-    value: int                                # >= 1
-    cardinality: ElasticCardinality | None = None   # {field: str, value: int >= 0}
-
-class ElasticNewTerms(TideModel):
-    fields: list[str]                         # 1–3
-    history_window: Duration                  # -> history_window_start
-
-class ElasticEql(TideModel):
-    timestamp_field: str | None = None
+    filters: list[dict[str, Any]] | None = None          # the filter objects the UI saves
+    interval: Duration = "5m"                            # Runs every
+    from_: Duration = "6m"                               # data_key "from": total window, sent as now-<from>
+    severity: str | None = None                          # alert_severity vocabulary
+    risk_score: int | None = None                        # 0–100
+    severity_mapping: list[ElasticSeverityMapping] | None = None
+    risk_score_mapping: list[ElasticRiskScoreMapping] | None = None
+    alert_suppression: ElasticSuppression | None = None
+    investigation_fields: list[str] | None = None        # Custom highlighted fields
+    threshold: ElasticThreshold | None = None
+    new_terms_fields: list[str] | None = None
+    history_window_start: Duration | None = None
+    timestamp_field: str | None = None                   # EQL settings
     event_category_override: str | None = None
     tiebreaker_field: str | None = None
+    threat_index: list[str] | None = None
+    threat_query: str | None = None
+    threat_language: Literal["kuery", "lucene"] | None = None
+    threat_mapping: list[ElasticThreatGroup] | None = None
+    threat_filters: list[dict[str, Any]] | None = None
+    threat_indicator_path: str | None = None             # Indicator prefix override
+    concurrent_searches: int | None = None               # API only; not in the create UI
+    items_per_search: int | None = None
+    machine_learning_job_id: str | list[str] | None = None
+    anomaly_threshold: int | None = None
+    rule_name_override: str | None = None
+    timestamp_override: str | None = None
+    timestamp_override_fallback_disabled: bool | None = None
+    max_signals: int | None = None                       # Max alerts per run
+    license: str | None = None
+    tags: list[str] | None = None
+    note: str | None = None                              # Investigation guide
+    setup: str | None = None                             # Setup guide
+    false_positives: list[str] | None = None
+    required_fields: list[ElasticRequiredField] | None = None
+    related_integrations: list[str | ElasticIntegration] | None = None
+    endpoint_exceptions: bool = False                    # Elastic endpoint exceptions checkbox
+    exceptions_list: list[dict[str, str]] | None = None
+    building_block: bool = False
+    actions: list[dict[str, Any]] | None = None
+    response_actions: list[dict[str, Any]] | None = None
+    timeline_id: str | None = None
+    timeline_title: str | None = None
+    meta: dict[str, Any] | None = None                   # API only
+    overrides: dict[str, Any] | None = None              # a Kibana field the UI does not show
+
+class ElasticSuppression(TideModel):
+    group_by: list[str] | None = None         # 1–3 field names; absent for threshold
+    duration: Duration | None = None          # required for threshold
+    missing_fields_strategy: Literal["suppress", "doNotSuppress"] = "suppress"
+
+class ElasticThreshold(TideModel):
+    field: list[str] = []                     # Group by, 0–5; [] counts all matches
+    value: int                                # Threshold, >= 1
+    cardinality: ElasticCardinality | None = None   # Count: {field, value}
 
 class ElasticRequiredField(TideModel):
     name: str
@@ -240,6 +258,26 @@ class ElasticIntegration(TideModel):
     package: str                              # Fleet package, e.g. windows, endpoint, aws
     integration: str | None = None            # policy template, e.g. cloudtrail
     version: str = "*"                        # semver range, e.g. "^2.0.0"
+
+class ElasticSeverityMapping(TideModel):
+    field: str
+    value: str
+    operator: Literal["equals"] = "equals"
+    severity: Literal["low", "medium", "high", "critical"]
+
+class ElasticRiskScoreMapping(TideModel):
+    field: str
+    operator: Literal["equals"] = "equals"
+    value: str = ""
+
+class ElasticThreatGroup(TideModel):
+    entries: list[ElasticThreatEntry]         # entries in one group are AND; groups are OR
+
+class ElasticThreatEntry(TideModel):
+    field: str                                # event field
+    value: str                                # indicator field
+    type: Literal["mapping"] = "mapping"
+    negate: bool | None = None                # true is the UI's DOES NOT MATCH
 ```
 
 **Model constraints.** Validation MUST reject a block that breaks any of these:
@@ -247,20 +285,20 @@ class ElasticIntegration(TideModel):
 <!-- rfc0006:constraints-table -->
 | Code | Constraint |
 |------|------------|
-| `type_block` | `threshold` is required iff `type: threshold`, `new_terms` iff `type: new_terms`; `eql` is allowed only for `type: eql` |
-| `language` | `language` MUST NOT be set for `eql` or `esql` |
-| `esql_source` | `esql` MUST NOT set `index` or `data_view_id` |
+| `type_block` | `threshold` iff `type: threshold`. `new_terms_fields` and `history_window_start` iff `type: new_terms`. `timestamp_field`, `event_category_override`, and `tiebreaker_field` only for `eql`. `threat_index`, `threat_query`, and `threat_mapping` iff `type: threat_match`. `machine_learning_job_id` and `anomaly_threshold` iff `type: machine_learning`. `saved_id` iff `type: saved_query`. `query` is required except for `machine_learning` and `saved_query`. |
+| `language` | `language` MUST NOT be set for `eql`, `esql`, or `machine_learning` |
+| `esql_source` | `esql` and `machine_learning` MUST NOT set `index` or `data_view_id` |
 | `index_xor_data_view` | `index` and `data_view_id` are mutually exclusive |
-| `suppression_shape` | For `threshold`: `suppression.duration` is required and `group_by` is forbidden. For other types: `group_by` is required, with 1–3 distinct, non-empty field names. |
-| `new_terms_fields` | `new_terms.fields` has 1–3 entries |
+| `suppression_shape` | For `threshold`: `alert_suppression.duration` is required and `group_by` is forbidden. For other types: `group_by` is required, with 1–3 distinct, non-empty field names. |
+| `new_terms_fields` | `new_terms_fields` has 1–3 entries |
 | `threshold_fields` | `threshold.field` has 0–5 entries; `threshold.value` >= 1 |
-| `risk_score` | `alert.risk_score` is an integer in 0–100 |
+| `risk_score` | `risk_score` is an integer in 0–100 |
 | `duration` | Every duration is a positive integer followed by `s`, `m`, `h`, or `d`, or ISO 8601 `P[nD][T[nH][nM][nS]]` with whole seconds, and is > 0 |
 | `override_key` | `overrides` MUST NOT contain a key from the [field mapping](#3-field-mapping) or [preserved fields](#5-deployment) tables |
 
-Validation SHOULD warn when `scheduling.lookback` < `scheduling.frequency` (gaps between runs), and when a non-aggregating ES\|QL query (no `STATS`) lacks `METADATA _id` (alerts are not deduplicated).
+Validation SHOULD warn when `from` < `interval` (the next run starts after the window ends), and when a non-aggregating ES\|QL query (no `STATS`) lacks `METADATA _id` (alerts are not deduplicated).
 
-**Field names are open-ended.** `group_by`, `threshold.field`, `new_terms.fields`, `investigation_fields`, and `required_fields[].name` name fields in the tenant's data: ECS, integration-specific, or custom. They cannot be an enum, and Kibana accepts any string for them. The deployer therefore checks aggregation fields against the tenant ([Aggregation field check](#aggregation-field-check)). `type` is closed. Of the 2,617 fields in ECS, 75% are `keyword`; the other types are `long`, `date`, `boolean`, `object`, `flattened`, `float`, `nested`, `wildcard`, `ip`, `geo_point`, `double`, `scaled_float`, `constant_keyword`, and `match_only_text`. `FieldType` lists those plus the other common Elasticsearch mapping types. Kibana sets `required_fields[].ecs` only when both the name and the type match ECS.
+**Field names are open-ended.** `alert_suppression.group_by`, `threshold.field`, `new_terms_fields`, `investigation_fields`, and `required_fields[].name` name fields in the tenant's data: ECS, integration-specific, or custom. They cannot be an enum, and Kibana accepts any string for them. The deployer therefore checks aggregation fields against the tenant ([Aggregation field check](#aggregation-field-check)). `type` is closed. Of the 2,617 fields in ECS, 75% are `keyword`; the other types are `long`, `date`, `boolean`, `object`, `flattened`, `float`, `nested`, `wildcard`, `ip`, `geo_point`, `double`, `scaled_float`, `constant_keyword`, and `match_only_text`. `FieldType` lists those plus the other common Elasticsearch mapping types. Kibana sets `required_fields[].ecs` only when both the name and the type match ECS.
 
 ### 3. Field mapping
 
@@ -274,29 +312,41 @@ The deployer compiles each MDR into a Kibana create or update body:
 | `name` | block `name`, else rule `name` | |
 | `description` | rule `description` | trailing whitespace stripped |
 | `enabled` | block `status` | `false` iff status strategy is `DISABLEMENT`. Always sent, because a `PUT` without it keeps the remote value. |
-| `severity`, `risk_score` | `alert.severity`, else `response.alert_severity`, else `Informational` | [Severity](#severity); `alert.risk_score` overrides the score |
-| `interval` | `scheduling.frequency` | [Durations](#durations) |
-| `from` | `scheduling.lookback` | `now-<duration>` |
-| `to` | — | `now` |
-| `language` | `type`, `language` | `eql` → `eql`, `esql` → `esql`, else `language` or `kuery` |
-| `query` | `query` | trailing whitespace stripped |
-| `index` | block `index`, else tenant `setup.index` | omitted for `esql`, when `data_view_id` is set, or when both sources are empty |
-| `data_view_id` | `data_view_id` | verbatim |
-| `threshold` | `threshold` | `cardinality` becomes a one-item list |
-| `new_terms_fields`, `history_window_start` | `new_terms.fields`, `new_terms.history_window` | `now-<duration>` |
-| `timestamp_field`, `event_category_override`, `tiebreaker_field` | `eql.*` | verbatim |
-| `alert_suppression` | `alert.suppression` | `{group_by, duration?, missing_fields_strategy}`; for threshold `{duration}` only. Omitted when tenant `setup.suppression` is `false`. |
-| `investigation_fields` | `alert.investigation_fields` | `{field_names: [...]}` |
+| `severity`, `risk_score` | block `severity`, else `response.alert_severity`, else `Informational` | [Severity](#severity); block `risk_score` overrides the score |
+| `severity_mapping`, `risk_score_mapping` | same-named block field | verbatim. These are the UI's Severity override and Risk score override. |
+| `interval` | `interval` | [Durations](#durations). This is the UI's Runs every. Default `5m`. |
+| `from` | `from` | `now-<duration>`. This is the whole window Kibana queries, not the UI's Additional look-back time. Additional look-back is `from` minus `interval`. Default `6m`, which is one extra minute. |
+| `to` | — | `now`. The UI does not expose it. |
+| `language` | `type`, `language` | `eql` → `eql`, `esql` → `esql`; omitted for `machine_learning`; else `language` or `kuery` |
+| `query` | `query` | trailing whitespace stripped; omitted for `machine_learning` and when `saved_query` has no query |
+| `saved_id` | `saved_id` | verbatim |
+| `index` | block `index`, else tenant `setup.index` | omitted for `esql` and `machine_learning`, when `data_view_id` is set, or when both sources are empty |
+| `data_view_id`, `filters` | same-named block field | verbatim |
+| `threshold` | `threshold` | `cardinality` is one `{field, value}` and is sent as a one-item list |
+| `new_terms_fields` | `new_terms_fields` | verbatim |
+| `history_window_start` | `history_window_start` | `now-<duration>` |
+| `timestamp_field`, `event_category_override`, `tiebreaker_field` | same-named block field | verbatim |
+| `threat_index`, `threat_query`, `threat_language`, `threat_filters`, `threat_indicator_path` | same-named block field | verbatim |
+| `threat_mapping` | `threat_mapping` | an entry with no `type` is sent as `type: mapping` |
+| `concurrent_searches`, `items_per_search` | same-named block field | verbatim. Not in the create UI. On update, an omitted value is kept from the remote rule. |
+| `machine_learning_job_id`, `anomaly_threshold` | same-named block field | verbatim |
+| `alert_suppression` | `alert_suppression` | `{group_by, duration?, missing_fields_strategy}`; for threshold `{duration}` only. `duration` is `{value, unit}`. Omitted when tenant `setup.suppression` is `false`. |
+| `investigation_fields` | `investigation_fields` | `{field_names: [...]}` |
 | `required_fields` | `required_fields` | one `{name, type}` per entry, sorted by name |
 | `related_integrations` | `related_integrations` | a string `p` becomes `{package: p, version: "*"}`; objects keep `integration`, and `version` defaults to `"*"` (Kibana requires a non-empty version) |
-| `false_positives`, `setup` | same-named block field | verbatim |
+| `false_positives`, `setup`, `license` | same-named block field | verbatim |
+| `max_signals` | `max_signals` | verbatim. This is Max alerts per run. Omitted means Kibana's default of 100. |
+| `rule_name_override`, `timestamp_override`, `timestamp_override_fallback_disabled` | same-named block field | verbatim |
+| `exceptions_list` | `exceptions_list`, `endpoint_exceptions` | `endpoint_exceptions: true` adds `{id: endpoint_list, list_id: endpoint_list, namespace_type: agnostic, type: endpoint}`. Omitted keeps the remote list. |
 | `building_block_type` | `building_block: true` | `"default"` |
+| `actions`, `response_actions`, `timeline_id`, `timeline_title` | same-named block field | verbatim when set. Omitted keeps the remote value, because connectors and Timeline templates belong to the tenant. |
+| `meta` | `meta` | verbatim. Not in the create UI. On update, an omitted value is kept. |
 | `tags` | `"OpenTide"`, tenant `setup.tags`, block `tags` | in that order, de-duplicated |
 | `author` | `metadata.author`, `metadata.contributors` | de-duplicated; omitted if empty |
 | `references` | `references.public` | values in ascending key order |
 | `note` | block `note`, else `response.procedure.analysis` | trailing whitespace stripped |
 | `threat` | resolved techniques | [Threat](#threat) |
-| anything else | `overrides` | merged last (for example `max_signals`, `timestamp_override`, `rule_name_override`, `severity_mapping`, `filters`) |
+| anything else | `overrides` | merged last. Only a Kibana field the create UI does not show. |
 
 Absent optional sources produce no key. The deployer MUST NOT send `id` or `version`.
 
@@ -392,14 +442,12 @@ configurations:
       process.name : ("powershell.exe" or "pwsh.exe") and
       process.args : ("-enc" or "-EncodedCommand")
     index: [logs-endpoint.events.process-*, winlogbeat-*]
-    scheduling:
-      frequency: 5m
-      lookback: 9m
-    alert:
-      suppression:
-        group_by: [host.name, user.name]
-        duration: 1h
-      investigation_fields: [process.command_line, process.parent.name]
+    interval: 5m
+    from: 9m
+    alert_suppression:
+      group_by: [host.name, user.name]
+      duration: 1h
+    investigation_fields: [process.command_line, process.parent.name]
     tags: [Windows]
     required_fields:
       - {name: process.args, type: keyword}
@@ -479,7 +527,7 @@ configurations:
         [process where event.type == "start" and process.name == "sc.exe" and process.args == "create"]
         [process where event.type == "start" and process.parent.name == "services.exe"]
     index: [logs-endpoint.events.process-*]
-    eql: {tiebreaker_field: event.sequence}
+    tiebreaker_field: event.sequence
 ```
 
 <!-- rfc0006:fragment-eql -->
@@ -532,7 +580,8 @@ configurations:
       | WHERE event.category == "authentication" AND event.outcome == "failure"
       | STATS failures = COUNT(*), users = COUNT_DISTINCT(user.name) BY source.ip
       | WHERE users >= 10
-    scheduling: {frequency: 15m, lookback: 15m}
+    interval: 15m
+    from: 15m
 ```
 
 <!-- rfc0006:fragment-esql -->
@@ -574,8 +623,7 @@ configurations:
     threshold:
       field: [user.name, source.ip]
       value: 25
-    alert:
-      suppression: {duration: 30m}
+    alert_suppression: {duration: 30m}
 ```
 
 <!-- rfc0006:fragment-threshold -->
@@ -606,9 +654,8 @@ configurations:
     type: new_terms
     query: 'event.category : "iam" and event.action : "added-user-account"'
     index: [logs-system.security-*]
-    new_terms:
-      fields: [host.name, user.name]
-      history_window: 14d
+    new_terms_fields: [host.name, user.name]
+    history_window_start: 14d
 ```
 
 <!-- rfc0006:fragment-new-terms -->
@@ -623,6 +670,65 @@ configurations:
 }
 ```
 
+**Example F: indicator match.** Entries in one group are AND. A second group would be OR. `type: mapping` is filled in when the entry omits it.
+
+<!-- rfc0006:rule-threat -->
+```yaml
+name: Known malware hash written to disk
+metadata: {uuid: 4e8b1c2d-6f7a-4b9e-8c0d-1a2b3c4d5e6f}
+description: A created file matches a malware hash from the threat index.
+techniques: [T1204.002]
+response: {alert_severity: Critical}
+configurations:
+  elastic:
+    enabled: true
+    schema: platform::elastic::1.0
+    type: threat_match
+    query: 'event.category : "file" and event.type : "creation"'
+    index: [logs-endpoint.events.file-*]
+    threat_index: [logs-ti_*]
+    threat_query: '@timestamp >= "now-30d/d"'
+    threat_mapping:
+      - entries:
+          - {field: file.hash.sha256, value: threat.indicator.file.hash.sha256}
+    threat_indicator_path: threat.indicator
+```
+
+**Example G: machine learning.** The job id is the name of a job that already exists in that tenant.
+
+<!-- rfc0006:rule-ml -->
+```yaml
+name: Anomalous network volume
+metadata: {uuid: 8a0c2e4f-1b3d-4e5f-9a6b-7c8d9e0f1a2b}
+description: The network-event anomaly job scored this entity at 75 or above.
+response: {alert_severity: Medium}
+configurations:
+  elastic:
+    enabled: true
+    schema: platform::elastic::1.0
+    type: machine_learning
+    machine_learning_job_id: [high_count_network_events]
+    anomaly_threshold: 75
+```
+
+**Advanced settings, on any of the rules above.** Each key is the Kibana field the UI writes.
+
+<!-- rfc0006:gui-fields -->
+```yaml
+max_signals: 200
+timestamp_override: event.ingested
+timestamp_override_fallback_disabled: true
+rule_name_override: event.action
+license: Elastic License v2
+severity_mapping:
+  - {field: host.name, operator: equals, severity: high, value: dc1}
+risk_score_mapping:
+  - {field: event.risk_score, operator: equals, value: ""}
+endpoint_exceptions: true
+filters:
+  - {meta: {negate: true}, query: {match_all: {}}}
+```
+
 **Invalid block.** It violates the constraints named in the comments.
 
 <!-- rfc0006:invalid -->
@@ -635,8 +741,7 @@ elastic:
   language: kuery                       # language
   query: FROM logs-* | LIMIT 10
   index: [logs-*]                       # esql_source
-  alert:
-    suppression: {duration: 1h}         # suppression_shape: group_by required
+  alert_suppression: {duration: 1h}       # suppression_shape: group_by required
   overrides: {rule_id: my-own-id}       # override_key
 ```
 
@@ -655,7 +760,7 @@ Headers: `Authorization: ApiKey <api_key>`, `elastic-api-version: 2023-10-31`, `
 
 **Type changes.** `PUT` cannot change `type`; Kibana returns 400. When the remote `type` differs from the compiled one, the deployer MUST `DELETE` the rule and `POST` the compiled body plus the preserved fields. The `rule_id` stays the same. Kibana assigns a new internal `id`, so execution history starts again.
 
-`PUT` replaces the whole rule and deletes unspecified fields. On update the deployer MUST copy these fields from the `GET` response, so analyst work done in Kibana survives redeploys:
+`PUT` replaces the whole rule. A field the block sets is sent as written. A field the block omits goes back to Kibana's default, except the fields below, which the deployer copies from the `GET` response when the block does not set them:
 
 <!-- rfc0006:preserved-table -->
 | Preserved field | Why |
@@ -664,6 +769,8 @@ Headers: `Authorization: ApiKey <api_key>`, `elastic-api-version: 2023-10-31`, `
 | `exceptions_list` | exception lists attached in Kibana |
 | `response_actions` | Elastic Defend and Osquery response actions |
 | `timeline_id`, `timeline_title` | investigation Timeline template |
+| `concurrent_searches`, `items_per_search`, `meta` | API-only fields the create UI does not show |
+| `output_index`, `namespace`, `throttle` | legacy fields the create UI does not show |
 
 The deployer MUST NOT modify an Elastic prebuilt rule. A prebuilt rule has `rule_source.type: external` (customised prebuilt rules included), or `immutable: true` on versions without `rule_source`. The deployer reports an error instead.
 
@@ -732,9 +839,9 @@ Kibana accepts any string as a field name. On 9.5.4, a field that does not exist
 
 | Field | Absent (for example misspelt) | `text` or `match_only_text` |
 |-------|-------------------------------|------------------------------|
-| `alert.suppression.group_by` | every alert collapses into one per window (`missing_fields: suppress`) | run error |
+| `alert_suppression.group_by` | every alert collapses into one per window (`missing_fields_strategy: suppress`) | run error |
 | `threshold.field`, `threshold.cardinality.field` | no alerts | run error |
-| `new_terms.fields` | no alerts | run error |
+| `new_terms_fields` | no alerts | run error |
 
 The deployer checks these fields with `GET <elasticsearch_url>/<sources>/_field_caps?fields=<fields>&ignore_unavailable=true&allow_no_indices=true`. `<sources>` is the compiled `index`, or the `title` of the data view from `GET /api/data_views/data_view/<data_view_id>` in the tenant's space. Every field MUST be present with `aggregatable: true`; otherwise the rule fails. For `esql`, the `group_by` fields MUST instead be among the `columns` the pre-flight returns, because ES\|QL suppression groups on result columns.
 
@@ -771,7 +878,7 @@ opentide adds an `opentide/platforms/elastic/` package with `client`, `deployer`
 | `_import` ndjson with `overwrite=true` as the only path | One call per batch, but `overwrite` replaces `actions` and `exceptions_list` unless the deployer round-trips them. Per-rule errors come back in an aggregate response, and multipart upload complicates proxies. Kept as a future fast path. |
 | `PATCH` instead of `PUT` | It cannot remove a field the author deleted from YAML (for example `alert_suppression`), so remote state would drift from the MDR. |
 | Emit `detection-rules` TOML or Terraform HCL | Adds an external toolchain and state file; both wrap the same API. |
-| Raw passthrough block (`body: {...}`) | Loses typed validation and ATT&CK derivation. `overrides` covers the long tail without giving up the typed core. |
+| Raw passthrough block (`body: {...}`) | Loses typed validation and ATT&CK derivation. A field the create UI shows is a key on the block. |
 | Validate only through Elasticsearch (`_validate/query`, `_eql/search`, `_query`) | Cannot check the rule-level fields (threshold, new terms, suppression shape) that preview checks. It is used for ES\|QL only, because Kibana does not parse ES\|QL on create. |
 | Detect the licence instead of a `suppression` flag | Needs the `monitor` cluster privilege (`GET _license`) or Kibana's `/api/licensing/info`, which is internal-only on 9.x. Neither fits a least-privilege deploy key, and Serverless tiers are not licences. |
 | Strip `alert_suppression` from every tenant, never send it | Loses a core noise control on Platinum, Enterprise, and Serverless tenants that support it. |
@@ -784,7 +891,6 @@ opentide adds an `opentide/platforms/elastic/` package with `client`, `deployer`
 |----------|--------------------|
 | Exceptions as code | Separate RFC mapping per-tenant exclusions (as in Sentinel and Defender) to `/api/exception_lists` and rule `exceptions_list`. Until then, exceptions are Kibana-managed and preserved. |
 | Orphan pruning | Report rules tagged `OpenTide` that have no MDR. Deletion stays opt-in in a later revision. |
-| `threat_match` and `machine_learning` | `platform::elastic::1.1` once indicator-index and ML-job references have a tenant-level model |
 | Bulk path for large catalogues | `_import` fast path behind a tenant flag, after per-rule semantics are proven |
 | Deriving `required_fields` and `related_integrations` | Elastic's `detection-rules` builds both at release time from the query AST, bundled ECS and integration schemas, and a package list (`integration = ["windows"]`). A later revision MAY fill `required_fields` from the query and `_field_caps`, leaving the block optional. |
 | Kibana not parsing ES\|QL on create | Report it upstream. A later revision MAY make the pre-flight optional on Kibana versions that reject invalid ES\|QL on create. |
