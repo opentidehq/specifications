@@ -150,7 +150,7 @@ def _tactics() -> dict[str, str]:
 def _mapping_fields() -> set[str]:
     fields: set[str] = set()
     for row in _table("mapping-table"):
-        fields.update(_ticked(row["Kibana field"]))
+        fields.update(_ticked(row["Detection-engine field"]))
     return fields
 
 
@@ -165,7 +165,7 @@ def _forbidden_overrides() -> set[str]:
     return _mapping_fields() | _preserved_fields() | {"id", "version"}
 
 
-def duration_seconds(value: str) -> int:
+def duration_seconds(value: str, *, allow_zero: bool = False) -> int:
     if short := _SHORT_DURATION.fullmatch(value):
         total = int(short.group(1)) * UNIT_SECONDS[short.group(2)]
     elif (match := _ISO_DURATION.fullmatch(value)) and value not in ("P", "PT"):
@@ -173,9 +173,19 @@ def duration_seconds(value: str) -> int:
         total = ((days * 24 + hours) * 60 + minutes) * 60 + secs
     else:
         raise ValueError(value)
-    if total <= 0:
+    if total < 0 or (total == 0 and not allow_zero):
         raise ValueError(value)
     return total
+
+
+def format_duration(total: int) -> str:
+    if total == 0:
+        return "0s"
+    for unit in "dhms":
+        size = UNIT_SECONDS[unit]
+        if total % size == 0:
+            return f"{total // size}{unit}"
+    raise AssertionError("unreachable: seconds always divide")
 
 
 def elastic_duration(value: str, units: str = "dhms") -> tuple[int, str]:
@@ -254,7 +264,12 @@ def derive_threat(techniques: list[str], vocab: dict[str, dict[str, Any]]) -> li
 
 
 _REMOVED_FLAT = frozenset({
-    "saved_id", "interval", "from",
+    "saved_id", "interval", "from", "license", "meta", "overrides",
+    "alert_suppression", "related_integrations", "investigation_fields",
+    "max_signals", "note", "setup", "endpoint_exceptions", "exceptions_list",
+    "timeline_id", "timeline_title", "timestamp_override",
+    "timestamp_override_fallback_disabled", "risk_score", "risk_score_mapping",
+    "severity_mapping",
     "timestamp_field", "event_category_override", "tiebreaker_field",
     "new_terms_fields", "history_window_start",
     "threat_index", "threat_query", "threat_language", "threat_mapping",
@@ -262,6 +277,8 @@ _REMOVED_FLAT = frozenset({
     "concurrent_searches", "items_per_search",
     "machine_learning_job_id", "anomaly_threshold",
 })
+_ENDPOINT_COMMANDS = frozenset({"isolate", "kill-process", "suspend-process", "runscript"})
+_EXCEPTION_TYPES = frozenset({"detection", "rule_default"})
 _RULE_TYPES = frozenset({
     "query", "eql", "esql", "threshold", "new_terms", "threat_match", "machine_learning",
 })
@@ -318,7 +335,35 @@ def check_block(block: dict[str, Any]) -> set[str]:
         codes.add("index_list")
     if isinstance(threat, dict) and "index" in threat and not _pattern_list(threat["index"]):
         codes.add("index_list")
-    suppression = block.get("alert_suppression")
+    for entries in (
+        block.get("filters"),
+        threat.get("filters") if isinstance(threat, dict) else None,
+    ):
+        if entries is None:
+            continue
+        if not isinstance(entries, list):
+            codes.add("filter_shape")
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                codes.add("filter_shape")
+                continue
+            shorthand = "field" in entry or "value" in entry or "negate" in entry
+            raw = "meta" in entry or "query" in entry
+            if (shorthand and raw) or (shorthand and ("field" not in entry or "value" not in entry)):
+                codes.add("filter_shape")
+    for item in ((block.get("exceptions") or {}).get("lists") or []):
+        if not isinstance(item, dict) or item.get("type") not in _EXCEPTION_TYPES:
+            codes.add("exception_type")
+    for action in block.get("response_actions") or []:
+        kind = action.get("action_type_id") if isinstance(action, dict) else None
+        command = ((action.get("params") or {}).get("command") if isinstance(action, dict) else None)
+        if kind == ".osquery":
+            continue
+        if kind == ".endpoint" and command in _ENDPOINT_COMMANDS:
+            continue
+        codes.add("response_action")
+    suppression = block.get("suppression")
     if suppression is not None:
         group_by = suppression.get("group_by")
         if rule_type == "threshold":
@@ -338,23 +383,35 @@ def check_block(block: dict[str, Any]) -> set[str]:
         len(threshold.get("field") or []) > 5 or threshold.get("value", 0) < 1
     ):
         codes.add("threshold_fields")
-    risk = block.get("risk_score")
-    if risk is not None and not (isinstance(risk, int) and 0 <= risk <= 100):
+    risk = block.get("risk")
+    if isinstance(risk, int):
+        if not 0 <= risk <= 100:
+            codes.add("risk_score")
+    elif isinstance(risk, dict):
+        score = risk.get("score")
+        if "score" in risk and not (isinstance(score, int) and 0 <= score <= 100):
+            codes.add("risk_score")
+    elif risk is not None:
         codes.add("risk_score")
     scheduling = block.get("scheduling") or {}
     if "scheduling" in block and not isinstance(scheduling, dict):
         codes.add("duration")
         scheduling = {}
+    if isinstance(scheduling, dict) and "lookback" in scheduling:
+        try:
+            duration_seconds(scheduling["lookback"], allow_zero=True)
+        except ValueError:
+            codes.add("duration")
     history = new_terms.get("history_window_start") if isinstance(new_terms, dict) else None
     for value in filter(None, (
-        scheduling.get("interval"), scheduling.get("from"),
+        scheduling.get("interval"),
         (suppression or {}).get("duration"), history,
     )):
         try:
             duration_seconds(value)
         except ValueError:
             codes.add("duration")
-    if set(block.get("overrides") or {}) & _forbidden_overrides():
+    if set(block.get("passthrough") or {}) & _forbidden_overrides():
         codes.add("override_key")
     return codes
 
@@ -366,18 +423,51 @@ def base_path(setup: dict[str, Any]) -> str:
     return f"{url}{prefix}/api/detection_engine/rules"
 
 
+def compile_filter(entry: dict[str, Any]) -> dict[str, Any]:
+    if "field" in entry and "value" in entry and "meta" not in entry and "query" not in entry:
+        field, value = entry["field"], entry["value"]
+        return {
+            "meta": {
+                "key": field,
+                "negate": bool(entry.get("negate", False)),
+                "disabled": False,
+                "type": "phrase",
+                "params": {"query": value},
+            },
+            "query": {"match_phrase": {field: value}},
+        }
+    return copy.deepcopy(entry)
+
+
+def _alert_level(block: dict[str, Any], response: dict[str, Any]) -> str:
+    severity = block.get("severity")
+    if isinstance(severity, dict):
+        return severity.get("default") or response.get("alert_severity") or "Informational"
+    if isinstance(severity, str):
+        return severity
+    return response.get("alert_severity") or "Informational"
+
+
 def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
     block = rule["configurations"]["elastic"]
     rule_type = block["type"]
     response = rule.get("response") or {}
     # Deployment status is per platform block. The rule's own status is not read.
     status = block.get("status") or "STAGING"
-    level = block.get("severity") or response.get("alert_severity") or "Informational"
+    level = _alert_level(block, response)
     severity, risk_score = _severity_table()[level]
-    if block.get("risk_score") is not None:
-        risk_score = block["risk_score"]
+    risk = block.get("risk")
+    if isinstance(risk, int):
+        risk_score = risk
+    elif isinstance(risk, dict) and risk.get("score") is not None:
+        risk_score = risk["score"]
 
     scheduling = block.get("scheduling") or {}
+    interval = scheduling.get("interval", "5m")
+    lookback = scheduling.get("lookback", "1m")
+    window = format_duration(
+        duration_seconds(interval) + duration_seconds(lookback, allow_zero=True)
+    )
     body: dict[str, Any] = {
         "rule_id": rule["metadata"]["uuid"],
         "type": rule_type,
@@ -386,8 +476,8 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
         "enabled": STATUS_STRATEGY[status] != "DISABLEMENT",
         "severity": severity,
         "risk_score": risk_score,
-        "interval": date_math(scheduling.get("interval", "5m")),
-        "from": "now-" + date_math(scheduling.get("from", "6m")),
+        "interval": date_math(interval),
+        "from": "now-" + window,
         "to": "now",
     }
     if rule_type == "eql":
@@ -405,7 +495,7 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
         if isinstance(index, list) and index:
             body["index"] = list(index)
     if block.get("filters") is not None and rule_type not in ("esql", "machine_learning"):
-        body["filters"] = copy.deepcopy(block["filters"])
+        body["filters"] = [compile_filter(entry) for entry in block["filters"]]
     if (threshold := block.get("threshold")) is not None:
         body["threshold"] = {"field": list(threshold.get("field") or []), "value": threshold["value"]}
         if threshold.get("cardinality"):
@@ -422,7 +512,7 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
         if threat_match.get("language"):
             body["threat_language"] = threat_match["language"]
         if threat_match.get("filters") is not None:
-            body["threat_filters"] = copy.deepcopy(threat_match["filters"])
+            body["threat_filters"] = [compile_filter(entry) for entry in threat_match["filters"]]
         if threat_match.get("indicator_path") is not None:
             body["threat_indicator_path"] = threat_match["indicator_path"]
         for key, kibana_key in (("concurrent_searches", "concurrent_searches"), ("items_per_search", "items_per_search")):
@@ -435,14 +525,33 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
     if (ml := block.get("machine_learning")) is not None:
         body["machine_learning_job_id"] = copy.deepcopy(ml["job_id"])
         body["anomaly_threshold"] = ml["anomaly_threshold"]
-    for key in (
-        "severity_mapping", "risk_score_mapping", "rule_name_override", "timestamp_override",
-        "timestamp_override_fallback_disabled", "max_signals", "license", "actions",
-        "response_actions", "timeline_id", "timeline_title", "meta",
-    ):
+    severity_mapping = block["severity"]["mapping"] if isinstance(block.get("severity"), dict) else None
+    if severity_mapping:
+        body["severity_mapping"] = [
+            {"operator": "equals", **entry} if "operator" not in entry else dict(entry)
+            for entry in severity_mapping
+        ]
+    if isinstance(risk, dict) and risk.get("mapping"):
+        body["risk_score_mapping"] = [
+            {"operator": "equals", **entry} if "operator" not in entry else dict(entry)
+            for entry in risk["mapping"]
+        ]
+    timestamp = block.get("timestamp") or {}
+    if timestamp.get("override") is not None:
+        body["timestamp_override"] = timestamp["override"]
+    if "disable_fallback" in timestamp:
+        body["timestamp_override_fallback_disabled"] = timestamp["disable_fallback"]
+    timeline = block.get("timeline") or {}
+    if timeline.get("id") is not None:
+        body["timeline_id"] = timeline["id"]
+    if timeline.get("title") is not None:
+        body["timeline_title"] = timeline["title"]
+    if scheduling.get("max_alerts") is not None:
+        body["max_signals"] = scheduling["max_alerts"]
+    for key in ("rule_name_override", "actions", "response_actions"):
         if block.get(key) is not None:
             body[key] = copy.deepcopy(block[key])
-    suppression = block.get("alert_suppression")
+    suppression = block.get("suppression")
     if suppression is not None and setup.get("suppression", True):
         compiled: dict[str, Any] = {}
         if rule_type != "threshold":
@@ -453,29 +562,33 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
         if rule_type != "threshold":
             compiled["missing_fields_strategy"] = suppression.get("missing_fields_strategy", "suppress")
         body["alert_suppression"] = compiled
-    if block.get("investigation_fields"):
-        body["investigation_fields"] = {"field_names": list(block["investigation_fields"])}
+    if block.get("highlighted_fields"):
+        body["investigation_fields"] = {"field_names": list(block["highlighted_fields"])}
     if block.get("required_fields"):
         body["required_fields"] = sorted(
             ({"name": field["name"], "type": field["type"]} for field in block["required_fields"]),
             key=lambda field: field["name"],
         )
-    if block.get("related_integrations"):
-        body["related_integrations"] = [related_integration(e) for e in block["related_integrations"]]
-    for key in ("false_positives", "setup"):
-        if block.get(key):
-            body[key] = copy.deepcopy(block[key])
+    if block.get("integration"):
+        body["related_integrations"] = [related_integration(e) for e in block["integration"]]
+    guide = block.get("guide") or {}
+    if guide.get("setup"):
+        body["setup"] = guide["setup"].rstrip()
+    if block.get("false_positives"):
+        body["false_positives"] = copy.deepcopy(block["false_positives"])
     if block.get("building_block"):
         body["building_block_type"] = "default"
-    if block.get("exceptions_list") is not None or block.get("endpoint_exceptions"):
-        lists = copy.deepcopy(block.get("exceptions_list") or [])
+    exceptions = block.get("exceptions")
+    if exceptions is not None:
+        lists = copy.deepcopy(exceptions.get("lists") or [])
         endpoint = {
             "id": "endpoint_list", "list_id": "endpoint_list",
             "namespace_type": "agnostic", "type": "endpoint",
         }
-        if block.get("endpoint_exceptions") and endpoint not in lists:
+        if exceptions.get("endpoint") and endpoint not in lists:
             lists.append(endpoint)
-        body["exceptions_list"] = lists
+        if lists:
+            body["exceptions_list"] = lists
     body["tags"] = list(
         dict.fromkeys(["OpenTide", *(setup.get("tags") or []), *(block.get("tags") or [])])
     )
@@ -486,13 +599,13 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
     public = (rule.get("references") or {}).get("public") or {}
     if public:
         body["references"] = [public[key] for key in sorted(public, key=int)]
-    note = block.get("note") or ((response.get("procedure") or {}).get("analysis"))
+    note = (block.get("guide") or {}).get("investigation") or ((response.get("procedure") or {}).get("analysis"))
     if note:
         body["note"] = note.rstrip()
     threat = derive_threat(list(rule.get("techniques") or []), _attack())
     if threat:
         body["threat"] = threat
-    body.update(copy.deepcopy(block.get("overrides") or {}))
+    body.update(copy.deepcopy(block.get("passthrough") or {}))
     return body
 
 
@@ -607,13 +720,24 @@ class ExampleCompilationTests(unittest.TestCase):
         rule = _yaml("rule-query")
         block = rule["configurations"]["elastic"]
         compiled = compile_rule(rule, _staging_setup())
-        for key in (
-            "max_signals", "timestamp_override", "timestamp_override_fallback_disabled",
-            "rule_name_override", "license", "severity_mapping", "risk_score_mapping", "filters",
-        ):
-            self.assertEqual(compiled[key], block[key], key)
+        self.assertEqual(compiled["max_signals"], block["scheduling"]["max_alerts"])
+        self.assertEqual(compiled["timestamp_override"], block["timestamp"]["override"])
+        self.assertEqual(
+            compiled["timestamp_override_fallback_disabled"],
+            block["timestamp"]["disable_fallback"],
+        )
+        self.assertEqual(compiled["rule_name_override"], block["rule_name_override"])
+        self.assertNotIn("license", compiled)
+        self.assertEqual(compiled["severity_mapping"], [
+            {"operator": "equals", **entry} for entry in block["severity"]["mapping"]
+        ])
+        self.assertEqual(compiled["risk_score_mapping"], [
+            {"operator": "equals", **entry} for entry in block["risk"]["mapping"]
+        ])
+        self.assertEqual(compiled["filters"], [compile_filter(entry) for entry in block["filters"]])
         self.assertEqual(compiled["interval"], "5m")
         self.assertEqual(compiled["from"], "now-6m")
+        self.assertEqual(compiled["note"], block["guide"]["investigation"].rstrip())
         self.assertEqual(compiled["exceptions_list"][-1], {
             "id": "endpoint_list", "list_id": "endpoint_list",
             "namespace_type": "agnostic", "type": "endpoint",
@@ -661,7 +785,7 @@ class TableConsistencyTests(unittest.TestCase):
                 "type": "threshold",
                 "query": "x",
                 "threshold": {"field": [], "value": 1},
-                "alert_suppression": {"group_by": ["a"], "duration": "1h"},
+                "suppression": {"group_by": ["a"], "duration": "1h"},
             },
             "new_terms_fields": {
                 "type": "new_terms",
@@ -669,16 +793,31 @@ class TableConsistencyTests(unittest.TestCase):
                 "new_terms": {"fields": ["a", "b", "c", "d"], "history_window_start": "7d"},
             },
             "threshold_fields": {"type": "threshold", "query": "x", "threshold": {"field": [], "value": 0}},
-            "risk_score": {"type": "query", "query": "x", "risk_score": 101},
-            "duration": {"type": "query", "query": "x", "scheduling": {"interval": "5min", "from": "6m"}},
-            "override_key": {"type": "query", "query": "x", "overrides": {"threat": []}},
+            "risk_score": {"type": "query", "query": "x", "risk": {"score": 101}},
+            "duration": {"type": "query", "query": "x", "scheduling": {"interval": "5min", "lookback": "1m"}},
+            "override_key": {"type": "query", "query": "x", "passthrough": {"threat": []}},
+            "filter_shape": {
+                "type": "query",
+                "query": "x",
+                "filters": [{"field": "a", "value": "b", "meta": {}}],
+            },
+            "exception_type": {
+                "type": "query",
+                "query": "x",
+                "exceptions": {"lists": [{"type": "endpoint"}]},
+            },
+            "response_action": {
+                "type": "query",
+                "query": "x",
+                "response_actions": [{"action_type_id": ".slack"}],
+            },
         }
         self.assertEqual(table_codes, set(probes))
         for code, block in probes.items():
             with self.subTest(code=code):
                 self.assertEqual(check_block(block), {code})
         self.assertEqual(
-            check_block({"type": "query", "query": "x", "interval": "5m", "saved_id": "abc"}),
+            check_block({"type": "query", "query": "x", "interval": "5m", "license": "Elastic License v2"}),
             {"type_block"},
         )
 
