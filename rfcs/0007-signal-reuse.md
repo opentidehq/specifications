@@ -10,7 +10,7 @@
 
 ## Summary
 
-A detection objective (DOM) may incorporate a signal defined on another objective that is already in the repository. The incorporating entry is a single UUID, completed from the workspace signal library. The signal keeps one UUID and one owning objective. A rule still names a single direct DOM through `detection_model`. Coverage also counts every other DOM that includes that signal, labeled indirect and partial, so one rule covers several DOMs. Examples below use the working key `reuse`. The key name is open; `ref` is withdrawn. See [Field name](#field-name).
+A detection objective (DOM) may incorporate a signal defined on another objective that is already in the repository. That ability is a new objective schema, `objective::1.1`, specified in `specs/objects/objective-1.1.md`. The incorporating entry is a single UUID, completed from the workspace signal library. The signal keeps one UUID and one owning objective. A rule still names a single direct DOM through `detection_model`. Coverage also counts every other DOM that includes that signal, labeled indirect and partial, so one rule covers several DOMs. Examples below use the working key `reuse`. The key name is open; `ref` is withdrawn. See [Field name](#field-name).
 
 ## Motivation
 
@@ -38,13 +38,58 @@ There is no content-pack import. An objective is available to the rest of the re
 
 ## Detailed design
 
-Additive on `objective::1.0`. Existing objectives remain valid. `metadata.schema` stays `objective::1.0`. No new object family, no new vocabulary file, no rule-schema change.
+This is an objective schema change. Coverage, the signal library, completion, and the extra MISP relation are behavior on top of that schema. They are not a separate object family and they are not a documentation-only edit of `objective::1.0`.
 
-On acceptance, edit the objective spec in place and bump its frontmatter `version` to `1.1` (document revision, same schema id), following the metadata 1.1 precedent. Record the history row. Update the other specs listed under [Affected specs](#affected-specs). Ship fixtures in that same spec PR. opentide follows in its own PR.
+### Schema revision: `objective::1.1`
+
+| | `objective::1.0` | `objective::1.1` |
+|--|------------------|------------------|
+| Spec file | [specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md), left as it is | new [specs/objects/objective-1.1.md](../specs/objects/objective-1.1.md) |
+| `metadata.schema` | `objective::1.0` | `objective::1.1` |
+| Signal item | Definition only. Required `name`, `uuid`, `description`, `severity`, `methodology`, `entities`, `data`. | Definition, or a library binding |
+| Status | Stays `normative`. Not deprecated. | `normative` |
+| `supersedes` | `null` | `null` |
+
+`objective::1.1` is the next minor schema revision, the same step [versioning.md](../specs/versioning.md) and [RFC 0001](0001-authority-model.md) describe for `rule::1.1`. The minor bump is the structural revision. Definitions are unchanged, so this is not `objective::2.0`.
+
+`metadata.version` is the instance's content version. It does not select the schema, and this RFC does not change how authors bump it. Consumers route on `metadata.schema` only.
+
+An objective that contains a binding MUST declare `metadata.schema: objective::1.1`. The same document declared as `objective::1.0` is invalid: 1.0 still requires a full definition on every signal. A definition-only objective MAY stay on `objective::1.0` forever. It MAY move to `objective::1.1` by changing `metadata.schema` and leaving the signals as definitions, because 1.1 accepts every 1.0 signal list. That migration is per object. [versioning.md](../specs/versioning.md) forbids a repository-wide cutover, so `objective::1.0` is not deprecated and authors are not required to touch DOMs that do not bind a signal.
+
+On acceptance the new spec file is:
+
+```yaml
+---
+spec: objective
+version: "1.1"
+schema_id: objective::1.1
+status: normative
+supersedes: null
+---
+```
+
+The 1.1 field tables copy 1.0, then replace the signal-item rule with the definition-or-binding union. `objective-1.0.md` gains a history row and a relationship pointer: signal bindings are `objective::1.1`. Its field tables do not change.
+
+Generated artifacts, both kept:
+
+| Artifact | `objective::1.0` | `objective::1.1` |
+|----------|------------------|------------------|
+| JSON Schema | `objective.1.0.schema.json` | `objective.1.1.schema.json` |
+| Template | `objective.1.0.template.yaml` | `objective.1.1.template.yaml` |
+
+The IDE router gains a branch for `objective::1.1`. `metadata.schema` is a `const` on each artifact. [schemas/pins/objective.toml](../schemas/pins/objective.toml) gains an `["objective::1.1"]` table with the same vocabulary pins as `["objective::1.0"]`. The binding key is the `signal` model vocabulary, not a pinned `.vocab.toml` contract.
+
+Sharing already emits `metadata.schema` verbatim. An `objective::1.1` event tells a receiver the signal list may contain bindings. A receiver that only implements 1.0 fails that object.
+
+No new object family. No rule schema change. No vocabulary file change.
+
+Ship the new spec, the 1.0 pointer, fixtures, `SPECS.md`, and `CHANGELOG.md` in the spec PR after acceptance. opentide registers a second model (`__schema_identifier__ = "objective::1.1"`) in its own PR, with a migration of `objective::1.0` → `objective::1.1` that rewrites only `metadata.schema`.
+
+The metadata 1.1 precedent does not apply. Metadata has no `schema_id`. An objective does, and a signal list that old `objective::1.0` parsers reject cannot keep that identifier.
 
 ### Signal item
 
-Each `objective.signals[]` entry is one of two shapes. Exactly one.
+On `objective::1.1`, each `objective.signals[]` entry is one of two shapes. Exactly one. On `objective::1.0`, only the definition exists.
 
 **Definition** — unchanged. Required: `name`, `uuid`, `description`, `severity`, `methodology`, `entities`, `data`. Optional fields stay as they are, including `parent`.
 
@@ -122,7 +167,7 @@ Add a model vocabulary named `signal`, built beside the objective model vocabula
 
 Only definitions are entries. A reference does not add a row.
 
-The objective metaschema binds the field:
+The `objective::1.1` metaschema binds the field. The `objective::1.0` metaschema does not grow a binding key:
 
 ```python
 "reuse": {"tide.vocab": "signal"}  # key follows Field name
@@ -219,7 +264,9 @@ The specifications-repo fixture checker (`scripts/object_fixtures.py`) currently
 
 ### Examples
 
-Owner, already in the repo:
+The owner can stay on `objective::1.0`. The library indexes its definitions either way. The consumer that binds one of them is `objective::1.1`.
+
+Owner, already in the repo (`objective::1.0`):
 
 ```yaml
 name: Credential Access Objective
@@ -254,13 +301,13 @@ objective:
         requirements: Security event logs
 ```
 
-Consumer, after that owner is imported. Completion of `reuse` inserts the signal UUID. The description shown beside it is `Credential Access Objective::Suspicious logon signal`.
+Consumer (`objective::1.1`), after that owner is imported. Completion of `reuse` inserts the signal UUID. The description shown beside it is `Credential Access Objective::Suspicious logon signal`. The 1.0 schema artifact does not offer that key.
 
 ```yaml
 name: Lateral Movement Objective
 metadata:
   uuid: 00000000-0000-4000-8002-000000000002
-  schema: objective::1.0
+  schema: objective::1.1
   version: 1
   created: "2026-01-01"
   modified: "2026-01-02"
@@ -305,7 +352,8 @@ A rule with `detection_model` pointing at Credential Access covers Credential Ac
 
 | Fixture | Expectation |
 |---------|-------------|
-| `fixtures/cross-object/objective-reuses-signal.yaml` | Consumer whose binding is the signal UUID in `fixtures/valid/objective-1.0.yaml` (`…8099…0001`). `metadata.tlp` is `clear` or stricter, matching that owner. Passes the shape checker. Filename follows the chosen key. |
+| `fixtures/cross-object/objective-reuses-signal.yaml` | `metadata.schema: objective::1.1`. Binding value is the signal UUID in `fixtures/valid/objective-1.0.yaml` (`…8099…0001`). `metadata.tlp` is `clear` or stricter, matching that owner. Passes the shape checker. Filename follows the chosen key. |
+| `fixtures/invalid/objective-1.0-signal-binding.yaml` | Binding on `metadata.schema: objective::1.0`. Fails 1.0 (definition fields required). |
 | `fixtures/invalid/objective-signal-entry-mixed.yaml` | Binding key plus `name`. Code `signal_entry_mixed`. |
 | `fixtures/invalid/objective-signal-bad-uuid.yaml` | Binding value is not a UUIDv4. Code `invalid_uuid`. |
 | `fixtures/valid/objective-1.0.yaml` | Unchanged definition. Still valid. |
@@ -316,22 +364,25 @@ Workspace-level cases (opentide tests, not a second copy of the object model in 
 
 | Path | Change on acceptance |
 |------|----------------------|
-| [specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md) | Union of definition and binding. Library, owner, TLP, effective set. Frontmatter `version: "1.1"`. `schema_id` stays `objective::1.0`. |
-| [specs/objects/rule-1.0.md](../specs/objects/rule-1.0.md) | State that `detection_model` is the direct DOM and that indirect DOMs are derived. Field table unchanged. |
-| [specs/validation.md](../specs/validation.md) | Codes above. Checker vs `opentide validate` split. |
-| [specs/metaschema-keywords.md](../specs/metaschema-keywords.md) | `signal` model vocabulary. Binding-key example. Objective vocabulary is objectives only. |
-| [specs/sharing/misp-1.0.md](../specs/sharing/misp-1.0.md) | Objective relations include referenced-signal owners. |
-| [site/index.md](../site/index.md) | Coverage diagram gains the indirect hop. The overview is descriptive; the objective spec stays normative. |
-| `fixtures/` as listed | Shape fixtures and checker codes in `scripts/object_fixtures.py`. |
-| [SPECS.md](../SPECS.md), [CHANGELOG.md](../CHANGELOG.md) | Objective document version 1.1, schema id unchanged. |
+| `specs/objects/objective-1.1.md` | New normative spec. `schema_id: objective::1.1`. Definition or binding. Library, owner, TLP, effective set. |
+| [specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md) | Unchanged field tables. History row and relationship pointer: bindings are `objective::1.1`. Status stays `normative`. |
+| [specs/objects/rule-1.0.md](../specs/objects/rule-1.0.md) | `detection_model` is the direct DOM. The UUID may be `objective::1.0` or `objective::1.1`. Indirect DOMs are derived. Field table unchanged. |
+| [specs/validation.md](../specs/validation.md) | Codes above. A binding on `objective::1.0` fails schema. Checker vs `opentide validate` split. |
+| [specs/metaschema-keywords.md](../specs/metaschema-keywords.md) | `signal` model vocabulary. Binding key on the 1.1 metaschema only. Objective vocabulary lists both revisions, objectives only. |
+| [specs/workspace.md](../specs/workspace.md) | Artifact rows `objective.1.1.schema.json` and `objective.1.1.template.yaml`. |
+| [schemas/pins/objective.toml](../schemas/pins/objective.toml) | `["objective::1.1"]` copies the `objective::1.0` pins. |
+| [specs/sharing/misp-1.0.md](../specs/sharing/misp-1.0.md) | Objective relations include owners of bound signals. `schema` is still emitted verbatim, so the value may be `objective::1.1`. |
+| [site/index.md](../site/index.md) | Schema table and coverage diagram include `objective::1.1`. The overview is descriptive; the object specs stay normative. |
+| `fixtures/` as listed | 1.1 consumer, 1.0 rejection, checker codes in `scripts/object_fixtures.py`. |
+| [SPECS.md](../SPECS.md), [CHANGELOG.md](../CHANGELOG.md) | New row: objective 1.1, schema `objective::1.1`. The 1.0 row stays. |
 
-No change to `vocabularies/`. No `objective::1.1` schema file.
+No change to `vocabularies/`. `objective::1.0` is not deleted and not deprecated.
 
 ### opentide follow-up
 
 File in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide) after this RFC is accepted. Expected touch points, for that issue:
 
-- `models/objective.py` — reference shape
+- `models/objective.py` — `objective::1.1` model beside `objective::1.0`; migration rewrites only `metadata.schema`
 - `registry/builder.py` and `indexing/inflight.py` — `owner` vs authored `parent`; reject duplicate definition UUIDs
 - `indexing/object_vocab.py` — `signal` vocabulary; drop signal rows from `objective`
 - `generation/framework.py` — `parents` / `childs` use `owner`
@@ -368,6 +419,12 @@ File in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide) after this
 
 **YAML key `ref`.** Withdrawn. It names a pointer, which is the mechanism, and it sits next to `references` (URLs on the objective) and `opentide-relation` without saying that the author is reusing a signal. Candidates are in [Field name](#field-name).
 
+**Stay on `objective::1.0` and bump the spec frontmatter to 1.1.** Set aside. That pattern fits metadata, which has no schema id. A binding is not a valid 1.0 signal. Serving it under `metadata.schema: objective::1.0` makes the identifier a lie: old engines, the 1.0 JSON Schema, and a receiver that only knows 1.0 all claim to understand the document and then drop or reject the signal list. The library, coverage, and completion are the system around the change. The change itself is the schema.
+
+**`objective::2.0`.** Set aside. A major revision is for a definition that no longer means what 1.0 said. Signal definitions are unchanged. The next structural step in [versioning.md](../specs/versioning.md) is the minor, `::1.1`.
+
+**Deprecate `objective::1.0` in the same change.** Set aside. Deprecation tells every author to migrate. 1.0 documents stay valid, and versioning forbids a single-step repo migration. 1.0 remains normative for definition-only objectives.
+
 ## Unresolved questions
 
 1. Pick the binding key. Working key in examples is `reuse`. See [Field name](#field-name). `ref` is withdrawn.
@@ -383,4 +440,4 @@ File in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide) after this
 - [specs/validation.md](../specs/validation.md), [specs/metaschema-keywords.md](../specs/metaschema-keywords.md)
 - [specs/sharing/misp-1.0.md](../specs/sharing/misp-1.0.md) relation table
 - opentide: `models/objective.py`, `registry/builder.py`, `indexing/inflight.py`, `indexing/object_vocab.py`, `documentation/catalog.py`, `generation/framework.py`, `export/explorer_export.py`
-- [RFC 0001](0001-authority-model.md) — additive change keeps `objective::1.0`; spec frontmatter version still bumps
+- [RFC 0001](0001-authority-model.md) and [specs/versioning.md](../specs/versioning.md) — next structural revision is `objective::1.1`, coexist with `objective::1.0`, no repo-wide migration
