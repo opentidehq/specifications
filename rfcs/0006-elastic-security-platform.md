@@ -16,10 +16,10 @@ Decisions:
 
 1. **One platform for every Elastic deployment type.** Self-managed, Elastic Cloud Hosted, and Elastic Cloud Serverless Security expose the same rule API with the same request schemas. The deployment type only changes the tenant URL, credentials, and which features a licence enables. There is no `edition` switch.
 2. **Target the Security detection engine, not generic Kibana alerting.** Detection rules are the only Elastic rules that land in the Security app, write to `.alerts-security.alerts-*`, carry ATT&CK mappings, and support exceptions.
-3. **Every rule type the Security UI can create:** `query`, `saved_query`, `eql`, `esql`, `threshold`, `new_terms`, `threat_match`, and `machine_learning`.
+3. **Every rule type the Security UI can create, except a saved query:** `query`, `eql`, `esql`, `threshold`, `new_terms`, `threat_match`, and `machine_learning`. A saved query is a Kibana object loaded by id on each run, so the detection text would not live in the rule file.
 4. **Identity is the MDR UUID.** Kibana's user-settable `rule_id` is set to `metadata.uuid`. It is unique per space, so one UUID serves every tenant, and alerts carry it as `kibana.alert.rule.rule_id`. Kibana's internal `id` is never stored, and nothing is written back to the rule file.
 5. **Validation:** offline syntax checks per query language, plus live validation through the rule preview API. Two Elasticsearch checks also run before every deploy, because Kibana accepts a mistyped ES\|QL command or aggregation field and the rule then fails silently ([Elasticsearch checks](#elasticsearch-checks)).
-6. **Kibana's own names.** Durations are written `5m`, `1h`, `14d`. `required_fields` is a list of `{name, type}` objects, and a package name may stand for a related integration. `index` and `threat_index` are lists of pattern strings, including a rule with one pattern (`[logs-*]`). Every other key is the Kibana field the create-rule UI writes. `overrides` is only for a field that UI does not show.
+6. **Kibana's own names, grouped where the UI groups them.** Durations are written `5m`, `1h`, `14d`. `required_fields` is a list of `{name, type}` objects, and a package name may stand for a related integration. `index` and `threat.index` are lists of pattern strings, including a rule with one pattern (`[logs-*]`). Keys that exist for only one rule type sit in a conditional object (`eql`, `threshold`, `new_terms`, `threat`, `machine_learning`). The Schedule step sits in `scheduling` (`interval`, `from`). The compiler flattens those objects to Kibana's fields. Every other key is the Kibana field the create-rule UI writes. `overrides` is only for a field that UI does not show.
 
 The change is additive: it adds a `configurations.elastic` key and a new platform schema. `rule::1.0` keeps its identifier and every existing rule stays valid.
 
@@ -64,20 +64,21 @@ Spaces isolate rules, alerts, and exceptions, but not source data. A rule in spa
 
 ### Rule types
 
-| Type | UI name | Query language | Required beyond the common set |
-|------|---------|----------------|------------------------------|
+| Type | UI name | Query language | Conditional object |
+|------|---------|----------------|--------------------|
 | `query` | Custom query | KQL (`kuery`) or Lucene | — |
-| `saved_query` | Custom query, saved query loaded on every run | the saved query's | `saved_id` |
-| `eql` | Event correlation | EQL | `query` |
-| `esql` | ES\|QL | ES\|QL | `query`; no `index` (the `FROM` clause selects data) |
-| `threshold` | Threshold | KQL or Lucene | `query`, `threshold.field`, `threshold.value` |
-| `new_terms` | New terms | KQL or Lucene | `query`, `new_terms_fields` (1–3), `history_window_start` |
-| `threat_match` | Indicator match | KQL or Lucene | `query`, `threat_index`, `threat_query`, `threat_mapping` |
-| `machine_learning` | Machine learning | — | `machine_learning_job_id`, `anomaly_threshold` |
+| `eql` | Event correlation | EQL | `eql` (optional settings) |
+| `esql` | ES\|QL | ES\|QL | — (the `FROM` clause selects data; no `index`) |
+| `threshold` | Threshold | KQL or Lucene | `threshold` |
+| `new_terms` | New terms | KQL or Lucene | `new_terms` |
+| `threat_match` | Indicator match | KQL or Lucene | `threat` (the indicator side; the event query stays flat) |
+| `machine_learning` | Machine learning | — | `machine_learning` |
 
-**New terms** alerts when a value, or a combination of up to three values, shows up that the rule has not seen in the history window. A rule with `new_terms_fields: [host.name, user.name]` and `history_window_start: 14d` alerts when that host and user appear together in the current run and did not appear together in the previous 14 days. It does not count events. That is what a threshold rule does.
+**New terms** alerts when a value, or a combination of up to three values, shows up that the rule has not seen in the history window. A rule with `new_terms.fields: [host.name, user.name]` and `new_terms.history_window_start: 14d` alerts when that host and user appear together in the current run and did not appear together in the previous 14 days. It does not count events. That is what a threshold rule does.
 
-`saved_id`, `threat_index`, and `machine_learning_job_id` are names that exist in one tenant. The block carries them as written; nothing rewrites them into a shared identifier.
+`threat.index` and `machine_learning.job_id` are names that exist in one tenant. The block carries them as written; nothing rewrites them into a shared identifier.
+
+A saved query (`saved_id`) is out of scope. Kibana loads that object on every run, the id differs per space, and an edit in Discover changes the rule with no diff in the file. The same detection is `type: query` with the text in `query`.
 
 The common required set on create is `name`, `description`, `type`, `severity`, and `risk_score`.
 
@@ -188,37 +189,24 @@ FieldType = Literal[                      # Elasticsearch mapping types
 
 class ElasticConfig(PlatformConfigBase):
     __schema_identifier__: ClassVar[str] = "platform::elastic::1.0"
-    type: Literal["query", "saved_query", "eql", "esql", "threshold", "new_terms", "threat_match", "machine_learning"]
+    type: Literal["query", "eql", "esql", "threshold", "new_terms", "threat_match", "machine_learning"]
     query: QueryText | None = None
-    language: Literal["kuery", "lucene"] | None = None
-    saved_id: str | None = None
-    index: list[str] | None = None                   # always a list; one pattern is [logs-*]
-    data_view_id: str | None = None                  # one data view; replaces index
-    filters: list[dict[str, Any]] | None = None          # the filter objects the UI saves
-    interval: Duration = "5m"                            # Runs every
-    from_: Duration = "6m"                               # data_key "from": total window, sent as now-<from>
+    language: Literal["kuery", "lucene"] | None = None   # event query; absent for eql, esql, machine_learning
+    index: list[str] | None = None                       # always a list; one pattern is [logs-*]
+    data_view_id: str | None = None                      # one data view; replaces index
+    filters: list[dict[str, Any]] | None = None          # event filters the UI saves
+    scheduling: ElasticScheduling | None = None          # Runs every and the whole window
     severity: str | None = None                          # alert_severity vocabulary
     risk_score: int | None = None                        # 0–100
     severity_mapping: list[ElasticSeverityMapping] | None = None
     risk_score_mapping: list[ElasticRiskScoreMapping] | None = None
     alert_suppression: ElasticSuppression | None = None
     investigation_fields: list[str] | None = None        # Custom highlighted fields
-    threshold: ElasticThreshold | None = None
-    new_terms_fields: list[str] | None = None
-    history_window_start: Duration | None = None
-    timestamp_field: str | None = None                   # EQL settings
-    event_category_override: str | None = None
-    tiebreaker_field: str | None = None
-    threat_index: list[str] | None = None            # always a list, same as index
-    threat_query: str | None = None
-    threat_language: Literal["kuery", "lucene"] | None = None
-    threat_mapping: list[ElasticThreatGroup] | None = None
-    threat_filters: list[dict[str, Any]] | None = None
-    threat_indicator_path: str | None = None             # Indicator prefix override
-    concurrent_searches: int | None = None               # API only; not in the create UI
-    items_per_search: int | None = None
-    machine_learning_job_id: str | list[str] | None = None   # Kibana accepts either
-    anomaly_threshold: int | None = None
+    threshold: ElasticThreshold | None = None            # iff type threshold
+    new_terms: ElasticNewTerms | None = None             # iff type new_terms
+    eql: ElasticEql | None = None                        # only for type eql
+    threat: ElasticThreatMatch | None = None             # iff type threat_match; not the ATT&CK array
+    machine_learning: ElasticMachineLearning | None = None
     rule_name_override: str | None = None
     timestamp_override: str | None = None
     timestamp_override_fallback_disabled: bool | None = None
@@ -278,6 +266,33 @@ class ElasticThreatEntry(TideModel):
     value: str                                # indicator field
     type: Literal["mapping"] = "mapping"
     negate: bool | None = None                # true is the UI's DOES NOT MATCH
+
+class ElasticScheduling(TideModel):
+    interval: Duration = "5m"                 # data_key none; Kibana interval. UI: Runs every
+    from_: Duration = "6m"                    # data_key "from": whole window, sent as now-<from>
+
+class ElasticEql(TideModel):
+    timestamp_field: str | None = None
+    event_category_override: str | None = None
+    tiebreaker_field: str | None = None
+
+class ElasticNewTerms(TideModel):
+    fields: list[str]                         # 1–3; Kibana new_terms_fields
+    history_window_start: Duration            # sent as now-<duration>
+
+class ElasticThreatMatch(TideModel):
+    index: list[str]                          # Kibana threat_index; always a list
+    query: str                                # Kibana threat_query
+    language: Literal["kuery", "lucene"] | None = None
+    mapping: list[ElasticThreatGroup]         # Kibana threat_mapping
+    filters: list[dict[str, Any]] | None = None
+    indicator_path: str | None = None         # Kibana threat_indicator_path
+    concurrent_searches: int | None = None    # API only; Kibana concurrent_searches
+    items_per_search: int | None = None       # API only; Kibana items_per_search
+
+class ElasticMachineLearning(TideModel):
+    job_id: str | list[str]                   # Kibana machine_learning_job_id; either shape
+    anomaly_threshold: int                    # 0–100
 ```
 
 **Model constraints.** Validation MUST reject a block that breaks any of these:
@@ -285,21 +300,21 @@ class ElasticThreatEntry(TideModel):
 <!-- rfc0006:constraints-table -->
 | Code | Constraint |
 |------|------------|
-| `type_block` | `threshold` iff `type: threshold`. `new_terms_fields` and `history_window_start` iff `type: new_terms`. `timestamp_field`, `event_category_override`, and `tiebreaker_field` only for `eql`. `threat_index`, `threat_query`, and `threat_mapping` iff `type: threat_match`. `machine_learning_job_id` and `anomaly_threshold` iff `type: machine_learning`. `saved_id` iff `type: saved_query`. `query` is required except for `machine_learning` and `saved_query`. |
+| `type_block` | `threshold` iff `type: threshold`. `new_terms` iff `type: new_terms`, and it has `fields` and `history_window_start`. `eql` only for `type: eql`. `threat` iff `type: threat_match`, and it has `index`, `query`, and `mapping`. `machine_learning` iff `type: machine_learning`, and it has `job_id` and `anomaly_threshold`. `query` is required except for `machine_learning`. Flat `interval`, `from`, `saved_id`, `timestamp_field`, `event_category_override`, `tiebreaker_field`, `new_terms_fields`, `history_window_start`, `threat_index`, `threat_query`, `threat_language`, `threat_mapping`, `threat_filters`, `threat_indicator_path`, `concurrent_searches`, `items_per_search`, `machine_learning_job_id`, and `anomaly_threshold` are invalid. |
 | `language` | `language` MUST NOT be set for `eql`, `esql`, or `machine_learning` |
-| `esql_source` | `esql` and `machine_learning` MUST NOT set `index` or `data_view_id` |
+| `esql_source` | `esql` and `machine_learning` MUST NOT set `index`, `data_view_id`, or `filters` |
 | `index_xor_data_view` | `index` and `data_view_id` are mutually exclusive |
-| `index_list` | `index` and `threat_index`, when set, are lists of one or more pattern strings. A single pattern is a one-item list. A string is invalid. |
+| `index_list` | `index` and `threat.index`, when set, are lists of one or more pattern strings. A single pattern is a one-item list. A string is invalid. |
 | `suppression_shape` | For `threshold`: `alert_suppression.duration` is required and `group_by` is forbidden. For other types: `group_by` is required, with 1–3 distinct, non-empty field names. |
-| `new_terms_fields` | `new_terms_fields` has 1–3 entries |
+| `new_terms_fields` | `new_terms.fields` has 1–3 entries |
 | `threshold_fields` | `threshold.field` has 0–5 entries; `threshold.value` >= 1 |
 | `risk_score` | `risk_score` is an integer in 0–100 |
 | `duration` | Every duration is a positive integer followed by `s`, `m`, `h`, or `d`, or ISO 8601 `P[nD][T[nH][nM][nS]]` with whole seconds, and is > 0 |
 | `override_key` | `overrides` MUST NOT contain a key from the [field mapping](#3-field-mapping) or [preserved fields](#5-deployment) tables |
 
-Validation SHOULD warn when `from` < `interval` (the next run starts after the window ends), and when a non-aggregating ES\|QL query (no `STATS`) lacks `METADATA _id` (alerts are not deduplicated).
+Validation SHOULD warn when `scheduling.from` < `scheduling.interval` (the next run starts after the window ends), and when a non-aggregating ES\|QL query (no `STATS`) lacks `METADATA _id` (alerts are not deduplicated).
 
-**Field names are open-ended.** `alert_suppression.group_by`, `threshold.field`, `new_terms_fields`, `investigation_fields`, and `required_fields[].name` name fields in the tenant's data: ECS, integration-specific, or custom. They cannot be an enum, and Kibana accepts any string for them. The deployer therefore checks aggregation fields against the tenant ([Aggregation field check](#aggregation-field-check)). `type` is closed. Of the 2,617 fields in ECS, 75% are `keyword`; the other types are `long`, `date`, `boolean`, `object`, `flattened`, `float`, `nested`, `wildcard`, `ip`, `geo_point`, `double`, `scaled_float`, `constant_keyword`, and `match_only_text`. `FieldType` lists those plus the other common Elasticsearch mapping types. Kibana sets `required_fields[].ecs` only when both the name and the type match ECS.
+**Field names are open-ended.** `alert_suppression.group_by`, `threshold.field`, `new_terms.fields`, `investigation_fields`, and `required_fields[].name` name fields in the tenant's data: ECS, integration-specific, or custom. They cannot be an enum, and Kibana accepts any string for them. The deployer therefore checks aggregation fields against the tenant ([Aggregation field check](#aggregation-field-check)). `type` is closed. Of the 2,617 fields in ECS, 75% are `keyword`; the other types are `long`, `date`, `boolean`, `object`, `flattened`, `float`, `nested`, `wildcard`, `ip`, `geo_point`, `double`, `scaled_float`, `constant_keyword`, and `match_only_text`. `FieldType` lists those plus the other common Elasticsearch mapping types. Kibana sets `required_fields[].ecs` only when both the name and the type match ECS.
 
 ### 3. Field mapping
 
@@ -315,22 +330,23 @@ The deployer compiles each MDR into a Kibana create or update body:
 | `enabled` | block `status` | `false` iff that status's strategy is `DISABLEMENT`. The rule's own `status` is not read. An omitted block status is `STAGING`. Always sent, because a `PUT` without it keeps the remote value. |
 | `severity`, `risk_score` | block `severity`, else `response.alert_severity`, else `Informational` | [Severity](#severity); block `risk_score` overrides the score |
 | `severity_mapping`, `risk_score_mapping` | same-named block field | verbatim. These are the UI's Severity override and Risk score override. |
-| `interval` | `interval` | [Durations](#durations). This is the UI's Runs every. Default `5m`. |
-| `from` | `from` | `now-<duration>`. This is the whole window Kibana queries, not the UI's Additional look-back time. Additional look-back is `from` minus `interval`. Default `6m`, which is one extra minute. |
+| `interval` | `scheduling.interval` | [Durations](#durations). UI Runs every. Default `5m`. |
+| `from` | `scheduling.from` | `now-<duration>`. The whole window Kibana stores. Additional look-back is `from` minus `interval` and has no field. Default `6m`, which is one extra minute. Authors write `6m`, not `now-6m`. |
 | `to` | — | `now`. The UI does not expose it. |
-| `language` | `type`, `language` | `eql` → `eql`, `esql` → `esql`; omitted for `machine_learning`; else `language` or `kuery` |
-| `query` | `query` | trailing whitespace stripped; omitted for `machine_learning` and when `saved_query` has no query |
-| `saved_id` | `saved_id` | verbatim |
+| `language` | `type`, `language` | `eql` → `eql`, `esql` → `esql`; omitted for `machine_learning`; else `language` or `kuery`. Flat `language` is the event query. |
+| `query` | `query` | trailing whitespace stripped; omitted for `machine_learning`. This is the event query. |
 | `index` | block `index`, else tenant `setup.index` | a list of one or more pattern strings. Omitted for `esql` and `machine_learning`, when `data_view_id` is set, or when both sources are empty |
-| `data_view_id`, `filters` | same-named block field | verbatim |
-| `threshold` | `threshold` | `cardinality` is one `{field, value}` and is sent as a one-item list |
-| `new_terms_fields` | `new_terms_fields` | verbatim |
-| `history_window_start` | `history_window_start` | `now-<duration>` |
-| `timestamp_field`, `event_category_override`, `tiebreaker_field` | same-named block field | verbatim |
-| `threat_index`, `threat_query`, `threat_language`, `threat_filters`, `threat_indicator_path` | same-named block field | verbatim |
-| `threat_mapping` | `threat_mapping` | an entry with no `type` is sent as `type: mapping` |
-| `concurrent_searches`, `items_per_search` | same-named block field | verbatim. Not in the create UI. On update, an omitted value is kept from the remote rule. |
-| `machine_learning_job_id`, `anomaly_threshold` | same-named block field | verbatim. `machine_learning_job_id` may be a string or a list; Kibana accepts either |
+| `data_view_id`, `filters` | same-named block field | verbatim. `filters` is the event side, and is omitted for `esql` and `machine_learning` |
+| `threshold` | `threshold` | sent as Kibana's `threshold` object, not flattened. `cardinality` is one `{field, value}` and is sent as a one-item list |
+| `new_terms_fields` | `new_terms.fields` | verbatim |
+| `history_window_start` | `new_terms.history_window_start` | `now-<duration>`. UI label: History window size. |
+| `timestamp_field`, `event_category_override`, `tiebreaker_field` | `eql.timestamp_field`, `eql.event_category_override`, `eql.tiebreaker_field` | verbatim. There is no `eql_` prefix on the Kibana fields. |
+| `threat_index` | `threat.index` | a list of pattern strings. YAML `threat` is the indicator-match group. It is not copied onto Kibana `threat`. |
+| `threat_query`, `threat_language`, `threat_filters`, `threat_indicator_path` | `threat.query`, `threat.language`, `threat.filters`, `threat.indicator_path` | verbatim |
+| `threat_mapping` | `threat.mapping` | an entry with no `type` is sent as `type: mapping` |
+| `concurrent_searches`, `items_per_search` | `threat.concurrent_searches`, `threat.items_per_search` | verbatim, under those Kibana names (no `threat_` prefix). Not in the create UI. On update, an omitted value is kept from the remote rule. |
+| `machine_learning_job_id` | `machine_learning.job_id` | verbatim. A string or a list; the compiler does not wrap or unwrap it. |
+| `anomaly_threshold` | `machine_learning.anomaly_threshold` | verbatim |
 | `alert_suppression` | `alert_suppression` | `{group_by, duration?, missing_fields_strategy}`; for threshold `{duration}` only. `duration` is `{value, unit}`. Omitted when tenant `setup.suppression` is `false`. |
 | `investigation_fields` | `investigation_fields` | `{field_names: [...]}` |
 | `required_fields` | `required_fields` | one `{name, type}` per entry, sorted by name |
@@ -380,7 +396,9 @@ Durations use Kibana's own notation: a whole number followed by `s`, `m`, `h`, o
 
 #### Threat
 
-`threat` is derived from the resolved technique set: the rule's `techniques`, plus techniques inherited through `detection_model` (objective, then threats, using the same resolver as Sentinel), de-duplicated. The Sentinel deployer uses only the inherited set. Elastic deliberately takes the union, so a rule's own `techniques` are never dropped.
+Kibana `threat` is the ATT&CK array below. It is derived from the resolved technique set. The YAML key `threat` on a `threat_match` block is a different object: the indicator-match group, flattened to `threat_index`, `threat_query`, `threat_mapping`, and the other indicator fields. The compiler MUST NOT assign that YAML object to the body key `threat`.
+
+The ATT&CK array is derived from the resolved technique set: the rule's `techniques`, plus techniques inherited through `detection_model` (objective, then threats, using the same resolver as Sentinel), de-duplicated. The Sentinel deployer uses only the inherited set. Elastic deliberately takes the union, so a rule's own `techniques` are never dropped.
 
 1. Keep **Enterprise** techniques only. In `att&ck.vocab.toml`, Mobile and ICS entries are marked only by a `Mobile : ` or `Industrial : ` name prefix, and they reuse Enterprise tactic names under different tactic IDs. The deployer MUST skip them with a warning.
 2. Map each technique's vocab `tide.vocab.stages` to tactics using the table below. A sub-technique uses its own stages.
@@ -407,30 +425,37 @@ Durations use Kibana's own notation: a whole number followed by `s`, `m`, `h`, o
 
 ### 4. Examples
 
-**Example A: `query` rule.** This is a complete MDR.
+Each example is a complete MDR. Deployment status is `configurations.elastic.status`. The rule's own `status` is omitted. `data_view_id` is a single string and replaces `index`; the examples set `index`, so they do not also set `data_view_id`. `meta` and `overrides` stay out of these rules: they are not create-rule fields. `building_block: false` is the checkbox off and is not sent.
+
+**Example A: `query`.** Custom query, every shared field set.
 
 <!-- rfc0006:rule-query -->
 ```yaml
-name: Encoded PowerShell command line
+name: Certutil downloading a file
 metadata:
-  uuid: 3f6c2a1e-8b4d-4c1a-9e2f-5a7b8c9d0e11
+  uuid: 6b2e9c14-7a31-4f58-9d0c-1e8a4b7c2d90
   schema: rule::1.0
   version: 1
-  created: "2026-09-25"
-  modified: "2026-09-25"
+  created: "2026-09-29"
+  modified: "2026-09-29"
   tlp: clear
-  author: SOC Detection Engineering
+  author: Detection Engineering
 description: |
-  Detects PowerShell started with an encoded command argument.
-techniques: [T1059.001]
+  Detects certutil.exe started with -urlcache or -verifyctl. Windows uses
+  those switches to pull a remote file, and intrusions use the same path
+  to land a payload.
+techniques: [T1105]
 references:
   public:
-    1: https://attack.mitre.org/techniques/T1059/001
+    1: https://attack.mitre.org/techniques/T1105/
+    2: https://lolbas-project.github.io/lolbas/Binaries/Certutil/
 response:
   alert_severity: High
   procedure:
     analysis: |
-      Decode the -EncodedCommand payload and review the parent process.
+      Confirm the certutil command line and the file it wrote.
+    containment: |
+      Isolate the host if the downloaded file is unsigned.
 configurations:
   elastic:
     enabled: true
@@ -440,67 +465,263 @@ configurations:
     language: kuery
     query: |
       event.category : "process" and event.type : "start" and
-      process.name : ("powershell.exe" or "pwsh.exe") and
-      process.args : ("-enc" or "-EncodedCommand")
-    index: [logs-endpoint.events.process-*, winlogbeat-*]
-    interval: 5m
-    from: 9m
+      process.name : "certutil.exe" and
+      process.command_line : (*urlcache* or *verifyctl*)
+    index: [logs-endpoint.events.process-*, logs-windows.sysmon_operational-*]
+    filters:
+      - meta:
+          key: process.parent.name
+          negate: true
+          disabled: false
+          type: phrase
+          params:
+            query: msiexec.exe
+        query:
+          match_phrase:
+            process.parent.name: msiexec.exe
+    scheduling:
+      interval: 5m
+      from: 6m
+    severity: High
+    risk_score: 68
+    severity_mapping:
+      - field: user.name
+        operator: equals
+        value: SYSTEM
+        severity: critical
+    risk_score_mapping:
+      - field: host.risk.calculated_score_norm
+        operator: equals
+        value: ""
     alert_suppression:
       group_by: [host.name, user.name]
       duration: 1h
-    investigation_fields: [process.command_line, process.parent.name]
-    tags: [Windows]
+      missing_fields_strategy: suppress
+    investigation_fields: [process.command_line, process.parent.name, process.parent.command_line, file.path]
     required_fields:
-      - {name: process.args, type: keyword}
+      - {name: process.command_line, type: wildcard}
       - {name: process.name, type: keyword}
-    related_integrations: [endpoint]
+      - {name: process.parent.name, type: keyword}
+    related_integrations:
+      - endpoint
+      - package: windows
+        integration: sysmon
+        version: "^2.0.0"
+    max_signals: 200
+    timestamp_override: event.ingested
+    timestamp_override_fallback_disabled: true
+    rule_name_override: process.command_line
+    license: Elastic License v2
+    tags: [Windows, LOLBAS]
+    note: |
+      Read process.command_line and the URL in -urlcache or -verifyctl.
+      Hash the file certutil wrote.
+    setup: |
+      Requires Elastic Defend process events or Sysmon process creation
+      (Event ID 1) with command-line auditing.
+    false_positives:
+      - Certificate enrollment and Windows installer repair launching certutil.
+      - Software-distribution scripts that download vendor CRLs with certutil.
+    endpoint_exceptions: true
+    exceptions_list:
+      - id: 4a8e1c20-7b55-4d19-9e30-2f6c8a1b5d74
+        list_id: certutil-software-distribution
+        namespace_type: single
+        type: detection
+    building_block: false
+    actions:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: "Certutil download on {{host.name}} by {{user.name}}"
+        frequency:
+          summary: true
+          notifyWhen: onActiveAlert
+          throttle: null
+    response_actions:
+      - action_type_id: .endpoint
+        params:
+          command: isolate
+          comment: Isolate the host that ran certutil -urlcache or -verifyctl.
+    timeline_id: 3d6f8a20-1c54-4b79-8e02-5a9c7d1e4b36
+    timeline_title: Windows process investigation
 ```
 
-This is the compiled body for tenant `elastic-staging`. It is sent as `POST https://soc-staging.kb.eu-west-1.aws.elastic.cloud/s/staging/api/detection_engine/rules`:
+Compiled for tenant `elastic-staging` and sent as `POST https://soc-staging.kb.eu-west-1.aws.elastic.cloud/s/staging/api/detection_engine/rules`:
 
 <!-- rfc0006:body-query -->
 ```json
 {
-  "rule_id": "3f6c2a1e-8b4d-4c1a-9e2f-5a7b8c9d0e11",
+  "rule_id": "6b2e9c14-7a31-4f58-9d0c-1e8a4b7c2d90",
   "type": "query",
-  "name": "Encoded PowerShell command line",
-  "description": "Detects PowerShell started with an encoded command argument.",
+  "name": "Certutil downloading a file",
+  "description": "Detects certutil.exe started with -urlcache or -verifyctl. Windows uses\nthose switches to pull a remote file, and intrusions use the same path\nto land a payload.",
   "enabled": true,
   "severity": "high",
-  "risk_score": 73,
+  "risk_score": 68,
   "interval": "5m",
-  "from": "now-9m",
+  "from": "now-6m",
   "to": "now",
   "language": "kuery",
-  "query": "event.category : \"process\" and event.type : \"start\" and\nprocess.name : (\"powershell.exe\" or \"pwsh.exe\") and\nprocess.args : (\"-enc\" or \"-EncodedCommand\")",
-  "index": ["logs-endpoint.events.process-*", "winlogbeat-*"],
+  "query": "event.category : \"process\" and event.type : \"start\" and\nprocess.name : \"certutil.exe\" and\nprocess.command_line : (*urlcache* or *verifyctl*)",
+  "index": [
+    "logs-endpoint.events.process-*",
+    "logs-windows.sysmon_operational-*"
+  ],
+  "filters": [
+    {
+      "meta": {
+        "key": "process.parent.name",
+        "negate": true,
+        "disabled": false,
+        "type": "phrase",
+        "params": {
+          "query": "msiexec.exe"
+        }
+      },
+      "query": {
+        "match_phrase": {
+          "process.parent.name": "msiexec.exe"
+        }
+      }
+    }
+  ],
+  "severity_mapping": [
+    {
+      "field": "user.name",
+      "operator": "equals",
+      "value": "SYSTEM",
+      "severity": "critical"
+    }
+  ],
+  "risk_score_mapping": [
+    {
+      "field": "host.risk.calculated_score_norm",
+      "operator": "equals",
+      "value": ""
+    }
+  ],
+  "rule_name_override": "process.command_line",
+  "timestamp_override": "event.ingested",
+  "timestamp_override_fallback_disabled": true,
+  "max_signals": 200,
+  "license": "Elastic License v2",
+  "actions": [
+    {
+      "id": "c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64",
+      "action_type_id": ".slack",
+      "group": "default",
+      "params": {
+        "message": "Certutil download on {{host.name}} by {{user.name}}"
+      },
+      "frequency": {
+        "summary": true,
+        "notifyWhen": "onActiveAlert",
+        "throttle": null
+      }
+    }
+  ],
+  "response_actions": [
+    {
+      "action_type_id": ".endpoint",
+      "params": {
+        "command": "isolate",
+        "comment": "Isolate the host that ran certutil -urlcache or -verifyctl."
+      }
+    }
+  ],
+  "timeline_id": "3d6f8a20-1c54-4b79-8e02-5a9c7d1e4b36",
+  "timeline_title": "Windows process investigation",
   "alert_suppression": {
-    "group_by": ["host.name", "user.name"],
-    "duration": {"value": 1, "unit": "h"},
+    "group_by": [
+      "host.name",
+      "user.name"
+    ],
+    "duration": {
+      "value": 1,
+      "unit": "h"
+    },
     "missing_fields_strategy": "suppress"
   },
-  "investigation_fields": {"field_names": ["process.command_line", "process.parent.name"]},
+  "investigation_fields": {
+    "field_names": [
+      "process.command_line",
+      "process.parent.name",
+      "process.parent.command_line",
+      "file.path"
+    ]
+  },
   "required_fields": [
-    {"name": "process.args", "type": "keyword"},
-    {"name": "process.name", "type": "keyword"}
+    {
+      "name": "process.command_line",
+      "type": "wildcard"
+    },
+    {
+      "name": "process.name",
+      "type": "keyword"
+    },
+    {
+      "name": "process.parent.name",
+      "type": "keyword"
+    }
   ],
-  "related_integrations": [{"package": "endpoint", "version": "*"}],
-  "tags": ["OpenTide", "Windows"],
-  "author": ["SOC Detection Engineering"],
-  "references": ["https://attack.mitre.org/techniques/T1059/001"],
-  "note": "Decode the -EncodedCommand payload and review the parent process.",
+  "related_integrations": [
+    {
+      "package": "endpoint",
+      "version": "*"
+    },
+    {
+      "package": "windows",
+      "integration": "sysmon",
+      "version": "^2.0.0"
+    }
+  ],
+  "false_positives": [
+    "Certificate enrollment and Windows installer repair launching certutil.",
+    "Software-distribution scripts that download vendor CRLs with certutil."
+  ],
+  "setup": "Requires Elastic Defend process events or Sysmon process creation\n(Event ID 1) with command-line auditing.\n",
+  "exceptions_list": [
+    {
+      "id": "4a8e1c20-7b55-4d19-9e30-2f6c8a1b5d74",
+      "list_id": "certutil-software-distribution",
+      "namespace_type": "single",
+      "type": "detection"
+    },
+    {
+      "id": "endpoint_list",
+      "list_id": "endpoint_list",
+      "namespace_type": "agnostic",
+      "type": "endpoint"
+    }
+  ],
+  "tags": [
+    "OpenTide",
+    "Windows",
+    "LOLBAS"
+  ],
+  "author": [
+    "Detection Engineering"
+  ],
+  "references": [
+    "https://attack.mitre.org/techniques/T1105/",
+    "https://lolbas-project.github.io/lolbas/Binaries/Certutil/"
+  ],
+  "note": "Read process.command_line and the URL in -urlcache or -verifyctl.\nHash the file certutil wrote.",
   "threat": [
     {
       "framework": "MITRE ATT&CK",
-      "tactic": {"id": "TA0002", "name": "Execution", "reference": "https://attack.mitre.org/tactics/TA0002/"},
+      "tactic": {
+        "id": "TA0011",
+        "name": "Command and Control",
+        "reference": "https://attack.mitre.org/tactics/TA0011/"
+      },
       "technique": [
         {
-          "id": "T1059",
-          "name": "Command and Scripting Interpreter",
-          "reference": "https://attack.mitre.org/techniques/T1059",
-          "subtechnique": [
-            {"id": "T1059.001", "name": "PowerShell", "reference": "https://attack.mitre.org/techniques/T1059/001"}
-          ]
+          "id": "T1105",
+          "name": "Ingress Tool Transfer",
+          "reference": "https://attack.mitre.org/techniques/T1105"
         }
       ]
     }
@@ -508,231 +729,726 @@ This is the compiled body for tenant `elastic-staging`. It is sent as `POST http
 }
 ```
 
-Examples B–E list only the rule keys they need. Every other key (`description`, metadata dates, `references`) comes from Example A, and a listed top-level key replaces Example A's key whole. Each JSON block is a subset of the compiled body for tenant `elastic-staging`.
-
-**Example B: `eql` sequence, one technique with two tactics.**
+**Example B: `eql`.** No `language` key. The sequence settings that belong only to EQL sit under `eql`. `from: 10m` with `interval: 5m` is five extra minutes of look-back.
 
 <!-- rfc0006:rule-eql -->
 ```yaml
-name: Service created with sc.exe then started
-metadata: {uuid: 7a1d4e2b-3c5f-4b6a-8d9e-0f1a2b3c4d5e}
-techniques: [T1543.003]
-response: {alert_severity: Medium}
+name: Word spawning cmd.exe and PowerShell
+metadata:
+  uuid: a4c8e1d2-5b67-4e90-8f13-2c6d9a0b4e71
+  schema: rule::1.0
+  version: 1
+  created: "2026-09-29"
+  modified: "2026-09-29"
+  tlp: clear
+  author: Detection Engineering
+description: |
+  Correlates WINWORD.EXE starting cmd.exe and that cmd.exe starting
+  powershell.exe on the same host within two minutes.
+techniques: [T1566.001, T1059.001]
+references:
+  public:
+    1: https://attack.mitre.org/techniques/T1566/001/
+    2: https://attack.mitre.org/techniques/T1059/001/
+response:
+  alert_severity: High
+  procedure:
+    analysis: |
+      Confirm WINWORD.EXE is the ancestor of powershell.exe and collect
+      the document path.
+    containment: |
+      Kill the PowerShell process and quarantine the document.
 configurations:
   elastic:
     enabled: true
     schema: platform::elastic::1.0
+    status: STAGING
     type: eql
     query: |
-      sequence by host.id with maxspan=1m
-        [process where event.type == "start" and process.name == "sc.exe" and process.args == "create"]
-        [process where event.type == "start" and process.parent.name == "services.exe"]
+      sequence by host.id with maxspan=2m
+        [process where event.type == "start" and process.name == "WINWORD.EXE"]
+        [process where event.type == "start" and process.parent.name == "WINWORD.EXE" and process.name == "cmd.exe"]
+        [process where event.type == "start" and process.parent.name == "cmd.exe" and process.name in ("powershell.exe", "pwsh.exe")]
     index: [logs-endpoint.events.process-*]
-    tiebreaker_field: event.sequence
+    filters:
+      - meta:
+          key: host.os.type
+          negate: false
+          disabled: false
+          type: phrase
+          params:
+            query: windows
+        query:
+          match_phrase:
+            host.os.type: windows
+    scheduling:
+      interval: 5m
+      from: 10m
+    severity: High
+    risk_score: 70
+    severity_mapping:
+      - field: user.name
+        operator: equals
+        value: svc-mail
+        severity: critical
+    risk_score_mapping:
+      - field: host.risk.calculated_score_norm
+        operator: equals
+        value: ""
+    alert_suppression:
+      group_by: [host.id]
+      duration: 30m
+      missing_fields_strategy: suppress
+    investigation_fields: [process.name, process.parent.name, process.command_line, process.parent.executable]
+    required_fields:
+      - {name: host.id, type: keyword}
+      - {name: process.name, type: keyword}
+      - {name: process.parent.name, type: keyword}
+    related_integrations: [endpoint]
+    max_signals: 100
+    timestamp_override: event.ingested
+    timestamp_override_fallback_disabled: false
+    rule_name_override: process.command_line
+    license: Elastic License v2
+    tags: [Windows, Phishing]
+    note: |
+      Confirm the three events share host.id and fall inside maxspan=2m.
+    setup: |
+      Requires Elastic Defend or an equivalent process data stream with
+      parent process name populated.
+    false_positives:
+      - Office add-in installers that legitimately shell out to cmd.exe.
+    endpoint_exceptions: true
+    exceptions_list:
+      - id: b7c2e190-4a68-4d35-8f02-1c9e6a3b5d80
+        list_id: office-addin-installers
+        namespace_type: single
+        type: detection
+    building_block: false
+    eql:
+      timestamp_field: "@timestamp"
+      event_category_override: event.category
+      tiebreaker_field: event.sequence
+    actions:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: "Word spawned PowerShell via cmd on {{host.name}}"
+        frequency:
+          summary: true
+          notifyWhen: onActiveAlert
+          throttle: null
+    response_actions:
+      - action_type_id: .endpoint
+        params:
+          command: kill-process
+          comment: Kill the PowerShell process started from the Word chain.
+          config:
+            field: process.entity_id
+            overwrite: false
+    timeline_id: 3d6f8a20-1c54-4b79-8e02-5a9c7d1e4b36
+    timeline_title: Windows process investigation
 ```
 
-<!-- rfc0006:fragment-eql -->
-```json
-{
-  "type": "eql",
-  "language": "eql",
-  "severity": "medium",
-  "risk_score": 47,
-  "interval": "5m",
-  "from": "now-6m",
-  "tiebreaker_field": "event.sequence",
-  "tags": ["OpenTide"],
-  "threat": [
-    {
-      "framework": "MITRE ATT&CK",
-      "tactic": {"id": "TA0003", "name": "Persistence", "reference": "https://attack.mitre.org/tactics/TA0003/"},
-      "technique": [
-        {"id": "T1543", "name": "Create or Modify System Process", "reference": "https://attack.mitre.org/techniques/T1543",
-         "subtechnique": [{"id": "T1543.003", "name": "Windows Service", "reference": "https://attack.mitre.org/techniques/T1543/003"}]}
-      ]
-    },
-    {
-      "framework": "MITRE ATT&CK",
-      "tactic": {"id": "TA0004", "name": "Privilege Escalation", "reference": "https://attack.mitre.org/tactics/TA0004/"},
-      "technique": [
-        {"id": "T1543", "name": "Create or Modify System Process", "reference": "https://attack.mitre.org/techniques/T1543",
-         "subtechnique": [{"id": "T1543.003", "name": "Windows Service", "reference": "https://attack.mitre.org/techniques/T1543/003"}]}
-      ]
-    }
-  ]
-}
-```
-
-**Example C: aggregating `esql`.** No `index` is sent.
+**Example C: `esql`.** No `index`, `data_view_id`, `language`, or `filters`. `FROM` selects the data. Suppression groups on `source.ip`, which the `STATS` keeps as a column. `from: 20m` with `interval: 15m` is five extra minutes.
 
 <!-- rfc0006:rule-esql -->
 ```yaml
-name: Password spraying from one source
-metadata: {uuid: 9c2e5f1a-6b7d-4e8f-a1b2-c3d4e5f6a7b8}
+name: Password spray from one source address
+metadata:
+  uuid: d19f3a60-2c84-4b17-a5e8-7f0c3d6b8a24
+  schema: rule::1.0
+  version: 1
+  created: "2026-09-29"
+  modified: "2026-09-29"
+  tlp: clear
+  author: Detection Engineering
+description: |
+  Alerts when one source address produces at least 20 Windows logon
+  failures with status 0xC000006A across 8 or more accounts.
 techniques: [T1110.003]
-response: {alert_severity: High}
+references:
+  public:
+    1: https://attack.mitre.org/techniques/T1110/003/
+response:
+  alert_severity: High
+  procedure:
+    analysis: |
+      Review the source address and whether the failures are 4625 with
+      substatus 0xC000006A.
+    containment: |
+      Block the source at the VPN or firewall if it is not a known
+      identity provider.
 configurations:
   elastic:
     enabled: true
     schema: platform::elastic::1.0
+    status: STAGING
     type: esql
     query: |
-      FROM logs-system.auth-*, logs-windows.forwarded-*
-      | WHERE event.category == "authentication" AND event.outcome == "failure"
-      | STATS failures = COUNT(*), users = COUNT_DISTINCT(user.name) BY source.ip
-      | WHERE users >= 10
-    interval: 15m
-    from: 15m
+      FROM logs-system.security-*, logs-windows.forwarded-*
+      | WHERE event.code == "4625" AND winlog.event_data.SubStatus == "0xC000006A"
+      | STATS failures = COUNT(*), accounts = COUNT_DISTINCT(user.name) BY source.ip
+      | WHERE accounts >= 8 AND failures >= 20
+    scheduling:
+      interval: 15m
+      from: 20m
+    severity: High
+    risk_score: 73
+    severity_mapping:
+      - field: source.ip
+        operator: equals
+        value: 10.0.0.5
+        severity: medium
+    risk_score_mapping:
+      - field: user.risk.calculated_score_norm
+        operator: equals
+        value: ""
+    alert_suppression:
+      group_by: [source.ip]
+      duration: 1h
+      missing_fields_strategy: suppress
+    investigation_fields: [source.ip, accounts, failures]
+    required_fields:
+      - {name: event.code, type: keyword}
+      - {name: source.ip, type: ip}
+      - {name: user.name, type: keyword}
+    related_integrations:
+      - package: system
+        integration: security
+        version: "^1.0.0"
+      - windows
+    max_signals: 50
+    timestamp_override: event.ingested
+    timestamp_override_fallback_disabled: false
+    rule_name_override: source.ip
+    license: Elastic License v2
+    tags: [Windows, Identity]
+    note: |
+      source.ip is the spray source. 0xC000006A is a wrong password for
+      a real account.
+    setup: |
+      Windows Security auditing must log 4625 with SubStatus. The ES|QL
+      FROM clause selects the data streams.
+    false_positives:
+      - A password manager retrying one stale password across a small set of accounts.
+      - Terminal servers where many users fail from the same NAT address.
+    endpoint_exceptions: false
+    exceptions_list:
+      - id: e1d4a860-2c79-4b15-9a30-7f6c2b8e1d45
+        list_id: known-nats-password-spray
+        namespace_type: single
+        type: detection
+    building_block: false
+    actions:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: "Password spray from {{source.ip}}"
+        frequency:
+          summary: true
+          notifyWhen: onThrottleInterval
+          throttle: 1h
+    response_actions:
+      - action_type_id: .osquery
+        params:
+          query: SELECT user, host, time FROM logged_in_users;
+          timeout: 60
+          ecs_mapping: {}
+    timeline_id: 9b1e4c70-2a85-4d63-b0f7-6c8a3e5d1f24
+    timeline_title: Windows logon investigation
 ```
 
-<!-- rfc0006:fragment-esql -->
-```json
-{
-  "type": "esql",
-  "language": "esql",
-  "interval": "15m",
-  "from": "now-15m",
-  "tags": ["OpenTide"],
-  "threat": [
-    {
-      "framework": "MITRE ATT&CK",
-      "tactic": {"id": "TA0006", "name": "Credential Access", "reference": "https://attack.mitre.org/tactics/TA0006/"},
-      "technique": [
-        {"id": "T1110", "name": "Brute Force", "reference": "https://attack.mitre.org/techniques/T1110",
-         "subtechnique": [{"id": "T1110.003", "name": "Password Spraying", "reference": "https://attack.mitre.org/techniques/T1110/003"}]}
-      ]
-    }
-  ]
-}
-```
-
-**Example D: `threshold` with suppression.** The tenant's `index` is not used here because the block sets its own.
+**Example D: `threshold`.** Suppression is a duration, with no `group_by`. `language: lucene` is the other legal event language. `threshold.cardinality` is one object here and a one-item list in the body.
 
 <!-- rfc0006:rule-threshold -->
 ```yaml
-name: Brute force against one account
-metadata: {uuid: 1b3d5f7a-9c2e-4a6b-8d0f-2e4a6c8e0a1b}
+name: Many failed logons for one account
+metadata:
+  uuid: 2e7b5c91-8d40-4a63-b1f5-9c3e6a8d0f17
+  schema: rule::1.0
+  version: 1
+  created: "2026-09-29"
+  modified: "2026-09-29"
+  tlp: clear
+  author: Detection Engineering
+description: |
+  Alerts when one account accumulates 50 failed logons and those failures
+  come from at least 8 distinct source addresses.
 techniques: [T1110]
-response: {alert_severity: Medium}
+references:
+  public:
+    1: https://attack.mitre.org/techniques/T1110/
+response:
+  alert_severity: Medium
+  procedure:
+    analysis: |
+      Identify user.name and whether the account is privileged.
+    containment: |
+      Reset the account if the sources are off-network.
 configurations:
   elastic:
     enabled: true
     schema: platform::elastic::1.0
+    status: PRODUCTION
     type: threshold
-    query: 'event.category : "authentication" and event.outcome : "failure"'
-    index: [logs-*]
+    language: lucene
+    query: 'event.code:"4625" AND event.outcome:"failure"'
+    index: [logs-system.security-*]
+    filters:
+      - meta:
+          key: winlog.channel
+          negate: false
+          disabled: false
+          type: phrase
+          params:
+            query: Security
+        query:
+          match_phrase:
+            winlog.channel: Security
+    scheduling:
+      interval: 5m
+      from: 6m
+    severity: Medium
+    risk_score: 40
+    severity_mapping:
+      - field: user.name
+        operator: equals
+        value: Administrator
+        severity: high
+    risk_score_mapping:
+      - field: user.risk.calculated_score_norm
+        operator: equals
+        value: ""
+    alert_suppression:
+      duration: 30m
     threshold:
-      field: [user.name, source.ip]
-      value: 25
-    alert_suppression: {duration: 30m}
+      field: [user.name]
+      value: 50
+      cardinality:
+        field: source.ip
+        value: 8
+    investigation_fields: [user.name, source.ip, host.name, winlog.event_data.SubStatus]
+    required_fields:
+      - {name: event.code, type: keyword}
+      - {name: source.ip, type: ip}
+      - {name: user.name, type: keyword}
+    related_integrations:
+      - package: system
+        integration: security
+        version: "^1.0.0"
+    max_signals: 100
+    timestamp_override: event.ingested
+    timestamp_override_fallback_disabled: false
+    rule_name_override: user.name
+    license: Elastic License v2
+    tags: [Windows, Identity]
+    note: |
+      threshold.field groups by user.name. cardinality requires 8 distinct
+      source.ip values. Suppression on a threshold rule is a duration only.
+    setup: |
+      Windows Security log 4625 via the System integration. user.name and
+      source.ip must be aggregatable.
+    false_positives:
+      - A user with a stale laptop password plus a phone and a second workstation.
+    endpoint_exceptions: false
+    exceptions_list:
+      - id: 0c5e8a31-6b47-4d92-a1f0-8e3c7b2d6a59
+        list_id: scanner-test-accounts
+        namespace_type: single
+        type: detection
+    building_block: false
+    actions:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: "Account {{user.name}} failed logon from many source addresses."
+        frequency:
+          summary: true
+          notifyWhen: onActiveAlert
+          throttle: null
+    response_actions:
+      - action_type_id: .osquery
+        params:
+          query: SELECT user, host, time FROM logged_in_users;
+          timeout: 60
+          ecs_mapping: {}
+    timeline_id: 9b1e4c70-2a85-4d63-b0f7-6c8a3e5d1f24
+    timeline_title: Windows logon investigation
 ```
 
-<!-- rfc0006:fragment-threshold -->
-```json
-{
-  "type": "threshold",
-  "language": "kuery",
-  "query": "event.category : \"authentication\" and event.outcome : \"failure\"",
-  "index": ["logs-*"],
-  "threshold": {"field": ["user.name", "source.ip"], "value": 25},
-  "alert_suppression": {"duration": {"value": 30, "unit": "m"}}
-}
-```
-
-**Example E: `new_terms`, disabled.** The block's `status: DISABLED` maps to the `DISABLEMENT` strategy, so the rule stays in Kibana with `enabled: false`.
+**Example E: `new_terms`.** `new_terms.history_window_start` is the history window, separate from `scheduling`. `from: 65m` with `interval: 1h` is five extra minutes. A suppression duration of `1d` is sent as 24 hours.
 
 <!-- rfc0006:rule-new-terms -->
 ```yaml
-name: First local account creation on a host
-metadata: {uuid: 5e7a9c1b-2d4f-4a6c-8e0a-1b3d5f7a9c2e}
-techniques: [T1136.001]
-response: {alert_severity: Low}
+name: IAM user creates an access key for the first time
+metadata:
+  uuid: f3a1c8e4-6d29-4b70-9e15-8a2c4f7b1d63
+  schema: rule::1.0
+  version: 1
+  created: "2026-09-29"
+  modified: "2026-09-29"
+  tlp: clear
+  author: Detection Engineering
+description: |
+  Alerts when an IAM user successfully calls CreateAccessKey in an AWS
+  account, and that user plus account pair has not done so in the past
+  14 days.
+techniques: [T1098.001]
+references:
+  public:
+    1: https://attack.mitre.org/techniques/T1098/001/
+response:
+  alert_severity: Medium
+  procedure:
+    analysis: |
+      Confirm who called CreateAccessKey and which account it landed in.
+    containment: |
+      Deactivate the new access key if the caller is not break-glass automation.
 configurations:
   elastic:
     enabled: true
     schema: platform::elastic::1.0
-    status: DISABLED
+    status: STAGING
     type: new_terms
-    query: 'event.category : "iam" and event.action : "added-user-account"'
-    index: [logs-system.security-*]
-    new_terms_fields: [host.name, user.name]
-    history_window_start: 14d
+    language: kuery
+    query: 'event.dataset : "aws.cloudtrail" and event.action : "CreateAccessKey" and event.outcome : "success"'
+    index: [logs-aws.cloudtrail-*]
+    filters:
+      - meta:
+          key: cloud.provider
+          negate: false
+          disabled: false
+          type: phrase
+          params:
+            query: aws
+        query:
+          match_phrase:
+            cloud.provider: aws
+    scheduling:
+      interval: 1h
+      from: 65m
+    severity: Medium
+    risk_score: 47
+    severity_mapping:
+      - field: user.name
+        operator: equals
+        value: OrganizationAccountAccessRole
+        severity: critical
+    risk_score_mapping:
+      - field: user.risk.calculated_score_norm
+        operator: equals
+        value: ""
+    alert_suppression:
+      group_by: [user.name, cloud.account.id]
+      duration: 1d
+      missing_fields_strategy: suppress
+    new_terms:
+      fields: [user.name, cloud.account.id]
+      history_window_start: 14d
+    investigation_fields: [user.name, cloud.account.id, event.action, aws.cloudtrail.user_identity.arn, source.ip]
+    required_fields:
+      - {name: cloud.account.id, type: keyword}
+      - {name: event.action, type: keyword}
+      - {name: user.name, type: keyword}
+    related_integrations:
+      - package: aws
+        integration: cloudtrail
+        version: "^2.0.0"
+    max_signals: 100
+    timestamp_override: event.ingested
+    timestamp_override_fallback_disabled: false
+    rule_name_override: aws.cloudtrail.user_identity.arn
+    license: Elastic License v2
+    tags: [AWS, Identity]
+    note: |
+      The new value is the pair user.name plus cloud.account.id.
+      history_window_start 14d is sent as now-14d.
+    setup: |
+      AWS CloudTrail via the AWS integration. user.name and cloud.account.id
+      must be aggregatable.
+    false_positives:
+      - A new engineer creating their first CLI key during onboarding.
+    endpoint_exceptions: false
+    exceptions_list:
+      - id: 7d3b6e12-9c40-4a85-b2f1-0e8a5c4d7b69
+        list_id: iam-break-glass-key-creators
+        namespace_type: single
+        type: detection
+    building_block: false
+    actions:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: "First CreateAccessKey in 14d for {{user.name}} in {{cloud.account.id}}"
+        frequency:
+          summary: true
+          notifyWhen: onActiveAlert
+          throttle: null
+    response_actions:
+      - action_type_id: .osquery
+        params:
+          query: SELECT * FROM users;
+          timeout: 60
+          ecs_mapping: {}
+    timeline_id: 5e2a7c90-8b14-4f36-a1d8-0c6b9e3f7a52
+    timeline_title: AWS CloudTrail investigation
 ```
 
-<!-- rfc0006:fragment-new-terms -->
-```json
-{
-  "type": "new_terms",
-  "enabled": false,
-  "severity": "low",
-  "risk_score": 21,
-  "new_terms_fields": ["host.name", "user.name"],
-  "history_window_start": "now-14d"
-}
-```
-
-**Example F: indicator match.** Entries in one group are AND. A second group would be OR. `type: mapping` is filled in when the entry omits it.
+**Example F: `threat_match`.** The event query, index, language, and filters stay flat. The indicator side is the `threat` object. That object is not Kibana's ATT&CK `threat` array; the compiler copies `threat.index` to `threat_index` and fills ATT&CK from `techniques`. Groups are OR. Entries in a group are AND. `negate: true` is DOES NOT MATCH. An entry with no `type` is sent as `type: mapping`.
 
 <!-- rfc0006:rule-threat -->
 ```yaml
-name: Known malware hash written to disk
-metadata: {uuid: 4e8b1c2d-6f7a-4b9e-8c0d-1a2b3c4d5e6f}
-description: A created file matches a malware hash from the threat index.
+name: Created file matches a malware hash
+metadata:
+  uuid: 8c5d2f70-1a94-4e36-b8c2-5d7e9a1b3f48
+  schema: rule::1.0
+  version: 1
+  created: "2026-09-29"
+  modified: "2026-09-29"
+  tlp: clear
+  author: Detection Engineering
+description: |
+  Alerts when a created file's SHA256 matches a file indicator, or when
+  its MD5 matches a file indicator and its path does not match the path
+  carried on that indicator.
 techniques: [T1204.002]
-response: {alert_severity: Critical}
+references:
+  public:
+    1: https://attack.mitre.org/techniques/T1204/002/
+response:
+  alert_severity: Critical
+  procedure:
+    analysis: |
+      Open the matched indicator and the file path. Confirm the hash
+      equality and whether the file was executed after it was written.
+    containment: |
+      Isolate the host and collect the file.
 configurations:
   elastic:
     enabled: true
     schema: platform::elastic::1.0
+    status: PRODUCTION
     type: threat_match
+    language: kuery
     query: 'event.category : "file" and event.type : "creation"'
     index: [logs-endpoint.events.file-*]
-    threat_index: [logs-ti_*]
-    threat_query: '@timestamp >= "now-30d/d"'
-    threat_mapping:
-      - entries:
-          - {field: file.hash.sha256, value: threat.indicator.file.hash.sha256}
-    threat_indicator_path: threat.indicator
+    filters:
+      - meta:
+          key: event.dataset
+          negate: false
+          disabled: false
+          type: phrase
+          params:
+            query: endpoint.events.file
+        query:
+          match_phrase:
+            event.dataset: endpoint.events.file
+    scheduling:
+      interval: 1h
+      from: 70m
+    severity: Critical
+    risk_score: 90
+    severity_mapping:
+      - field: file.extension
+        operator: equals
+        value: exe
+        severity: critical
+    risk_score_mapping:
+      - field: host.risk.calculated_score_norm
+        operator: equals
+        value: ""
+    alert_suppression:
+      group_by: [host.name, file.hash.sha256]
+      duration: 6h
+      missing_fields_strategy: doNotSuppress
+    investigation_fields: [file.hash.sha256, file.hash.md5, file.path, file.name, process.name]
+    required_fields:
+      - {name: file.hash.md5, type: keyword}
+      - {name: file.hash.sha256, type: keyword}
+      - {name: file.path, type: keyword}
+    related_integrations:
+      - endpoint
+      - package: ti_abusech
+        version: "*"
+    max_signals: 500
+    timestamp_override: event.ingested
+    timestamp_override_fallback_disabled: false
+    rule_name_override: file.hash.sha256
+    license: Elastic License v2
+    tags: [Windows, ThreatIntel]
+    note: |
+      The event query is file creation. The indicator query is under threat.
+      The second mapping group is OR, and file.path DOES NOT MATCH.
+    setup: |
+      Elastic Defend file events plus a file-indicator index. Hashes must
+      be keyword.
+    false_positives:
+      - A red-team hash left in the indicator index after an exercise.
+    endpoint_exceptions: true
+    exceptions_list:
+      - id: 2b9f4d60-8e13-4c57-a0b6-5d7c1e8a3f24
+        list_id: approved-software-hashes
+        namespace_type: single
+        type: detection
+    building_block: false
+    threat:
+      index: [logs-ti_abusech.malware-*, logs-ti_misp.indicator-*]
+      query: '@timestamp >= "now-30d/d" and threat.indicator.type : "file"'
+      language: kuery
+      indicator_path: threat.indicator
+      filters:
+        - meta:
+            key: threat.indicator.marking.tlp
+            negate: true
+            disabled: false
+            type: phrase
+            params:
+              query: red
+          query:
+            match_phrase:
+              threat.indicator.marking.tlp: red
+      mapping:
+        - entries:
+            - field: file.hash.sha256
+              value: threat.indicator.file.hash.sha256
+        - entries:
+            - field: file.hash.md5
+              value: threat.indicator.file.hash.md5
+            - field: file.path
+              value: threat.indicator.file.path
+              negate: true
+      concurrent_searches: 5
+      items_per_search: 10000
+    actions:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: "Malware hash written on {{host.name}}: {{file.hash.sha256}}"
+        frequency:
+          summary: true
+          notifyWhen: onActiveAlert
+          throttle: null
+    response_actions:
+      - action_type_id: .endpoint
+        params:
+          command: isolate
+          comment: Isolate the host that wrote a file matching a malware indicator.
+    timeline_id: 6a4c1e80-3d25-4b97-9f10-7e2b8c5a1d63
+    timeline_title: File hash investigation
 ```
 
-**Example G: machine learning.** The job id is the name of a job that already exists in that tenant.
+**Example G: `machine_learning`.** No `query`, `index`, or `language`. `job_id` is a list here; a single job may be a string (`job_id: high_count_network_events`) and is sent unchanged.
 
 <!-- rfc0006:rule-ml -->
 ```yaml
-name: Anomalous network volume
-metadata: {uuid: 8a0c2e4f-1b3d-4e5f-9a6b-7c8d9e0f1a2b}
-description: The network-event anomaly job scored this entity at 75 or above.
-response: {alert_severity: Medium}
+name: Anomalous network volume for a host
+metadata:
+  uuid: 1f6a9e23-4c80-4d57-a2b9-6e8c0d3f5a71
+  schema: rule::1.0
+  version: 1
+  created: "2026-09-29"
+  modified: "2026-09-29"
+  tlp: clear
+  author: Detection Engineering
+description: |
+  Raises an alert when the packetbeat anomaly jobs score a host at 75
+  or above. The jobs already exist in the tenant; this rule only points
+  at them.
+techniques: [T1071]
+references:
+  public:
+    1: https://attack.mitre.org/techniques/T1071/
+response:
+  alert_severity: Medium
+  procedure:
+    analysis: |
+      Open the anomaly in the ML app for the job named on the alert.
+    containment: |
+      Isolate the workstation if the score stays high.
 configurations:
   elastic:
     enabled: true
     schema: platform::elastic::1.0
+    status: STAGING
     type: machine_learning
-    machine_learning_job_id: [high_count_network_events]
-    anomaly_threshold: 75
-```
-
-**Advanced settings, on any of the rules above.** Each key is the Kibana field the UI writes.
-
-<!-- rfc0006:gui-fields -->
-```yaml
-max_signals: 200
-timestamp_override: event.ingested
-timestamp_override_fallback_disabled: true
-rule_name_override: event.action
-license: Elastic License v2
-severity_mapping:
-  - {field: host.name, operator: equals, severity: high, value: dc1}
-risk_score_mapping:
-  - {field: event.risk_score, operator: equals, value: ""}
-endpoint_exceptions: true
-filters:
-  - {meta: {negate: true}, query: {match_all: {}}}
+    scheduling:
+      interval: 15m
+      from: 16m
+    severity: Medium
+    risk_score: 42
+    severity_mapping:
+      - field: host.name
+        operator: equals
+        value: dc01
+        severity: high
+    risk_score_mapping:
+      - field: host.risk.calculated_score_norm
+        operator: equals
+        value: ""
+    alert_suppression:
+      group_by: [host.name]
+      duration: 3h
+      missing_fields_strategy: suppress
+    machine_learning:
+      job_id:
+        - high_count_network_events
+        - high_count_network_denies
+      anomaly_threshold: 75
+    investigation_fields: [host.name, source.ip, destination.ip, network.transport]
+    required_fields:
+      - {name: destination.ip, type: ip}
+      - {name: host.name, type: keyword}
+      - {name: source.ip, type: ip}
+    related_integrations: [packetbeat]
+    max_signals: 100
+    timestamp_override: event.ingested
+    timestamp_override_fallback_disabled: false
+    rule_name_override: host.name
+    license: Elastic License v2
+    tags: [Network, MachineLearning]
+    note: |
+      anomaly_threshold 75 is the Kibana anomaly score cutoff. The job's
+      datafeed selects events. This block does not create the job.
+    setup: |
+      The named anomaly jobs must already be running in this tenant.
+    false_positives:
+      - Backup windows that the job has not baselined yet.
+    endpoint_exceptions: false
+    exceptions_list:
+      - id: a6c1e840-5b27-4d90-8f13-2e9b7c4a1d58
+        list_id: backup-network-hosts
+        namespace_type: single
+        type: detection
+    building_block: false
+    actions:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: "Network anomaly score >= 75 for {{host.name}}"
+        frequency:
+          summary: true
+          notifyWhen: onActiveAlert
+          throttle: null
+    response_actions:
+      - action_type_id: .osquery
+        params:
+          query: SELECT pid, name, path, cmdline FROM processes;
+          timeout: 60
+          ecs_mapping: {}
+    timeline_id: 2f7b9e40-5c18-4a62-8d30-1a6e4c8b0f75
+    timeline_title: Network anomaly investigation
 ```
 
 ### Templates
 
-OpenTide generates one rule template, `rule.1.0.template.yaml` ([workspace layout](../specs/workspace.md)). The Elastic block in it is a custom query, the create-rule UI's starting point. Each other rule type keeps this MDR and replaces the Elastic keys shown under it. Metadata, description, and response stay in this one file. The template leaves out the rule's own `status`: deployment reads `configurations.elastic.status`.
+OpenTide generates one rule template, `rule.1.0.template.yaml` ([workspace layout](../specs/workspace.md)). The Elastic block in it is a custom query, the create-rule UI's starting point. Each other rule type keeps this MDR and replaces the Elastic keys shown under it. The template leaves out the rule's own `status`: deployment reads `configurations.elastic.status`.
 
 <!-- rfc0006:rule-template -->
 ```yaml
@@ -741,8 +1457,8 @@ metadata:
   uuid: 00000000-0000-4000-8000-000000000000
   schema: rule::1.0
   version: 1
-  created: "2026-09-28"
-  modified: "2026-09-28"
+  created: "2026-09-29"
+  modified: "2026-09-29"
   tlp: clear
   author: Detection Engineering
 description: |
@@ -758,12 +1474,13 @@ configurations:
     type: query
     language: kuery
     query: 'event.category : "process"'
-    index: [logs-*]          # one pattern; further patterns are further entries
-    interval: 5m             # Runs every
-    from: 6m                 # whole window: Runs every plus one extra minute
+    index: [logs-*]
+    scheduling:
+      interval: 5m
+      from: 6m
 ```
 
-Kibana stores `index` as an array of pattern strings on every rule that sets one, including a rule with a single pattern. The YAML value is that array. `threat_index` has the same shape. `threshold.field`, `new_terms_fields`, `investigation_fields`, and `alert_suppression.group_by` are lists of field names in the same way, including a list of one. `data_view_id` is a single string and replaces `index` when the UI is pointed at a data view. `machine_learning_job_id` is the field Kibana accepts as either a string or a list of strings.
+`index: [logs-*]` is one pattern. `scheduling.from` is the whole window (Runs every plus one extra minute). `data_view_id` replaces `index`.
 
 The keys that change with the rule type:
 
@@ -774,7 +1491,10 @@ query: |
   sequence by host.id with maxspan=1m
     [process where event.type == "start" and process.name == "x.exe"]
 index: [logs-endpoint.events.process-*]
-tiebreaker_field: event.sequence
+eql:
+  timestamp_field: "@timestamp"
+  event_category_override: event.category
+  tiebreaker_field: event.sequence
 
 # esql — no index and no language; FROM selects the data
 type: esql
@@ -787,35 +1507,40 @@ query: |
 type: threshold
 query: 'event.category : "authentication" and event.outcome : "failure"'
 index: [logs-*]
-threshold: {field: [source.ip], value: 20}
-alert_suppression: {duration: 1h}
+threshold:
+  field: [source.ip]
+  value: 20
+  cardinality:
+    field: user.name
+    value: 5
+alert_suppression:
+  duration: 1h
 
 # new_terms
 type: new_terms
 query: 'event.category : "iam"'
 index: [logs-*]
-new_terms_fields: [user.name]
-history_window_start: 14d
+new_terms:
+  fields: [user.name]
+  history_window_start: 14d
 
-# threat_match
+# threat_match — event query stays flat; indicator side is threat
 type: threat_match
 query: 'event.category : "file"'
 index: [logs-*]
-threat_index: [logs-ti_*]
-threat_query: '@timestamp >= "now-30d/d"'
-threat_mapping:
-  - entries:
-      - {field: file.hash.sha256, value: threat.indicator.file.hash.sha256}
+threat:
+  index: [logs-ti_*]
+  query: '@timestamp >= "now-30d/d"'
+  mapping:
+    - entries:
+        - field: file.hash.sha256
+          value: threat.indicator.file.hash.sha256
 
 # machine_learning — no query and no index; a job id may be a string
 type: machine_learning
-machine_learning_job_id: rare_process_by_host
-anomaly_threshold: 50
-
-# saved_query — the saved query supplies the query text
-type: saved_query
-saved_id: 00000000-0000-4000-8000-000000000001
-index: [logs-*]
+machine_learning:
+  job_id: rare_process_by_host
+  anomaly_threshold: 50
 ```
 
 **Invalid block.** It violates the constraints named in the comments.
@@ -827,12 +1552,13 @@ elastic:
   enabled: true
   schema: platform::elastic::1.0
   type: esql
-  language: kuery                       # language
+  language: kuery
   query: FROM logs-* | LIMIT 10
-  index: [logs-*]                       # esql_source
-  alert_suppression: {duration: 1h}       # suppression_shape: group_by required
-  overrides: {rule_id: my-own-id}       # override_key
+  index: [logs-*]
+  alert_suppression: {duration: 1h}
+  overrides: {rule_id: my-own-id}
 ```
+
 
 ### 5. Deployment
 
@@ -911,7 +1637,7 @@ Elasticsearch's own parser rejects the query, so the deployer sends every `esql`
 <!-- rfc0006:esql-preflight -->
 ```json
 {
-  "query": "FROM logs-system.auth-*, logs-windows.forwarded-*\n| WHERE event.category == \"authentication\" AND event.outcome == \"failure\"\n| STATS failures = COUNT(*), users = COUNT_DISTINCT(user.name) BY source.ip\n| WHERE users >= 10\n| LIMIT 0"
+  "query": "FROM logs-system.security-*, logs-windows.forwarded-*\n| WHERE event.code == \"4625\" AND winlog.event_data.SubStatus == \"0xC000006A\"\n| STATS failures = COUNT(*), accounts = COUNT_DISTINCT(user.name) BY source.ip\n| WHERE accounts >= 8 AND failures >= 20\n| LIMIT 0"
 }
 ```
 
@@ -968,6 +1694,8 @@ opentide adds an `opentide/platforms/elastic/` package with `client`, `deployer`
 | `PATCH` instead of `PUT` | It cannot remove a field the author deleted from YAML (for example `alert_suppression`), so remote state would drift from the MDR. |
 | Emit `detection-rules` TOML or Terraform HCL | Adds an external toolchain and state file; both wrap the same API. |
 | Raw passthrough block (`body: {...}`) | Loses typed validation and ATT&CK derivation. A field the create UI shows is a key on the block. |
+| `saved_query` / `saved_id` | The query text lives in a Kibana saved object. The id differs in every space, and a Discover edit changes the rule with no diff. The same detection is `type: query` with `query`, `language`, and `filters`. |
+| Leave type-specific keys flat (`threat_index`, `machine_learning_job_id`, …) | The create UI already groups them. A conditional object keeps the indicator side, the EQL settings, and the job next to each other. The compiler still sends Kibana's flat names. |
 | Validate only through Elasticsearch (`_validate/query`, `_eql/search`, `_query`) | Cannot check the rule-level fields (threshold, new terms, suppression shape) that preview checks. It is used for ES\|QL only, because Kibana does not parse ES\|QL on create. |
 | Detect the licence instead of a `suppression` flag | Needs the `monitor` cluster privilege (`GET _license`) or Kibana's `/api/licensing/info`, which is internal-only on 9.x. Neither fits a least-privilege deploy key, and Serverless tiers are not licences. |
 | Strip `alert_suppression` from every tenant, never send it | Loses a core noise control on Platinum, Enterprise, and Serverless tenants that support it. |

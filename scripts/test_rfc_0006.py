@@ -52,7 +52,6 @@ KIBANA_FIELDS = {
     },
     "machine_learning": (_KIBANA_COMMON - {"data_view_id", "filters", "index", "language", "query", "saved_id"})
     | {"anomaly_threshold", "machine_learning_job_id"},
-    "saved_query": _KIBANA_COMMON,
 }
 _KIBANA_REQUIRED_COMMON = {"name", "description", "type", "severity", "risk_score"}
 KIBANA_REQUIRED = {
@@ -65,7 +64,6 @@ KIBANA_REQUIRED = {
     "threat_match": _KIBANA_REQUIRED_COMMON
     | {"query", "threat_index", "threat_mapping", "threat_query"},
     "machine_learning": _KIBANA_REQUIRED_COMMON | {"anomaly_threshold", "machine_learning_job_id"},
-    "saved_query": _KIBANA_REQUIRED_COMMON | {"saved_id"},
 }
 
 # specs/deployment.md status → strategy.
@@ -255,46 +253,71 @@ def derive_threat(techniques: list[str], vocab: dict[str, dict[str, Any]]) -> li
     return threat
 
 
-_EQL_ONLY = ("timestamp_field", "event_category_override", "tiebreaker_field")
-_THREAT_REQUIRED = ("threat_index", "threat_query", "threat_mapping")
-_ML_REQUIRED = ("machine_learning_job_id", "anomaly_threshold")
+_REMOVED_FLAT = frozenset({
+    "saved_id", "interval", "from",
+    "timestamp_field", "event_category_override", "tiebreaker_field",
+    "new_terms_fields", "history_window_start",
+    "threat_index", "threat_query", "threat_language", "threat_mapping",
+    "threat_filters", "threat_indicator_path",
+    "concurrent_searches", "items_per_search",
+    "machine_learning_job_id", "anomaly_threshold",
+})
+_RULE_TYPES = frozenset({
+    "query", "eql", "esql", "threshold", "new_terms", "threat_match", "machine_learning",
+})
+
+
+def _pattern_list(value: Any) -> bool:
+    return isinstance(value, list) and bool(value) and all(isinstance(item, str) and item for item in value)
 
 
 def check_block(block: dict[str, Any]) -> set[str]:
     codes: set[str] = set()
-    rule_type = block["type"]
+    rule_type = block.get("type")
+    if rule_type not in _RULE_TYPES or (_REMOVED_FLAT & set(block)):
+        codes.add("type_block")
     if ("threshold" in block) != (rule_type == "threshold"):
         codes.add("type_block")
-    has_new_terms = "new_terms_fields" in block or "history_window_start" in block
-    if has_new_terms != (rule_type == "new_terms") or (
-        rule_type == "new_terms" and ("new_terms_fields" not in block or "history_window_start" not in block)
+    new_terms = block.get("new_terms")
+    if ("new_terms" in block) != (rule_type == "new_terms") or (
+        rule_type == "new_terms" and (
+            not isinstance(new_terms, dict)
+            or "fields" not in new_terms
+            or "history_window_start" not in new_terms
+        )
     ):
         codes.add("type_block")
-    if any(key in block for key in _EQL_ONLY) and rule_type != "eql":
+    if "eql" in block and rule_type != "eql":
         codes.add("type_block")
-    if any(key in block for key in _THREAT_REQUIRED) != (rule_type == "threat_match") or (
-        rule_type == "threat_match" and any(key not in block for key in _THREAT_REQUIRED)
+    threat = block.get("threat")
+    if ("threat" in block) != (rule_type == "threat_match") or (
+        rule_type == "threat_match" and (
+            not isinstance(threat, dict)
+            or any(key not in threat for key in ("index", "query", "mapping"))
+        )
     ):
         codes.add("type_block")
-    if any(key in block for key in _ML_REQUIRED) != (rule_type == "machine_learning") or (
-        rule_type == "machine_learning" and any(key not in block for key in _ML_REQUIRED)
+    ml = block.get("machine_learning")
+    if ("machine_learning" in block) != (rule_type == "machine_learning") or (
+        rule_type == "machine_learning" and (
+            not isinstance(ml, dict) or "job_id" not in ml or "anomaly_threshold" not in ml
+        )
     ):
         codes.add("type_block")
-    if ("saved_id" in block) != (rule_type == "saved_query"):
-        codes.add("type_block")
-    if rule_type not in ("machine_learning", "saved_query") and not block.get("query"):
+    if rule_type != "machine_learning" and not block.get("query"):
         codes.add("type_block")
     if rule_type in ("eql", "esql", "machine_learning") and block.get("language"):
         codes.add("language")
-    if rule_type in ("esql", "machine_learning") and (block.get("index") or block.get("data_view_id")):
+    if rule_type in ("esql", "machine_learning") and (
+        block.get("index") or block.get("data_view_id") or block.get("filters")
+    ):
         codes.add("esql_source")
     if block.get("index") and block.get("data_view_id"):
         codes.add("index_xor_data_view")
-    for key in ("index", "threat_index"):
-        if key in block and not (
-            isinstance(block[key], list) and block[key] and all(isinstance(p, str) and p for p in block[key])
-        ):
-            codes.add("index_list")
+    if "index" in block and not _pattern_list(block["index"]):
+        codes.add("index_list")
+    if isinstance(threat, dict) and "index" in threat and not _pattern_list(threat["index"]):
+        codes.add("index_list")
     suppression = block.get("alert_suppression")
     if suppression is not None:
         group_by = suppression.get("group_by")
@@ -308,20 +331,24 @@ def check_block(block: dict[str, Any]) -> set[str]:
             or not all(group_by)
         ):
             codes.add("suppression_shape")
-    fields = block.get("new_terms_fields")
-    if fields is not None and not 1 <= len(fields) <= 3:
+    if isinstance(new_terms, dict) and "fields" in new_terms and not 1 <= len(new_terms["fields"]) <= 3:
         codes.add("new_terms_fields")
     threshold = block.get("threshold")
-    if threshold is not None and (
+    if isinstance(threshold, dict) and (
         len(threshold.get("field") or []) > 5 or threshold.get("value", 0) < 1
     ):
         codes.add("threshold_fields")
     risk = block.get("risk_score")
     if risk is not None and not (isinstance(risk, int) and 0 <= risk <= 100):
         codes.add("risk_score")
+    scheduling = block.get("scheduling") or {}
+    if "scheduling" in block and not isinstance(scheduling, dict):
+        codes.add("duration")
+        scheduling = {}
+    history = new_terms.get("history_window_start") if isinstance(new_terms, dict) else None
     for value in filter(None, (
-        block.get("interval"), block.get("from"),
-        (suppression or {}).get("duration"), block.get("history_window_start"),
+        scheduling.get("interval"), scheduling.get("from"),
+        (suppression or {}).get("duration"), history,
     )):
         try:
             duration_seconds(value)
@@ -350,6 +377,7 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
     if block.get("risk_score") is not None:
         risk_score = block["risk_score"]
 
+    scheduling = block.get("scheduling") or {}
     body: dict[str, Any] = {
         "rule_id": rule["metadata"]["uuid"],
         "type": rule_type,
@@ -358,52 +386,62 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
         "enabled": STATUS_STRATEGY[status] != "DISABLEMENT",
         "severity": severity,
         "risk_score": risk_score,
-        "interval": date_math(block.get("interval", "5m")),
-        "from": "now-" + date_math(block.get("from", "6m")),
+        "interval": date_math(scheduling.get("interval", "5m")),
+        "from": "now-" + date_math(scheduling.get("from", "6m")),
         "to": "now",
     }
     if rule_type == "eql":
         body["language"] = "eql"
     elif rule_type == "esql":
         body["language"] = "esql"
-    elif rule_type != "machine_learning" and (rule_type != "saved_query" or block.get("language")):
+    elif rule_type != "machine_learning":
         body["language"] = block.get("language") or "kuery"
     if block.get("query") is not None:
         body["query"] = block["query"].rstrip()
-    if block.get("saved_id"):
-        body["saved_id"] = block["saved_id"]
     if block.get("data_view_id"):
         body["data_view_id"] = block["data_view_id"]
     elif rule_type not in ("esql", "machine_learning"):
         index = block.get("index") or setup.get("index")
         if isinstance(index, list) and index:
             body["index"] = list(index)
-    if block.get("filters") is not None:
+    if block.get("filters") is not None and rule_type not in ("esql", "machine_learning"):
         body["filters"] = copy.deepcopy(block["filters"])
     if (threshold := block.get("threshold")) is not None:
         body["threshold"] = {"field": list(threshold.get("field") or []), "value": threshold["value"]}
         if threshold.get("cardinality"):
             body["threshold"]["cardinality"] = [threshold["cardinality"]]
-    if block.get("new_terms_fields") is not None:
-        body["new_terms_fields"] = list(block["new_terms_fields"])
-        body["history_window_start"] = "now-" + date_math(block["history_window_start"])
+    if (new_terms := block.get("new_terms")) is not None:
+        body["new_terms_fields"] = list(new_terms["fields"])
+        body["history_window_start"] = "now-" + date_math(new_terms["history_window_start"])
     for key in ("timestamp_field", "event_category_override", "tiebreaker_field"):
-        if block.get(key) is not None:
-            body[key] = block[key]
+        if (block.get("eql") or {}).get(key) is not None:
+            body[key] = block["eql"][key]
+    if (threat_match := block.get("threat")) is not None:
+        body["threat_index"] = list(threat_match["index"])
+        body["threat_query"] = threat_match["query"]
+        if threat_match.get("language"):
+            body["threat_language"] = threat_match["language"]
+        if threat_match.get("filters") is not None:
+            body["threat_filters"] = copy.deepcopy(threat_match["filters"])
+        if threat_match.get("indicator_path") is not None:
+            body["threat_indicator_path"] = threat_match["indicator_path"]
+        for key, kibana_key in (("concurrent_searches", "concurrent_searches"), ("items_per_search", "items_per_search")):
+            if threat_match.get(key) is not None:
+                body[kibana_key] = threat_match[key]
+        body["threat_mapping"] = [
+            {"entries": [{**entry, "type": entry.get("type", "mapping")} for entry in group["entries"]]}
+            for group in threat_match["mapping"]
+        ]
+    if (ml := block.get("machine_learning")) is not None:
+        body["machine_learning_job_id"] = copy.deepcopy(ml["job_id"])
+        body["anomaly_threshold"] = ml["anomaly_threshold"]
     for key in (
-        "threat_index", "threat_query", "threat_language", "threat_filters", "threat_indicator_path",
-        "concurrent_searches", "items_per_search", "machine_learning_job_id", "anomaly_threshold",
         "severity_mapping", "risk_score_mapping", "rule_name_override", "timestamp_override",
         "timestamp_override_fallback_disabled", "max_signals", "license", "actions",
         "response_actions", "timeline_id", "timeline_title", "meta",
     ):
         if block.get(key) is not None:
             body[key] = copy.deepcopy(block[key])
-    if block.get("threat_mapping") is not None:
-        body["threat_mapping"] = [
-            {"entries": [{**entry, "type": entry.get("type", "mapping")} for entry in group["entries"]]}
-            for group in block["threat_mapping"]
-        ]
     suppression = block.get("alert_suppression")
     if suppression is not None and setup.get("suppression", True):
         compiled: dict[str, Any] = {}
@@ -472,22 +510,10 @@ def _staging_setup() -> dict[str, Any]:
     return _setup("elastic-staging")
 
 
-def _overlay(anchor: str) -> dict[str, Any]:
-    rule = copy.deepcopy(_yaml("rule-query"))
-    for key, value in _yaml(anchor).items():
-        if key == "metadata":
-            rule["metadata"] = {**rule["metadata"], **value}
-        else:
-            rule[key] = copy.deepcopy(value)
-    return rule
-
-
-OVERLAYS = {
-    "rule-eql": "fragment-eql",
-    "rule-esql": "fragment-esql",
-    "rule-threshold": "fragment-threshold",
-    "rule-new-terms": "fragment-new-terms",
-}
+EXAMPLES = (
+    "rule-query", "rule-eql", "rule-esql", "rule-threshold",
+    "rule-new-terms", "rule-threat", "rule-ml",
+)
 
 
 class ExampleCompilationTests(unittest.TestCase):
@@ -499,21 +525,17 @@ class ExampleCompilationTests(unittest.TestCase):
         url = base_path(_staging_setup())
         self.assertIn(f"`POST {url}`", _text())
 
-    def test_overlay_fragments_are_subsets_of_compilation(self) -> None:
-        for rule_anchor, fragment_anchor in OVERLAYS.items():
-            with self.subTest(example=rule_anchor):
-                compiled = compile_rule(_overlay(rule_anchor), _staging_setup())
-                for key, value in _json(fragment_anchor).items():
-                    self.assertIn(key, compiled)
-                    self.assertEqual(compiled[key], value, key)
-
     def test_esql_sends_no_index(self) -> None:
-        compiled = compile_rule(_overlay("rule-esql"), _staging_setup())
+        compiled = compile_rule(_yaml("rule-esql"), _staging_setup())
         self.assertNotIn("index", compiled)
         self.assertNotIn("data_view_id", compiled)
+        self.assertNotIn("filters", compiled)
+        self.assertEqual(compiled["language"], "esql")
+        self.assertEqual(compiled["interval"], "15m")
+        self.assertEqual(compiled["from"], "now-20m")
 
     def test_esql_preflight_body(self) -> None:
-        block = _overlay("rule-esql")["configurations"]["elastic"]
+        block = _yaml("rule-esql")["configurations"]["elastic"]
         self.assertEqual(_json("esql-preflight"), esql_preflight(block["query"]))
         self.assertIn("POST <elasticsearch_url>/_query", _text())
 
@@ -523,7 +545,7 @@ class ExampleCompilationTests(unittest.TestCase):
         staged = compile_rule(_yaml("rule-query"), _staging_setup())
         compiled = compile_rule(_yaml("rule-query"), prod)
         self.assertNotIn("alert_suppression", compiled)
-        self.assertEqual(compiled["tags"], ["OpenTide", "soc-prod", "Windows"])
+        self.assertEqual(compiled["tags"], ["OpenTide", "soc-prod", "Windows", "LOLBAS"])
         self.assertEqual(compiled["index"], staged["index"])
         without = {k: v for k, v in staged.items() if k not in ("alert_suppression", "tags")}
         self.assertEqual({k: v for k, v in compiled.items() if k != "tags"}, without)
@@ -536,7 +558,7 @@ class ExampleCompilationTests(unittest.TestCase):
                 self.assertRegex(tenant["setup"]["elasticsearch_url"], r"^https://")
 
     def test_bodies_use_only_kibana_fields_and_carry_required_ones(self) -> None:
-        rules = [_yaml("rule-query"), *(_overlay(a) for a in OVERLAYS)]
+        rules = [_yaml(anchor) for anchor in EXAMPLES]
         for rule in rules:
             compiled = compile_rule(rule, _staging_setup())
             rule_type = compiled["type"]
@@ -550,7 +572,7 @@ class ExampleCompilationTests(unittest.TestCase):
                 self.assertTrue(low <= compiled["risk_score"] <= high)
 
     def test_valid_examples_pass_constraints(self) -> None:
-        rules = {"rule-query": _yaml("rule-query"), **{a: _overlay(a) for a in OVERLAYS}}
+        rules = {anchor: _yaml(anchor) for anchor in EXAMPLES}
         for anchor, rule in rules.items():
             with self.subTest(example=anchor):
                 self.assertEqual(check_block(rule["configurations"]["elastic"]), set())
@@ -559,32 +581,43 @@ class ExampleCompilationTests(unittest.TestCase):
         threat = compile_rule(_yaml("rule-threat"), _staging_setup())
         self.assertEqual(check_block(_yaml("rule-threat")["configurations"]["elastic"]), set())
         self.assertEqual(threat["type"], "threat_match")
+        self.assertEqual(threat["threat_index"], ["logs-ti_abusech.malware-*", "logs-ti_misp.indicator-*"])
         self.assertEqual(
             threat["threat_mapping"],
-            [{"entries": [{"field": "file.hash.sha256", "type": "mapping", "value": "threat.indicator.file.hash.sha256"}]}],
+            [
+                {"entries": [{"field": "file.hash.sha256", "type": "mapping", "value": "threat.indicator.file.hash.sha256"}]},
+                {"entries": [
+                    {"field": "file.hash.md5", "type": "mapping", "value": "threat.indicator.file.hash.md5"},
+                    {"field": "file.path", "type": "mapping", "value": "threat.indicator.file.path", "negate": True},
+                ]},
+            ],
         )
         self.assertEqual(threat["threat_indicator_path"], "threat.indicator")
+        self.assertEqual(threat["concurrent_searches"], 5)
+        self.assertEqual(threat["threat"][0]["tactic"]["id"], "TA0002")
         ml = compile_rule(_yaml("rule-ml"), _staging_setup())
         self.assertEqual(check_block(_yaml("rule-ml")["configurations"]["elastic"]), set())
-        self.assertEqual(ml["machine_learning_job_id"], ["high_count_network_events"])
+        self.assertEqual(ml["machine_learning_job_id"], ["high_count_network_events", "high_count_network_denies"])
         self.assertEqual(ml["anomaly_threshold"], 75)
         self.assertNotIn("query", ml)
         self.assertNotIn("language", ml)
         self.assertNotIn("index", ml)
 
     def test_advanced_settings_keep_their_kibana_names(self) -> None:
-        rule = copy.deepcopy(_yaml("rule-query"))
-        rule["configurations"]["elastic"].update(_yaml("gui-fields"))
+        rule = _yaml("rule-query")
+        block = rule["configurations"]["elastic"]
         compiled = compile_rule(rule, _staging_setup())
         for key in (
             "max_signals", "timestamp_override", "timestamp_override_fallback_disabled",
             "rule_name_override", "license", "severity_mapping", "risk_score_mapping", "filters",
         ):
-            self.assertEqual(compiled[key], rule["configurations"]["elastic"][key], key)
-        self.assertEqual(compiled["exceptions_list"], [{
+            self.assertEqual(compiled[key], block[key], key)
+        self.assertEqual(compiled["interval"], "5m")
+        self.assertEqual(compiled["from"], "now-6m")
+        self.assertEqual(compiled["exceptions_list"][-1], {
             "id": "endpoint_list", "list_id": "endpoint_list",
             "namespace_type": "agnostic", "type": "endpoint",
-        }])
+        })
 
     def test_default_template_is_a_custom_query_with_a_pattern_list(self) -> None:
         rule = _yaml("rule-template")
@@ -594,6 +627,8 @@ class ExampleCompilationTests(unittest.TestCase):
         self.assertEqual(check_block(block), set())
         compiled = compile_rule(rule, _staging_setup())
         self.assertEqual(compiled["index"], ["logs-*"])
+        self.assertEqual(compiled["interval"], "5m")
+        self.assertEqual(compiled["from"], "now-6m")
         self.assertNotIn("status", rule)
 
     def test_deployment_status_comes_from_the_elastic_block_only(self) -> None:
@@ -631,18 +666,27 @@ class TableConsistencyTests(unittest.TestCase):
             "new_terms_fields": {
                 "type": "new_terms",
                 "query": "x",
-                "new_terms_fields": ["a", "b", "c", "d"],
-                "history_window_start": "7d",
+                "new_terms": {"fields": ["a", "b", "c", "d"], "history_window_start": "7d"},
             },
             "threshold_fields": {"type": "threshold", "query": "x", "threshold": {"field": [], "value": 0}},
             "risk_score": {"type": "query", "query": "x", "risk_score": 101},
-            "duration": {"type": "query", "query": "x", "interval": "5min"},
+            "duration": {"type": "query", "query": "x", "scheduling": {"interval": "5min", "from": "6m"}},
             "override_key": {"type": "query", "query": "x", "overrides": {"threat": []}},
         }
         self.assertEqual(table_codes, set(probes))
         for code, block in probes.items():
             with self.subTest(code=code):
                 self.assertEqual(check_block(block), {code})
+        self.assertEqual(
+            check_block({"type": "query", "query": "x", "interval": "5m", "saved_id": "abc"}),
+            {"type_block"},
+        )
+
+    def test_machine_learning_job_id_string_is_kept(self) -> None:
+        rule = copy.deepcopy(_yaml("rule-ml"))
+        rule["configurations"]["elastic"]["machine_learning"]["job_id"] = "rare_process_by_host"
+        compiled = compile_rule(rule, _staging_setup())
+        self.assertEqual(compiled["machine_learning_job_id"], "rare_process_by_host")
 
     def test_mapping_and_preserved_fields_are_kibana_fields(self) -> None:
         allowed = set().union(*KIBANA_FIELDS.values())
@@ -708,7 +752,7 @@ class TableConsistencyTests(unittest.TestCase):
     def test_field_types_cover_ecs_and_examples(self) -> None:
         types = field_types()
         self.assertLessEqual(ECS_FIELD_TYPES, types)
-        for anchor in ["rule-query", *OVERLAYS]:
+        for anchor in EXAMPLES:
             required = _yaml(anchor)["configurations"]["elastic"].get("required_fields") or []
             with self.subTest(example=anchor):
                 self.assertIsInstance(required, list)
@@ -744,7 +788,7 @@ class PlatformConfigTests(unittest.TestCase):
                 self.assertRegex(tenant["setup"]["url"], r"^https://")
 
     def test_every_example_uses_the_platform_schema(self) -> None:
-        anchors = ["rule-query", *OVERLAYS]
+        anchors = EXAMPLES
         for anchor in anchors:
             block = _yaml(anchor)["configurations"]["elastic"]
             self.assertEqual(block["schema"], "platform::elastic::1.0")
