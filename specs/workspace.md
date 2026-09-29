@@ -62,6 +62,7 @@ Registered objects list: `threat`, `objective`, `rule`.
 |--------|-------------------|
 | threat | `threat.1.0.schema.json` |
 | objective | `objective.1.0.schema.json` |
+| objective | `objective.1.1.schema.json` |
 | rule | `rule.1.0.schema.json` |
 | visibility | `visibility.1.0.schema.json` |
 | router | `opentide.schema.json` |
@@ -77,6 +78,7 @@ Inflight shard schema source of truth: [schemas/inflight.shard.1.0.schema.json](
 |--------|-------------------|
 | threat | `threat.1.0.template.yaml` |
 | objective | `objective.1.0.template.yaml` |
+| objective | `objective.1.1.template.yaml` |
 | rule | `rule.1.0.template.yaml` |
 
 ### Export artifacts
@@ -176,6 +178,7 @@ Object fixtures assume the default layout: rules under `objects/rules/`, etc.
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-09-29 | `objective::1.1` schema and template artifacts beside `objective::1.0` ([RFC 0007](../rfcs/0007-signal-reuse.md)). |
 | 1.0 | 2026-09-28 | Optional CI stage `share` runs `opentide share push --changed` on a push to the default branch. |
 | 1.0 | 2026-09-28 | Sharing uses one client file, `sharing.toml`, and one generated ledger, `.opentide/states/sharing.jsonl`. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `paths.toml` |

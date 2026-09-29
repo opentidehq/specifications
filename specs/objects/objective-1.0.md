@@ -18,6 +18,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 - `name` and top-level `composition` MUST be present.
 - `objective` body MUST include at least one `signals` entry.
 - Each signal MUST have `name`, `uuid`, `description`, `severity`, `methodology`, `entities`, and `data`.
+- A signal binding (`reuse`) is not valid on this schema. Bindings require [`objective::1.1`](objective-1.1.md) (`binding_requires_1_1`).
 - `objective.composition` MUST mirror the top-level `composition` strategy and description.
 - `objective.threats` entries MUST reference valid threat UUIDs when cross-validation is enabled.
 - `references` MAY be omitted.
@@ -105,6 +106,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 - [metadata.md](../metadata.md) — shared metadata
 - [threat-1.0.md](threat-1.0.md) — referenced by `objective.threats`
 - [rule-1.0.md](rule-1.0.md) — rules reference objectives via `detection_model` (objective UUID)
+- [objective-1.1.md](objective-1.1.md) — same object, plus a `reuse` binding. This schema stays normative for definition-only objectives.
 - Vocabularies: `detection.composition`, `detection.types`, `detection.methodology`, `signal.entities`, `severity`, `datasources`, `efforts`
 
 ## Defaults & overrides
@@ -152,4 +154,5 @@ objective:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-09-29 | Signal bindings are [`objective::1.1`](objective-1.1.md) ([RFC 0007](../../rfcs/0007-signal-reuse.md)). Field tables unchanged. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `models/objective.py` |

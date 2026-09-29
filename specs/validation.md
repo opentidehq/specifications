@@ -96,6 +96,9 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/invalid/rule-unknown-schema.yaml](../fixtures/invalid/rule-unknown-schema.yaml) | `unknown_schema` |
 | [fixtures/invalid/rule-missing-metadata.yaml](../fixtures/invalid/rule-missing-metadata.yaml) | `missing_metadata` |
 | [fixtures/invalid/objective-no-signals.yaml](../fixtures/invalid/objective-no-signals.yaml) | `empty_signals` |
+| [fixtures/invalid/objective-signal-entry-mixed.yaml](../fixtures/invalid/objective-signal-entry-mixed.yaml) | `signal_entry_mixed` |
+| [fixtures/invalid/objective-signal-bad-uuid.yaml](../fixtures/invalid/objective-signal-bad-uuid.yaml) | `invalid_uuid` |
+| [fixtures/invalid/objective-1.0-signal-binding.yaml](../fixtures/invalid/objective-1.0-signal-binding.yaml) | `binding_requires_1_1` |
 | [fixtures/sharing/invalid/unknown-distribution.toml](../fixtures/sharing/invalid/unknown-distribution.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/legacy-targets-table.toml](../fixtures/sharing/invalid/legacy-targets-table.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/duplicate-name.toml](../fixtures/sharing/invalid/duplicate-name.toml) | `duplicate_name` |
@@ -155,6 +158,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-09-29 | `objective::1.1` signal binding codes ([RFC 0007](../rfcs/0007-signal-reuse.md)). The fixture checker proves `signal_entry_mixed`, `invalid_uuid` on `reuse`, and `binding_requires_1_1`. `unresolved_signal`, `self_signal`, `duplicate_signal`, `duplicate_signal_uuid`, and `signal_tlp` are `opentide validate` against the workspace library. |
 | 1.0 | 2026-09-28 | `sharing-config` checker codes for `[[misp]]` integration blocks. |
 | 1.0 | 2026-09-16 | Document specifications-repo fixture checker codes for `threat::1.0` list/`ThreatActor` encoding ([#11](https://github.com/OpenTideHQ/specifications/issues/11), [#12](https://github.com/OpenTideHQ/specifications/issues/12)). |
 | 1.0 | 2026-06-25 | Initial spec from opentide `validation/session.py` |

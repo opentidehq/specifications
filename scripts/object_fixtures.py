@@ -24,7 +24,23 @@ else:
 UUID_V4 = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
 )
-REGISTERED_SCHEMAS = frozenset({"threat::1.0", "objective::1.0", "rule::1.0"})
+REGISTERED_SCHEMAS = frozenset(
+    {"threat::1.0", "objective::1.0", "objective::1.1", "rule::1.0"}
+)
+OBJECTIVE_SCHEMAS = frozenset({"objective::1.0", "objective::1.1"})
+SIGNAL_DEFINITION_FIELDS = (
+    "name",
+    "uuid",
+    "description",
+    "severity",
+    "methodology",
+    "entities",
+    "data",
+    "effort",
+    "detectors",
+    "examples",
+    "parent",
+)
 THREAT_REQUIRED_BODY = (
     "description",
     "severity",
@@ -348,7 +364,7 @@ def validate_objective(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[Ch
     errors: list[CheckError] = []
     _require_non_empty_string(doc.get("name"), code="missing_field", path="name", errors=errors)
     schema = _validate_metadata(doc.get("metadata"), errors)
-    if schema and schema != "objective::1.0":
+    if schema and schema not in OBJECTIVE_SCHEMAS:
         errors.append(
             CheckError("unknown_schema", f"objective fixture has schema {schema!r}", "metadata.schema")
         )
@@ -374,6 +390,27 @@ def validate_objective(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[Ch
             errors.append(
                 CheckError("invalid_signal", "each signal MUST be a mapping", f"objective.signals[{index}]")
             )
+            continue
+        has_reuse = "reuse" in signal
+        definition_fields = [key for key in SIGNAL_DEFINITION_FIELDS if key in signal]
+        if has_reuse and definition_fields:
+            errors.append(
+                CheckError(
+                    "signal_entry_mixed",
+                    "reuse cannot be combined with definition fields",
+                    f"objective.signals[{index}]",
+                )
+            )
+        if has_reuse and schema == "objective::1.0":
+            errors.append(
+                CheckError(
+                    "binding_requires_1_1",
+                    "reuse is valid only on objective::1.1",
+                    f"objective.signals[{index}].reuse",
+                )
+            )
+        if has_reuse:
+            _require_uuid_v4(signal.get("reuse"), path=f"objective.signals[{index}].reuse", errors=errors)
             continue
         for required in ("name", "uuid", "description", "severity", "methodology", "entities", "data"):
             if required not in signal:
@@ -412,7 +449,7 @@ def validate_document(doc: Any, vocabs: dict[str, Vocab]) -> list[CheckError]:
     schema = metadata.get("schema") if isinstance(metadata, dict) else None
     if schema == "threat::1.0" or "threat" in doc:
         return validate_threat(doc, vocabs)
-    if schema == "objective::1.0" or "objective" in doc:
+    if schema in OBJECTIVE_SCHEMAS or "objective" in doc:
         return validate_objective(doc, vocabs)
     return validate_rule(doc, vocabs)
 
@@ -449,4 +486,7 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "rule-unknown-schema.yaml": "unknown_schema",
     "rule-missing-metadata.yaml": "missing_metadata",
     "objective-no-signals.yaml": "empty_signals",
+    "objective-signal-entry-mixed.yaml": "signal_entry_mixed",
+    "objective-signal-bad-uuid.yaml": "invalid_uuid",
+    "objective-1.0-signal-binding.yaml": "binding_requires_1_1",
 }

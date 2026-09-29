@@ -18,12 +18,13 @@ Detection content in OpenTide is a small graph of typed **objects**, each a YAML
 | Family | Schema | Answers | Spec |
 |--------|--------|---------|------|
 | **Threat** | `threat::1.0` | What do we defend against? | [threat-1.0](specs/objects/threat-1.0.md) |
-| **Objective** | `objective::1.0` | What are we trying to detect? | [objective-1.0](specs/objects/objective-1.0.md) |
+| **Objective** | `objective::1.0` | What are we trying to detect? Each signal is defined on this objective. | [objective-1.0](specs/objects/objective-1.0.md) |
+| **Objective** | `objective::1.1` | The same objective, and a signal may `reuse` one defined on another objective already in the repository. | [objective-1.1](specs/objects/objective-1.1.md) |
 | **Rule** | `rule::1.0` | How do we detect it, on which platform? | [rule-1.0](specs/objects/rule-1.0.md) |
 
 ### How objects chain
 
-Objects reference each other by UUID. **References** point from rule to objective to threat; detection **coverage** flows the other way.
+Objects reference each other by UUID. **References** point from rule to objective to threat; detection **coverage** flows the other way. On `objective::1.1`, a `reuse` binding also covers the objective that owns that signal, and every other objective that reuses it. That coverage is indirect and partial. The rule still has one `detection_model`.
 
 ```mermaid
 flowchart LR
@@ -61,7 +62,7 @@ flowchart LR
 
 1. **[Conformance](conformance.md)** — how to read the normative keywords.
 2. **[Metadata](specs/metadata.md)** — the block every object shares.
-3. **The object spec** you care about — [threat](specs/objects/threat-1.0.md), [objective](specs/objects/objective-1.0.md), or [rule](specs/objects/rule-1.0.md).
+3. **The object spec** you care about — [threat](specs/objects/threat-1.0.md), [objective 1.0](specs/objects/objective-1.0.md), [objective 1.1](specs/objects/objective-1.1.md), or [rule](specs/objects/rule-1.0.md).
 4. **[Validation](specs/validation.md)** — what the engine checks and when.
 
 ## Full index

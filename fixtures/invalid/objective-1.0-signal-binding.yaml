@@ -1,0 +1,23 @@
+name: Binding On One Point Zero
+
+metadata:
+  uuid: 00000000-0000-4000-8002-000000000023
+  schema: objective::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+
+composition:
+  strategy: synergetic
+  description: reuse is not part of objective::1.0
+
+objective:
+  priority: High
+  type: Threat
+  description: A binding on the 1.0 schema
+  composition:
+    strategy: synergetic
+    description: reuse is not part of objective::1.0
+  signals:
+    - reuse: 00000000-0000-4000-8099-000000000001

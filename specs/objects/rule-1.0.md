@@ -22,7 +22,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 - `severity` MUST be a valid rule severity vocabulary value (default: `Informational`).
 - `techniques` MUST be a list of ATT&CK technique IDs (MAY be empty).
 - `platforms` or `configurations` MUST contain at least one enabled platform block for deployable rules.
-- `detection_model` when present MUST reference a valid objective UUID.
+- `detection_model` when present MUST reference a valid objective UUID (`objective::1.0` or `objective::1.1`). That objective is the rule's direct coverage. Indirect coverage of other objectives is derived from signal bindings on `objective::1.1` ([objective-1.1.md](objective-1.1.md)). The rule does not gain a second `detection_model`.
 - Platform blocks MUST validate against the platform schema identifier declared in each block's `schema` field.
 - `references` MAY be omitted.
 - Registry-backed methods (`deploy`, `validate`, `document`) require a bound opentide registry at runtime — not part of static YAML validation.
@@ -50,7 +50,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 | `platforms` | map[string, object] | no | `{}` | Legacy flat platform dict (prefer `configurations`) |
 | `configurations` | RuleConfigurations | no | null | Typed per-platform configuration blocks |
 | `references` | ObjectReferences | no | null | External and internal references |
-| `detection_model` | string | no | null | Objective UUID this rule implements |
+| `detection_model` | string | no | null | Objective UUID this rule implements (`objective::1.0` or `objective::1.1`). Direct coverage only. |
 | `response` | RuleResponse | no | null | Alert and response configuration |
 
 ### `response` (RuleResponse)
@@ -112,6 +112,7 @@ See [platforms.md](../platforms.md) for per-platform required fields and capabil
 
 - [metadata.md](../metadata.md) — identity and schema routing
 - [objective-1.0.md](objective-1.0.md) — linked via `detection_model`
+- [objective-1.1.md](objective-1.1.md) — same link; `reuse` bindings add indirect coverage
 - [deployment.md](../deployment.md) — `status` lifecycle and promotion
 - [platforms.md](../platforms.md) — platform blocks and deploy/validate capabilities
 - [validation.md](../validation.md) — schema, vocabulary, and query validation
@@ -180,4 +181,5 @@ configurations:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-09-29 | `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage is derived ([RFC 0007](../../rfcs/0007-signal-reuse.md)). |
 | 1.0 | 2026-06-25 | Initial exemplar spec from opentide `models/rule.py` |

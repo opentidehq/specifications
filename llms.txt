@@ -27,6 +27,7 @@
 
 - specs/objects/threat-1.0.md (schema_id: threat::1.0)
 - specs/objects/objective-1.0.md (schema_id: objective::1.0)
+- specs/objects/objective-1.1.md (schema_id: objective::1.1)
 - specs/objects/rule-1.0.md (schema_id: rule::1.0)
 
 ## Vocabulary specs (specs/vocabularies/)
@@ -54,6 +55,7 @@
 - rfcs/0003-per-key-vocabulary-versioning.md
 - rfcs/0005-sharing-system.md
 - rfcs/0006-sharing-ci.md
+- rfcs/0007-signal-reuse.md
 
 ## Agent skills
 

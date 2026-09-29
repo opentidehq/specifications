@@ -10,7 +10,7 @@
 
 ## Summary
 
-A detection objective (DOM) may incorporate a signal defined on another objective that is already in the repository. That ability is a new objective schema, `objective::1.1`, specified in `specs/objects/objective-1.1.md`. The incorporating entry is a single UUID, completed from the workspace signal library. The signal keeps one UUID and one owning objective. A rule still names a single direct DOM through `detection_model`. Coverage also counts every other DOM that includes that signal, labeled indirect and partial, so one rule covers several DOMs. Examples below use the working key `reuse`. The key name is open; `ref` is withdrawn. See [Field name](#field-name).
+A detection objective (DOM) may incorporate a signal defined on another objective that is already in the repository. That ability is a new objective schema, `objective::1.1`, specified in `specs/objects/objective-1.1.md`. The incorporating entry is a single UUID, completed from the workspace signal library. The signal keeps one UUID and one owning objective. A rule still names a single direct DOM through `detection_model`. Coverage also counts every other DOM that includes that signal, labeled indirect and partial, so one rule covers several DOMs. The YAML key is `reuse`. Normative text is [specs/objects/objective-1.1.md](../specs/objects/objective-1.1.md). `ref` is withdrawn. See [Field name](#field-name).
 
 ## Motivation
 
@@ -44,7 +44,7 @@ This is an objective schema change. Coverage, the signal library, completion, an
 
 | | `objective::1.0` | `objective::1.1` |
 |--|------------------|------------------|
-| Spec file | [specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md), left as it is | new [specs/objects/objective-1.1.md](../specs/objects/objective-1.1.md) |
+| Spec file | [specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md). Field tables unchanged. Pointer to 1.1 added. | [specs/objects/objective-1.1.md](../specs/objects/objective-1.1.md) |
 | `metadata.schema` | `objective::1.0` | `objective::1.1` |
 | Signal item | Definition only. Required `name`, `uuid`, `description`, `severity`, `methodology`, `entities`, `data`. | Definition, or a library binding |
 | Status | Stays `normative`. Not deprecated. | `normative` |
@@ -83,7 +83,7 @@ Sharing already emits `metadata.schema` verbatim. An `objective::1.1` event tell
 
 No new object family. No rule schema change. No vocabulary file change.
 
-Ship the new spec, the 1.0 pointer, fixtures, `SPECS.md`, and `CHANGELOG.md` in the spec PR after acceptance. opentide registers a second model (`__schema_identifier__ = "objective::1.1"`) in its own PR, with a migration of `objective::1.0` → `objective::1.1` that rewrites only `metadata.schema`.
+The spec, the 1.0 pointer, fixtures, pins, `SPECS.md`, and `CHANGELOG.md` are in this PR. opentide registers a second model (`__schema_identifier__ = "objective::1.1"`) in its own PR, with a migration of `objective::1.0` → `objective::1.1` that rewrites only `metadata.schema`.
 
 The metadata 1.1 precedent does not apply. Metadata has no `schema_id`. An objective does, and a signal list that old `objective::1.0` parsers reject cannot keep that identifier.
 
@@ -113,11 +113,11 @@ List order is the composition order. Definitions and bindings may interleave. Th
 
 ### Field name
 
-The binding is one library UUID. The key is not settled. Examples in this RFC use `reuse`. Semantics are the same for every row. One key becomes normative.
+The binding is one library UUID. The normative key, used by [specs/objects/objective-1.1.md](../specs/objects/objective-1.1.md), is `reuse`. The other rows were the alternatives. `ref` stays withdrawn.
 
 | Key | YAML | Reads as | Cost |
 |-----|------|----------|------|
-| `reuse` | `- reuse: <uuid>` | Take this library signal into the composition. | New schema word. Working choice for the examples. |
+| `reuse` | `- reuse: <uuid>` | Take this library signal into the composition. | Normative key in `objective::1.1`. |
 | `include` | `- include: <uuid>` | This signal joins the objective. | Also how people talk about pulling in a file or a whole document. |
 | `signal` | `- signal: <uuid>` | This list item is that signal. | The parent key is already `signals`, and the completion vocabulary is named `signal`. |
 | `from` | `- from: <uuid>` | Origin of this slot. | Short, and easy to hear as "copied from". |
@@ -427,16 +427,15 @@ File in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide) after this
 
 ## Unresolved questions
 
-1. Pick the binding key. Working key in examples is `reuse`. See [Field name](#field-name). `ref` is withdrawn.
-2. Confirm indirect reason `shares` (co-consumers). Dropping it leaves `owns` only. The YAML does not change either way. This RFC includes `shares` so a rule covers every DOM that lists the signal.
-3. Confirm ATT&CK layers stay on the direct DOM. Indirect threat techniques would widen `techniques_resolver` and double-count layers if they were copied onto the rule.
-4. Confirm the TLP rank, including `amber` versus `amber+strict`. This RFC treats `amber+strict` as stricter: an `amber+strict` objective may bind an `amber` signal; the reverse is `signal_tlp`.
-5. Should a definition's `parent` be required to sit in the same effective set, or is any library signal enough? This RFC says MUST be in the library and SHOULD be in the same effective set.
+1. Confirm indirect reason `shares` (co-consumers). Dropping it leaves `owns` only. The YAML does not change either way. This RFC includes `shares` so a rule covers every DOM that lists the signal. The binding key is settled: `reuse`.
+2. Confirm ATT&CK layers stay on the direct DOM. Indirect threat techniques would widen `techniques_resolver` and double-count layers if they were copied onto the rule.
+3. Confirm the TLP rank, including `amber` versus `amber+strict`. This RFC treats `amber+strict` as stricter: an `amber+strict` objective may bind an `amber` signal; the reverse is `signal_tlp`.
+4. Should a definition's `parent` be required to sit in the same effective set, or is any library signal enough? This RFC says MUST be in the library and SHOULD be in the same effective set.
 
 ## References
 
 - Issue [#22](https://github.com/OpenTideHQ/specifications/issues/22)
-- [specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md), [specs/objects/rule-1.0.md](../specs/objects/rule-1.0.md)
+- [specs/objects/objective-1.1.md](../specs/objects/objective-1.1.md), [specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md), [specs/objects/rule-1.0.md](../specs/objects/rule-1.0.md)
 - [specs/validation.md](../specs/validation.md), [specs/metaschema-keywords.md](../specs/metaschema-keywords.md)
 - [specs/sharing/misp-1.0.md](../specs/sharing/misp-1.0.md) relation table
 - opentide: `models/objective.py`, `registry/builder.py`, `indexing/inflight.py`, `indexing/object_vocab.py`, `documentation/catalog.py`, `generation/framework.py`, `export/explorer_export.py`

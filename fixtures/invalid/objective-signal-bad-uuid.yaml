@@ -1,0 +1,23 @@
+name: Bad Reuse UUID
+
+metadata:
+  uuid: 00000000-0000-4000-8002-000000000022
+  schema: objective::1.1
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+
+composition:
+  strategy: synergetic
+  description: reuse value is not a UUIDv4
+
+objective:
+  priority: High
+  type: Threat
+  description: reuse is not a UUIDv4
+  composition:
+    strategy: synergetic
+    description: reuse value is not a UUIDv4
+  signals:
+    - reuse: not-a-uuid

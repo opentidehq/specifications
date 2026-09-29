@@ -1,0 +1,35 @@
+name: Lateral Movement Objective
+
+metadata:
+  uuid: 00000000-0000-4000-8002-000000000002
+  schema: objective::1.1
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: amber
+
+composition:
+  strategy: synergetic
+  description: Compose movement signals with the shared logon signal
+
+objective:
+  priority: High
+  type: Threat
+  description: Reuses the suspicious logon signal from valid/objective-1.0.yaml
+  composition:
+    strategy: synergetic
+    description: Compose movement signals with the shared logon signal
+  threats:
+    - 00000000-0000-4000-8001-000000000003
+  signals:
+    - reuse: 00000000-0000-4000-8099-000000000001
+    - name: Remote service logon
+      uuid: 00000000-0000-4000-8099-000000000002
+      description: A new service logon on a second host
+      severity: High
+      methodology: analytics
+      entities:
+        - host
+      data:
+        availability: Complete
+        requirements: Security event logs

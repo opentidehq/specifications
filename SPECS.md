@@ -13,6 +13,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Metadata | 1.1 | — | normative | [specs/metadata.md](specs/metadata.md) |
 | Threat object | 1.0 | `threat::1.0` | normative | [specs/objects/threat-1.0.md](specs/objects/threat-1.0.md) |
 | Objective object | 1.0 | `objective::1.0` | normative | [specs/objects/objective-1.0.md](specs/objects/objective-1.0.md) |
+| Objective object | 1.1 | `objective::1.1` | normative | [specs/objects/objective-1.1.md](specs/objects/objective-1.1.md) |
 | Rule object | 1.0 | `rule::1.0` | normative | [specs/objects/rule-1.0.md](specs/objects/rule-1.0.md) |
 | Workspace layout | 1.0 | — | normative | [specs/workspace.md](specs/workspace.md) |
 | Inflight preview shard | 1.0 | `inflight.shard::1.0` | normative | [specs/workspace.md](specs/workspace.md#inflight-preview-shards) |

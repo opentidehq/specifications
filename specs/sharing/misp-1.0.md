@@ -269,7 +269,7 @@ Updates touch the seven envelope fields, the tag set, and the one `opentide` obj
 | Family | Source | Emitted |
 |--------|--------|---------|
 | `threat` | — | zero relations |
-| `objective` | `objective.threats[]` | one per distinct UUID |
+| `objective` | `objective.threats[]`, and on `objective::1.1` the owning objective UUID of each signal bound with `reuse` | one per distinct UUID |
 | `rule` | top-level `detection_model` | zero or one |
 
 Values are 36-character lowercase canonical UUIDs of Tide objects, never MISP Event or object UUIDs, at most one attribute per distinct UUID, ordered ascending. A non-canonical UUID fails the object. An absent, null, or empty source emits zero relations. A relation UUID whose object was not shared to that block is still emitted, with an informational note.
@@ -356,4 +356,5 @@ A block needs `name`, `url`, `api_key`, and `max_tlp`. It ships disabled, select
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-09-29 | `objective::1.1` relations include the owner of each signal bound with `reuse` ([RFC 0007](../../rfcs/0007-signal-reuse.md)). |
 | 1.0 | 2026-09-28 | Initial connector spec from accepted [RFC 0005](../../rfcs/0005-sharing-system.md). Pins upstream `opentide` template version 5. Minimal `[[misp]]` block; organisation from `metadata.organisation.uuid`, overridable per block; distribution derived from TLP. |
