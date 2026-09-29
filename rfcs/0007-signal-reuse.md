@@ -10,7 +10,7 @@
 
 ## Summary
 
-A detection objective (DOM) may incorporate a signal defined on another objective that is already in the repository. The incorporating entry is a reference, `ref: <signal-uuid>`, completed from the workspace signal library. The signal keeps one UUID and one owning objective. A rule still names a single direct DOM through `detection_model`. Coverage also counts every other DOM that includes that signal, labeled indirect and partial, so one rule covers several DOMs. A copied `clone` field was the starting idea; a second definition cannot stay the same signal, so this RFC uses a live reference instead.
+A detection objective (DOM) may incorporate a signal defined on another objective that is already in the repository. The incorporating entry is a single UUID, completed from the workspace signal library. The signal keeps one UUID and one owning objective. A rule still names a single direct DOM through `detection_model`. Coverage also counts every other DOM that includes that signal, labeled indirect and partial, so one rule covers several DOMs. Examples below use the working key `reuse`. The key name is open; `ref` is withdrawn. See [Field name](#field-name).
 
 ## Motivation
 
@@ -48,23 +48,40 @@ Each `objective.signals[]` entry is one of two shapes. Exactly one.
 
 **Definition** — unchanged. Required: `name`, `uuid`, `description`, `severity`, `methodology`, `entities`, `data`. Optional fields stay as they are, including `parent`.
 
-**Reference:**
+**Binding** — one library UUID and no local definition. The YAML key is the open choice in [Field name](#field-name). Examples use `reuse`:
 
 ```yaml
-- ref: 00000000-0000-4000-8099-000000000001
+- reuse: 00000000-0000-4000-8099-000000000001
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `ref` | string (UUIDv4) | yes | Signal UUID of a definition in the workspace library |
+| `reuse` (working key) | string (UUIDv4) | yes | Signal UUID of a definition in the workspace library |
 
-A reference carries no local name, description, severity, methodology, entities, data, examples, detectors, effort, or `parent`. Those values are read from the definition at render, validation, and coverage time. The reference does not allocate a UUID and does not insert a second signal record.
+A binding carries no local name, description, severity, methodology, entities, data, examples, detectors, effort, or `parent`. Those values are read from the definition at render, validation, and coverage time. The binding does not allocate a UUID and does not insert a second signal record.
 
-`ref` together with any definition field is `signal_ref_not_exclusive`.
+The binding key together with any definition field is `signal_entry_mixed`.
 
-List order is the composition order. Definitions and references may interleave. The objective's composition strategy applies to the full effective list. The owning objective's composition is unchanged.
+List order is the composition order. Definitions and bindings may interleave. The objective's composition strategy applies to the full effective list. The owning objective's composition is unchanged.
 
-`objective.signals` still requires at least one entry. A resolved reference counts. An unresolved one does not, and is still an error.
+`objective.signals` still requires at least one entry. A resolved binding counts. An unresolved one does not, and is still an error.
+
+### Field name
+
+The binding is one library UUID. The key is not settled. Examples in this RFC use `reuse`. Semantics are the same for every row. One key becomes normative.
+
+| Key | YAML | Reads as | Cost |
+|-----|------|----------|------|
+| `reuse` | `- reuse: <uuid>` | Take this library signal into the composition. | New schema word. Working choice for the examples. |
+| `include` | `- include: <uuid>` | This signal joins the objective. | Also how people talk about pulling in a file or a whole document. |
+| `signal` | `- signal: <uuid>` | This list item is that signal. | The parent key is already `signals`, and the completion vocabulary is named `signal`. |
+| `from` | `- from: <uuid>` | Origin of this slot. | Short, and easy to hear as "copied from". |
+| `clone` | `- clone: <uuid>` | The word from the original request, defined as this same binding. | A clone is a fork that can drift. The spec would have to keep correcting that reading. The field is still only a UUID, with no local body. |
+| `source` | `- source: <uuid>` | Where the signal is defined. | Signal `data` already uses data-source and log-source language. |
+| `import` | `- import: <uuid>` | Bring in a library signal. | In this RFC, "imported" means the owning DOM is already in the repo. The key would mean a second thing. |
+| bare UUID | `- <uuid>` | The array item is the completed value. A string is a binding. A mapping is a definition. | No name to dislike. A bare UUID is opaque in review, and a later overlay has to grow a oneOf around a string. |
+
+`ref` is withdrawn. It names the pointer, and it sits beside `references` (URLs) and `opentide-relation`.
 
 ### Library and import
 
@@ -76,9 +93,9 @@ The **signal library** is the set of definitions in the workspace signal index.
 
 Two definitions with the same UUID are `duplicate_signal_uuid`. The index MUST NOT keep last-writer-wins.
 
-A reference target that is absent from the library is `unresolved_signal_ref`. A reference whose owner is the same objective is `self_signal_ref`. The same UUID twice in one objective's effective set (two refs, or a definition plus a ref) is `duplicate_signal`.
+A binding target that is absent from the library is `unresolved_signal`. A binding whose owner is the same objective is `self_signal`. The same UUID twice in one objective's effective set (two bindings, or a definition plus a binding) is `duplicate_signal`.
 
-`effective_signals(objective)` is the ordered signal UUIDs on that objective: definition UUIDs, and `ref` values resolved to definition UUIDs.
+`effective_signals(objective)` is the ordered signal UUIDs on that objective: definition UUIDs, and binding values resolved to definition UUIDs.
 
 Narrow validation (`--file`, `--uuid`, `--type`) still resolves references against the full workspace index, the same way threat UUID checks do.
 
@@ -88,7 +105,7 @@ Inflight overlay rules are unchanged. A reference to a signal whose definition a
 
 Rank, least restrictive first, matches [`vocabularies/tlp.vocab.toml`](../vocabularies/tlp.vocab.toml): `clear` < `green` < `amber` < `amber+strict` < `red`.
 
-A reference is valid when the consumer's `metadata.tlp` is the same rank as the owner's or stricter. A consumer that is less restrictive than the owner is `signal_ref_tlp`. The check uses the two objectives' metadata, not `sharing.toml` `max_tlp`.
+A binding is valid when the consumer's `metadata.tlp` is the same rank as the owner's or stricter. A consumer that is less restrictive than the owner is `signal_tlp`. The check uses the two objectives' metadata, not `sharing.toml` `max_tlp`.
 
 ### Autocomplete
 
@@ -108,7 +125,7 @@ Only definitions are entries. A reference does not add a row.
 The objective metaschema binds the field:
 
 ```python
-"ref": {"tide.vocab": "signal"}
+"reuse": {"tide.vocab": "signal"}  # key follows Field name
 ```
 
 `tide.vocab` resolution is the existing model-vocabulary path used by `detection_model` / `tide.vocab: "objective"`. Generated JSON Schema turns the library into an `enum` plus descriptions, so completion and hover show the signal name, description, severity, and owning DOM.
@@ -170,7 +187,7 @@ The walk stops at S. If A references signal S owned by B, and B references signa
 Documentation coverage graphs (`catalog.coverage_graph` and the pages that call it) MUST draw this set for a focused objective, rule, or threat:
 
 - The focused objective's effective signals, resolved to definition name and owner.
-- An edge from a referencing objective to a foreign signal, distinct from the owner's edge (label `ref` on the reference, owner edge unlabeled or `owns`).
+- An edge from a binding objective to a foreign signal, distinct from the owner's edge (label `reuse` on the binding, owner edge unlabeled or `owns`). The label matches the chosen key.
 - Every rule whose direct DOM includes that signal, edge signal → rule `implements`.
 - Direct threats, and indirect threats marked partial with the via-signals.
 
@@ -178,25 +195,27 @@ Explorer relation counts MUST include each covered DOM once. A reference is a re
 
 ### Sharing
 
-On an objective, `opentide-relation` gains one value per distinct owner UUID of a referenced signal, alongside the existing `objective.threats[]` values. Emission rules in [specs/sharing/misp-1.0.md](../specs/sharing/misp-1.0.md) stay: canonical lowercase UUIDs, one attribute per UUID, ascending order, still emitted when that owner was not shared to the block (informational note). Signal UUIDs are not relation values. The consumer document stores `ref` only. The definition remains on the owner document, so a receiver renders the signal from the owner event.
+On an objective, `opentide-relation` gains one value per distinct owner UUID of a referenced signal, alongside the existing `objective.threats[]` values. Emission rules in [specs/sharing/misp-1.0.md](../specs/sharing/misp-1.0.md) stay: canonical lowercase UUIDs, one attribute per UUID, ascending order, still emitted when that owner was not shared to the block (informational note). Signal UUIDs are not relation values. The consumer document stores the binding key only. The definition remains on the owner document, so a receiver renders the signal from the owner event.
 
-A reference does not change the consumer's `content_hash` when the definition text changes. The owner's hash changes, and the owner is what gets re-shared.
+A binding does not change the consumer's `content_hash` when the definition text changes. The owner's hash changes, and the owner is what gets re-shared.
 
 ### Validation codes
 
 Checked in the schema check's cross-object reference step ([specs/validation.md](../specs/validation.md)). Severity `error`.
 
+Codes name the condition, so they stay put when the YAML key is chosen.
+
 | Code | Condition |
 |------|-----------|
-| `unresolved_signal_ref` | `ref` is not a definition in the library |
-| `self_signal_ref` | `ref` target is owned by this objective |
+| `unresolved_signal` | the binding UUID is not a definition in the library |
+| `self_signal` | the binding target is owned by this objective |
 | `duplicate_signal` | the same UUID appears twice in one objective's effective set |
 | `duplicate_signal_uuid` | two definitions in the workspace share a signal UUID |
-| `signal_ref_not_exclusive` | `ref` is combined with any definition field |
-| `signal_ref_tlp` | consumer TLP is less restrictive than the owner's |
-| `invalid_uuid` | `ref` is not a UUIDv4 (existing UUID check) |
+| `signal_entry_mixed` | the binding key is combined with any definition field |
+| `signal_tlp` | consumer TLP is less restrictive than the owner's |
+| `invalid_uuid` | the binding value is not a UUIDv4 (existing UUID check) |
 
-The specifications-repo fixture checker (`scripts/object_fixtures.py`) currently requires `name`, `uuid`, `description`, `severity`, `methodology`, `entities`, and `data` on every signal. The spec PR teaches it the reference shape and the single-file codes (`signal_ref_not_exclusive`, `invalid_uuid` on `ref`). Cross-file resolution (`unresolved_signal_ref`, TLP, duplicate owners) is `opentide validate` against a workspace index. The checker does not grow a registry.
+The specifications-repo fixture checker (`scripts/object_fixtures.py`) currently requires `name`, `uuid`, `description`, `severity`, `methodology`, `entities`, and `data` on every signal. The spec PR teaches it the binding shape and the single-file codes (`signal_entry_mixed`, `invalid_uuid` on the binding value). Cross-file resolution (`unresolved_signal`, TLP, duplicate owners) is `opentide validate` against a workspace index. The checker does not grow a registry.
 
 ### Examples
 
@@ -235,7 +254,7 @@ objective:
         requirements: Security event logs
 ```
 
-Consumer, after that owner is imported. Completion of `ref` inserts the signal UUID. The description shown beside it is `Credential Access Objective::Suspicious logon signal`.
+Consumer, after that owner is imported. Completion of `reuse` inserts the signal UUID. The description shown beside it is `Credential Access Objective::Suspicious logon signal`.
 
 ```yaml
 name: Lateral Movement Objective
@@ -259,7 +278,7 @@ objective:
   threats:
     - 00000000-0000-4000-8001-000000000003
   signals:
-    - ref: 00000000-0000-4000-8099-000000000001
+    - reuse: 00000000-0000-4000-8099-000000000001
     - name: Remote service logon
       uuid: 00000000-0000-4000-8099-000000000002
       description: A new service logon on a second host
@@ -286,21 +305,21 @@ A rule with `detection_model` pointing at Credential Access covers Credential Ac
 
 | Fixture | Expectation |
 |---------|-------------|
-| `fixtures/cross-object/objective-refs-signal.yaml` | Consumer whose `ref` is the signal UUID in `fixtures/valid/objective-1.0.yaml` (`…8099…0001`). `metadata.tlp` is `clear` or stricter, matching that owner. Passes the shape checker. |
-| `fixtures/invalid/objective-signal-ref-and-name.yaml` | `ref` plus `name`. Code `signal_ref_not_exclusive`. |
-| `fixtures/invalid/objective-signal-ref-bad-uuid.yaml` | `ref` is not a UUIDv4. Code `invalid_uuid`. |
+| `fixtures/cross-object/objective-reuses-signal.yaml` | Consumer whose binding is the signal UUID in `fixtures/valid/objective-1.0.yaml` (`…8099…0001`). `metadata.tlp` is `clear` or stricter, matching that owner. Passes the shape checker. Filename follows the chosen key. |
+| `fixtures/invalid/objective-signal-entry-mixed.yaml` | Binding key plus `name`. Code `signal_entry_mixed`. |
+| `fixtures/invalid/objective-signal-bad-uuid.yaml` | Binding value is not a UUIDv4. Code `invalid_uuid`. |
 | `fixtures/valid/objective-1.0.yaml` | Unchanged definition. Still valid. |
 
-Workspace-level cases (opentide tests, not a second copy of the object model in this repo): dangling ref, self-ref, duplicate in one list, two definitions with one UUID, TLP laundering, mutual refs, inflight add and delete.
+Workspace-level cases (opentide tests, not a second copy of the object model in this repo): dangling binding, self-binding, duplicate in one list, two definitions with one UUID, TLP laundering, mutual bindings, inflight add and delete.
 
 ### Affected specs
 
 | Path | Change on acceptance |
 |------|----------------------|
-| [specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md) | Union of definition and `ref`. Library, owner, TLP, effective set. Frontmatter `version: "1.1"`. `schema_id` stays `objective::1.0`. |
+| [specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md) | Union of definition and binding. Library, owner, TLP, effective set. Frontmatter `version: "1.1"`. `schema_id` stays `objective::1.0`. |
 | [specs/objects/rule-1.0.md](../specs/objects/rule-1.0.md) | State that `detection_model` is the direct DOM and that indirect DOMs are derived. Field table unchanged. |
 | [specs/validation.md](../specs/validation.md) | Codes above. Checker vs `opentide validate` split. |
-| [specs/metaschema-keywords.md](../specs/metaschema-keywords.md) | `signal` model vocabulary. `ref` example. Objective vocabulary is objectives only. |
+| [specs/metaschema-keywords.md](../specs/metaschema-keywords.md) | `signal` model vocabulary. Binding-key example. Objective vocabulary is objectives only. |
 | [specs/sharing/misp-1.0.md](../specs/sharing/misp-1.0.md) | Objective relations include referenced-signal owners. |
 | [site/index.md](../site/index.md) | Coverage diagram gains the indirect hop. The overview is descriptive; the objective spec stays normative. |
 | `fixtures/` as listed | Shape fixtures and checker codes in `scripts/object_fixtures.py`. |
@@ -326,7 +345,7 @@ File in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide) after this
 - A widely reused signal makes every rule that implements any including DOM a partial cover of the others. That is the point of one signal, and it will inflate coverage for a signal that was referenced too freely.
 - The consumer cannot override severity, examples, or data requirements. A different threshold is a new definition.
 - Completion lags the live index until schemas are regenerated.
-- A clear or green objective cannot reference an amber or red signal. Authors hit `signal_ref_tlp` when they widen distribution by accident.
+- A clear or green objective cannot bind an amber or red signal. Authors hit `signal_tlp` when they widen distribution by accident.
 - Splitting `owner` from `parent` changes the index record every current signal walker reads. Walkers that still treat `parent` as the objective UUID will lose the objective hop.
 - Remote MISP consumers see the definition only on the owner event. The consumer event carries the UUID and the relation. Its content hash does not move when the signal text changes.
 - Coverage output grows by one DOM per consumer and per co-consumer.
@@ -337,7 +356,7 @@ File in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide) after this
 
 **Reuse authored `parent`.** Set aside. `parent` is a signal-to-signal composition edge. Ingest already stuffs the objective UUID into that field. Using it as "this entry is that signal" removes the composition edge and keeps the ambiguity.
 
-**Several `detection_model` values on the rule.** Set aside. The rule would name DOMs by hand. The list would drift from the signals the direct DOM actually includes. Deriving indirect DOMs from `ref` keeps a single authored link.
+**Several `detection_model` values on the rule.** Set aside. The rule would name DOMs by hand. The list would drift from the signals the direct DOM actually includes. Deriving indirect DOMs from the binding keeps a single authored link.
 
 **`objective.imports: [<objective-uuid>]`.** Set aside. Importing every signal of another DOM is coarser than the signal the author meant, and coverage would claim the rest.
 
@@ -345,14 +364,17 @@ File in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide) after this
 
 **Local overlays on a reference** (severity, examples). Set aside for this revision. Two severities for one UUID is a second signal. A later revision can add overlays if a consumer has a real case.
 
-**Keep signal UUIDs inside the objective vocabulary.** Set aside. `detection_model` would keep offering signals. The rule spec already rejects those values. A separate `signal` vocabulary is what `ref` completes against.
+**Keep signal UUIDs inside the objective vocabulary.** Set aside. `detection_model` would keep offering signals. The rule spec already rejects those values. A separate `signal` vocabulary is what the binding key completes against.
+
+**YAML key `ref`.** Withdrawn. It names a pointer, which is the mechanism, and it sits next to `references` (URLs on the objective) and `opentide-relation` without saying that the author is reusing a signal. Candidates are in [Field name](#field-name).
 
 ## Unresolved questions
 
-1. Confirm indirect reason `shares` (co-consumers). Dropping it leaves `owns` only. The YAML does not change either way. This RFC includes `shares` so a rule covers every DOM that lists the signal.
-2. Confirm ATT&CK layers stay on the direct DOM. Indirect threat techniques would widen `techniques_resolver` and double-count layers if they were copied onto the rule.
-3. Confirm the TLP rank, including `amber` versus `amber+strict`. This RFC treats `amber+strict` as stricter: an `amber+strict` objective may reference an `amber` signal; the reverse is `signal_ref_tlp`.
-4. Should a definition's `parent` be required to sit in the same effective set, or is any library signal enough? This RFC says MUST be in the library and SHOULD be in the same effective set.
+1. Pick the binding key. Working key in examples is `reuse`. See [Field name](#field-name). `ref` is withdrawn.
+2. Confirm indirect reason `shares` (co-consumers). Dropping it leaves `owns` only. The YAML does not change either way. This RFC includes `shares` so a rule covers every DOM that lists the signal.
+3. Confirm ATT&CK layers stay on the direct DOM. Indirect threat techniques would widen `techniques_resolver` and double-count layers if they were copied onto the rule.
+4. Confirm the TLP rank, including `amber` versus `amber+strict`. This RFC treats `amber+strict` as stricter: an `amber+strict` objective may bind an `amber` signal; the reverse is `signal_tlp`.
+5. Should a definition's `parent` be required to sit in the same effective set, or is any library signal enough? This RFC says MUST be in the library and SHOULD be in the same effective set.
 
 ## References
 
