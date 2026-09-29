@@ -19,7 +19,7 @@ Decisions:
 3. **Every rule type the Security UI can create, except a saved query:** `query`, `eql`, `esql`, `threshold`, `new_terms`, `threat_match`, and `machine_learning`. A saved query is a Kibana object loaded by id on each run, so the detection text would not live in the rule file.
 4. **Identity is the MDR UUID.** Kibana's user-settable `rule_id` is set to `metadata.uuid`. It is unique per space, so one UUID serves every tenant, and alerts carry it as `kibana.alert.rule.rule_id`. Kibana's internal `id` is never stored, and nothing is written back to the rule file.
 5. **Validation:** offline syntax checks per query language, plus live validation through the rule preview API. Two Elasticsearch checks also run before every deploy, because Kibana accepts a mistyped ES\|QL command or aggregation field and the rule then fails silently ([Elasticsearch checks](#elasticsearch-checks)).
-6. **The Security rule screens, in the author's words.** Durations are written `5m`, `1h`, `14d`. `index` is optional and, when set, a list of patterns (`[logs-*]`). Severity, risk, the schedule, suppression, guides, and exceptions are blocks a detection engineer can scan. Keys that exist for only one rule type sit in `eql`, `threshold`, `new_terms`, `threat`, or `machine_learning`. The compiler flattens those blocks to detection-engine fields. `passthrough` is only for a detection-engine field the create-rule UI does not show.
+6. **The Security create-rule screens, in the author's words.** Durations are written `5m`, `1h`, `14d`. `index` is optional and, when set, a list of patterns (`[logs-*]`). Severity, risk, the schedule, suppression, guides, exceptions, overrides, and actions are blocks a detection engineer can scan. Keys that exist for only one rule type sit in `eql`, `threshold`, `new_terms`, `threat`, or `machine_learning`. The compiler flattens those blocks to detection-engine fields. Fields the create-rule UI does not show are not authored.
 
 The change is additive: it adds a `configurations.elastic` key and a new platform schema. `rule::1.0` keeps its identifier and every existing rule stays valid.
 
@@ -81,7 +81,19 @@ Spaces isolate rules, alerts, and exceptions, but not source data. A rule in spa
 
 A saved query (`saved_id`) is out of scope. Kibana loads that object on every run, the id differs per space, and an edit in Discover changes the rule with no diff in the file. The same detection is `type: query` with the text in `query`.
 
-The common required set on create is `name`, `description`, `type`, `severity`, and `risk_score`.
+The common required set on create is `name`, `description`, `type`, `severity`, and `risk_score`. `index` is not part of that set.
+
+The author block follows the [create-rule wizard](https://www.elastic.co/guide/en/security/8.19/rules-ui-create.html) (8.19, and the same screens on 9.x):
+
+| Screen | Author keys |
+|--------|-------------|
+| Define rule | `type`, `query`, `language`, `index` or `data_view_id`, `filters`, `suppression`, `required_fields`, `integration`, plus the type object |
+| About rule | rule `name` and `description`, `severity`, `risk`, `tags` |
+| Advanced settings | `references`, `false_positives`, `techniques`, `highlighted_fields`, `guide`, `metadata.author`, `exceptions.endpoint`, `building_block`, `scheduling.max_alerts`, `threat.indicator_path`, `overrides` |
+| Schedule | `scheduling.interval`, `scheduling.lookback` |
+| Rule actions, response actions, Timeline template | `actions.notify`, `actions.respond`, `actions.timeline` |
+
+Not authored, because a detection engineer does not set them on those screens: saved queries, the prebuilt-rule `license` string, `concurrent_searches`, `items_per_search`, `meta`, `output_index`, `namespace`, and `throttle`. The last six are copied back from the remote rule when present, so an update does not wipe them.
 
 ### Versions and licensing
 
@@ -206,8 +218,6 @@ class ElasticConfig(PlatformConfigBase):
     eql: ElasticEql | None = None                        # only for type eql
     threat: ElasticThreatMatch | None = None             # iff type threat_match; not the ATT&CK array
     machine_learning: ElasticMachineLearning | None = None
-    rule_name_override: str | None = None                # Alerts table title
-    timestamp: ElasticTimestamp | None = None            # query clock; not the Timeline template
     integration: list[str | ElasticIntegration] | None = None
     required_fields: list[ElasticRequiredField] | None = None
     guide: ElasticGuide | None = None                    # Investigation guide and Setup guide
@@ -215,10 +225,8 @@ class ElasticConfig(PlatformConfigBase):
     tags: list[str] | None = None
     exceptions: ElasticExceptions | None = None
     building_block: bool = False                         # one checkbox; false is not sent
-    actions: list[dict[str, Any]] | None = None          # notification connectors on this rule
-    response_actions: list[dict[str, Any]] | None = None # .endpoint or .osquery on this rule
-    timeline: ElasticTimeline | None = None              # Timeline template on this rule
-    passthrough: dict[str, Any] | None = None            # unmapped detection-engine fields only
+    overrides: ElasticOverrides | None = None            # Advanced settings: rule name and timestamp
+    actions: ElasticActions | None = None                # notifications, response, Timeline template
 
 class ElasticSuppression(TideModel):
     group_by: list[str] | None = None         # 1–3 field names; absent for threshold
@@ -272,9 +280,10 @@ class ElasticRisk(TideModel):
     score: int | None = None                  # 0–100; omitted uses the severity table
     mapping: list[ElasticRiskScoreMapping] | None = None
 
-class ElasticTimestamp(TideModel):
-    override: str | None = None               # Kibana timestamp_override
-    disable_fallback: bool | None = None      # Kibana timestamp_override_fallback_disabled
+class ElasticOverrides(TideModel):
+    name: str | None = None                   # Rule name override → rule_name_override
+    timestamp: str | None = None              # Timestamp override → timestamp_override
+    disable_fallback: bool | None = None      # "Do not use @timestamp as a fallback timestamp field"
 
 class ElasticGuide(TideModel):
     investigation: str | None = None          # Kibana note, the Investigation guide
@@ -293,6 +302,11 @@ class ElasticExceptionList(TideModel):
 class ElasticTimeline(TideModel):
     id: str | None = None
     title: str | None = None
+
+class ElasticActions(TideModel):
+    notify: list[dict[str, Any]] | None = None    # Rule actions: connector id, params, frequency
+    respond: list[dict[str, Any]] | None = None   # Response actions: endpoint or osquery
+    timeline: ElasticTimeline | None = None       # Timeline template attached to the rule
 
 class ElasticFilter(TideModel):
     field: str | None = None                  # phrase shorthand, with value
@@ -316,9 +330,7 @@ class ElasticThreatMatch(TideModel):
     language: Literal["kuery", "lucene"] | None = None
     mapping: list[ElasticThreatGroup]         # Kibana threat_mapping
     filters: list[dict[str, Any]] | None = None
-    indicator_path: str | None = None         # Kibana threat_indicator_path
-    concurrent_searches: int | None = None    # API only; Kibana concurrent_searches
-    items_per_search: int | None = None       # API only; Kibana items_per_search
+    indicator_path: str | None = None         # Indicator prefix override; default threat.indicator
 
 class ElasticMachineLearning(TideModel):
     job_id: str | list[str]                   # Kibana machine_learning_job_id; either shape
@@ -330,7 +342,7 @@ class ElasticMachineLearning(TideModel):
 <!-- rfc0006:constraints-table -->
 | Code | Constraint |
 |------|------------|
-| `type_block` | `threshold` iff `type: threshold`. `new_terms` iff `type: new_terms`, and it has `fields` and `history_window_start`. `eql` only for `type: eql`. `threat` iff `type: threat_match`, and it has `index`, `query`, and `mapping`. `machine_learning` iff `type: machine_learning`, and it has `job_id` and `anomaly_threshold`. `query` is required except for `machine_learning`. The old flat names (`interval`, `from`, `alert_suppression`, `risk_score`, `license`, `note`, `setup`, `max_signals`, `saved_id`, and the other pre-grouping keys) are invalid. |
+| `type_block` | `threshold` iff `type: threshold`. `new_terms` iff `type: new_terms`, and it has `fields` and `history_window_start`. `eql` only for `type: eql`. `threat` iff `type: threat_match`, and it has `index`, `query`, and `mapping`. `machine_learning` iff `type: machine_learning`, and it has `job_id` and `anomaly_threshold`. `query` is required except for `machine_learning`. Flat pre-grouping names (`interval`, `from`, `alert_suppression`, `rule_name_override`, `response_actions`, `timestamp`, `timeline`, `passthrough`, `license`, and the other retired keys) are invalid. `actions` is an object, not a list. |
 | `language` | `language` MUST NOT be set for `eql`, `esql`, or `machine_learning` |
 | `esql_source` | `esql` and `machine_learning` MUST NOT set `index`, `data_view_id`, or `filters` |
 | `index_xor_data_view` | `index` and `data_view_id` are mutually exclusive |
@@ -342,8 +354,7 @@ class ElasticMachineLearning(TideModel):
 | `duration` | Every duration is a positive integer followed by `s`, `m`, `h`, or `d`, or ISO 8601 with whole seconds, and is > 0. `scheduling.lookback` may be `0m`. |
 | `filter_shape` | A filter entry is either `{field, value, negate?}` or a raw `{meta, query}` object, never both. |
 | `exception_type` | `exceptions.lists[].type` is `detection` or `rule_default`. The endpoint list is added only by `exceptions.endpoint: true`. |
-| `response_action` | `response_actions[].action_type_id` is `.endpoint` (`isolate`, `kill-process`, `suspend-process`, or `runscript` on 9.4+) or `.osquery`. |
-| `override_key` | `passthrough` MUST NOT contain a key from the [field mapping](#3-field-mapping) or [preserved fields](#5-deployment) tables |
+| `response_action` | `actions.respond` is `{endpoint: isolate\|kill-process\|suspend-process\|runscript, comment?, field?}` or `{osquery: {query, ...}}`. `runscript` is 9.4+. |
 
 Validation SHOULD warn when `scheduling.lookback` is `0m` (the next run starts as the window ends; Elastic recommends at least one minute), and when a non-aggregating ES\|QL query (no `STATS`) lacks `METADATA _id` (alerts are not deduplicated).
 
@@ -383,7 +394,7 @@ The deployer compiles each MDR into a detection-engine create or update body:
 | `threat_query`, `threat_language`, `threat_indicator_path` | `threat.query`, `threat.language`, `threat.indicator_path` | verbatim |
 | `threat_filters` | `threat.filters` | same phrase shorthand or raw object as `filters` |
 | `threat_mapping` | `threat.mapping` | an entry with no `type` is sent as `type: mapping` |
-| `concurrent_searches`, `items_per_search` | `threat.concurrent_searches`, `threat.items_per_search` | verbatim, under those Kibana names (no `threat_` prefix). Not in the create UI. On update, an omitted value is kept from the remote rule. |
+| `concurrent_searches`, `items_per_search` | — | not authored. Indicator-match batching knobs the create UI does not show. On update, an omitted value is kept. |
 | `machine_learning_job_id` | `machine_learning.job_id` | verbatim. A string or a list; the compiler does not wrap or unwrap it. |
 | `anomaly_threshold` | `machine_learning.anomaly_threshold` | verbatim |
 | `alert_suppression` | `suppression` | `{group_by, duration?, missing_fields_strategy}`; for threshold `{duration}` only. `duration` is `{value, unit}`. Omitted when tenant `setup.suppression` is `false`. |
@@ -393,20 +404,19 @@ The deployer compiles each MDR into a detection-engine create or update body:
 | `false_positives` | `false_positives` | verbatim |
 | `setup` | `guide.setup` | the Setup guide. Not the tenant `setup` block. |
 | `max_signals` | `scheduling.max_alerts` | Max alerts per run. Omitted means the detection engine's default of 100. |
-| `rule_name_override` | `rule_name_override` | verbatim. Alerts table title. |
-| `timestamp_override` | `timestamp.override` | the field the query clock uses instead of `@timestamp` |
-| `timestamp_override_fallback_disabled` | `timestamp.disable_fallback` | verbatim |
+| `rule_name_override` | `overrides.name` | Rule name override. Alerts table title. |
+| `timestamp_override` | `overrides.timestamp` | Timestamp override. The query clock, instead of `@timestamp`. |
+| `timestamp_override_fallback_disabled` | `overrides.disable_fallback` | the Advanced settings checkbox "Do not use @timestamp as a fallback timestamp field" |
 | `exceptions_list` | `exceptions.lists`, `exceptions.endpoint` | list `type` is `detection` or `rule_default`. `endpoint: true` adds `{id: endpoint_list, list_id: endpoint_list, namespace_type: agnostic, type: endpoint}`. Omitted keeps the remote list. |
 | `building_block_type` | `building_block: true` | `"default"`. Alerts are hidden from the default Alerts view and can feed later rules. `false` is not sent. |
-| `actions` | `actions` | notification connectors on this detection rule. Omitted keeps the remote value. |
-| `response_actions` | `response_actions` | `.endpoint` (`isolate`, `kill-process`, `suspend-process`, `runscript` on 9.4+) or `.osquery`. Omitted keeps the remote value. |
-| `timeline_id`, `timeline_title` | `timeline.id`, `timeline.title` | Timeline template on this rule. Omitted keeps the remote value. |
+| `actions` | `actions.notify` | Rule actions step: connector id, params, and frequency. Omitted keeps the remote value. |
+| `response_actions` | `actions.respond` | `{endpoint: isolate\|kill-process\|suspend-process\|runscript, comment?, field?}` or `{osquery: {...}}`. `field` is the custom process field (overwrite false). Omitted keeps the remote value. |
+| `timeline_id`, `timeline_title` | `actions.timeline.id`, `actions.timeline.title` | Timeline template attached to the rule. Omitted keeps the remote value. |
 | `tags` | `"OpenTide"`, tenant `setup.tags`, block `tags` | in that order, de-duplicated |
 | `author` | `metadata.author`, `metadata.contributors` | de-duplicated; omitted if empty |
 | `references` | `references.public` | values in ascending key order |
 | `note` | `guide.investigation`, else `response.procedure.analysis` | Investigation guide, trailing whitespace stripped |
 | `threat` | resolved techniques | [Threat](#threat). Not the YAML `threat` object. |
-| anything else | `passthrough` | merged last. Only an unmapped detection-engine field. `license` may be set here when a catalogue must copy a prebuilt rule's license string; custom rules omit it. |
 
 Absent optional sources produce no key. The deployer MUST NOT send `id` or `version`.
 
@@ -562,10 +572,6 @@ configurations:
     - package: windows
       integration: sysmon
       version: ^2.0.0
-    rule_name_override: process.command_line
-    timestamp:
-      override: event.ingested
-      disable_fallback: true
     guide:
       investigation: |
         Read process.command_line and the URL in -urlcache or -verifyctl.
@@ -586,24 +592,27 @@ configurations:
         list_id: certutil-software-distribution
         namespace_type: single
         type: detection
+    overrides:
+      name: process.command_line
+      timestamp: event.ingested
+      disable_fallback: true
     actions:
-    - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
-      action_type_id: .slack
-      group: default
-      params:
-        message: Certutil download on {{host.name}} by {{user.name}}
-      frequency:
-        summary: true
-        notifyWhen: onActiveAlert
-        throttle: null
-    response_actions:
-    - action_type_id: .endpoint
-      params:
-        command: isolate
+      notify:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: Certutil download on {{host.name}} by {{user.name}}
+        frequency:
+          summary: true
+          notifyWhen: onActiveAlert
+          throttle: null
+      respond:
+      - endpoint: isolate
         comment: Isolate the host that ran certutil -urlcache or -verifyctl.
-    timeline:
-      id: 3d6f8a20-1c54-4b79-8e02-5a9c7d1e4b36
-      title: Windows process investigation
+      timeline:
+        id: 3d6f8a20-1c54-4b79-8e02-5a9c7d1e4b36
+        title: Windows process investigation
 ```
 
 Compiled for tenant `elastic-staging` and sent as `POST https://soc-staging.kb.eu-west-1.aws.elastic.cloud/s/staging/api/detection_engine/rules`:
@@ -660,12 +669,9 @@ Compiled for tenant `elastic-staging` and sent as `POST https://soc-staging.kb.e
       "value": ""
     }
   ],
+  "rule_name_override": "process.command_line",
   "timestamp_override": "event.ingested",
   "timestamp_override_fallback_disabled": true,
-  "timeline_id": "3d6f8a20-1c54-4b79-8e02-5a9c7d1e4b36",
-  "timeline_title": "Windows process investigation",
-  "max_signals": 200,
-  "rule_name_override": "process.command_line",
   "actions": [
     {
       "id": "c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64",
@@ -690,6 +696,9 @@ Compiled for tenant `elastic-staging` and sent as `POST https://soc-staging.kb.e
       }
     }
   ],
+  "timeline_id": "3d6f8a20-1c54-4b79-8e02-5a9c7d1e4b36",
+  "timeline_title": "Windows process investigation",
+  "max_signals": 200,
   "alert_suppression": {
     "group_by": [
       "host.name",
@@ -871,10 +880,6 @@ configurations:
       type: keyword
     integration:
     - endpoint
-    rule_name_override: process.command_line
-    timestamp:
-      override: event.ingested
-      disable_fallback: false
     guide:
       investigation: |
         Confirm the three events share host.id and fall inside maxspan=2m.
@@ -893,27 +898,28 @@ configurations:
         list_id: office-addin-installers
         namespace_type: single
         type: detection
+    overrides:
+      name: process.command_line
+      timestamp: event.ingested
+      disable_fallback: false
     actions:
-    - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
-      action_type_id: .slack
-      group: default
-      params:
-        message: Word spawned PowerShell via cmd on {{host.name}}
-      frequency:
-        summary: true
-        notifyWhen: onActiveAlert
-        throttle: null
-    response_actions:
-    - action_type_id: .endpoint
-      params:
-        command: kill-process
+      notify:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: Word spawned PowerShell via cmd on {{host.name}}
+        frequency:
+          summary: true
+          notifyWhen: onActiveAlert
+          throttle: null
+      respond:
+      - endpoint: kill-process
         comment: Kill the PowerShell process started from the Word chain.
-        config:
-          field: process.entity_id
-          overwrite: false
-    timeline:
-      id: 3d6f8a20-1c54-4b79-8e02-5a9c7d1e4b36
-      title: Windows process investigation
+        field: process.entity_id
+      timeline:
+        id: 3d6f8a20-1c54-4b79-8e02-5a9c7d1e4b36
+        title: Windows process investigation
 ```
 
 **Example C: `esql`.** No `index`, `data_view_id`, `language`, or `filters`. `FROM` selects the data. Suppression groups on `source.ip`, which the `STATS` keeps as a column. `lookback: 5m` with `interval: 15m` is sent as `from: now-20m`.
@@ -993,10 +999,6 @@ configurations:
       integration: security
       version: ^1.0.0
     - windows
-    rule_name_override: source.ip
-    timestamp:
-      override: event.ingested
-      disable_fallback: false
     guide:
       investigation: |
         source.ip is the spray source. 0xC000006A is a wrong password for
@@ -1017,25 +1019,28 @@ configurations:
         list_id: known-nats-password-spray
         namespace_type: single
         type: detection
+    overrides:
+      name: source.ip
+      timestamp: event.ingested
+      disable_fallback: false
     actions:
-    - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
-      action_type_id: .slack
-      group: default
-      params:
-        message: Password spray from {{source.ip}}
-      frequency:
-        summary: true
-        notifyWhen: onThrottleInterval
-        throttle: 1h
-    response_actions:
-    - action_type_id: .osquery
-      params:
-        query: SELECT user, host, time FROM logged_in_users;
-        timeout: 60
-        ecs_mapping: {}
-    timeline:
-      id: 9b1e4c70-2a85-4d63-b0f7-6c8a3e5d1f24
-      title: Windows logon investigation
+      notify:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: Password spray from {{source.ip}}
+        frequency:
+          summary: true
+          notifyWhen: onThrottleInterval
+          throttle: 1h
+      respond:
+      - osquery:
+          query: SELECT user, host, time FROM logged_in_users;
+          timeout: 60
+      timeline:
+        id: 9b1e4c70-2a85-4d63-b0f7-6c8a3e5d1f24
+        title: Windows logon investigation
 ```
 
 **Example D: `threshold`.** Suppression is a duration, with no `group_by`. `language: lucene` is the other legal event language. `threshold.cardinality` is one object here and a one-item list in the body.
@@ -1119,10 +1124,6 @@ configurations:
     - package: system
       integration: security
       version: ^1.0.0
-    rule_name_override: user.name
-    timestamp:
-      override: event.ingested
-      disable_fallback: false
     guide:
       investigation: |
         threshold.field groups by user.name. cardinality requires 8 distinct
@@ -1142,25 +1143,28 @@ configurations:
         list_id: scanner-test-accounts
         namespace_type: single
         type: detection
+    overrides:
+      name: user.name
+      timestamp: event.ingested
+      disable_fallback: false
     actions:
-    - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
-      action_type_id: .slack
-      group: default
-      params:
-        message: Account {{user.name}} failed logon from many source addresses.
-      frequency:
-        summary: true
-        notifyWhen: onActiveAlert
-        throttle: null
-    response_actions:
-    - action_type_id: .osquery
-      params:
-        query: SELECT user, host, time FROM logged_in_users;
-        timeout: 60
-        ecs_mapping: {}
-    timeline:
-      id: 9b1e4c70-2a85-4d63-b0f7-6c8a3e5d1f24
-      title: Windows logon investigation
+      notify:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: Account {{user.name}} failed logon from many source addresses.
+        frequency:
+          summary: true
+          notifyWhen: onActiveAlert
+          throttle: null
+      respond:
+      - osquery:
+          query: SELECT user, host, time FROM logged_in_users;
+          timeout: 60
+      timeline:
+        id: 9b1e4c70-2a85-4d63-b0f7-6c8a3e5d1f24
+        title: Windows logon investigation
 ```
 
 **Example E: `new_terms`.** `new_terms.history_window_start` is the history window, separate from the schedule. `lookback: 5m` with `interval: 1h` is sent as `from: now-65m`. A suppression duration of `1d` is sent as 24 hours.
@@ -1249,10 +1253,6 @@ configurations:
     - package: aws
       integration: cloudtrail
       version: ^2.0.0
-    rule_name_override: aws.cloudtrail.user_identity.arn
-    timestamp:
-      override: event.ingested
-      disable_fallback: false
     guide:
       investigation: |
         The new value is the pair user.name plus cloud.account.id.
@@ -1272,25 +1272,28 @@ configurations:
         list_id: iam-break-glass-key-creators
         namespace_type: single
         type: detection
+    overrides:
+      name: aws.cloudtrail.user_identity.arn
+      timestamp: event.ingested
+      disable_fallback: false
     actions:
-    - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
-      action_type_id: .slack
-      group: default
-      params:
-        message: First CreateAccessKey in 14d for {{user.name}} in {{cloud.account.id}}
-      frequency:
-        summary: true
-        notifyWhen: onActiveAlert
-        throttle: null
-    response_actions:
-    - action_type_id: .osquery
-      params:
-        query: SELECT * FROM users;
-        timeout: 60
-        ecs_mapping: {}
-    timeline:
-      id: 5e2a7c90-8b14-4f36-a1d8-0c6b9e3f7a52
-      title: AWS CloudTrail investigation
+      notify:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: First CreateAccessKey in 14d for {{user.name}} in {{cloud.account.id}}
+        frequency:
+          summary: true
+          notifyWhen: onActiveAlert
+          throttle: null
+      respond:
+      - osquery:
+          query: SELECT * FROM users;
+          timeout: 60
+      timeline:
+        id: 5e2a7c90-8b14-4f36-a1d8-0c6b9e3f7a52
+        title: AWS CloudTrail investigation
 ```
 
 **Example F: `threat_match`.** The event query, index, language, and filters stay flat. The indicator side is the `threat` object. That object is not the detection engine's ATT&CK `threat` array; the compiler copies `threat.index` to `threat_index` and fills ATT&CK from `techniques`. Groups are OR. Entries in a group are AND. `negate: true` is DOES NOT MATCH. An entry with no `type` is sent as `type: mapping`.
@@ -1378,8 +1381,6 @@ configurations:
         - field: file.path
           value: threat.indicator.file.path
           negate: true
-      concurrent_searches: 5
-      items_per_search: 10000
     highlighted_fields:
     - file.hash.sha256
     - file.hash.md5
@@ -1397,10 +1398,6 @@ configurations:
     - endpoint
     - package: ti_abusech
       version: '*'
-    rule_name_override: file.hash.sha256
-    timestamp:
-      override: event.ingested
-      disable_fallback: false
     guide:
       investigation: |
         The event query is file creation. The indicator query is under threat.
@@ -1420,24 +1417,27 @@ configurations:
         list_id: approved-software-hashes
         namespace_type: single
         type: detection
+    overrides:
+      name: file.hash.sha256
+      timestamp: event.ingested
+      disable_fallback: false
     actions:
-    - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
-      action_type_id: .slack
-      group: default
-      params:
-        message: 'Malware hash written on {{host.name}}: {{file.hash.sha256}}'
-      frequency:
-        summary: true
-        notifyWhen: onActiveAlert
-        throttle: null
-    response_actions:
-    - action_type_id: .endpoint
-      params:
-        command: isolate
+      notify:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: 'Malware hash written on {{host.name}}: {{file.hash.sha256}}'
+        frequency:
+          summary: true
+          notifyWhen: onActiveAlert
+          throttle: null
+      respond:
+      - endpoint: isolate
         comment: Isolate the host that wrote a file matching a malware indicator.
-    timeline:
-      id: 6a4c1e80-3d25-4b97-9f10-7e2b8c5a1d63
-      title: File hash investigation
+      timeline:
+        id: 6a4c1e80-3d25-4b97-9f10-7e2b8c5a1d63
+        title: File hash investigation
 ```
 
 **Example G: `machine_learning`.** No `query`, `index`, or `language`. `job_id` is a list here; a single job may be a string (`job_id: high_count_network_events`) and is sent unchanged.
@@ -1514,10 +1514,6 @@ configurations:
       type: ip
     integration:
     - packetbeat
-    rule_name_override: host.name
-    timestamp:
-      override: event.ingested
-      disable_fallback: false
     guide:
       investigation: |
         anomaly_threshold 75 is the Kibana anomaly score cutoff. The job's
@@ -1536,25 +1532,28 @@ configurations:
         list_id: backup-network-hosts
         namespace_type: single
         type: detection
+    overrides:
+      name: host.name
+      timestamp: event.ingested
+      disable_fallback: false
     actions:
-    - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
-      action_type_id: .slack
-      group: default
-      params:
-        message: Network anomaly score >= 75 for {{host.name}}
-      frequency:
-        summary: true
-        notifyWhen: onActiveAlert
-        throttle: null
-    response_actions:
-    - action_type_id: .osquery
-      params:
-        query: SELECT pid, name, path, cmdline FROM processes;
-        timeout: 60
-        ecs_mapping: {}
-    timeline:
-      id: 2f7b9e40-5c18-4a62-8d30-1a6e4c8b0f75
-      title: Network anomaly investigation
+      notify:
+      - id: c4e8a1b2-6d30-4f57-9a18-3b7e5c0d2f64
+        action_type_id: .slack
+        group: default
+        params:
+          message: Network anomaly score >= 75 for {{host.name}}
+        frequency:
+          summary: true
+          notifyWhen: onActiveAlert
+          throttle: null
+      respond:
+      - osquery:
+          query: SELECT pid, name, path, cmdline FROM processes;
+          timeout: 60
+      timeline:
+        id: 2f7b9e40-5c18-4a62-8d30-1a6e4c8b0f75
+        title: Network anomaly investigation
 ```
 
 ### Templates
@@ -1658,7 +1657,7 @@ machine_learning:
 
 <!-- rfc0006:invalid -->
 ```yaml
-# expect: esql_source, language, suppression_shape, override_key
+# expect: esql_source, language, suppression_shape
 elastic:
   enabled: true
   schema: platform::elastic::1.0
@@ -1667,7 +1666,6 @@ elastic:
   query: FROM logs-* | LIMIT 10
   index: [logs-*]
   suppression: {duration: 1h}
-  passthrough: {rule_id: my-own-id}
 ```
 
 
@@ -1805,8 +1803,9 @@ opentide adds an `opentide/platforms/elastic/` package with `client`, `deployer`
 | `PATCH` instead of `PUT` | It cannot remove a field the author deleted from YAML (for example `alert_suppression`), so remote state would drift from the MDR. |
 | Emit `detection-rules` TOML or Terraform HCL | Adds an external toolchain and state file; both wrap the same API. |
 | Raw passthrough block (`body: {...}`) | Loses typed validation and ATT&CK derivation. A field the Security create-rule UI shows is a key on the block. |
-| Author the prebuilt-rule `license` string | It does not select a feature tier and is not required to create a custom detection. A catalogue that must copy it uses `passthrough.license`. |
-| One `overrides` bucket for severity, risk, timestamp, and the rule name | Those controls do different jobs. Severity mapping stays under `severity`, risk mapping under `risk`, and the query clock under `timestamp`. |
+| Author the prebuilt-rule `license` string | It does not select a feature tier and it is not on the path a detection engineer uses for a custom rule. |
+| Author `concurrent_searches` and `items_per_search` | Indicator-match batching. The create UI does not show them. An update keeps the remote values. |
+| Leave rule name override, timestamp override, notifications, response actions, and the Timeline template as sibling keys | The Advanced settings screen groups the two overrides. The last create-rule steps are rule actions and response actions, and the Timeline template is the investigation attachment on the same rule. |
 | `saved_query` / `saved_id` | The query text lives in a Kibana saved object. The id differs in every space, and a Discover edit changes the rule with no diff. The same detection is `type: query` with `query`, `language`, and `filters`. |
 | Leave type-specific keys flat (`threat_index`, `machine_learning_job_id`, …) | The create UI already groups them. A conditional object keeps the indicator side, the EQL settings, and the job next to each other. The compiler still sends Kibana's flat names. |
 | Validate only through Elasticsearch (`_validate/query`, `_eql/search`, `_query`) | Cannot check the rule-level fields (threshold, new terms, suppression shape) that preview checks. It is used for ES\|QL only, because Kibana does not parse ES\|QL on create. |

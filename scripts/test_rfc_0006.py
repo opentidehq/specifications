@@ -264,7 +264,7 @@ def derive_threat(techniques: list[str], vocab: dict[str, dict[str, Any]]) -> li
 
 
 _REMOVED_FLAT = frozenset({
-    "saved_id", "interval", "from", "license", "meta", "overrides",
+    "saved_id", "interval", "from", "license", "meta",
     "alert_suppression", "related_integrations", "investigation_fields",
     "max_signals", "note", "setup", "endpoint_exceptions", "exceptions_list",
     "timeline_id", "timeline_title", "timestamp_override",
@@ -276,6 +276,7 @@ _REMOVED_FLAT = frozenset({
     "threat_filters", "threat_indicator_path",
     "concurrent_searches", "items_per_search",
     "machine_learning_job_id", "anomaly_threshold",
+    "rule_name_override", "response_actions", "timestamp", "timeline", "passthrough",
 })
 _ENDPOINT_COMMANDS = frozenset({"isolate", "kill-process", "suspend-process", "runscript"})
 _EXCEPTION_TYPES = frozenset({"detection", "rule_default"})
@@ -355,14 +356,13 @@ def check_block(block: dict[str, Any]) -> set[str]:
     for item in ((block.get("exceptions") or {}).get("lists") or []):
         if not isinstance(item, dict) or item.get("type") not in _EXCEPTION_TYPES:
             codes.add("exception_type")
-    for action in block.get("response_actions") or []:
-        kind = action.get("action_type_id") if isinstance(action, dict) else None
-        command = ((action.get("params") or {}).get("command") if isinstance(action, dict) else None)
-        if kind == ".osquery":
-            continue
-        if kind == ".endpoint" and command in _ENDPOINT_COMMANDS:
-            continue
-        codes.add("response_action")
+    actions = block.get("actions")
+    if isinstance(actions, list):
+        codes.add("type_block")
+    elif isinstance(actions, dict):
+        for action in actions.get("respond") or []:
+            if not isinstance(action, dict) or not _valid_response(action):
+                codes.add("response_action")
     suppression = block.get("suppression")
     if suppression is not None:
         group_by = suppression.get("group_by")
@@ -411,8 +411,6 @@ def check_block(block: dict[str, Any]) -> set[str]:
             duration_seconds(value)
         except ValueError:
             codes.add("duration")
-    if set(block.get("passthrough") or {}) & _forbidden_overrides():
-        codes.add("override_key")
     return codes
 
 
@@ -421,6 +419,29 @@ def base_path(setup: dict[str, Any]) -> str:
     space = setup.get("space", "default")
     prefix = "" if space == "default" else f"/s/{space}"
     return f"{url}{prefix}/api/detection_engine/rules"
+
+
+def _valid_response(action: dict[str, Any]) -> bool:
+    if "endpoint" in action and action["endpoint"] in _ENDPOINT_COMMANDS:
+        return True
+    if "osquery" in action and isinstance(action["osquery"], dict):
+        return True
+    kind = action.get("action_type_id")
+    command = (action.get("params") or {}).get("command")
+    return kind == ".osquery" or (kind == ".endpoint" and command in _ENDPOINT_COMMANDS)
+
+
+def compile_response(action: dict[str, Any]) -> dict[str, Any]:
+    if "endpoint" in action:
+        params: dict[str, Any] = {"command": action["endpoint"]}
+        if action.get("comment"):
+            params["comment"] = action["comment"]
+        if action.get("field"):
+            params["config"] = {"field": action["field"], "overwrite": False}
+        return {"action_type_id": ".endpoint", "params": params}
+    if "osquery" in action:
+        return {"action_type_id": ".osquery", "params": copy.deepcopy(action["osquery"])}
+    return copy.deepcopy(action)
 
 
 def compile_filter(entry: dict[str, Any]) -> dict[str, Any]:
@@ -515,9 +536,6 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
             body["threat_filters"] = [compile_filter(entry) for entry in threat_match["filters"]]
         if threat_match.get("indicator_path") is not None:
             body["threat_indicator_path"] = threat_match["indicator_path"]
-        for key, kibana_key in (("concurrent_searches", "concurrent_searches"), ("items_per_search", "items_per_search")):
-            if threat_match.get(key) is not None:
-                body[kibana_key] = threat_match[key]
         body["threat_mapping"] = [
             {"entries": [{**entry, "type": entry.get("type", "mapping")} for entry in group["entries"]]}
             for group in threat_match["mapping"]
@@ -536,21 +554,26 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
             {"operator": "equals", **entry} if "operator" not in entry else dict(entry)
             for entry in risk["mapping"]
         ]
-    timestamp = block.get("timestamp") or {}
-    if timestamp.get("override") is not None:
-        body["timestamp_override"] = timestamp["override"]
-    if "disable_fallback" in timestamp:
-        body["timestamp_override_fallback_disabled"] = timestamp["disable_fallback"]
-    timeline = block.get("timeline") or {}
-    if timeline.get("id") is not None:
-        body["timeline_id"] = timeline["id"]
-    if timeline.get("title") is not None:
-        body["timeline_title"] = timeline["title"]
+    overrides = block.get("overrides") or {}
+    if overrides.get("name") is not None:
+        body["rule_name_override"] = overrides["name"]
+    if overrides.get("timestamp") is not None:
+        body["timestamp_override"] = overrides["timestamp"]
+    if "disable_fallback" in overrides:
+        body["timestamp_override_fallback_disabled"] = overrides["disable_fallback"]
+    actions = block.get("actions") or {}
+    if isinstance(actions, dict):
+        if actions.get("notify") is not None:
+            body["actions"] = copy.deepcopy(actions["notify"])
+        if actions.get("respond") is not None:
+            body["response_actions"] = [compile_response(item) for item in actions["respond"]]
+        timeline = actions.get("timeline") or {}
+        if timeline.get("id") is not None:
+            body["timeline_id"] = timeline["id"]
+        if timeline.get("title") is not None:
+            body["timeline_title"] = timeline["title"]
     if scheduling.get("max_alerts") is not None:
         body["max_signals"] = scheduling["max_alerts"]
-    for key in ("rule_name_override", "actions", "response_actions"):
-        if block.get(key) is not None:
-            body[key] = copy.deepcopy(block[key])
     suppression = block.get("suppression")
     if suppression is not None and setup.get("suppression", True):
         compiled: dict[str, Any] = {}
@@ -605,7 +628,6 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
     threat = derive_threat(list(rule.get("techniques") or []), _attack())
     if threat:
         body["threat"] = threat
-    body.update(copy.deepcopy(block.get("passthrough") or {}))
     return body
 
 
@@ -706,7 +728,8 @@ class ExampleCompilationTests(unittest.TestCase):
             ],
         )
         self.assertEqual(threat["threat_indicator_path"], "threat.indicator")
-        self.assertEqual(threat["concurrent_searches"], 5)
+        self.assertNotIn("concurrent_searches", threat)
+        self.assertNotIn("items_per_search", threat)
         self.assertEqual(threat["threat"][0]["tactic"]["id"], "TA0002")
         ml = compile_rule(_yaml("rule-ml"), _staging_setup())
         self.assertEqual(check_block(_yaml("rule-ml")["configurations"]["elastic"]), set())
@@ -721,12 +744,15 @@ class ExampleCompilationTests(unittest.TestCase):
         block = rule["configurations"]["elastic"]
         compiled = compile_rule(rule, _staging_setup())
         self.assertEqual(compiled["max_signals"], block["scheduling"]["max_alerts"])
-        self.assertEqual(compiled["timestamp_override"], block["timestamp"]["override"])
+        self.assertEqual(compiled["timestamp_override"], block["overrides"]["timestamp"])
         self.assertEqual(
             compiled["timestamp_override_fallback_disabled"],
-            block["timestamp"]["disable_fallback"],
+            block["overrides"]["disable_fallback"],
         )
-        self.assertEqual(compiled["rule_name_override"], block["rule_name_override"])
+        self.assertEqual(compiled["rule_name_override"], block["overrides"]["name"])
+        self.assertEqual(compiled["actions"], block["actions"]["notify"])
+        self.assertEqual(compiled["timeline_id"], block["actions"]["timeline"]["id"])
+        self.assertEqual(compiled["response_actions"][0]["params"]["command"], "isolate")
         self.assertNotIn("license", compiled)
         self.assertEqual(compiled["severity_mapping"], [
             {"operator": "equals", **entry} for entry in block["severity"]["mapping"]
@@ -795,7 +821,6 @@ class TableConsistencyTests(unittest.TestCase):
             "threshold_fields": {"type": "threshold", "query": "x", "threshold": {"field": [], "value": 0}},
             "risk_score": {"type": "query", "query": "x", "risk": {"score": 101}},
             "duration": {"type": "query", "query": "x", "scheduling": {"interval": "5min", "lookback": "1m"}},
-            "override_key": {"type": "query", "query": "x", "passthrough": {"threat": []}},
             "filter_shape": {
                 "type": "query",
                 "query": "x",
@@ -809,7 +834,7 @@ class TableConsistencyTests(unittest.TestCase):
             "response_action": {
                 "type": "query",
                 "query": "x",
-                "response_actions": [{"action_type_id": ".slack"}],
+                "actions": {"respond": [{"endpoint": "reboot"}]},
             },
         }
         self.assertEqual(table_codes, set(probes))
