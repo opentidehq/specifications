@@ -1,12 +1,16 @@
-# RFC 0006: Elastic Security detection platform
+# RFC 0007: Elastic Security detection platform
 
-- **RFC:** 0006
+- **RFC:** 0007
 - **Title:** Elastic Security detection platform
 - **Author:** OpenTide maintainers
-- **Status:** draft
+- **Status:** accepted
 - **Created:** 2026-09-25
+- **Revised:** 2026-09-29 — author blocks follow the Security create-rule screens
+- **Accepted:** 2026-09-29 — design accepted for the first implementation. Normative spec text and fixtures follow ([§7](#7-spec-changes-after-acceptance)).
 - **Issue:** [OpenTideHQ/specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)
 - **PR:** [OpenTideHQ/specifications#18](https://github.com/OpenTideHQ/specifications/pull/18)
+
+> Numbering note: **RFC 0006** is [Sharing on the production merge](0006-sharing-ci.md). This proposal is **0007**.
 
 ## Summary
 
@@ -108,7 +112,7 @@ Not authored, because a detection engineer does not set them on those screens: s
 
 ### 1. Platform configuration (`platforms/elastic.toml`)
 
-<!-- rfc0006:platform-toml -->
+<!-- rfc0007:platform-toml -->
 ```toml
 [platform]
 enabled = true
@@ -147,7 +151,7 @@ suppression = false
 
 Bundled defaults ship with `enabled = false` and no tenants, as for every platform. `[[modifiers]]` work unchanged on block dot-keys, for example `alert.severity = "Low"` for `STAGING`.
 
-<!-- rfc0006:setup-table -->
+<!-- rfc0007:setup-table -->
 | `tenants.setup` field | Type | Required | Default | Meaning |
 |-----------------------|------|----------|---------|---------|
 | `url` | string | yes | — | Kibana base URL, without `/s/<space>` |
@@ -339,7 +343,7 @@ class ElasticMachineLearning(TideModel):
 
 **Model constraints.** Validation MUST reject a block that breaks any of these:
 
-<!-- rfc0006:constraints-table -->
+<!-- rfc0007:constraints-table -->
 | Code | Constraint |
 |------|------------|
 | `type_block` | `threshold` iff `type: threshold`. `new_terms` iff `type: new_terms`, and it has `fields` and `history_window_start`. `eql` only for `type: eql`. `threat` iff `type: threat_match`, and it has `index`, `query`, and `mapping`. `machine_learning` iff `type: machine_learning`, and it has `job_id` and `anomaly_threshold`. `query` is required except for `machine_learning`. Flat pre-grouping names (`interval`, `from`, `alert_suppression`, `rule_name_override`, `response_actions`, `timestamp`, `timeline`, `passthrough`, `license`, and the other retired keys) are invalid. `actions` is an object, not a list. |
@@ -366,7 +370,7 @@ Validation SHOULD warn when `scheduling.lookback` is `0m` (the next run starts a
 
 The deployer compiles each MDR into a detection-engine create or update body:
 
-<!-- rfc0006:mapping-table -->
+<!-- rfc0007:mapping-table -->
 | Detection-engine field | Source | Rule |
 |--------------|--------|------|
 | `rule_id` | `metadata.uuid` | verbatim |
@@ -422,7 +426,7 @@ Absent optional sources produce no key. The deployer MUST NOT send `id` or `vers
 
 #### Severity
 
-<!-- rfc0006:severity-table -->
+<!-- rfc0007:severity-table -->
 | `alert_severity` | `severity` | `risk_score` |
 |------------------|------------|--------------|
 | Informational | low | 1 |
@@ -443,7 +447,7 @@ The Schedule step asks for two durations: how often the rule runs, and Additiona
 
 Durations use the detection engine's notation: a whole number followed by `s`, `m`, `h`, or `d`. Kibana rejects ISO 8601 (`PT5M`) and weeks (`1w`) in `interval`. ISO 8601 is still accepted on input, for parity with other platform blocks. The deployer converts every duration to the largest unit that divides it exactly. `alert_suppression.duration` has no `d` unit, so days become hours there.
 
-<!-- rfc0006:duration-table -->
+<!-- rfc0007:duration-table -->
 | Written | `interval` / `from` | `alert_suppression.duration` | `history_window_start` |
 |---------|---------------------|------------------------------|------------------------|
 | `5m` | `5m` / `now-5m` | `{value: 5, unit: m}` | `now-5m` |
@@ -464,7 +468,7 @@ The ATT&CK array is derived from the resolved technique set: the rule's `techniq
 3. Emit one `threat` entry per tactic, in table order, with `framework: "MITRE ATT&CK"`. Techniques are sorted by ID. A sub-technique appears under its parent technique; its name is the vocab name minus the `<parent name>: ` prefix. Empty `subtechnique` arrays are omitted.
 4. `reference` values are the vocab `link` for techniques and `https://attack.mitre.org/tactics/<id>/` for tactics.
 
-<!-- rfc0006:tactic-table -->
+<!-- rfc0007:tactic-table -->
 | Stage | Tactic ID |
 |-------|-----------|
 | Reconnaissance | TA0043 |
@@ -488,7 +492,7 @@ Each example is a complete MDR. Deployment status is `configurations.elastic.sta
 
 **Example A: `query`.** Custom query, every shared field set.
 
-<!-- rfc0006:rule-query -->
+<!-- rfc0007:rule-query -->
 ```yaml
 name: Certutil downloading a file
 metadata:
@@ -617,7 +621,7 @@ configurations:
 
 Compiled for tenant `elastic-staging` and sent as `POST https://soc-staging.kb.eu-west-1.aws.elastic.cloud/s/staging/api/detection_engine/rules`:
 
-<!-- rfc0006:body-query -->
+<!-- rfc0007:body-query -->
 ```json
 {
   "rule_id": "6b2e9c14-7a31-4f58-9d0c-1e8a4b7c2d90",
@@ -797,7 +801,7 @@ Compiled for tenant `elastic-staging` and sent as `POST https://soc-staging.kb.e
 
 **Example B: `eql`.** No `language` key. The sequence settings that belong only to EQL sit under `eql`. `lookback: 5m` with `interval: 5m` is five extra minutes, sent as `from: now-10m`.
 
-<!-- rfc0006:rule-eql -->
+<!-- rfc0007:rule-eql -->
 ```yaml
 name: Word spawning cmd.exe and PowerShell
 metadata:
@@ -924,7 +928,7 @@ configurations:
 
 **Example C: `esql`.** No `index`, `data_view_id`, `language`, or `filters`. `FROM` selects the data. Suppression groups on `source.ip`, which the `STATS` keeps as a column. `lookback: 5m` with `interval: 15m` is sent as `from: now-20m`.
 
-<!-- rfc0006:rule-esql -->
+<!-- rfc0007:rule-esql -->
 ```yaml
 name: Password spray from one source address
 metadata:
@@ -1045,7 +1049,7 @@ configurations:
 
 **Example D: `threshold`.** Suppression is a duration, with no `group_by`. `language: lucene` is the other legal event language. `threshold.cardinality` is one object here and a one-item list in the body.
 
-<!-- rfc0006:rule-threshold -->
+<!-- rfc0007:rule-threshold -->
 ```yaml
 name: Many failed logons for one account
 metadata:
@@ -1169,7 +1173,7 @@ configurations:
 
 **Example E: `new_terms`.** `new_terms.history_window_start` is the history window, separate from the schedule. `lookback: 5m` with `interval: 1h` is sent as `from: now-65m`. A suppression duration of `1d` is sent as 24 hours.
 
-<!-- rfc0006:rule-new-terms -->
+<!-- rfc0007:rule-new-terms -->
 ```yaml
 name: IAM user creates an access key for the first time
 metadata:
@@ -1298,7 +1302,7 @@ configurations:
 
 **Example F: `threat_match`.** The event query, index, language, and filters stay flat. The indicator side is the `threat` object. That object is not the detection engine's ATT&CK `threat` array; the compiler copies `threat.index` to `threat_index` and fills ATT&CK from `techniques`. Groups are OR. Entries in a group are AND. `negate: true` is DOES NOT MATCH. An entry with no `type` is sent as `type: mapping`.
 
-<!-- rfc0006:rule-threat -->
+<!-- rfc0007:rule-threat -->
 ```yaml
 name: Created file matches a malware hash
 metadata:
@@ -1442,7 +1446,7 @@ configurations:
 
 **Example G: `machine_learning`.** No `query`, `index`, or `language`. `job_id` is a list here; a single job may be a string (`job_id: high_count_network_events`) and is sent unchanged.
 
-<!-- rfc0006:rule-ml -->
+<!-- rfc0007:rule-ml -->
 ```yaml
 name: Anomalous network volume for a host
 metadata:
@@ -1560,7 +1564,7 @@ configurations:
 
 OpenTide generates one rule template, `rule.1.0.template.yaml` ([workspace layout](../specs/workspace.md)). The Elastic block in it is a custom query, the create-rule UI's starting point. Each other rule type keeps this MDR and replaces the Elastic keys shown under it. The template leaves out the rule's own `status`: deployment reads `configurations.elastic.status`.
 
-<!-- rfc0006:rule-template -->
+<!-- rfc0007:rule-template -->
 ```yaml
 name: Rule name
 metadata:
@@ -1655,7 +1659,7 @@ machine_learning:
 
 **Invalid block.** It violates the constraints named in the comments.
 
-<!-- rfc0006:invalid -->
+<!-- rfc0007:invalid -->
 ```yaml
 # expect: esql_source, language, suppression_shape
 elastic:
@@ -1686,7 +1690,7 @@ Headers: `Authorization: ApiKey <api_key>`, `elastic-api-version: 2023-10-31`, `
 
 `PUT` replaces the whole rule. A field the block sets is sent as written. A field the block omits goes back to Kibana's default, except the fields below, which the deployer copies from the `GET` response when the block does not set them:
 
-<!-- rfc0006:preserved-table -->
+<!-- rfc0007:preserved-table -->
 | Preserved field | Why |
 |-----------------|-----|
 | `actions` | notification connectors on this detection rule |
@@ -1743,7 +1747,7 @@ A one-letter typo therefore becomes a dead rule on 8.19, or a rule that matches 
 
 Elasticsearch's own parser rejects the query, so the deployer sends every `esql` query to Elasticsearch with `LIMIT 0` appended:
 
-<!-- rfc0006:esql-preflight -->
+<!-- rfc0007:esql-preflight -->
 ```json
 {
   "query": "FROM logs-system.security-*, logs-windows.forwarded-*\n| WHERE event.code == \"4625\" AND winlog.event_data.SubStatus == \"0xC000006A\"\n| STATS failures = COUNT(*), accounts = COUNT_DISTINCT(user.name) BY source.ip\n| WHERE accounts >= 8 AND failures >= 20\n| LIMIT 0"
@@ -1826,7 +1830,7 @@ opentide adds an `opentide/platforms/elastic/` package with `client`, `deployer`
 
 ## Appendix A: reference test
 
-The design was checked against local single-node self-managed clusters: Kibana and Elasticsearch 8.19.22 on Basic, and 9.5.4 on Basic and then trial. A throwaway harness compiled Examples A–E with the reference compiler in `scripts/test_rfc_0006.py` and deployed them to space `staging` with the key below. The harness needs a live cluster, so it is not committed.
+The design was checked against local single-node self-managed clusters: Kibana and Elasticsearch 8.19.22 on Basic, and 9.5.4 on Basic and then trial. A throwaway harness compiled Examples A–E with the reference compiler in `scripts/test_rfc_0007.py` and deployed them to space `staging` with the key below. The harness needs a live cluster, so it is not committed.
 
 ```json
 {

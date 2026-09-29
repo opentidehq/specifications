@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Consistency tests for RFC 0006 (Elastic Security platform).
+"""Consistency tests for RFC 0007 (Elastic Security platform).
 
 The helpers are a reference reading of the RFC's normative tables. Every
 example in the RFC is recompiled from those tables and the canonical ATT&CK
@@ -20,7 +20,7 @@ from typing import Any
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-RFC = ROOT / "rfcs" / "0006-elastic-security-platform.md"
+RFC = ROOT / "rfcs" / "0007-elastic-security-platform.md"
 ATTACK = ROOT / "vocabularies" / "att&ck.vocab.toml"
 ALERT_SEVERITY = ROOT / "vocabularies" / "alert_severity.vocab.toml"
 
@@ -95,10 +95,10 @@ def _text() -> str:
 
 
 def _fence(anchor: str) -> tuple[str, str]:
-    pattern = rf"<!-- rfc0006:{re.escape(anchor)} -->\n```(\w+)\n(.*?)\n```"
+    pattern = rf"<!-- rfc0007:{re.escape(anchor)} -->\n```(\w+)\n(.*?)\n```"
     match = re.search(pattern, _text(), flags=re.DOTALL)
     if not match:
-        raise AssertionError(f"RFC 0006 is missing the {anchor!r} fenced block")
+        raise AssertionError(f"RFC 0007 is missing the {anchor!r} fenced block")
     return match.group(1), match.group(2)
 
 
@@ -115,9 +115,9 @@ def _json(anchor: str) -> Any:
 
 
 def _table(anchor: str) -> list[dict[str, str]]:
-    match = re.search(rf"<!-- rfc0006:{re.escape(anchor)} -->\n((?:\|.*\n)+)", _text())
+    match = re.search(rf"<!-- rfc0007:{re.escape(anchor)} -->\n((?:\|.*\n)+)", _text())
     if not match:
-        raise AssertionError(f"RFC 0006 is missing the {anchor!r} table")
+        raise AssertionError(f"RFC 0007 is missing the {anchor!r} table")
     lines = match.group(1).strip().splitlines()
 
     def cells(line: str) -> list[str]:
@@ -204,7 +204,7 @@ def date_math(value: str, units: str = "dhms") -> str:
 def field_types() -> set[str]:
     match = re.search(r"FieldType = Literal\[(.*?)\]", _text(), flags=re.DOTALL)
     if not match:
-        raise AssertionError("RFC 0006 is missing the FieldType literal")
+        raise AssertionError("RFC 0007 is missing the FieldType literal")
     return set(re.findall(r'"([a-z_]+)"', match.group(1)))
 
 
