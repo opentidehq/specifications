@@ -63,6 +63,7 @@
 - rfcs/0005-sharing-system.md
 - rfcs/0006-sharing-ci.md
 - rfcs/0007-elastic-security-platform.md
+- rfcs/0008-rule-reviewed-date.md
 
 ## Agent skills
 
