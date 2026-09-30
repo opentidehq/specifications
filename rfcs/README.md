@@ -21,6 +21,7 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0005](0005-sharing-system.md) | Sharing system and MISP connector | accepted |
 | [0006](0006-sharing-ci.md) | Sharing on the production merge | accepted |
 | [0007](0007-elastic-security-platform.md) | Elastic Security detection platform | accepted |
+| [0008](0008-rule-document-shape.md) | Detection rule document shape (`rule::2.0`) | draft |
 
 ## Numbering
 
