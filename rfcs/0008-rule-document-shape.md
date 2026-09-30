@@ -15,7 +15,7 @@ A threat file has a `threat:` block. An objective file has an `objective:` block
 
 `rule::2.0` puts the detection in a `rule:` block and places each platform directly on that block. Platform payloads stay as they are. Deployment status stays on the platform, which is where deploy already reads it. The link to an objective is named `objective`.
 
-Files that still say `rule::1.0` keep today's layout. Running both shapes in one workspace is a versioning requirement, specified separately in [specs/versioning.md](../specs/versioning.md). This RFC does not redesign Sentinel, Splunk, or any other platform.
+Files that still say `rule::1.0` keep today's layout. Both shapes have to validate, deploy, and survive every other feature; that requirement is the versioning spec ([#27](https://github.com/OpenTideHQ/specifications/pull/27)), not this proposal. This RFC does not redesign Sentinel, Splunk, or any other platform.
 
 ## Motivation
 
@@ -142,5 +142,5 @@ Leaving the fields on the root and only renaming `configurations` keeps rules as
 - [OpenTideHQ/specifications#24](https://github.com/OpenTideHQ/specifications/issues/24)
 - [OpenTideHQ/opentide#394](https://github.com/OpenTideHQ/opentide/issues/394)
 - [specs/objects/rule-1.0.md](../specs/objects/rule-1.0.md), [specs/objects/threat-1.0.md](../specs/objects/threat-1.0.md), [specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md)
-- [specs/versioning.md](../specs/versioning.md) — both revisions have to work for validation, deployment, and every other feature
+- [specs/versioning.md](../specs/versioning.md) — both revisions have to work for validation, deployment, and every other feature ([#27](https://github.com/OpenTideHQ/specifications/pull/27))
 - [RFC 0007](0007-elastic-security-platform.md) — Elastic block, unchanged, new location only
