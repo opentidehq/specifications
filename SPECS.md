@@ -9,7 +9,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 
 | Spec | Version | Schema ID | Status | Path |
 |------|---------|-----------|--------|------|
-| Versioning | 1.0 | — | normative | [specs/versioning.md](specs/versioning.md) |
+| Versioning | 1.1 | — | normative | [specs/versioning.md](specs/versioning.md) |
 | Metadata | 1.1 | — | normative | [specs/metadata.md](specs/metadata.md) |
 | Threat object | 1.0 | `threat::1.0` | normative | [specs/objects/threat-1.0.md](specs/objects/threat-1.0.md) |
 | Objective object | 1.0 | `objective::1.0` | normative | [specs/objects/objective-1.0.md](specs/objects/objective-1.0.md) |
