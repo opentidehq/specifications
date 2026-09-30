@@ -19,7 +19,7 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 - Static validation MUST NOT require `sigma` or `yara`. `maturity`, `confidence`, and `action` have defaults, so a block with only the shared fields validates.
 - Deploy MUST fail unless `sigma` or `yara` is present.
 - When both are present, deploy MUST publish `sigma` and MUST NOT publish `yara`.
-- A `sigma` object MUST include `logsource.category`, `logsource.product`, `selections`, and `condition`. Each selection MUST include `name`, `field`, and `value`.
+- A `sigma` object MUST include `logsource.category`, `logsource.product`, `selections`, and `condition` for static validation. Each selection MUST include `name`, `field`, and `value`. The HarfangLab loader supplies an empty `selections` list when that key is omitted, so registry load accepts a Sigma block the validator rejects.
 - A `yara` object MUST include `meta.context`, `meta.os`, `strings`, and `condition`.
 - `action` SHOULD be `Alert`, `Alert & Block`, or `Alert, Block & Quarantine`. Any other string deploys as `alert`.
 - `maturity` SHOULD be `Stable`, `Testing`, or `Experimental`. Any other string deploys as `experimental`.
@@ -32,13 +32,13 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `maturity` | string | no | `Experimental` | Rule maturity. Mapped to HarfangLab `hl_status`. |
-| `confidence` | string | no | `Moderate` | Analyst confidence. Mapped to `rule_confidence_override`. |
-| `action` | string | no | `Alert` | What the agent does on a match. Mapped to `global_state`. |
-| `tags` | list[string] | no | null | Sigma tags, and the YARA `tags` meta line. |
-| `sigma` | [HarfangLabSigma](#sigma-harfanglabsigma) | no | null | Behavioural rule. Preferred when `yara` is also set. |
-| `yara` | [HarfangLabYara](#yara-harfanglabyara) | no | null | File or memory scan rule. |
-| `rule_id_bundle` | map[string, string] | no | null | Accepted. Not used for the HarfangLab id. |
+| `maturity` | string | optional | `Experimental` | Rule maturity. Mapped to HarfangLab `hl_status`. |
+| `confidence` | string | optional | `Moderate` | Analyst confidence. Mapped to `rule_confidence_override`. |
+| `action` | string | optional | `Alert` | What the agent does on a match. Mapped to `global_state`. |
+| `tags` | list[string] | optional | null | Sigma tags, and the YARA `tags` meta line. |
+| `sigma` | [HarfangLabSigma](#sigma-harfanglabsigma) | optional | null | Behavioural rule. Preferred when `yara` is also set. |
+| `yara` | [HarfangLabYara](#yara-harfanglabyara) | optional | null | File or memory scan rule. |
+| `rule_id_bundle` | map[string, string] | optional | null | Accepted. Not used for the HarfangLab id. |
 
 ### Action, maturity, and confidence
 
@@ -86,7 +86,7 @@ Deploy builds a Sigma YAML document. The title is the Tide rule `name`, the id i
 | `logsource.product` | string | yes | Sigma logsource product (`windows`). |
 | `selections` | list[Selection] | yes | Named selections. |
 | `condition` | string | yes | Sigma condition expression (`selection`, `selection1 and selection2`). |
-| `false_positives` | list[string] | no | Sigma false-positive notes. |
+| `false_positives` | list[string] | optional | Sigma false-positive notes. |
 
 `selections[]`:
 
@@ -95,7 +95,7 @@ Deploy builds a Sigma YAML document. The title is the Tide rule `name`, the id i
 | `name` | string | yes | Selection name used by `condition`. |
 | `field` | string | yes | Event field (`Image`, `CommandLine`). |
 | `value` | string \| number \| boolean \| list of those | yes | Match value. A list is a Sigma list. |
-| `modifiers` | list[string] | no | Sigma modifiers (`contains`, `endswith`). Empty when omitted. |
+| `modifiers` | list[string] | optional | Sigma modifiers (`contains`, `endswith`). Empty when omitted. |
 
 ### `yara` (HarfangLabYara)
 
@@ -106,7 +106,7 @@ Deploy builds a YARA rule. The rule name is the Tide rule `name` lowercased, wit
 | `meta` | [YaraMeta](#yarameta) | yes | Scan context, OS, and optional score override. |
 | `strings` | string | yes | YARA string section body, one definition per line, without the `strings:` header. |
 | `condition` | string | yes | YARA condition body, without the `condition:` header. |
-| `imports` | list[string] | no | YARA modules (`pe`, `elf`). Each becomes `import "<module>"`. |
+| `imports` | list[string] | optional | YARA modules (`pe`, `elf`). Each becomes `import "<module>"`. |
 
 #### `yara.meta`
 
@@ -114,9 +114,9 @@ Deploy builds a YARA rule. The rule name is the Tide rule `name` lowercased, wit
 |-------|------|----------|-------------|
 | `context` | list[string] | yes | Scan contexts. The value `file` is rewritten from `os`: `Windows` → `file.pe`, `MacOS` → `file.macho`, `Linux` → `file.elf`. Other context values are kept. |
 | `os` | string | yes | `Windows`, `MacOS`, or `Linux`. Also written to meta `os`. |
-| `arch` | list[string] | no | Architectures, joined with commas. |
-| `score` | string | no | `Informational`, `Low`, `Medium`, `High`, or `Critical`. A known value overrides the score taken from `response.alert_severity`. An unknown value falls back to that severity, then to 50. |
-| `classification` | string | no | Free-form classification written to meta. |
+| `arch` | list[string] | optional | Architectures, joined with commas. |
+| `score` | string | optional | `Informational`, `Low`, `Medium`, `High`, or `Critical`. A known value overrides the score taken from `response.alert_severity`. An unknown value falls back to that severity, then to 50. |
+| `classification` | string | optional | Free-form classification written to meta. |
 
 Author meta uses `metadata.author`, then `metadata.organisation.name`. `metadata.created` and `metadata.modified` are written when set. Public references are joined into meta `references`.
 

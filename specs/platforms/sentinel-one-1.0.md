@@ -31,9 +31,9 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `condition` | [SentinelOneCondition](#condition-sentinelonecondition) | yes | — | Single-event or correlation query. |
-| `response` | [SentinelOneResponse](#response-sentineloneresponse) | no | null | Threat verdict and network quarantine. Omitted means neither action is sent. |
-| `details` | [SentinelOneDetails](#details-sentinelonedetails) | no | null | Overrides for name, description, severity, and expiration. |
-| `rule_id_bundle` | map[string, int] | no | null | STAR rule id per tenant name. See [External rule ids](index.md#external-rule-ids). |
+| `response` | [SentinelOneResponse](#response-sentineloneresponse) | optional | null | Threat verdict and network quarantine. Omitted means neither action is sent. |
+| `details` | [SentinelOneDetails](#details-sentinelonedetails) | optional | null | Overrides for name, description, severity, and expiration. |
+| `rule_id_bundle` | map[string, int] | optional | null | STAR rule id per tenant name. See [External rule ids](index.md#external-rule-ids). |
 
 The rule is scoped to the tenant's `site_id` when that is set, otherwise to `account_id`.
 
@@ -42,9 +42,9 @@ The rule is scoped to the tenant's `site_id` when that is set, otherwise to `acc
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `type` | string | yes | `Single Event` or `Correlation`. |
-| `single_event` | object | no | Required at deploy when `type` is `Single Event`. |
-| `correlation` | object | no | Required at deploy when `type` is `Correlation`. |
-| `cool_off` | string | no | Renotify window (`30m`, `1h`). Intended to become `renotifyMinutes`. The current deployer does not convert it; see Requirements. |
+| `single_event` | object | optional | Required at deploy when `type` is `Single Event`. |
+| `correlation` | object | optional | Required at deploy when `type` is `Correlation`. |
+| `cool_off` | string | optional | Renotify window (`30m`, `1h`). Intended to become `renotifyMinutes`. The current deployer does not convert it; see Requirements. |
 
 `single_event`:
 
@@ -76,10 +76,10 @@ Both fields are required when `response` is present. Omitting `response` omits b
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | string | no | STAR rule name. Deploy uses the Tide rule `name` when omitted. |
-| `description` | string | no | STAR description. Deploy uses the Tide rule `description` when omitted. |
-| `severity` | string | no | Sent as the STAR severity string. When omitted, deploy maps `response.alert_severity`: `Informational` and `Low` become `Low`; `Medium`, `High`, and `Critical` keep those names. |
-| `expiration` | string | no | When set, the rule is `Temporary` and this value is the expiration. When omitted, the rule is `Permanent`. |
+| `name` | string | optional | STAR rule name. Deploy uses the Tide rule `name` when omitted. |
+| `description` | string | optional | STAR description. Deploy uses the Tide rule `description` when omitted. |
+| `severity` | string | optional | Sent as the STAR severity string. When omitted, deploy maps `response.alert_severity`: `Informational` and `Low` become `Low`; `Medium`, `High`, and `Critical` keep those names. |
+| `expiration` | string | optional | When set, the rule is `Temporary` and this value is the expiration. When omitted, the rule is `Permanent`. |
 
 A `details.severity` value is sent as written. It does not pass through the `response.alert_severity` map.
 

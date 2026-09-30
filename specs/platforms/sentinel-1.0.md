@@ -20,6 +20,7 @@ Shared fields (`enabled`, `name`, `schema`, `status`, `flags`, `tenants`, `contr
 - `query` MUST be non-blank KQL.
 - `scheduling` MAY omit `frequency`, `lookback`, and `nrt` and still validate.
 - `alert` MAY be an empty object and still validate. `suppression` defaults to `false`. `create_incident` defaults to `true`.
+- The Sentinel loader treats a missing `scheduling` or `alert` as an empty object, and it drops keys it does not map. Static validation still requires both objects and rejects unknown keys.
 - `grouping`, `entities`, `exclusions`, `template`, and `trigger` MAY be omitted and still validate.
 - Deploy of a non-NRT rule MUST fail when `scheduling.frequency` or `scheduling.lookback` is missing.
 - Deploy MUST fail when `grouping` is missing, and MUST fail when `grouping.alert` is missing.
@@ -36,19 +37,19 @@ Shared fields (`enabled`, `name`, `schema`, `status`, `flags`, `tenants`, `contr
 | `query` | string | yes | — | KQL. Multiline. Compiled with matching `exclusions` before deploy. |
 | `scheduling` | [SentinelScheduling](#scheduling-sentinelscheduling) | yes | — | Run cadence, or NRT. |
 | `alert` | [SentinelAlert](#alert-sentinelalert) | yes | — | Alert and incident presentation. |
-| `grouping` | [SentinelGrouping](#grouping-sentinelgrouping) | no | null | Event grouping and incident grouping. Required at deploy. |
-| `entities` | list[[SentinelEntityMapping](#entities-sentinelentitymapping)] | no | null | Entity mappings from result columns. |
-| `exclusions` | list[[SentinelExclusion](#exclusions-sentinelexclusion)] | no | null | Per-tenant KQL fragments appended to `query`. |
-| `template` | [SentinelTemplate](#template-sentineltemplate) | no | null | Analytics-rule template this rule was built from. |
-| `trigger` | [SentinelTrigger](#trigger-sentineltrigger) | no | null | Result threshold. Ignored when `scheduling.nrt` is true. |
+| `grouping` | [SentinelGrouping](#grouping-sentinelgrouping) | optional | null | Event grouping and incident grouping. Required at deploy. |
+| `entities` | list[[SentinelEntityMapping](#entities-sentinelentitymapping)] | optional | null | Entity mappings from result columns. |
+| `exclusions` | list[[SentinelExclusion](#exclusions-sentinelexclusion)] | optional | null | Per-tenant KQL fragments appended to `query`. |
+| `template` | [SentinelTemplate](#template-sentineltemplate) | optional | null | Analytics-rule template this rule was built from. |
+| `trigger` | [SentinelTrigger](#trigger-sentineltrigger) | optional | null | Result threshold. Ignored when `scheduling.nrt` is true. |
 
 ### `scheduling` (SentinelScheduling)
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `nrt` | boolean | no | null | `true` deploys `kind: NRT` and skips frequency, lookback, and trigger. |
-| `frequency` | string | no | null | ISO 8601 duration. How often a scheduled rule runs (`PT1H`). Required at deploy unless `nrt` is true. |
-| `lookback` | string | no | null | ISO 8601 duration. Query window (`PT2H`). Required at deploy unless `nrt` is true. |
+| `nrt` | boolean | optional | null | `true` deploys `kind: NRT` and skips frequency, lookback, and trigger. |
+| `frequency` | string | optional | null | ISO 8601 duration. How often a scheduled rule runs (`PT1H`). Required at deploy unless `nrt` is true. |
+| `lookback` | string | optional | null | ISO 8601 duration. Query window (`PT2H`). Required at deploy unless `nrt` is true. |
 
 Durations are converted to Sentinel `queryFrequency` and `queryPeriod`.
 
@@ -56,15 +57,15 @@ Durations are converted to Sentinel `queryFrequency` and `queryPeriod`.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `title` | string | no | null | Alert display-name format. Empty leaves the Sentinel default. The rule `name` is still the analytics-rule display name. |
-| `description` | string | no | null | Alert description format. |
-| `severity` | string | no | null | Sentinel severity. When omitted, deploy uses `response.alert_severity`. `Critical` is sent as `High`. |
-| `suppression` | string \| boolean | no | `false` | `false` disables suppression and sends a one-hour duration. A duration string enables suppression for that long. Boolean `true` fails deploy. |
-| `create_incident` | boolean | no | `true` | Whether a firing alert opens an incident. |
-| `tactics` | list[string] | no | null | Sentinel tactic names. Replaced when the rule's ATT&CK techniques resolve to tactics. |
-| `techniques` | list[string] | no | null | Technique ids. Replaced by the rule's resolved techniques when those exist. |
-| `custom_details` | list[CustomDetail] | no | null | Extra alert properties. |
-| `dynamic_properties` | list[DynamicProperty] | no | null | Column-driven alert properties. |
+| `title` | string | optional | null | Alert display-name format. Empty leaves the Sentinel default. The rule `name` is still the analytics-rule display name. |
+| `description` | string | optional | null | Alert description format. |
+| `severity` | string | optional | null | Sentinel severity. When omitted, deploy uses `response.alert_severity`. `Critical` is sent as `High`. |
+| `suppression` | string \| boolean | optional | `false` | `false` disables suppression and sends a one-hour duration. A duration string enables suppression for that long. Boolean `true` fails deploy. |
+| `create_incident` | boolean | optional | `true` | Whether a firing alert opens an incident. |
+| `tactics` | list[string] | optional | null | Sentinel tactic names. Replaced when the rule's ATT&CK techniques resolve to tactics. |
+| `techniques` | list[string] | optional | null | Technique ids. Replaced by the rule's resolved techniques when those exist. |
+| `custom_details` | list[CustomDetail] | optional | null | Extra alert properties. |
+| `dynamic_properties` | list[DynamicProperty] | optional | null | Column-driven alert properties. |
 
 `custom_details[]`:
 
@@ -85,19 +86,19 @@ Durations are converted to Sentinel `queryFrequency` and `queryPeriod`.
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `event` | string | yes | — | Sentinel `aggregationKind`. `SingleAlert` groups events into one alert. `AlertPerResult` emits one alert per row. |
-| `alert` | [SentinelAlertGrouping](#groupingalert-sentinelalertgrouping) | no | null | Incident grouping. Required at deploy. |
+| `alert` | [SentinelAlertGrouping](#groupingalert-sentinelalertgrouping) | optional | null | Incident grouping. Required at deploy. |
 
 ### `grouping.alert` (SentinelAlertGrouping)
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `enabled` | boolean | yes | — | Group alerts into one incident. |
-| `reopen_closed_incidents` | boolean | no | null | Reopen a matching closed incident. Deploy sends `false` when omitted. |
-| `grouping_lookback` | string | no | null | ISO 8601 duration. Required at deploy when `enabled` is true. When `enabled` is false and this is omitted, deploy sends `PT1H`. |
-| `matching` | string | no | null | Sentinel matching method. Deploy sends `AllEntities` when omitted. |
-| `group_by_entities` | list[string] | no | null | Entity types used when matching is selective. |
-| `group_by_alert_details` | list[string] | no | null | Alert-detail fields used when matching is selective. |
-| `group_by_custom_details` | list[string] | no | null | Custom-detail keys used when matching is selective. |
+| `reopen_closed_incidents` | boolean | optional | null | Reopen a matching closed incident. Deploy sends `false` when omitted. |
+| `grouping_lookback` | string | optional | null | ISO 8601 duration. Required at deploy when `enabled` is true. When `enabled` is false and this is omitted, deploy sends `PT1H`. |
+| `matching` | string | optional | null | Sentinel matching method. Deploy sends `AllEntities` when omitted. |
+| `group_by_entities` | list[string] | optional | null | Entity types used when matching is selective. |
+| `group_by_alert_details` | list[string] | optional | null | Alert-detail fields used when matching is selective. |
+| `group_by_custom_details` | list[string] | optional | null | Custom-detail keys used when matching is selective. |
 
 ### `entities[]` (SentinelEntityMapping)
 
@@ -119,10 +120,10 @@ Applied at deploy for the target tenant. An exclusion with no `tenant`, or with 
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `query` | string | no | `""` | KQL fragment appended after the base query. |
+| `query` | string | yes | — | KQL fragment appended after the base query. The key is required. An empty string is accepted (this field is not the non-blank rule `query`). |
 | `reason` | string | yes | — | Why the exclusion exists. Not sent to Sentinel. |
-| `tenant` | string | no | null | Limit the exclusion to one tenant name. |
-| `let` | map[string, scalar] | no | null | KQL `let` bindings prepended to the query. Values may be string, number, or boolean. Other types are skipped. The last definition of a name wins. |
+| `tenant` | string | optional | null | Limit the exclusion to one tenant name. |
+| `let` | map[string, scalar] | optional | null | KQL `let` bindings prepended to the query. Values may be string, number, or boolean. Other types are skipped. The last definition of a name wins. |
 
 ### `template` (SentinelTemplate)
 

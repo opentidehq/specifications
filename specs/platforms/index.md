@@ -24,7 +24,7 @@ The block's schema identifier is `platform::<identifier>::1.0`. This page is the
 | `crowdstrike` | `platform::crowdstrike::1.0` | [crowdstrike-1.0.md](crowdstrike-1.0.md) |
 | `harfanglab` | `platform::harfanglab::1.0` | [harfanglab-1.0.md](harfanglab-1.0.md) |
 
-These specs describe the blocks as the engine accepts them today. Generated JSON Schema is a build artifact. Where it disagrees with this page or a platform spec, the spec wins.
+These specs describe the blocks as the engine accepts them today, including every optional key. Generated JSON Schema is a build artifact. Where it disagrees with this page or a platform spec, the spec wins. opentide's usage and SDK pages link here. They do not restate the keys. Change a field here first; the implementation follows.
 
 ## Requirements
 
@@ -33,7 +33,9 @@ These specs describe the blocks as the engine accepts them today. Generated JSON
 - Deploy and validate capabilities MUST be reported honestly. A platform without a query validator MUST NOT claim query validation support.
 - CrowdStrike and HarfangLab MUST NOT advertise query validation (`can_validate: false`).
 - A typed block SHOULD set `schema` to `platform::<identifier>::1.0`. Implementations MUST accept a missing `schema` and MUST accept a legacy identifier (`sentinel::2.4`, `splunk::2.0`, `splunk::3.0`, `carbon_black_cloud::3.0`, and the same shape for the other platforms). The identifier is not a closed enum.
-- Unknown keys on a block MUST fail static validation. The loader aliases in [External rule ids](#external-rule-ids) and [Splunk](splunk-1.0.md) are the only exceptions, and they apply on the registry-load path.
+- Unknown keys on a block MUST fail static validation. The model forbids them.
+- Registry load is stricter or looser depending on the platform. Defender, Splunk, and Carbon Black pass leftover keys on the block into the model, so an unknown key at the block root fails load as well. The Splunk loader still drops unknown keys inside `scheduling` other than `type`, `expires`, `schedule`, and `timerange`. Sentinel, SentinelOne, CrowdStrike, and HarfangLab drop keys the loader does not map, so those keys pass load and fail `opentide validate`. The aliases in [External rule ids](#external-rule-ids) and [Splunk](splunk-1.0.md) are mapped before that check.
+- In every field table, **optional** means the key may be omitted at static validation. A later sentence in that platform spec names the keys deploy or registry load still require.
 - `query`, where the platform spec marks it required, MUST be a string and MUST NOT be empty or whitespace.
 - Static validation (`opentide validate`) MUST enforce the **Required** column of each platform spec. It MUST NOT require a field only because generated JSON Schema lists it.
 - A successful deploy MUST also satisfy that platform spec's **Deploy** section. Those checks are not static-validation failures.
@@ -86,13 +88,13 @@ Every block includes these fields. Platform specs do not repeat them except wher
 
 | Field | YAML key | Type | Required | Default | Description |
 |-------|----------|------|----------|---------|-------------|
-| `enabled` | `enabled` | boolean | no | `false` | When `true`, the block is active for deploy. A rule with no enabled block is still valid. |
-| `name` | `name` | string | no | `""` | Platform-specific rule name. Empty means the deployer uses the rule `name`, where that platform has a name field. |
-| `platform_schema` | `schema` | string | no | null | Schema identifier. Canonical value: `platform::<identifier>::1.0`. Templates emit it. Validation does not require it. |
-| `status` | `status` | string | no | null | Deployment status for this block. When set, it MUST be a status name from [deployment.md](../deployment.md). `DISABLEMENT` disables an existing rule; `DELETION` removes it. Other strategies deploy it enabled. |
-| `flags` | `flags` | list[string] | no | null | Free-form flags. Splunk modifiers may match on them. |
-| `tenants` | `tenants` | list[string] | no | null | Tenant names this block targets. Empty or omitted means the deployment plan's tenant selection. |
-| `contributors` | `contributors` | list[string] | no | null | People credited on the platform rule. CrowdStrike joins them into the rule comment. |
+| `enabled` | `enabled` | boolean | optional | `false` | When `true`, the block is active for deploy. A rule with no enabled block is still valid. |
+| `name` | `name` | string | optional | `""` | Platform-specific rule name. Empty means the deployer uses the rule `name`, where that platform has a name field. |
+| `platform_schema` | `schema` | string | optional | null | Schema identifier. Canonical value: `platform::<identifier>::1.0`. Templates emit it. Validation does not require it. |
+| `status` | `status` | string | optional | null | Deployment status for this block. When set, it MUST be a status name from [deployment.md](../deployment.md). `DISABLEMENT` disables an existing rule; `DELETION` removes it. Other strategies deploy it enabled. |
+| `flags` | `flags` | list[string] | optional | null | Free-form flags. Splunk modifiers may match on them. |
+| `tenants` | `tenants` | list[string] | optional | null | Tenant names this block targets. Empty or omitted means the deployment plan's tenant selection. |
+| `contributors` | `contributors` | list[string] | optional | null | People credited on the platform rule. CrowdStrike joins them into the rule comment. |
 
 `schema` is the YAML key. The model field is `platform_schema` because `schema` would collide with the base model's schema method.
 
@@ -151,6 +153,20 @@ Published JSON Schema is built from the models plus a `required` overlay. The ov
 | `splunk` | `scheduling` |
 
 `opentide validate` follows the model, not the overlay. A Sentinel block without `grouping` validates. Deploy of that block fails. Editor validation that consumes the generated schema may reject objects the engine accepts.
+
+The same overlay sets a default for `schema` that is the legacy identifier. The model default is null, and the bundled templates write `platform::<identifier>::1.0`. Validation accepts both. Splunk and Carbon Black also set a `pattern` that only matches the legacy identifier (`^splunk::[1-9]\.[0-9]$`, `^carbon_black_cloud::[1-9]\.[0-9]$`). That pattern rejects `platform::splunk::1.0` and `platform::carbon_black_cloud::1.0`. `opentide validate` does not apply it.
+
+Splunk extras also name `threshold`, `throttling`, and `security_domain` on the block root, and `cron` and `lookback` directly under `scheduling`. Those properties are not on the model. The generator skips an extra whose property is missing. The live keys are the nested ones in [splunk-1.0.md](splunk-1.0.md).
+
+| Platform | Generated default `schema` |
+|----------|----------------------------|
+| `sentinel` | `sentinel::2.4` |
+| `defender_for_endpoint` | `defender_for_endpoint::2.3` |
+| `splunk` | `splunk::3.0` |
+| `sentinel_one` | `sentinel_one::2.0` |
+| `crowdstrike` | `crowdstrike::2.0` |
+| `harfanglab` | `harfanglab::2.0` |
+| `carbon_black_cloud` | `carbon_black_cloud::3.0` |
 
 ### Entry points
 

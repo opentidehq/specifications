@@ -35,10 +35,10 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 | `alert` | [DefenderAlert](#alert-defenderalert) | yes | — | Custom detection alert template. |
 | `impacted_entities` | [DefenderImpactedEntities](#impacted_entities-defenderimpactedentities) | yes | — | Columns that identify the impacted device, user, or mailbox. |
 | `scheduling` | string | yes | — | `NRT`, `1H`, `3H`, `12H`, or `24H`. |
-| `scope` | [DefenderGroupScoping](#scope-defendergroupscoping) | no | null | Device-group scope. Required by registry load. The current deployer does not send it. |
-| `actions` | [DefenderResponseActions](#actions-defenderresponseactions) | no | null | Response actions run when the detection fires. |
-| `exclusions` | list[[DefenderExclusion](#exclusions-defenderexclusion)] | no | null | Per-tenant KQL fragments appended to `query`. |
-| `rule_id` | map[string, int] | no | null | Defender rule id per tenant name. See [External rule ids](index.md#external-rule-ids). |
+| `scope` | [DefenderGroupScoping](#scope-defendergroupscoping) | optional | null | Device-group scope. Required by registry load. The current deployer does not send it. |
+| `actions` | [DefenderResponseActions](#actions-defenderresponseactions) | optional | null | Response actions run when the detection fires. |
+| `exclusions` | list[[DefenderExclusion](#exclusions-defenderexclusion)] | optional | null | Per-tenant KQL fragments appended to `query`. |
+| `rule_id` | map[string, int] | optional | null | Defender rule id per tenant name. See [External rule ids](index.md#external-rule-ids). |
 
 `scheduling: NRT` is sent as period `0`. The other values are sent unchanged.
 
@@ -47,11 +47,11 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `category` | string | yes | — | Defender alert category. Deploy removes spaces (`Suspicious Activity` is sent as `SuspiciousActivity`). |
-| `title` | string | no | null | Alert title. Deploy uses the rule `name` when omitted. |
-| `description` | string | no | null | Alert description. Deploy uses the rule `description` when omitted. |
-| `severity` | string | no | null | `Informational`, `Low`, `Medium`, `High`, or `Critical`. Deploy uses `response.alert_severity` when omitted. `Critical` is sent as `high`. |
-| `recommendation` | string | no | null | Recommended actions text. |
-| `techniques` | list[string] | no | null | Accepted on the block. The current deployer sends an empty technique list. |
+| `title` | string | optional | null | Alert title. Deploy uses the rule `name` when omitted. |
+| `description` | string | optional | null | Alert description. Deploy uses the rule `description` when omitted. |
+| `severity` | string | optional | null | `Informational`, `Low`, `Medium`, `High`, or `Critical`. Deploy uses `response.alert_severity` when omitted. `Critical` is sent as `high`. |
+| `recommendation` | string | optional | null | Recommended actions text. |
+| `techniques` | list[string] | optional | null | Accepted on the block. The current deployer sends an empty technique list. |
 
 ### `impacted_entities` (DefenderImpactedEntities)
 
@@ -59,16 +59,16 @@ Each value is a result column. Deploy lowercases the first character (Defender e
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `device` | string | no | Device column. |
-| `user` | string | no | User column. |
-| `mailbox` | string | no | Mailbox column. |
+| `device` | string | optional | Device column. |
+| `user` | string | optional | User column. |
+| `mailbox` | string | optional | Mailbox column. |
 
 ### `scope` (DefenderGroupScoping)
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `selection` | string | yes | `All` or `Specific`. |
-| `device_groups` | list[string] | no | Group names. Used when `selection` is `Specific`. |
+| `device_groups` | list[string] | optional | Group names. Used when `selection` is `Specific`. |
 
 ### `actions` (DefenderResponseActions)
 
@@ -78,18 +78,18 @@ Any of `devices`, `files`, and `users` MAY be omitted. An empty actions object d
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `isolate_device` | string | no | null | Isolation type. Deploy lowercases the first character (`Full` is sent as `full`). |
-| `collect_investigation_package` | boolean | no | `false` | Collect an investigation package. |
-| `run_antivirus_scan` | boolean | no | `false` | Run an antivirus scan. |
-| `initiate_investigation` | boolean | no | `false` | Start an automated investigation. |
-| `restrict_app_execution` | boolean | no | `false` | Restrict app execution. |
+| `isolate_device` | string | optional | null | Isolation type. Deploy lowercases the first character (`Full` is sent as `full`). |
+| `collect_investigation_package` | boolean | optional | `false` | Collect an investigation package. |
+| `run_antivirus_scan` | boolean | optional | `false` | Run an antivirus scan. |
+| `initiate_investigation` | boolean | optional | `false` | Start an automated investigation. |
+| `restrict_app_execution` | boolean | optional | `false` | Restrict app execution. |
 
 #### `actions.files`
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `allow_block` | [AllowBlock](#actionsfilesallow_block) | no | Allow or block a file identifier. |
-| `quarantine_file` | string | no | Column identifying the file to quarantine. Loader alias: `quarantine_files`. |
+| `allow_block` | [AllowBlock](#actionsfilesallow_block) | optional | Allow or block a file identifier. |
+| `quarantine_file` | string | optional | Column identifying the file to quarantine. Loader alias: `quarantine_files`. |
 
 `actions.files.allow_block`:
 
@@ -97,7 +97,14 @@ Any of `devices`, `files`, and `users` MAY be omitted. An empty actions object d
 |-------|------|----------|-------------|
 | `action` | string | yes | `Allow` or `Block`. |
 | `identifier` | string | yes | Column identifying the file. Deploy lowercases the first character. |
-| `groups` | object | no | `selection` is `All` or `Specific`. `device_groups` is the name list sent when `selection` is `Specific`. |
+| `groups` | [GroupScoping](#actionsfilesallow_blockgroups) | optional | Device groups the allow or block applies to. |
+
+`actions.files.allow_block.groups`:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `selection` | string | yes | — | `All` or `Specific`. |
+| `device_groups` | list[string] | optional | null | Group names. Sent when `selection` is `Specific`. |
 
 #### `actions.users`
 
@@ -105,9 +112,9 @@ Each value is a column. Deploy lowercases the first character. Omitted keys are 
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `mark_as_compromised` | string | no | User column. |
-| `disable_user` | string | no | User column. |
-| `force_password_reset` | string | no | User column. |
+| `mark_as_compromised` | string | optional | User column. |
+| `disable_user` | string | optional | User column. |
+| `force_password_reset` | string | optional | User column. |
 
 ### `exclusions[]` (DefenderExclusion)
 
@@ -115,10 +122,10 @@ Same shape and tenant matching as Sentinel exclusions. See [sentinel-1.0.md](sen
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `query` | string | no | `""` | KQL fragment appended after the base query. |
+| `query` | string | yes | — | KQL fragment appended after the base query. The key is required. An empty string is accepted. |
 | `reason` | string | yes | — | Why the exclusion exists. Not sent to Defender. |
-| `tenant` | string | no | null | Limit the exclusion to one tenant name. |
-| `let` | map[string, scalar] | no | null | KQL `let` bindings. String, number, or boolean. |
+| `tenant` | string | optional | null | Limit the exclusion to one tenant name. |
+| `let` | map[string, scalar] | optional | null | KQL `let` bindings. String, number, or boolean. |
 
 ### Deploy
 

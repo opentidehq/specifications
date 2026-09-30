@@ -33,7 +33,7 @@ Shared fields are defined in [platforms](index.md#shared-platform-block). `contr
 | `details` | [CrowdstrikeDetails](#details-crowdstrikedetails) | yes | — | Correlation outcome, trigger mode, and alert metadata. |
 | `schedule` | [CrowdstrikeSchedule](#schedule-crowdstrikeschedule) | yes | — | How often the correlation search runs and how far it looks back. |
 | `query` | string | yes | — | Correlation filter. Multiline. Sent as the rule `filter`. |
-| `rule_id_bundle` | map[string, string] | no | null | Falcon rule id per tenant name. See [External rule ids](index.md#external-rule-ids). |
+| `rule_id_bundle` | map[string, string] | optional | null | Falcon rule id per tenant name. See [External rule ids](index.md#external-rule-ids). |
 
 ### `details` (CrowdstrikeDetails)
 
@@ -41,11 +41,11 @@ Shared fields are defined in [platforms](index.md#shared-platform-block). `contr
 |-------|------|----------|-------------|
 | `trigger` | string | yes | `verbose` or `summary`, any case. Deploy lowercases the value. |
 | `outcome` | string | yes | `detection` or `incident`, any case. Deploy lowercases the value. |
-| `name` | string | no | Falcon rule name. Deploy uses the Tide rule `name` when omitted. |
-| `description` | string | no | Falcon description. Deploy uses the Tide rule `description` when omitted. |
-| `severity` | string | no | `Informational`, `Low`, `Medium`, `High`, or `Critical`. Deploy uses `response.alert_severity` when omitted. |
-| `tactic` | string | no | Falcon tactic. Sent as given. |
-| `technique` | string | no | Falcon technique. Sent as given. |
+| `name` | string | optional | Falcon rule name. Deploy uses the Tide rule `name` when omitted. |
+| `description` | string | optional | Falcon description. Deploy uses the Tide rule `description` when omitted. |
+| `severity` | string | optional | `Informational`, `Low`, `Medium`, `High`, or `Critical`. Deploy uses `response.alert_severity` when omitted. |
+| `tactic` | string | optional | Falcon tactic. Sent as given. |
+| `technique` | string | optional | Falcon technique. Sent as given. |
 
 Severity is sent as an integer:
 
@@ -63,8 +63,8 @@ Severity is sent as an integer:
 |-------|------|----------|-------------|
 | `frequency` | string | yes | Run interval. Deploy sends it as `@every <frequency>` (`@every 1h`). |
 | `lookback` | string | yes | How far back each run searches. Sent as the search lookback. |
-| `start` | string | no | Do not run before this UTC time. |
-| `end` | string | no | Stop running at this UTC time. |
+| `start` | string | optional | Do not run before this UTC time. |
+| `end` | string | optional | Stop running at this UTC time. |
 
 ### Deploy
 
