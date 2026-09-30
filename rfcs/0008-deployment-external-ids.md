@@ -233,11 +233,11 @@ flowchart TD
   legacy -->|yes| stop["external_id_in_rule\nno HTTP, no shard write"]
   legacy -->|no| shard{"shard has this platform and tenant?"}
   shard -->|yes| upd["update, or delete and drop the entry"]
-  shard -->|no, not a deletion| create["create, then write the returned id into the shard"]
-  shard -->|no, deletion| missing["external_id_missing\nno HTTP"]
+  shard -->|no, not a deletion or disablement| create["create, then write the returned id into the shard"]
+  shard -->|no, deletion or disablement| missing["external_id_missing\nno HTTP"]
 ```
 
-`DELETION` with no shard entry does not create. It reports `external_id_missing` and does not call the vendor, which is today's missing-id path.
+`DELETION` or `DISABLEMENT` with no shard entry does not create. It reports `external_id_missing` and does not call the vendor, which is today's missing-id path.
 
 #### What has to be migrated
 
@@ -351,8 +351,8 @@ For Defender, SentinelOne, and CrowdStrike, per tenant the deployment plan alrea
 |------------------------|-------------|--------|
 | present | present or absent | `external_id_in_rule`. No HTTP. |
 | absent | present | Update, or delete and remove the entry. |
-| absent | absent, strategy is not `DELETION` | Create. Write the returned id into the shard. |
-| absent | absent, strategy is `DELETION` | `external_id_missing`. No HTTP. |
+| absent | absent, strategy is not `DELETION` or `DISABLEMENT` | Create. Write the returned id into the shard. |
+| absent | absent, strategy is `DELETION` or `DISABLEMENT` | `external_id_missing`. No HTTP. |
 
 Disablement is an update that sets the vendor's disabled state, using the shard id. It does not remove the entry.
 
