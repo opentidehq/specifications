@@ -6,6 +6,7 @@
 - **Status:** draft
 - **Created:** 2026-09-30
 - **Issue:** [#28](https://github.com/OpenTideHQ/specifications/issues/28)
+- **PR:** [#29](https://github.com/OpenTideHQ/specifications/pull/29)
 
 ## Summary
 
