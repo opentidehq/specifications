@@ -1,0 +1,31 @@
+name: CrowdStrike platform block
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000016
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+description: |
+  CrowdStrike correlation rule. Query syntax is not validated.
+status: STAGING
+severity: High
+response:
+  alert_severity: High
+configurations:
+  crowdstrike:
+    enabled: true
+    schema: platform::crowdstrike::1.0
+    status: STAGING
+    query: |
+      event_simpleName=ProcessRollup2 FileName=cmd.exe
+    details:
+      trigger: summary
+      outcome: detection
+      severity: High
+      tactic: Execution
+      technique: T1059
+    schedule:
+      frequency: 1h
+      lookback: 2h
+      start: "2026-04-15T19:00:00Z"

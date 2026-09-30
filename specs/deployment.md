@@ -114,7 +114,7 @@ When both `proxy_user` and `proxy_password` are present, authenticated proxy is 
 
 - [rule-1.0.md](objects/rule-1.0.md) — `status` field on rules and platform blocks
 - [configuration.md](configuration.md) — override mechanism
-- [platforms.md](platforms.md) — per-platform deployment
+- [platforms/index.md](platforms/index.md) — per-platform deployment
 - [metaschema-keywords.md](metaschema-keywords.md) — `tide.config.statuses` keyword
 
 ## Defaults & overrides

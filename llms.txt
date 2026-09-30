@@ -18,7 +18,14 @@
 - specs/configuration.md
 - specs/deployment.md
 - specs/metaschema-keywords.md
-- specs/platforms.md
+- specs/platforms/index.md
+- specs/platforms/sentinel-1.0.md (schema_id: platform::sentinel::1.0)
+- specs/platforms/defender-for-endpoint-1.0.md (schema_id: platform::defender_for_endpoint::1.0)
+- specs/platforms/splunk-1.0.md (schema_id: platform::splunk::1.0)
+- specs/platforms/sentinel-one-1.0.md (schema_id: platform::sentinel_one::1.0)
+- specs/platforms/carbon-black-cloud-1.0.md (schema_id: platform::carbon_black_cloud::1.0)
+- specs/platforms/crowdstrike-1.0.md (schema_id: platform::crowdstrike::1.0)
+- specs/platforms/harfanglab-1.0.md (schema_id: platform::harfanglab::1.0)
 - specs/validation.md
 - specs/sharing.md
 - specs/sharing/misp-1.0.md (schema_id: sharing::misp::1.0)
@@ -42,6 +49,7 @@
 - schemas/misp/opentide.definition.json: Pinned upstream MISP opentide object template (version 5)
 - fixtures/sharing/: Sharing TOML and golden MISP Event JSON
 - fixtures/valid/: Valid conformance YAML
+- fixtures/platforms/: Per-platform rule-block examples
 - fixtures/invalid/: Invalid conformance YAML
 - fixtures/cross-object/: Cross-reference conformance YAML
 

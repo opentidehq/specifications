@@ -96,24 +96,24 @@ Shared fields on every platform configuration:
 
 Typed optional blocks keyed by platform identifier:
 
-| Key | Model | Schema ID |
-|-----|-------|-----------|
-| `sentinel` | SentinelConfig | `platform::sentinel::1.0` |
-| `defender_for_endpoint` | DefenderConfig | `platform::defender_for_endpoint::1.0` |
-| `splunk` | SplunkConfig | `platform::splunk::1.0` |
-| `sentinel_one` | SentinelOneConfig | `platform::sentinel_one::1.0` |
-| `crowdstrike` | CrowdstrikeConfig | `platform::crowdstrike::1.0` |
-| `harfanglab` | HarfangLabConfig | `platform::harfanglab::1.0` |
-| `carbon_black_cloud` | CarbonBlackConfig | `platform::carbon_black_cloud::1.0` |
+| Key | Model | Schema ID | Spec |
+|-----|-------|-----------|------|
+| `sentinel` | SentinelConfig | `platform::sentinel::1.0` | [sentinel-1.0.md](../platforms/sentinel-1.0.md) |
+| `defender_for_endpoint` | DefenderConfig | `platform::defender_for_endpoint::1.0` | [defender-for-endpoint-1.0.md](../platforms/defender-for-endpoint-1.0.md) |
+| `splunk` | SplunkConfig | `platform::splunk::1.0` | [splunk-1.0.md](../platforms/splunk-1.0.md) |
+| `sentinel_one` | SentinelOneConfig | `platform::sentinel_one::1.0` | [sentinel-one-1.0.md](../platforms/sentinel-one-1.0.md) |
+| `crowdstrike` | CrowdstrikeConfig | `platform::crowdstrike::1.0` | [crowdstrike-1.0.md](../platforms/crowdstrike-1.0.md) |
+| `harfanglab` | HarfangLabConfig | `platform::harfanglab::1.0` | [harfanglab-1.0.md](../platforms/harfanglab-1.0.md) |
+| `carbon_black_cloud` | CarbonBlackConfig | `platform::carbon_black_cloud::1.0` | [carbon-black-cloud-1.0.md](../platforms/carbon-black-cloud-1.0.md) |
 
-See [platforms.md](../platforms.md) for per-platform required fields and capabilities.
+Shared block fields and the capability matrix are in [platforms/index.md](../platforms/index.md). Each link above is the field contract for that block.
 
 ## Relationships
 
 - [metadata.md](../metadata.md) — identity and schema routing
 - [objective-1.0.md](objective-1.0.md) — linked via `detection_model`
 - [deployment.md](../deployment.md) — `status` lifecycle and promotion
-- [platforms.md](../platforms.md) — platform blocks and deploy/validate capabilities
+- [platforms/index.md](../platforms/index.md) — platform blocks and deploy/validate capabilities
 - [validation.md](../validation.md) — schema, vocabulary, and query validation
 - Vocabularies: `severity`, `alert_severity`, `att&ck`, `responders`, deployment statuses
 

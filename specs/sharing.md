@@ -22,7 +22,7 @@ Sharing publishes Tide objects (threat, objective, rule) to external intelligenc
 - Every block MUST set `max_tlp`. There is no default ceiling. A block MUST NOT share an object whose `metadata.tlp` exceeds that value, including TLP:RED when the ceiling is below `red`.
 - Bundled defaults MUST ship with no enabled block.
 - `opentide share` with no subcommand MUST mean `push`. Implementations MUST provide `push`, `preview`, `status`, `retract`, and `targets`.
-- MISP MUST NOT be added to the [platforms](platforms.md) capability matrix and MUST NOT appear as `configurations.misp` on `rule::1.0`.
+- MISP MUST NOT be added to the [platforms](platforms/index.md) capability matrix and MUST NOT appear as `configurations.misp` on `rule::1.0`.
 - Scope filters and target selection that match nothing MUST fail with `scope_no_match`. A `--changed` run whose diff is empty, and a `--changed` run with no enabled block, MUST exit 0 instead.
 - Secrets MUST NOT appear in logs, reports, preview payloads, or share state. API keys, authorization header values, and values substituted from `${ENV_VAR}` MUST be replaced with a fixed redaction marker. URLs and organisation UUIDs are not credentials and MUST be emitted unredacted.
 - `opentide setup` and `opentide setup ci` MUST offer a sharing stage. The stage defaults off. When selected, it MUST run only on a push to the default branch, and its command MUST be `opentide share push --changed`. The generated pipeline MUST NOT run `opentide share` on a pull request or a merge request.
@@ -250,7 +250,7 @@ A connector spec MUST declare its integration key (the top-level array name), it
 - [workspace.md](workspace.md) — generated sharing paths
 - [validation.md](validation.md) — `sharing-config` check
 - [metadata.md](metadata.md) — `metadata.tlp`, optional `metadata.pap`, `metadata.organisation`
-- [platforms.md](platforms.md) — deployment targets; MISP is not in this matrix
+- [platforms/index.md](platforms/index.md) — deployment targets; MISP is not in this matrix
 - [RFC 0005](../rfcs/0005-sharing-system.md) — accepted proposal
 - [RFC 0006](../rfcs/0006-sharing-ci.md) — production-merge sharing job
 
