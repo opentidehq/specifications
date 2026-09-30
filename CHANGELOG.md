@@ -6,6 +6,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `SCHEMA_REVISION.md`.
 
+## metadata 1.2
+
+- Optional `metadata.reviewed` on `rule::1.1` only ([RFC 0008](rfcs/0008-rule-reviewed-date.md)). `rule::1.0`, `threat::1.0`, and `objective::1.0` reject the field.
+
 ## metadata 1.1
 
 - Optional `metadata.pap` ([RFC 0005](rfcs/0005-sharing-system.md)). `metadata.organisation.uuid` is the default sharing publishing organisation.
@@ -23,6 +27,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## objective 1.0
 
 - Initial normative spec bootstrapped from opentide `models/objective.py`.
+
+## rule 1.1
+
+- Minor MDR revision `rule::1.1` with optional `metadata.reviewed` ([RFC 0008](rfcs/0008-rule-reviewed-date.md)). `rule::1.0` remains normative. A consumer treats `rule::1.0`, a missing `reviewed`, or a `reviewed` instant older than a supplied window as unreviewed.
 
 ## rule 1.0
 
@@ -104,6 +112,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## validation 1.0
 
+- Fixture checker codes `invalid_reviewed` and `reviewed_not_in_schema` for `metadata.reviewed` ([RFC 0008](rfcs/0008-rule-reviewed-date.md)).
 - `sharing-config` checker codes and fixtures for `[[misp]]` blocks, including the merge-by-`name` fixture.
 - Document specifications-repo fixture checker codes for `threat::1.0` list and `ThreatActor` encoding ([#11](https://github.com/OpenTideHQ/specifications/issues/11), [#12](https://github.com/OpenTideHQ/specifications/issues/12)).
 - Initial normative spec bootstrapped from opentide validation pipeline.

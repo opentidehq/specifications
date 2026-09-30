@@ -71,9 +71,9 @@ Evaluated at instant `T`, for a positive duration `W` supplied by the consumer, 
 
 `rule::1.0` is included so a rule left on the old schema cannot drop out of the result. A `reviewed` instant equal to `T − W` or later is not unreviewed. This predicate is a read. It does not modify the rule. No CLI flag is specified here; an opentide command can wrap the same predicate later.
 
-### Specs after acceptance
+### Normative changes
 
-This RFC does not edit `specs/` or `fixtures/`. Acceptance lands the following.
+This PR lands the following. The RFC stays `draft` until review accepts it.
 
 | Path | Action |
 |------|--------|
@@ -85,6 +85,8 @@ This RFC does not edit `specs/` or `fixtures/`. Acceptance lands the following.
 | `fixtures/valid/rule-1.1-unreviewed.yaml` | Valid `rule::1.1` with `metadata.reviewed` omitted. |
 | `fixtures/invalid/rule-reviewed-bad-date.yaml` | `rule::1.1` whose `metadata.reviewed` is not an ISO 8601 date or datetime. |
 | `fixtures/invalid/rule-1.0-reviewed.yaml` | `rule::1.0` that carries `metadata.reviewed` (rejected). |
+| `specs/validation.md` | Fixture checker codes `invalid_reviewed` and `reviewed_not_in_schema`. |
+| `scripts/object_fixtures.py` | Accept `rule::1.1`, require an ISO 8601 `reviewed` when present, reject it on every other schema. |
 | `SPECS.md`, `CHANGELOG.md`, `llms.txt` | Index `rule` 1.1 and `metadata` 1.2. |
 
 No change to `vocabularies/`, threat, objective, deployment statuses, platform specs, or sharing. Sharing publishes the rule document verbatim, so a present `reviewed` value is carried inside that document without a MISP template change.

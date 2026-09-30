@@ -1,7 +1,7 @@
 ---
 spec: rule
-version: "1.0"
-schema_id: rule::1.0
+version: "1.1"
+schema_id: rule::1.1
 status: normative
 supersedes: null
 ---
@@ -10,14 +10,18 @@ supersedes: null
 
 ## Summary
 
-A detection rule (MDR — Managed Detection Rule) is the deployable unit of detection content: metadata, severity, ATT&CK techniques, platform-specific query configurations, optional response playbook, and lifecycle status. Schema identifier: `rule::1.0`.
+A detection rule (MDR — Managed Detection Rule) is the deployable unit of detection content: metadata, severity, ATT&CK techniques, platform-specific query configurations, optional response playbook, and lifecycle status. Schema identifier: `rule::1.1`.
 
-This document is the **exemplar spec** — all object specs follow the same section order and level of detail.
+This revision adds optional `metadata.reviewed`. [rule-1.0.md](rule-1.0.md) (`rule::1.0`) stays normative. A rule opts in by setting `metadata.schema`. Platform blocks and every other field match `rule::1.0`.
 
 ## Requirements
 
-- The document MUST declare `metadata.schema: rule::1.0`.
+- The document MUST declare `metadata.schema: rule::1.1`.
 - `name`, `metadata`, and `description` MUST be present.
+- `metadata.reviewed` MAY be omitted. Omitted means no recorded review.
+- When `metadata.reviewed` is present, it MUST be an ISO 8601 date (`YYYY-MM-DD`) or datetime string, coerced to string on load, using the same forms as `metadata.created` and `metadata.modified`. A date-only value denotes 00:00:00Z on that date.
+- Implementations MUST NOT write `metadata.reviewed` during validate, deploy, share, or template generation. Authors set it when a person reviews the rule.
+- Consumers MUST NOT treat `metadata.created` or `metadata.modified` as a review time. Updating `reviewed` does not require a change to `metadata.version` or `metadata.modified`.
 - `status` MUST be a valid deployment status from [deployment.md](../deployment.md) (default: `STAGING`).
 - `severity` MUST be a valid rule severity vocabulary value (default: `Informational`).
 - `techniques` MUST be a list of ATT&CK technique IDs (MAY be empty).
@@ -42,7 +46,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `name` | string | yes | — | Rule display name |
-| `metadata` | ObjectMetadata | yes | — | See [metadata.md](../metadata.md) |
+| `metadata` | ObjectMetadata | yes | — | See [metadata.md](../metadata.md). This revision accepts optional `metadata.reviewed`. |
 | `description` | string | yes | — | Rule narrative (multiline YAML encouraged) |
 | `status` | string | no | `STAGING` | Deployment lifecycle status |
 | `severity` | string | no | `Informational` | Rule severity vocabulary |
@@ -52,6 +56,16 @@ This document is the **exemplar spec** — all object specs follow the same sect
 | `references` | ObjectReferences | no | null | External and internal references |
 | `detection_model` | string | no | null | Objective UUID this rule implements |
 | `response` | RuleResponse | no | null | Alert and response configuration |
+
+### Review staleness
+
+Evaluated at instant `T`, for a positive duration `W` supplied by the consumer, a detection rule is **unreviewed** when any of the following holds:
+
+1. `metadata.schema` is `rule::1.0` (that revision has no review field).
+2. `metadata.schema` is `rule::1.1` and `metadata.reviewed` is absent.
+3. `metadata.schema` is `rule::1.1` and the `reviewed` instant is strictly earlier than `T − W`.
+
+A `reviewed` instant equal to `T − W` or later is not unreviewed. `W` is not a field on the rule. The predicate is a read and MUST NOT modify the rule.
 
 ### `response` (RuleResponse)
 
@@ -110,8 +124,8 @@ Shared block fields and the capability matrix are in [platforms/index.md](../pla
 
 ## Relationships
 
-- [metadata.md](../metadata.md) — identity and schema routing
-- [rule-1.1.md](rule-1.1.md) — minor revision with optional `metadata.reviewed`. This revision does not define that field and MUST reject it.
+- [metadata.md](../metadata.md) — identity, schema routing, and `metadata.reviewed`
+- [rule-1.0.md](rule-1.0.md) — previous MDR revision; still valid; no `metadata.reviewed`
 - [objective-1.0.md](objective-1.0.md) — linked via `detection_model`
 - [deployment.md](../deployment.md) — `status` lifecycle and promotion
 - [platforms/index.md](../platforms/index.md) — platform blocks and deploy/validate capabilities
@@ -134,9 +148,12 @@ Vocabulary files are canonical in `vocabularies/` — not overridable. See [conf
 ```yaml
 name: Sentinel KQL Rule
 metadata:
-  uuid: 00000000-0000-4000-8003-000000000001
-  schema: rule::1.0
+  uuid: 00000000-0000-4000-8003-000000000101
+  schema: rule::1.1
   version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  reviewed: "2026-09-01"                 # optional; omit when nobody has reviewed the rule
   tlp: clear
 description: Detects credential access via suspicious process creation
 status: STAGING
@@ -146,7 +163,7 @@ detection_model: 00000000-0000-4000-8002-000000000001   # → objective UUID
 response:
   alert_severity: High
 configurations:
-  sentinel:                          # typed, preferred form
+  sentinel:
     enabled: true
     name: Sentinel KQL Rule
     status: STAGING
@@ -166,20 +183,23 @@ configurations:
 
 | Fixture | Demonstrates |
 |---------|--------------|
-| [fixtures/valid/rule-1.0.yaml](../../fixtures/valid/rule-1.0.yaml) | Minimal valid rule with Sentinel configuration |
+| [fixtures/valid/rule-1.1.yaml](../../fixtures/valid/rule-1.1.yaml) | `rule::1.1` with `metadata.reviewed` set |
+| [fixtures/valid/rule-1.1-unreviewed.yaml](../../fixtures/valid/rule-1.1-unreviewed.yaml) | `rule::1.1` with `metadata.reviewed` omitted |
+| [fixtures/valid/rule-1.0.yaml](../../fixtures/valid/rule-1.0.yaml) | Previous revision, still valid |
 | [fixtures/cross-object/rule-references-objective.yaml](../../fixtures/cross-object/rule-references-objective.yaml) | `detection_model` → objective UUID |
 
 ### Invalid fixtures
 
 | Fixture | Violation |
 |---------|-----------|
+| [fixtures/invalid/rule-reviewed-bad-date.yaml](../../fixtures/invalid/rule-reviewed-bad-date.yaml) | `metadata.reviewed` is not an ISO 8601 date or datetime |
+| [fixtures/invalid/rule-1.0-reviewed.yaml](../../fixtures/invalid/rule-1.0-reviewed.yaml) | `metadata.reviewed` on `rule::1.0` |
 | [fixtures/invalid/rule-missing-metadata.yaml](../../fixtures/invalid/rule-missing-metadata.yaml) | Missing required `metadata` |
 | [fixtures/invalid/rule-unknown-schema.yaml](../../fixtures/invalid/rule-unknown-schema.yaml) | Unregistered `metadata.schema` |
 | [fixtures/invalid/rule-bad-uuid.yaml](../../fixtures/invalid/rule-bad-uuid.yaml) | Non-UUIDv4 `metadata.uuid` |
-| [fixtures/invalid/rule-1.0-reviewed.yaml](../../fixtures/invalid/rule-1.0-reviewed.yaml) | `metadata.reviewed` on `rule::1.0` |
 
 ## History
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-06-25 | Initial exemplar spec from opentide `models/rule.py` |
+| 1.1 | 2026-09-30 | Optional `metadata.reviewed` ([RFC 0008](../../rfcs/0008-rule-reviewed-date.md)). `rule::1.0` remains normative. |

@@ -1,0 +1,32 @@
+name: Sentinel KQL Rule Unreviewed
+
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000102
+  schema: rule::1.1
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+
+description: |
+  Valid rule::1.1 with metadata.reviewed omitted. Absence means no recorded review.
+status: STAGING
+severity: High
+techniques:
+  - T1059
+
+configurations:
+  sentinel:
+    enabled: true
+    name: Sentinel KQL Rule Unreviewed
+    status: STAGING
+    query: |
+      SecurityEvent
+      | where EventID == 4688
+      | take 1
+    scheduling:
+      frequency: PT1H
+      lookback: PT2H
+    alert:
+      title: Sentinel KQL Rule Unreviewed
+      suppression: false

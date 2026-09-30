@@ -14,6 +14,7 @@ from object_fixtures import (
     load_yaml,
     validate_document,
     validate_fixture_file,
+    validate_rule,
     validate_threat,
 )
 
@@ -238,9 +239,48 @@ class ThreatFixtureTests(unittest.TestCase):
         doc["metadata"]["uuid"] = "not-a-valid-uuid"
         self.assertIn("invalid_uuid", _codes(validate_threat(doc, self.vocabs)))
 
+    def test_reviewed_on_threat_is_rejected(self) -> None:
+        doc = copy.deepcopy(self.valid)
+        doc["metadata"]["reviewed"] = "2026-09-01"
+        self.assertIn("reviewed_not_in_schema", _codes(validate_threat(doc, self.vocabs)))
+
     def test_non_mapping_document(self) -> None:
         errors = validate_document(["not", "an", "object"], self.vocabs)
         self.assertIn("invalid_yaml", _codes(errors))
+
+
+class RuleReviewedTests(unittest.TestCase):
+    vocabs = None
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.vocabs = load_vocabularies(VOCAB_DIR)
+        cls.reviewed = load_yaml(FIXTURES / "valid" / "rule-1.1.yaml")
+        cls.unreviewed = load_yaml(FIXTURES / "valid" / "rule-1.1-unreviewed.yaml")
+
+    def test_reviewed_rule_passes(self) -> None:
+        self.assertEqual(validate_rule(self.reviewed, self.vocabs), [])
+        self.assertEqual(self.reviewed["metadata"]["schema"], "rule::1.1")
+        self.assertEqual(self.reviewed["metadata"]["reviewed"], "2026-09-01")
+
+    def test_omitted_reviewed_passes(self) -> None:
+        self.assertNotIn("reviewed", self.unreviewed["metadata"])
+        self.assertEqual(validate_rule(self.unreviewed, self.vocabs), [])
+
+    def test_datetime_reviewed_passes(self) -> None:
+        doc = copy.deepcopy(self.reviewed)
+        doc["metadata"]["reviewed"] = "2026-09-01T12:30:00Z"
+        self.assertEqual(validate_rule(doc, self.vocabs), [])
+
+    def test_bad_reviewed_is_rejected(self) -> None:
+        doc = copy.deepcopy(self.reviewed)
+        doc["metadata"]["reviewed"] = "yesterday"
+        self.assertIn("invalid_reviewed", _codes(validate_rule(doc, self.vocabs)))
+
+    def test_reviewed_on_rule_1_0_is_rejected(self) -> None:
+        doc = copy.deepcopy(self.reviewed)
+        doc["metadata"]["schema"] = "rule::1.0"
+        self.assertIn("reviewed_not_in_schema", _codes(validate_rule(doc, self.vocabs)))
 
 
 class InvalidFixtureRegistryTests(unittest.TestCase):

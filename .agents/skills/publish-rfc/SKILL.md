@@ -12,7 +12,7 @@ Draft a Request for Comments (RFC) for the OpenTide specifications repository.
 - User opened a spec-change issue with "Draft RFC for me"
 - Breaking schema revision proposed
 - Multi-spec or architectural change
-- Maintainer asked for an RFC before spec edits
+- Maintainer asked for an RFC together with the spec change. "Draft RFC for me" on an issue, with no schema or object bump, is the RFC-only case.
 
 ## Workflow
 
@@ -35,12 +35,13 @@ Draft a Request for Comments (RFC) for the OpenTide specifications repository.
    - **Unresolved questions** — open items for review
 
 4. **Link affected specs**
-   - List every `specs/` path that will change on acceptance
+   - List every `specs/` path this change touches
    - Note whether a new object spec file is needed (e.g. `rule-1.1.md`)
 
-5. **Do not implement yet** unless the user also asked for spec edits
-   - RFC PR can be spec-only
-   - After acceptance, follow with spec + fixture PR
+5. **Land the spec change in the same PR**
+   - A schema bump, object bump, new field, or other normative edit is part of the request, even when it is named next to "add an RFC"
+   - In that PR, update the specs, fixtures, `SPECS.md`, and `CHANGELOG.md` the RFC names, and extend the fixture checker when this repo proves the new field
+   - Write an RFC file only, with no spec edits, when the user explicitly asks for a draft RFC and no schema or object changes
 
 ## RFC numbering
 

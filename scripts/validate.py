@@ -131,6 +131,10 @@ def _check_fixtures() -> list[str]:
     errors: list[str] = []
     required = [
         FIXTURES / "valid" / "rule-1.0.yaml",
+        FIXTURES / "valid" / "rule-1.1.yaml",
+        FIXTURES / "valid" / "rule-1.1-unreviewed.yaml",
+        FIXTURES / "invalid" / "rule-reviewed-bad-date.yaml",
+        FIXTURES / "invalid" / "rule-1.0-reviewed.yaml",
         FIXTURES / "valid" / "threat-1.0.yaml",
         FIXTURES / "valid" / "objective-1.0.yaml",
         FIXTURES / "invalid" / "rule-missing-metadata.yaml",

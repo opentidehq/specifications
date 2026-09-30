@@ -35,6 +35,7 @@
 - specs/objects/threat-1.0.md (schema_id: threat::1.0)
 - specs/objects/objective-1.0.md (schema_id: objective::1.0)
 - specs/objects/rule-1.0.md (schema_id: rule::1.0)
+- specs/objects/rule-1.1.md (schema_id: rule::1.1)
 
 ## Vocabulary specs (specs/vocabularies/)
 
