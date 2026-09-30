@@ -130,7 +130,7 @@ Implementations MUST NOT resolve pins against the latest unversioned vocabulary 
 - [RFC 0003](../rfcs/0003-per-key-vocabulary-versioning.md) — per-key versioning design
 - [configuration.md](configuration.md) — config sources for `tide.config.*`
 - [deployment.md](deployment.md) — statuses for `tide.config.statuses`
-- [platforms.md](platforms.md) — `recomposition` and platform schemas
+- [platforms/index.md](platforms/index.md) — `recomposition` and platform schemas
 - [validation.md](validation.md) — metaschema-driven vocabulary and deprecation walks
 
 ## Defaults & overrides

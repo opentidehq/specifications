@@ -149,6 +149,15 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "invalid" / "threat-actor-wrong-stage.yaml",
         FIXTURES / "cross-object" / "rule-references-objective.yaml",
         FIXTURES / "inflight" / "example-shard.json",
+        FIXTURES / "platforms" / "sentinel.yaml",
+        FIXTURES / "platforms" / "defender-for-endpoint.yaml",
+        FIXTURES / "platforms" / "splunk.yaml",
+        FIXTURES / "platforms" / "splunk-legacy.yaml",
+        FIXTURES / "platforms" / "sentinel-one.yaml",
+        FIXTURES / "platforms" / "crowdstrike.yaml",
+        FIXTURES / "platforms" / "harfanglab-sigma.yaml",
+        FIXTURES / "platforms" / "harfanglab-yara.yaml",
+        FIXTURES / "platforms" / "carbon-black-cloud.yaml",
     ]
     for path in required:
         if not path.is_file():

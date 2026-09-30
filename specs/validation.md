@@ -21,7 +21,7 @@ OpenTide validates detection content through a structured pipeline: ID uniquenes
 - Object UUIDs MUST be unique across the workspace registry.
 - Cross-object references MUST resolve to existing objects when checked.
 - Threat `chaining` relationships MUST reference valid targets when checked.
-- Query validation MUST only be offered for platforms in the query-validation allowlist (see [platforms.md](platforms.md)).
+- Query validation MUST only be offered for platforms in the query-validation allowlist (see [platforms/index.md](platforms/index.md)).
 - Platforms without query validators MUST return `supported: false` — not fake success.
 
 ## Definition
@@ -134,7 +134,7 @@ Validation MAY parallelize per-object work and ID scans; worker count is resolve
 - [versioning.md](versioning.md) — schema routing at validation time
 - [vocabularies/format.md](vocabularies/format.md) — vocabulary conformance
 - [metaschema-keywords.md](metaschema-keywords.md) — `tide.vocab`, `tide.meta.deprecation`
-- [platforms.md](platforms.md) — query validation allowlist
+- [platforms/index.md](platforms/index.md) — query validation allowlist
 - Object specs — field requirements validated by Pydantic
 
 ## Defaults & overrides

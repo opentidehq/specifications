@@ -1,0 +1,37 @@
+name: Defender for Endpoint platform block
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000012
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+description: |
+  Defender custom detection with a device entity and an isolate action.
+status: STAGING
+severity: High
+response:
+  alert_severity: High
+configurations:
+  defender_for_endpoint:
+    enabled: true
+    schema: platform::defender_for_endpoint::1.0
+    status: STAGING
+    query: |
+      DeviceProcessEvents
+      | where FileName =~ "cmd.exe"
+      | take 1
+    scheduling: 1H
+    alert:
+      category: Execution
+      title: Suspicious command processor
+      severity: High
+    impacted_entities:
+      device: DeviceId
+      user: AccountName
+    scope:
+      selection: All
+    actions:
+      devices:
+        isolate_device: Full
+        collect_investigation_package: true

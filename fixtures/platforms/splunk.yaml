@@ -1,0 +1,40 @@
+name: Splunk platform block
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000013
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+description: |
+  Splunk saved search on the v3 layout.
+status: STAGING
+severity: High
+response:
+  alert_severity: High
+configurations:
+  splunk:
+    enabled: true
+    schema: platform::splunk::1.0
+    status: STAGING
+    query: |
+      index=main sourcetype=WinEventLog EventCode=4688
+      | head 1
+    scheduling:
+      schedule:
+        frequency: 1h
+      timerange:
+        lookback: 2h
+    trigger:
+      condition: number of events
+      comparator: greater than
+      threshold: 0
+      throttling:
+        duration: 1h
+        fields:
+          - host
+    actions:
+      notable:
+        event:
+          title: Suspicious process
+        security_domain: threat

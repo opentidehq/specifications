@@ -63,9 +63,10 @@ flowchart LR
 2. **[Metadata](specs/metadata.md)** — the block every object shares.
 3. **The object spec** you care about — [threat](specs/objects/threat-1.0.md), [objective](specs/objects/objective-1.0.md), or [rule](specs/objects/rule-1.0.md).
 4. **[Validation](specs/validation.md)** — what the engine checks and when.
+5. **A platform schema**, when you are writing `configurations.<platform>` — start at [Platforms](specs/platforms/index.md), then the block you deploy (for example [Sentinel](specs/platforms/sentinel-1.0.md)).
 
 ## Full index
 
-The [spec index](SPECS.md) lists every active spec, its version, and status. Core infrastructure specs cover [workspace layout](specs/workspace.md), [configuration](specs/configuration.md), [deployment](specs/deployment.md), [platforms](specs/platforms.md), [metaschema keywords](specs/metaschema-keywords.md), and [vocabularies](specs/vocabularies/format.md).
+The [spec index](SPECS.md) lists every active spec, its version, and status. Core infrastructure specs cover [workspace layout](specs/workspace.md), [configuration](specs/configuration.md), [deployment](specs/deployment.md), [platforms](specs/platforms/index.md), [metaschema keywords](specs/metaschema-keywords.md), and [vocabularies](specs/vocabularies/format.md). The seven `platform::<identifier>::1.0` field contracts live under [Platforms](specs/platforms/index.md).
 
 Changes follow the process in [Governance](GOVERNANCE.md).
