@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -219,7 +219,7 @@ def _require_token_list(
 
 def _is_iso_timestamp(value: Any) -> bool:
     """ISO 8601 date or datetime, the same forms as metadata.created and metadata.modified."""
-    if isinstance(value, datetime):
+    if isinstance(value, date):
         return True
     if not isinstance(value, str):
         return False
