@@ -2,6 +2,10 @@
 
 Per-spec change history. Breaking changes require a new spec file version and an RFC.
 
+## versioning 1.1
+
+- Every supported schema revision works for validation, deployment, documentation, export, query checks, promotion, sharing, and editor validation. A missing schema is an error. Migration is explicit and does not change `metadata.version`.
+
 ## versioning 1.0
 
 - Initial normative spec bootstrapped from opentide `SCHEMA_REVISION.md`.
