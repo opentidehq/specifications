@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +25,8 @@ else:
 UUID_V4 = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
 )
-REGISTERED_SCHEMAS = frozenset({"threat::1.0", "objective::1.0", "rule::1.0"})
+REGISTERED_SCHEMAS = frozenset({"threat::1.0", "objective::1.0", "rule::1.0", "rule::1.1"})
+RULE_SCHEMAS = frozenset({"rule::1.0", "rule::1.1"})
 THREAT_REQUIRED_BODY = (
     "description",
     "severity",
@@ -215,6 +217,44 @@ def _require_token_list(
         checker(item, vocab, path=f"{path}[{index}]", errors=errors)
 
 
+def _is_iso_timestamp(value: Any) -> bool:
+    """ISO 8601 date or datetime, the same forms as metadata.created and metadata.modified."""
+    if isinstance(value, date):
+        return True
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if not text:
+        return False
+    try:
+        datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return True
+
+
+def _validate_reviewed(metadata: Any, *, allowed: bool, errors: list[CheckError]) -> None:
+    if not isinstance(metadata, dict) or "reviewed" not in metadata:
+        return
+    if not allowed:
+        errors.append(
+            CheckError(
+                "reviewed_not_in_schema",
+                "metadata.reviewed is defined only on rule::1.1",
+                "metadata.reviewed",
+            )
+        )
+        return
+    if not _is_iso_timestamp(metadata.get("reviewed")):
+        errors.append(
+            CheckError(
+                "invalid_reviewed",
+                "metadata.reviewed must be an ISO 8601 date or datetime",
+                "metadata.reviewed",
+            )
+        )
+
+
 def _validate_metadata(metadata: Any, errors: list[CheckError]) -> str | None:
     if not isinstance(metadata, dict):
         errors.append(CheckError("missing_metadata", "metadata block is required", "metadata"))
@@ -307,6 +347,7 @@ def validate_threat(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[Check
         errors.append(CheckError("unknown_schema", f"threat fixture has schema {schema!r}", "metadata.schema"))
     tlp = (doc.get("metadata") or {}).get("tlp") if isinstance(doc.get("metadata"), dict) else None
     _require_vocab_name(tlp, vocabs.get("tlp"), path="metadata.tlp", errors=errors)
+    _validate_reviewed(doc.get("metadata"), allowed=False, errors=errors)
 
     body = doc.get("threat")
     if not isinstance(body, dict):
@@ -354,6 +395,7 @@ def validate_objective(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[Ch
         )
     tlp = (doc.get("metadata") or {}).get("tlp") if isinstance(doc.get("metadata"), dict) else None
     _require_vocab_name(tlp, vocabs.get("tlp"), path="metadata.tlp", errors=errors)
+    _validate_reviewed(doc.get("metadata"), allowed=False, errors=errors)
 
     composition = doc.get("composition")
     if not isinstance(composition, dict):
@@ -395,10 +437,11 @@ def validate_rule(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[CheckEr
         errors.append(CheckError("missing_metadata", "metadata block is required", "metadata"))
         return errors
     schema = _validate_metadata(doc.get("metadata"), errors)
-    if schema and schema != "rule::1.0":
+    if schema and schema not in RULE_SCHEMAS:
         errors.append(CheckError("unknown_schema", f"rule fixture has schema {schema!r}", "metadata.schema"))
     tlp = (doc.get("metadata") or {}).get("tlp") if isinstance(doc.get("metadata"), dict) else None
     _require_vocab_name(tlp, vocabs.get("tlp"), path="metadata.tlp", errors=errors)
+    _validate_reviewed(doc.get("metadata"), allowed=schema == "rule::1.1", errors=errors)
     _require_non_empty_string(
         doc.get("description"), code="missing_field", path="description", errors=errors
     )
@@ -448,5 +491,7 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "rule-bad-uuid.yaml": "invalid_uuid",
     "rule-unknown-schema.yaml": "unknown_schema",
     "rule-missing-metadata.yaml": "missing_metadata",
+    "rule-reviewed-bad-date.yaml": "invalid_reviewed",
+    "rule-1.0-reviewed.yaml": "reviewed_not_in_schema",
     "objective-no-signals.yaml": "empty_signals",
 }

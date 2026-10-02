@@ -95,6 +95,8 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/invalid/rule-bad-uuid.yaml](../fixtures/invalid/rule-bad-uuid.yaml) | `invalid_uuid` |
 | [fixtures/invalid/rule-unknown-schema.yaml](../fixtures/invalid/rule-unknown-schema.yaml) | `unknown_schema` |
 | [fixtures/invalid/rule-missing-metadata.yaml](../fixtures/invalid/rule-missing-metadata.yaml) | `missing_metadata` |
+| [fixtures/invalid/rule-reviewed-bad-date.yaml](../fixtures/invalid/rule-reviewed-bad-date.yaml) | `invalid_reviewed` |
+| [fixtures/invalid/rule-1.0-reviewed.yaml](../fixtures/invalid/rule-1.0-reviewed.yaml) | `reviewed_not_in_schema` |
 | [fixtures/invalid/objective-no-signals.yaml](../fixtures/invalid/objective-no-signals.yaml) | `empty_signals` |
 | [fixtures/sharing/invalid/unknown-distribution.toml](../fixtures/sharing/invalid/unknown-distribution.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/legacy-targets-table.toml](../fixtures/sharing/invalid/legacy-targets-table.toml) | `unknown_key` |
@@ -155,6 +157,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-09-30 | Fixture checker codes `invalid_reviewed` and `reviewed_not_in_schema` ([RFC 0008](../rfcs/0008-rule-reviewed-date.md)). |
 | 1.0 | 2026-09-28 | `sharing-config` checker codes for `[[misp]]` integration blocks. |
 | 1.0 | 2026-09-16 | Document specifications-repo fixture checker codes for `threat::1.0` list/`ThreatActor` encoding ([#11](https://github.com/OpenTideHQ/specifications/issues/11), [#12](https://github.com/OpenTideHQ/specifications/issues/12)). |
 | 1.0 | 2026-06-25 | Initial spec from opentide `validation/session.py` |
