@@ -176,7 +176,7 @@ Cluster values MUST be the `value` string the instance returns. The connector MU
 
 | Identifier source | Galaxy | First key that yields exactly one match |
 |-------------------|--------|------------------------------------------|
-| `threat.att&ck[]`, objective `attack[]`, rule `techniques[]` | `mitre-attack-pattern` | `meta.external_id` contains the technique id, case-insensitive after trimming |
+| `threat.mitre_attack[]`, `objective.mitre_attack[]`, `rule.techniques[]` | `mitre-attack-pattern` | `meta.external_id` contains the technique id, case-insensitive after trimming |
 | `threat.actors[].name` scope `att&ck::` | `threat-actor` | (a) `meta.external_id` contains the id; else (b) `meta.refs` URL final path segment equals the id; else (c) `meta.synonyms` contains the id |
 | `threat.actors[].name` scope `misp::` | `threat-actor` | cluster `uuid` equals the scoped identifier, canonical form, case-insensitive |
 
@@ -356,4 +356,5 @@ A block needs `name`, `url`, `api_key`, and `max_tlp`. It ships disabled, select
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-10-06 | Technique-list sources are `threat.mitre_attack` and `objective.mitre_attack`. `rule.techniques` is unchanged. |
 | 1.0 | 2026-09-28 | Initial connector spec from accepted [RFC 0005](../../rfcs/0005-sharing-system.md). Pins upstream `opentide` template version 5. Minimal `[[misp]]` block; organisation from `metadata.organisation.uuid`, overridable per block; distribution derived from TLP. |

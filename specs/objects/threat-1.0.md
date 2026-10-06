@@ -17,7 +17,7 @@ A threat vector describes an adversary capability or scenario: severity, impact,
 - The document MUST declare `metadata.schema: threat::1.0`.
 - `name` and `criticality` MUST be present at the top level.
 - `threat` body MUST be present with all required subfields.
-- `threat.att&ck` MUST be a non-empty list of ATT&CK technique references (YAML key `att&ck`; aliased as `att_ck` in Pydantic).
+- `threat.mitre_attack` MUST be a non-empty list of ATT&CK technique ids from vocabulary `att&ck` (YAML key `mitre_attack`; pin `att&ck::1.1`).
 - `threat.impact` MUST be a non-empty `list[string]` of `impact::1.0` vocabulary names.
 - `threat.leverage` MUST be a non-empty `list[string]` of `leverage::1.0` vocabulary names.
 - `threat.impact` and `threat.leverage` MUST be YAML lists of tokens. A scalar string is invalid. Implementations MUST NOT accept semicolon-concatenated strings (for example `Elevation of privilege; Repudiation`) as an encoding of multiple values, neither as the field value nor as a list item.
@@ -52,7 +52,7 @@ A threat vector describes an adversary capability or scenario: severity, impact,
 | `viability` | string | yes | — | Viability vocabulary (`viability::1.0`) |
 | `terrain` | string | yes | — | Explanatory narrative about where/how the threat operates |
 | `surface` | list[string] | yes | — | Threat surface vocabulary values (`surface::1.0`) |
-| `att&ck` | list[string] | yes | — | MITRE ATT&CK technique IDs |
+| `mitre_attack` | list[string] | yes | — | MITRE ATT&CK technique ids (`att&ck::1.1`) |
 | `actors` | list[ThreatActor] | no | null | Threat actors; each entry is a `ThreatActor` object |
 | `killchain` | string \| list[string] | no | null | Kill chain stage(s) |
 | `chaining` | list[ChainingEntry] | no | null | Vector chaining relationships |
@@ -134,7 +134,7 @@ threat:
   terrain: Endpoint workstations and user devices.
   surface:
     - Windows::Desktop
-  att&ck:
+  mitre_attack:
     - T1059
   actors:
     - name: att&ck::G0007
@@ -164,5 +164,6 @@ threat:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-10-06 | Technique list key is `mitre_attack`, pinned to `att&ck::1.1`. Vocabulary id stays `att&ck`. `schema_id` stays `threat::1.0`. |
 | 1.0 | 2026-09-16 | Correct `impact` and `leverage` to non-empty `list[string]`; forbid semicolon packing and first-token collapse ([#12](https://github.com/OpenTideHQ/specifications/issues/12)). Correct `actors` to `list[ThreatActor]` with scoped `name`; pin path is `threat.actors.name` ([#11](https://github.com/OpenTideHQ/specifications/issues/11)). Write-up correction of 1.0 — `schema_id` stays `threat::1.0`. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `models/threat.py` |
