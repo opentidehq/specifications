@@ -35,7 +35,7 @@ THREAT_REQUIRED_BODY = (
     "viability",
     "terrain",
     "surface",
-    "att&ck",
+    "mitre_attack",
 )
 PACKED_SEPARATOR = ";"
 
@@ -370,7 +370,11 @@ def validate_threat(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[Check
     )
     _require_token_list(body.get("surface"), vocabs.get("surface"), path="threat.surface", errors=errors)
     _require_token_list(
-        body.get("att&ck"), vocabs.get("att&ck"), path="threat.att&ck", errors=errors, id_mode=True
+        body.get("mitre_attack"),
+        vocabs.get("att&ck"),
+        path="threat.mitre_attack",
+        errors=errors,
+        id_mode=True,
     )
 
     actors = body.get("actors", None)

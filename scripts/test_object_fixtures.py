@@ -226,7 +226,7 @@ class ThreatFixtureTests(unittest.TestCase):
 
     def test_unknown_attck_id(self) -> None:
         doc = copy.deepcopy(self.valid)
-        doc["threat"]["att&ck"] = ["not-a-technique"]
+        doc["threat"]["mitre_attack"] = ["not-a-technique"]
         self.assertIn("unknown_vocab_value", _codes(validate_threat(doc, self.vocabs)))
 
     def test_empty_surface_rejected(self) -> None:
