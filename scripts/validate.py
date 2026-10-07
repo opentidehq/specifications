@@ -123,6 +123,10 @@ def _validate_pin_files() -> list[str]:
                     )
         if path.name == "threat.toml":
             errors.extend(_validate_threat_pins(path, doc))
+        elif path.name == "objective.toml":
+            errors.extend(_validate_objective_pins(path, doc))
+        elif path.name == "rule.toml":
+            errors.extend(_validate_rule_pins(path, doc))
 
     return errors
 
@@ -171,10 +175,11 @@ def _check_fixtures() -> list[str]:
 
 def _validate_threat_pins(path: Path, doc: dict) -> list[str]:
     errors: list[str] = []
-    for section in ("threat::1.0", "threat::2.1"):
-        pins = doc.get(section)
-        if not isinstance(pins, dict):
-            continue
+    if "threat::2.1" in doc:
+        errors.append(f"{path}: [threat::2.1] is not a live schema and must not be pinned")
+    section = "threat::1.0"
+    pins = doc.get(section)
+    if isinstance(pins, dict):
         if "threat.actors" in pins:
             errors.append(
                 f"{path}: [{section}] pin 'threat.actors' is invalid; "
@@ -184,6 +189,39 @@ def _validate_threat_pins(path: Path, doc: dict) -> list[str]:
             errors.append(
                 f"{path}: [{section}] must pin threat.actors.name = 'actors::1.0'"
             )
+        if pins.get("threat.mitre_attack") != "att&ck::1.1":
+            errors.append(f"{path}: [{section}] must pin threat.mitre_attack = 'att&ck::1.1'")
+    return errors
+
+
+def _validate_objective_pins(path: Path, doc: dict) -> list[str]:
+    errors: list[str] = []
+    pins = doc.get("objective::1.0")
+    if not isinstance(pins, dict):
+        return [f"{path}: missing [objective::1.0]"]
+    if pins.get("objective.signals.severity") != "alert_severity::1.0":
+        errors.append(
+            f"{path}: [objective::1.0] must pin objective.signals.severity = 'alert_severity::1.0'"
+        )
+    if pins.get("objective.mitre_attack") != "att&ck::1.1":
+        errors.append(f"{path}: [objective::1.0] must pin objective.mitre_attack = 'att&ck::1.1'")
+    if "objective.signals.data.logsources" in pins:
+        errors.append(
+            f"{path}: [objective::1.0] must not pin objective.signals.data.logsources; "
+            "log sources are visibility names, not ATT&CK datasources"
+        )
+    return errors
+
+
+def _validate_rule_pins(path: Path, doc: dict) -> list[str]:
+    errors: list[str] = []
+    for section in ("rule::1.0", "rule::1.1"):
+        pins = doc.get(section)
+        if not isinstance(pins, dict):
+            errors.append(f"{path}: missing [{section}]")
+            continue
+        if pins.get("techniques") != "att&ck::1.1":
+            errors.append(f"{path}: [{section}] must pin techniques = 'att&ck::1.1'")
     return errors
 
 

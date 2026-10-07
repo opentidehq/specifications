@@ -20,7 +20,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 - `name`, `metadata`, and `description` MUST be present.
 - `status` MUST be a valid deployment status from [deployment.md](../deployment.md) (default: `STAGING`).
 - `severity` MUST be a valid rule severity vocabulary value (default: `Informational`).
-- `techniques` MUST be a list of ATT&CK technique IDs (MAY be empty).
+- `techniques` MUST be a list of ATT&CK technique ids from vocabulary `att&ck` (pin `att&ck::1.1`). The list MAY be empty.
 - `platforms` or `configurations` MUST contain at least one enabled platform block for deployable rules.
 - `detection_model` when present MUST reference a valid objective UUID.
 - Platform blocks MUST validate against the platform schema identifier declared in each block's `schema` field.
@@ -46,7 +46,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 | `description` | string | yes | — | Rule narrative (multiline YAML encouraged) |
 | `status` | string | no | `STAGING` | Deployment lifecycle status |
 | `severity` | string | no | `Informational` | Rule severity vocabulary |
-| `techniques` | list[string] | no | `[]` | MITRE ATT&CK technique IDs |
+| `techniques` | list[string] | no | `[]` | MITRE ATT&CK technique ids (`att&ck::1.1`) |
 | `platforms` | map[string, object] | no | `{}` | Legacy flat platform dict (prefer `configurations`) |
 | `configurations` | RuleConfigurations | no | null | Typed per-platform configuration blocks |
 | `references` | ObjectReferences | no | null | External and internal references |
@@ -182,4 +182,5 @@ configurations:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-10-07 | `techniques` is pinned to `att&ck::1.1`. `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-06-25 | Initial exemplar spec from opentide `models/rule.py` |
