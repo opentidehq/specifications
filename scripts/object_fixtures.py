@@ -187,6 +187,70 @@ def _require_vocab_id(
         )
 
 
+def _require_scoped_token_list(
+    value: Any,
+    vocab: Vocab | None,
+    *,
+    path: str,
+    errors: list[CheckError],
+) -> None:
+    """Validate a list whose vocabulary groups its keys under stages.
+
+    A stage-scoped vocabulary carries the same key name under more than one
+    stage (``VPN``, ``Wireless`` and ``Industrial`` are each defined under both
+    ``Infrastructure`` and ``Protocol`` in ``surface``), so a bare key name is
+    ambiguous and MUST NOT be accepted: the authored value is
+    ``<stage>::<key>``. This mirrors ``ThreatActor.name``, which has required
+    ``att&ck::``/``misp::`` scoping since actors::1.0.
+    """
+    if isinstance(value, str):
+        code = "packed_vocab_string" if _is_packed_token(value) else "field_not_list"
+        errors.append(
+            CheckError(code, "must be a list of stage-scoped vocabulary strings", path)
+        )
+        return
+    if not isinstance(value, list) or not value:
+        errors.append(CheckError("empty_vocab_list", "MUST be a non-empty list", path))
+        return
+    for index, item in enumerate(value):
+        item_path = f"{path}[{index}]"
+        if not isinstance(item, str) or not item.strip():
+            errors.append(
+                CheckError("invalid_vocab_token", "must be a non-empty vocabulary string", item_path)
+            )
+            continue
+        if _is_packed_token(item):
+            errors.append(
+                CheckError(
+                    "packed_vocab_string",
+                    "semicolon-packed strings are not a valid encoding of list[string]",
+                    item_path,
+                )
+            )
+            continue
+        if vocab is None:
+            continue
+        if not vocab.has_scoped(item):
+            # A value that resolves unscoped is a missing stage prefix, which is
+            # a different authoring mistake from naming a key that does not exist.
+            if vocab.has_unscoped(item):
+                errors.append(
+                    CheckError(
+                        "surface_unscoped",
+                        f"{item!r} MUST be stage-scoped (for example OS::{item})",
+                        item_path,
+                    )
+                )
+            else:
+                errors.append(
+                    CheckError(
+                        "unknown_vocab_value",
+                        f"{item!r} is not a scoped {vocab.field} value",
+                        item_path,
+                    )
+                )
+
+
 def _require_token_list(
     value: Any,
     vocab: Vocab | None,
@@ -368,7 +432,9 @@ def validate_threat(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[Check
     _require_non_empty_string(
         body.get("terrain"), code="missing_field", path="threat.terrain", errors=errors
     )
-    _require_token_list(body.get("surface"), vocabs.get("surface"), path="threat.surface", errors=errors)
+    _require_scoped_token_list(
+        body.get("surface"), vocabs.get("surface"), path="threat.surface", errors=errors
+    )
     _require_token_list(
         body.get("mitre_attack"),
         vocabs.get("att&ck"),
@@ -492,6 +558,7 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "threat-actor-missing-name.yaml": "actor_missing_name",
     "threat-actor-unscoped.yaml": "actor_unscoped",
     "threat-actor-wrong-stage.yaml": "actor_unknown",
+    "threat-surface-unscoped.yaml": "surface_unscoped",
     "rule-bad-uuid.yaml": "invalid_uuid",
     "rule-unknown-schema.yaml": "unknown_schema",
     "rule-missing-metadata.yaml": "missing_metadata",
