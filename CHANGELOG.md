@@ -20,6 +20,8 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## threat 1.0
 
+- Correct `threat.surface` to stage-scoped values (`<stage>::<key>`, e.g. `OS::Windows::Desktop`). The vocabulary groups keys under stages and the same key name is defined under two of them — `VPN`, `VPN::OpenVPN`, `VPN::WireGuard`, `Wireless` and `Industrial` are each both `Infrastructure` and `Protocol` — so a bare key name was ambiguous and those five values were unreachable. The prior description asserting values "are not prefixed with the stage id" was wrong and is corrected in place; no vocabulary version bump, as `surface::1.0` key names are unchanged and only the authored encoding is corrected.
+- Bump `threat.actors.name` pin to `actors::1.1`. The 220 galaxy clusters added at `actors::1.1` were present in the vocabulary but unreachable behind the `actors::1.0` pin, so a correctly-authored MISP cluster UUID was reported as an unknown vocabulary value. Additive minor; `actors::1.0` keys are unaffected.
 - Correct `threat.impact` and `threat.leverage` to non-empty `list[string]`; semicolon-packed strings are invalid and MUST NOT collapse to the first token ([#12](https://github.com/OpenTideHQ/specifications/issues/12)).
 - Correct `threat.actors` to `list[ThreatActor]` with scoped `name`; pin path is `threat.actors.name` ([#11](https://github.com/OpenTideHQ/specifications/issues/11)).
 - Initial normative spec bootstrapped from opentide `models/threat.py`.

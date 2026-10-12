@@ -155,6 +155,7 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "invalid" / "threat-actor-missing-name.yaml",
         FIXTURES / "invalid" / "threat-actor-unscoped.yaml",
         FIXTURES / "invalid" / "threat-actor-wrong-stage.yaml",
+        FIXTURES / "invalid" / "threat-surface-unscoped.yaml",
         FIXTURES / "cross-object" / "rule-references-objective.yaml",
         FIXTURES / "inflight" / "example-shard.json",
         FIXTURES / "platforms" / "sentinel.yaml",
@@ -185,9 +186,9 @@ def _validate_threat_pins(path: Path, doc: dict) -> list[str]:
                 f"{path}: [{section}] pin 'threat.actors' is invalid; "
                 "actors are objects — pin 'threat.actors.name'"
             )
-        if pins.get("threat.actors.name") != "actors::1.0":
+        if pins.get("threat.actors.name") != "actors::1.1":
             errors.append(
-                f"{path}: [{section}] must pin threat.actors.name = 'actors::1.0'"
+                f"{path}: [{section}] must pin threat.actors.name = 'actors::1.1'"
             )
         if pins.get("threat.mitre_attack") != "att&ck::1.1":
             errors.append(f"{path}: [{section}] must pin threat.mitre_attack = 'att&ck::1.1'")
