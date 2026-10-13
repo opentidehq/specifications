@@ -45,7 +45,6 @@ Index of canonical vocabulary files bundled with OpenTide. Each file lives in `v
 | `objectives.vocab.toml` | Strategic Objectives | `objectives` |
 | `pap.vocab.toml` | Permissible Action Protocol | `pap` |
 | `resources.vocab.toml` | Adversary Resource Level | `resources` |
-| `responders.vocab.toml` | Alert Handling Team | `responders` |
 | `rsit.vocab.toml` | Reference Security Incident Classification Taxonomy | `rsit` |
 | `scheduling.vocab.toml` | Rule Scheduling | `scheduling` |
 | `sectors.vocab.toml` | Victim Industry Sector | `sectors` |
