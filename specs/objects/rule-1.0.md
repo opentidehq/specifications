@@ -59,7 +59,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 |-------|------|----------|---------|-------------|
 | `alert_severity` | string | no | `Informational` | Alert severity vocabulary |
 | `playbook` | string | no | null | Playbook identifier or URL |
-| `responders` | string | no | null | Responder team vocabulary |
+| `responders` | string | no | `[deployment] default_responders` | Alert handling team. Free text, NOT a vocabulary: the team is per-organisation configuration (opentide#507) |
 | `procedure` | ResponseProcedure | no | null | Analysis and containment procedure |
 
 ### `procedure` (ResponseProcedure)
@@ -116,7 +116,7 @@ Shared block fields and the capability matrix are in [platforms/index.md](../pla
 - [deployment.md](../deployment.md) — `status` lifecycle and promotion
 - [platforms/index.md](../platforms/index.md) — platform blocks and deploy/validate capabilities
 - [validation.md](../validation.md) — schema, vocabulary, and query validation
-- Vocabularies: `severity`, `alert_severity`, `att&ck`, `responders`, deployment statuses
+- Vocabularies: `severity`, `alert_severity`, `att&ck`, deployment statuses
 
 ## Defaults & overrides
 

@@ -28,6 +28,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## objective 1.0
 
+- `objective.signals[].entities` is stage-scoped: an authored value is `<stage>::<key>` (`Host::Process`). Seven of the 28 keys are defined under two stages, so the bare key name could not tell a host account from a cloud account and seven values were unreachable. Stage ids are capitalised to `Host`, `Network`, `Cloud`. No key changes, so `signal.entities::1.0` is unaffected ([RFC 0005](rfcs/0005-scoped-signal-entities.md)).
 - Initial normative spec bootstrapped from opentide `models/objective.py`.
 
 ## rule 1.1
@@ -51,10 +52,12 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## vocabulary format 1.0
 
+- Staged vocabularies state one prefixing rule: a field bound to a staged vocabulary declares `tide.vocab.scoped` and authors `<stage>::<key>`. Records that a key name may itself contain `::`, and that resolution is therefore raw-first; and that scoping triggers no contract revision under RFC 0003.
 - Initial normative spec bootstrapped from opentide `vocabulary.schema.json`.
 
 ## vocabulary catalog 1.0
 
+- `responders.vocab.toml` is retired. It shipped with `keys = []` while `response.responders` was pinned to it, so every authored value failed validation and no instance could fix it (vocabularies are not locally extensible). The alert handling team is per-organisation configuration: the field is free text defaulted from `[deployment] default_responders` (opentide#507).
 - Initial catalog of 36 bundled vocabularies copied from opentide.
 
 ## deployment 1.0

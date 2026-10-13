@@ -18,6 +18,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 - `name` and top-level `composition` MUST be present.
 - `objective` body MUST include at least one `signals` entry.
 - Each signal MUST have `name`, `uuid`, `description`, `severity`, `methodology`, `entities`, and `data`.
+- `entities` values MUST be stage-scoped as `<stage>::<key>` — `Host::Process`, not `Process` — because the same key name is defined under more than one stage (see [RFC 0005](../../rfcs/0005-scoped-signal-entities.md)).
 - `objective.composition` MUST mirror the top-level `composition` strategy and description.
 - `objective.threats` entries MUST reference valid threat UUIDs when cross-validation is enabled.
 - `references` MAY be omitted.
@@ -68,7 +69,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 | `severity` | string | yes | — | Alert severity vocabulary (`alert_severity::1.0`) |
 | `data` | SignalData | yes | — | Data availability and requirements |
 | `methodology` | string | yes | — | Detection methodology vocabulary |
-| `entities` | list[string] | yes | — | Signal entity vocabulary values |
+| `entities` | list[string] | yes | — | Signal entity vocabulary values, stage-scoped (`signal.entities::1.0`; e.g. `Host::Process`, `Cloud::Account`) |
 | `effort` | integer | no | null | Recovery effort (NIST 800-61) |
 | `detectors` | list[ExternalDetector] | no | null | External detector references |
 | `examples` | list[DetectionExample] | no | null | Example queries |
@@ -138,7 +139,7 @@ objective:
       description: Suspicious authentication activity
       severity: Medium
       methodology: analytics
-      entities: [host]
+      entities: [Host::Hostname]          # stage-scoped: <stage>::<key>
       data:
         availability: Complete
         requirements: Security event logs
