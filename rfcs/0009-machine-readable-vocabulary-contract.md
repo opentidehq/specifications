@@ -150,6 +150,14 @@ The five staged vocabularies are `actors`, `chaining_relations`, `malapi`, `sign
 `surface`. `att&ck` and `killchain` declare `stages` as a plain string list — tactic and phase
 classification, not a value prefix — and stay bare.
 
+`schemas/pins/rule.toml` needs no change. Both its sections, `rule::1.0` and `rule::1.1`, pin
+only `tlp`, `severity`, `att&ck` and `alert_severity`, none of which is staged, so every entry
+stays in string form.
+
+`malapi` is staged but **no pin binds it** — it appears only in
+`specs/vocabularies/catalog.md`. That is not an error today, but it means the per-field rule
+above can never be exercised for it, which is the argument for the orphan check in §3.
+
 ### 2. A generated vocabulary index
 
 Affected paths: new `vocabularies/index.json`, new `scripts/generate_vocabulary_index.py`,
@@ -221,6 +229,9 @@ today — can silently diverge.
 - a catalogue row's `field` column disagrees with the file's declared `field`
 - `vocabularies/index.json` is stale against the TOMLs
 - a pin entry names a vocabulary contract no file provides
+- a `*.vocab.toml` file exists that no pin entry references, and it is not deprecated — the
+  converse of the check above. `malapi` is in this state today, so this check lands as a warning
+  and is promoted to an error once each orphan is either bound or deprecated
 - a field bound to a staged vocabulary omits `scoped = true`, or a field bound to an unstaged
   vocabulary declares it
 
@@ -250,7 +261,7 @@ description = "..."
 since = "2026-10-13"
 sunset = "2027-04-13"
 reason = "Shipped with keys = [] while the rule schema pinned a field to it, so no instance could validate a value. Now a deployment.toml configuration enum."
-replacement = ""
+# replacement omitted: there is no successor vocabulary
 ```
 
 Requirements:
@@ -335,8 +346,10 @@ JSON Schema is for editor and router validation, never for authoring normative c
   Should it be folded in, or tracked separately?
 - **Sunset enforcement.** Should CI fail once a deprecated vocabulary is past its `sunset` and
   still present, or is that a maintainer's judgement?
-- **Does `rule` need scoped pins?** `schemas/pins/rule.toml` was not audited field by field for
-  this draft.
+- **Does `rule` need scoped pins?** Resolved during review: no. `rule::1.0` and `rule::1.1` pin
+  only unstaged vocabularies. See §1.
+- **Orphan vocabularies.** `malapi` is staged and bound by no pin. Should an unbound vocabulary
+  be an error, a permanent warning, or evidence that a pin is missing somewhere?
 - **RFC numbering.** `0005` is used twice in `rfcs/README.md`
   (`0005-scoped-signal-entities.md` and `0005-sharing-system.md`). Worth correcting separately,
   and noted here so this RFC's `0009` is not built on a miscount.
