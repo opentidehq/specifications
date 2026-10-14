@@ -23,6 +23,7 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0006](0006-sharing-ci.md) | Sharing on the production merge | accepted |
 | [0007](0007-elastic-security-platform.md) | Elastic Security detection platform | accepted |
 | [0008](0008-rule-reviewed-date.md) | Optional review date on detection rules | draft |
+| [0009](0009-machine-readable-vocabulary-contract.md) | A machine-readable vocabulary contract | draft |
 
 ## Numbering
 
