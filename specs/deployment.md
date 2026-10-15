@@ -20,6 +20,7 @@ Defines rule deployment statuses, promotion strategy, proxy settings, and debug 
 - Status promotion MUST respect `[promotion]` settings when `promotion.enabled` is true.
 - Deprecated statuses MUST NOT be used for new rules (opentide emits warnings).
 - Platform-specific `status` on configuration blocks MUST also be valid deployment statuses when set.
+- `opentide deploy` MUST select only the rule files placed directly in the rules directory from the [workspace layout](workspace.md). A rule file in a subdirectory of that folder MUST NOT be deployed.
 
 ## Definition
 
@@ -130,3 +131,4 @@ Default rule status in fixtures: `STAGING` — see [fixtures/valid/rule-1.0.yaml
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-06-25 | Initial spec from opentide `deployment.toml` |
+| 1.0 | 2026-09-23 | Deploy reads rule files directly in the rules directory; subfolders are outside the workspace layout |
