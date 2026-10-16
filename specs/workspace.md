@@ -1,6 +1,6 @@
 ---
 spec: workspace
-version: "1.1"
+version: "1.2"
 schema_id: null
 status: normative
 supersedes: null
@@ -167,7 +167,7 @@ Consumers overlay shards onto the committed registry when the shard object `meta
 
 The production deploy job (`opentide deploy --plan PRODUCTION` on the default branch) is the only generated job that commits deployment state. `opentide setup` and `opentide setup ci` MUST generate it to meet [deployment-state.md CI requirements 1–7](deployment-state.md#continuous-integration):
 
-1. Serialise production jobs (GitHub `concurrency` with `cancel-in-progress: false`, GitLab `resource_group`, Azure the strongest available lock, documented).
+1. Queue production jobs without dropping runs (no GitHub `concurrency` group, GitLab `resource_group`, Azure the strongest available lock, documented).
 2. Before the dry run and the deploy, overlay `.opentide/states/deployment/` from the default-branch tip.
 3. Run the write-back whenever the deploy started, including after a failure, a cancellation, or a timeout.
 4. Stage shards independently of rule files; commit rule files only when `opentide validate --strict` passes on exactly those files, read NUL-delimited.
@@ -196,6 +196,7 @@ Object fixtures assume the default layout: rules under `objects/rules/`, etc.
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.2 | 2026-10-16 | The production deploy job has no GitHub Actions `concurrency` group ([specifications#43](https://github.com/OpenTideHQ/specifications/issues/43)). |
 | 1.1 | 2026-10-16 | `.opentide/states/deployment/` holds committed deployment-state shards; `.opentide/states/` is never ignored whole and setup ignores `sharing.jsonl` only. The production deploy job serialises, overlays the default branch's state, and writes it back, and staging jobs cannot create on state-backed platforms ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |
 | 1.0 | 2026-09-28 | Optional CI stage `share` runs `opentide share push --changed` on a push to the default branch. |
 | 1.0 | 2026-09-28 | Sharing uses one client file, `sharing.toml`, and one generated ledger, `.opentide/states/sharing.jsonl`. |

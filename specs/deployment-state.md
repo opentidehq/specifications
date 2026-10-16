@@ -1,6 +1,6 @@
 ---
 spec: deployment-state
-version: "1.0"
+version: "1.1"
 schema_id: deployment.state::1.0
 status: normative
 supersedes: null
@@ -183,7 +183,7 @@ A migration is complete when the default branch contains, in one commit, every r
 
 These requirements apply to the production deploy job that `opentide setup` and `opentide setup ci` generate for GitHub Actions, GitLab CI, and Azure Pipelines. That job runs `opentide deploy --plan PRODUCTION` on the default branch and is the only generated job that commits deployment state.
 
-1. **Serialise production jobs.** GitHub Actions MUST set job-level `concurrency: {group: opentide-production-<branch>, cancel-in-progress: false}`. GitLab CI MUST set `resource_group: opentide-production`. Azure Pipelines MUST use the strongest serialisation available from YAML (`lockBehavior: sequential` on the production stage) and the generated file MUST state that Azure serialises the job only when an Exclusive Lock check is configured on the protected resource the stage uses. Without that check Azure cannot serialise from YAML; requirements 2 and 5 then bound the damage.
+1. **Queue production jobs where the provider queues without dropping runs.** GitHub Actions MUST NOT place the production job in a `concurrency` group: GitHub keeps one pending run per group and cancels an older pending run even with `cancel-in-progress: false`, and a production plan deploys only its own commit's diff, so the cancelled commit's rules would never deploy and nothing would report it. Overlapping GitHub runs are bounded by requirements 2 and 5, which turn a double create into a reported `deployment_state_conflict`. GitLab CI MUST set `resource_group: opentide-production`. Azure Pipelines MUST use the strongest serialisation available from YAML (`lockBehavior: sequential` on the production stage) and the generated file MUST state that Azure serialises the job only when an Exclusive Lock check is configured on the protected resource the stage uses. Without that check Azure cannot serialise from YAML; requirements 2 and 5 then bound the damage.
 2. **Overlay the default-branch state before deploying.** Before the dry run and the deploy, the job MUST fetch the default branch and replace `.opentide/states/deployment/` in the working tree with the tip's copy. It MUST remove the directory first, so deletions on the tip hold, and MUST leave it absent when the tip has none. The tip descends from the triggering commit, so it already holds that commit's state plus every later production write-back.
 3. **Write back whenever the deploy started**, including after a partial failure, a cancellation, or a timeout:
    - GitHub Actions: `if: ${{ always() && steps.deploy.outcome != 'skipped' }}`.
@@ -296,4 +296,5 @@ Fixtures: [fixtures/deployment/valid/](../fixtures/deployment/valid/) and [fixtu
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-10-16 | CI requirement 1: no GitHub Actions `concurrency` group on the production job, which would cancel a pending diff-scoped deploy ([specifications#43](https://github.com/OpenTideHQ/specifications/issues/43)). |
 | 1.0 | 2026-10-16 | Initial normative deployment-state contract from accepted [RFC 0010](../rfcs/0010-deployment-external-ids.md). |

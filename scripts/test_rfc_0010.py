@@ -36,11 +36,11 @@ BUMPED = {
     "specs/platforms/crowdstrike-1.0.md": "1.1",
     "specs/platforms/harfanglab-1.0.md": "1.1",
     "specs/platforms/carbon-black-cloud-1.0.md": "1.1",
-    "specs/workspace.md": "1.1",
+    "specs/workspace.md": "1.2",
     "specs/deployment.md": "1.1",
     "specs/validation.md": "1.1",
     "specs/sharing.md": "1.1",
-    "specs/deployment-state.md": "1.0",
+    "specs/deployment-state.md": "1.1",
 }
 
 SECTIONS = ["Summary", "Requirements", "Definition", "Relationships", "Defaults & overrides", "Examples", "History"]
