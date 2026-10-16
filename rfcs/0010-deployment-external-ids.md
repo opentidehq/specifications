@@ -1,6 +1,6 @@
-# RFC 0008: Deployment external ids
+# RFC 0010: Deployment external ids
 
-- **RFC:** 0008
+- **RFC:** 0010
 - **Title:** Deployment external ids
 - **Author:** Behemoth Security
 - **Status:** proposed
