@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.0"
+version: "1.1"
 schema_id: null
 status: normative
 supersedes: null
@@ -23,6 +23,8 @@ OpenTide validates detection content through a structured pipeline: ID uniquenes
 - Threat `chaining` relationships MUST reference valid targets when checked.
 - Query validation MUST only be offered for platforms in the query-validation allowlist (see [platforms/index.md](platforms/index.md)).
 - Platforms without query validators MUST return `supported: false` — not fake success.
+- The schema check MUST report `external_id_in_rule` for `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>` at the root of any platform block and MUST suppress the redundant generic unknown-key diagnostic for that same field.
+- Full-workspace validation MUST validate every deployment-state shard under `.opentide/states/deployment/`, including orphan shards whose `object_uuid` is not in the registry. A missing shard is not an error.
 
 ## Definition
 
@@ -46,6 +48,8 @@ When `schema` is enabled, for each in-scope object the implementation MUST, in o
 4. **References** — resolve `references` links to existing objects.
 5. **Chaining** — resolve chaining relationships (threat vectors only).
 
+The model-validation step reports a legacy external-id key as `external_id_in_rule` rather than as an unknown key ([platforms/index.md](platforms/index.md#external-rule-ids)). The key is checked at the root of every platform block only; a key of the same name nested inside `alert`, `query`, `exclusions`, or another field is not a legacy key.
+
 Steps 4 and 5 resolve cross-object links; they run whenever the `schema` check runs against a full workspace scope where the referenced objects are present.
 
 ### Validation scope
@@ -55,7 +59,18 @@ Steps 4 and 5 resolve cross-object links; they run whenever the `schema` check r
 | `full` | All objects in the workspace index |
 | `narrow` | Filter by `--file`, `--uuid`, and/or `--type` |
 
-When `--file`, `--uuid`, or `--type` filters match no objects, validation MUST emit a `scope_no_match` error rather than silently passing — a filter that selects nothing is treated as a mistake, not a success.
+When `--file`, `--uuid`, or `--type` filters match no objects, validation MUST emit a `scope_no_match` error rather than silently passing — a filter that selects nothing is treated as a mistake, not a success. With several `--file` targets, validation MUST fail when any one of them matches no object, even if the others do. The production write-back relies on this to commit only rule files that were actually validated ([deployment-state.md](deployment-state.md#continuous-integration)).
+
+### Deployment state
+
+In `full` scope, validation MUST read every `*.json` file under `.opentide/states/deployment/` and report the [deployment-state](deployment-state.md#diagnostics) codes: `deployment_state_shape`, `deployment_state_platform`, and `deployment_state_uuid_mismatch` (including two files that canonicalise to one uuid). Orphan shards are validated like any other. A rule with no shard is not an error. `narrow` scope MAY check only the shards of the selected rules plus any shard file passed directly.
+
+| Code | Severity | When |
+|------|----------|------|
+| `external_id_in_rule` | error | A legacy external-id key at the root of a platform block |
+| `deployment_state_shape` | error | A shard is unreadable or violates `deployment.state::1.0` |
+| `deployment_state_platform` | error | A shard names a platform that is not state-backed |
+| `deployment_state_uuid_mismatch` | error | A shard's filename and `object_uuid` disagree or are not lowercase canonical |
 
 ### Query validation
 
@@ -107,6 +122,19 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/sharing/invalid/missing-max-tlp.toml](../fixtures/sharing/invalid/missing-max-tlp.toml) | `missing_field` |
 | [fixtures/sharing/invalid/bad-organisation-uuid.toml](../fixtures/sharing/invalid/bad-organisation-uuid.toml) | `organisation_uuid_invalid` |
 | [fixtures/sharing/invalid/bad-object-type.toml](../fixtures/sharing/invalid/bad-object-type.toml) | `object_type_unknown` |
+| [fixtures/deployment/invalid/bad-schema.json](../fixtures/deployment/invalid/bad-schema.json) | `deployment_state_shape` |
+| [fixtures/deployment/invalid/uuid-mismatch.json](../fixtures/deployment/invalid/uuid-mismatch.json) | `deployment_state_uuid_mismatch` |
+| [fixtures/deployment/invalid/noncanonical-uuid.json](../fixtures/deployment/invalid/noncanonical-uuid.json) | `deployment_state_uuid_mismatch` |
+| [fixtures/deployment/invalid/numeric-id.json](../fixtures/deployment/invalid/numeric-id.json) | `deployment_state_shape` |
+| [fixtures/deployment/invalid/leading-zero-defender-id.json](../fixtures/deployment/invalid/leading-zero-defender-id.json) | `deployment_state_shape` |
+| [fixtures/deployment/invalid/empty-id.json](../fixtures/deployment/invalid/empty-id.json) | `deployment_state_shape` |
+| [fixtures/deployment/invalid/whitespace-tenant.json](../fixtures/deployment/invalid/whitespace-tenant.json) | `deployment_state_shape` |
+| [fixtures/deployment/invalid/unsupported-platform.json](../fixtures/deployment/invalid/unsupported-platform.json) | `deployment_state_platform` |
+| [fixtures/deployment/invalid/rule-with-rule-id.yaml](../fixtures/deployment/invalid/rule-with-rule-id.yaml) | `external_id_in_rule` |
+| [fixtures/deployment/invalid/rule-with-rule-id-tenant.yaml](../fixtures/deployment/invalid/rule-with-rule-id-tenant.yaml) | `external_id_in_rule` |
+| [fixtures/deployment/invalid/rule-with-rule-id-bundle.yaml](../fixtures/deployment/invalid/rule-with-rule-id-bundle.yaml) | `external_id_in_rule` |
+
+Deployment fixtures (`scripts/deployment_state_fixtures.py`) are checked against [schemas/deployment.state.1.0.schema.json](../schemas/deployment.state.1.0.schema.json) plus the filename rules the schema cannot see. Each invalid shard fixture is checked under the shard filename the checker assigns to it (a uuid that differs from `object_uuid` for `uuid-mismatch.json`, the uppercase spelling for `noncanonical-uuid.json`, the valid name otherwise). The valid shard must be byte-identical to writer output, and no rule fixture in `fixtures/valid/`, `fixtures/platforms/`, or `fixtures/cross-object/` may carry a legacy external-id key.
 
 Sharing fixtures (`scripts/sharing_fixtures.py`) also prove the merge rule: [override.toml](../fixtures/sharing/valid/override.toml) merged by `name` onto [sharing.toml](../fixtures/sharing/valid/sharing.toml) MUST equal [merged.toml](../fixtures/sharing/valid/merged.toml).
 
@@ -116,7 +144,7 @@ A packed semicolon string that happens to start with a valid token MUST still fa
 
 | Severity | Examples |
 |----------|----------|
-| `error` | Schema failure, duplicate UUID, invalid UUID, broken cross-ref |
+| `error` | Schema failure, duplicate UUID, invalid UUID, broken cross-ref, `external_id_in_rule`, invalid deployment-state shard |
 | `warning` | Deprecated field usage |
 
 ### Environment signals
@@ -136,7 +164,8 @@ Validation MAY parallelize per-object work and ID scans; worker count is resolve
 - [versioning.md](versioning.md) — schema routing at validation time
 - [vocabularies/format.md](vocabularies/format.md) — vocabulary conformance
 - [metaschema-keywords.md](metaschema-keywords.md) — `tide.vocab`, `tide.meta.deprecation`
-- [platforms/index.md](platforms/index.md) — query validation allowlist
+- [platforms/index.md](platforms/index.md) — query validation allowlist, external rule ids
+- [deployment-state.md](deployment-state.md) — shard format and diagnostic codes
 - Object specs — field requirements validated by Pydantic
 
 ## Defaults & overrides
@@ -152,11 +181,14 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 | [fixtures/invalid/rule-bad-uuid.yaml](../fixtures/invalid/rule-bad-uuid.yaml) | Fails `uuid-format` (`opentide validate`); checker code `invalid_uuid` |
 | [fixtures/invalid/rule-unknown-schema.yaml](../fixtures/invalid/rule-unknown-schema.yaml) | Fails `schema` (`opentide validate`); checker code `unknown_schema` |
 | [fixtures/cross-object/rule-references-objective.yaml](../fixtures/cross-object/rule-references-objective.yaml) | Passes when sibling objective fixture present |
+| [fixtures/deployment/valid/00000000-0000-4000-8003-000000000010.json](../fixtures/deployment/valid/00000000-0000-4000-8003-000000000010.json) | Valid `deployment.state::1.0` shard in writer form |
+| [fixtures/deployment/invalid/rule-with-rule-id-tenant.yaml](../fixtures/deployment/invalid/rule-with-rule-id-tenant.yaml) | Fails `schema` with `external_id_in_rule` |
 
 ## History
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-10-16 | `external_id_in_rule` replaces the generic unknown-key error for legacy external-id keys; full-workspace validation checks every deployment-state shard, orphans included; every `--file` target must match an object; deployment fixture checker codes ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |
 | 1.0 | 2026-09-30 | Fixture checker codes `invalid_reviewed` and `reviewed_not_in_schema` ([RFC 0008](../rfcs/0008-rule-reviewed-date.md)). |
 | 1.0 | 2026-09-28 | `sharing-config` checker codes for `[[misp]]` integration blocks. |
 | 1.0 | 2026-09-16 | Document specifications-repo fixture checker codes for `threat::1.0` list/`ThreatActor` encoding ([#11](https://github.com/OpenTideHQ/specifications/issues/11), [#12](https://github.com/OpenTideHQ/specifications/issues/12)). |

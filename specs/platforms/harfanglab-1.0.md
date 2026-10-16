@@ -1,6 +1,6 @@
 ---
 spec: platform-harfanglab
-version: "1.0"
+version: "1.1"
 schema_id: platform::harfanglab::1.0
 status: normative
 supersedes: null
@@ -24,7 +24,7 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 - `action` SHOULD be `Alert`, `Alert & Block`, or `Alert, Block & Quarantine`. Any other string deploys as `alert`.
 - `maturity` SHOULD be `Stable`, `Testing`, or `Experimental`. Any other string deploys as `experimental`.
 - `confidence` SHOULD be `Weak`, `Moderate`, or `Strong`. Any other string deploys as `moderate`.
-- `rule_id_bundle` MAY be present. The current deployer does not read it.
+- Legacy external-id keys are invalid. `rule_id_bundle`, `rule_id`, and `rule_id::<tenant>` fail `external_id_in_rule`. Migration removes them as `external_id_unused`; HarfangLab continues to address Sigma and YARA rules by `metadata.uuid`.
 
 ## Definition
 
@@ -38,7 +38,6 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 | `tags` | list[string] | optional | null | Sigma tags, and the YARA `tags` meta line. |
 | `sigma` | [HarfangLabSigma](#sigma-harfanglabsigma) | optional | null | Behavioural rule. Preferred when `yara` is also set. |
 | `yara` | [HarfangLabYara](#yara-harfanglabyara) | optional | null | File or memory scan rule. |
-| `rule_id_bundle` | map[string, string] | optional | null | Accepted. Not used for the HarfangLab id. |
 
 ### Action, maturity, and confidence
 
@@ -132,7 +131,8 @@ The tenant `source_id` is sent with the rule. The tenant `type` (`Sigma` or `YAR
 
 ## Relationships
 
-- [platforms](index.md) — shared fields, no query validation
+- [platforms](index.md) — shared fields, no query validation, external ids
+- [deployment-state.md](../deployment-state.md) — `external_id_unused` in migration; HarfangLab has no shard entry
 - [rule-1.0.md](../objects/rule-1.0.md) — `response.alert_severity` feeds level and score
 - [metadata.md](../metadata.md) — uuid, author, organisation, dates
 
@@ -201,3 +201,4 @@ Fixtures: [fixtures/platforms/harfanglab-sigma.yaml](../../fixtures/platforms/ha
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-09-30 | Initial field contract from the HarfangLab configuration model and deployer. |
+| 1.1 | 2026-10-16 | `rule_id_bundle` is removed. Legacy external-id keys fail `external_id_in_rule`, and migration removes them as `external_id_unused` ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Identity stays `metadata.uuid`. Schema id unchanged. |

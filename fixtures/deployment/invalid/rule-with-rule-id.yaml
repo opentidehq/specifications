@@ -1,0 +1,34 @@
+name: Defender rule still carrying the rule_id map
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000020
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+description: |
+  Unmigrated Defender rule. The vendor ids belong in
+  .opentide/states/deployment/00000000-0000-4000-8003-000000000020.json.
+status: PRODUCTION
+severity: High
+response:
+  alert_severity: High
+configurations:
+  defender_for_endpoint:
+    enabled: true
+    schema: platform::defender_for_endpoint::1.0
+    status: PRODUCTION
+    rule_id:
+      Contoso: 12345
+      Fabrikam: 67890
+    query: |
+      DeviceProcessEvents
+      | where FileName =~ "cmd.exe"
+      | take 1
+    scheduling: 1H
+    alert:
+      category: Execution
+    impacted_entities:
+      device: DeviceId
+    scope:
+      selection: All

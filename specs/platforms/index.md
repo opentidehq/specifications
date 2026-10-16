@@ -1,6 +1,6 @@
 ---
 spec: platforms
-version: "1.0"
+version: "1.1"
 schema_id: null
 status: normative
 supersedes: null
@@ -34,7 +34,8 @@ These specs describe the blocks as the engine accepts them today, including ever
 - CrowdStrike and HarfangLab MUST NOT advertise query validation (`can_validate: false`).
 - A typed block SHOULD set `schema` to `platform::<identifier>::1.0`. Implementations MUST accept a missing `schema` and MUST accept a legacy identifier (`sentinel::2.4`, `splunk::2.0`, `splunk::3.0`, `carbon_black_cloud::3.0`, and the same shape for the other platforms). The identifier is not a closed enum.
 - Unknown keys on a block MUST fail static validation. The model forbids them.
-- Registry load is stricter or looser depending on the platform. Defender, Splunk, and Carbon Black pass leftover keys on the block into the model, so an unknown key at the block root fails load as well. The Splunk loader still drops unknown keys inside `scheduling` other than `type`, `expires`, `schedule`, and `timerange`. Sentinel, SentinelOne, CrowdStrike, and HarfangLab drop keys the loader does not map, so those keys pass load and fail `opentide validate`. The aliases in [External rule ids](#external-rule-ids) and [Splunk](splunk-1.0.md) are mapped before that check.
+- A block MUST NOT carry a vendor-assigned external id. `rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` at the root of any block, on every platform, MUST fail with `external_id_in_rule` ([External rule ids](#external-rule-ids)).
+- Registry load is stricter or looser depending on the platform. Defender, Splunk, and Carbon Black pass leftover keys on the block into the model, so an unknown key at the block root fails load as well. The Splunk loader still drops unknown keys inside `scheduling` other than `type`, `expires`, `schedule`, and `timerange`. Sentinel, SentinelOne, CrowdStrike, and HarfangLab drop keys the loader does not map, so those keys pass load and fail `opentide validate`. The [Splunk](splunk-1.0.md) aliases and Defender's `quarantine_files` alias are mapped before that check.
 - In every field table, **optional** means the key may be omitted at static validation. A later sentence in that platform spec names the keys deploy or registry load still require.
 - `query`, where the platform spec marks it required, MUST be a string and MUST NOT be empty or whitespace.
 - Static validation (`opentide validate`) MUST enforce the **Required** column of each platform spec. It MUST NOT require a field only because generated JSON Schema lists it.
@@ -120,25 +121,21 @@ All bundled platforms default to `enabled = false`. Enable one by setting `enabl
 
 ### External rule ids
 
-Sentinel addresses the analytics rule by `metadata.uuid`. HarfangLab addresses Sigma and YARA rules by `metadata.uuid`. The other platforms store the vendor's id on the block so the next deploy updates instead of creating.
+Platform blocks MUST NOT contain vendor-assigned external identifiers. Defender for Endpoint, SentinelOne, and CrowdStrike use the committed deployment-state shard defined in [deployment-state.md](../deployment-state.md). Sentinel and HarfangLab use `metadata.uuid`; Carbon Black Cloud uses `metadata.uuid` for the IOC and the title for the report; Splunk uses its saved-search identity.
 
-| Platform | Model field | Value type | Loader alias |
-|----------|-------------|------------|--------------|
-| `defender_for_endpoint` | `rule_id` | map[string, int] | `rule_id::<tenant>` |
-| `sentinel_one` | `rule_id_bundle` | map[string, int] | `rule_id::<tenant>` |
-| `crowdstrike` | `rule_id_bundle` | map[string, string] | `rule_id::<tenant>` |
-| `harfanglab` | `rule_id_bundle` | map[string, string] | `rule_id::<tenant>` |
-| `carbon_black_cloud` | `rule_id_bundle` | map[string, string] | `rule_id::<tenant>` |
+| Platform | How deploy addresses the remote rule | Where a vendor id lives |
+|----------|--------------------------------------|-------------------------|
+| `sentinel` | `metadata.uuid` is the analytics rule id | Nowhere |
+| `defender_for_endpoint` | Defender-assigned rule id | `.opentide/states/deployment/<uuid>.json` |
+| `splunk` | The saved search | Nowhere |
+| `sentinel_one` | SentinelOne-assigned STAR rule id | `.opentide/states/deployment/<uuid>.json` |
+| `carbon_black_cloud` | `metadata.uuid` on the IOC; title on the report | Nowhere |
+| `crowdstrike` | CrowdStrike-assigned correlation rule id | `.opentide/states/deployment/<uuid>.json` |
+| `harfanglab` | `metadata.uuid` on the Sigma rule and the YARA meta `id` | Nowhere |
 
-The key inside the map is the tenant name. Deploy writes the alias back into the rule file:
+Elastic Security ([RFC 0007](../../rfcs/0007-elastic-security-platform.md), accepted; its platform spec is not yet in this matrix) addresses every rule by `metadata.uuid`, which it sets as the Kibana `rule_id`. Elastic never stores an external id: Kibana's internal `id` is not recorded in a block or in deployment state. When Elastic joins the matrix, it joins the `Nowhere` rows.
 
-```yaml
-configurations:
-  defender_for_endpoint:
-    rule_id::Tenant: 12345
-```
-
-The registry loader folds every `rule_id::<tenant>` key into the model field and then validates. Static validation does not run the loader, so a raw `rule_id::<tenant>` key is an unknown key and MUST fail `opentide validate`. The map field (`rule_id` or `rule_id_bundle`) is the spelling static validation accepts. HarfangLab and Carbon Black accept `rule_id_bundle` and do not read it when deploying: HarfangLab uses `metadata.uuid`, and Carbon Black matches the report by title.
+`rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` are legacy keys from before [RFC 0010](../../rfcs/0010-deployment-external-ids.md). Static validation and every deploy path MUST reject them with `external_id_in_rule`, on every platform block, whether or not a shard also holds the id. No loader folds them into a field. `opentide deploy migrate-state` moves Defender, SentinelOne, and CrowdStrike values into shards and removes the keys from every other platform with an `external_id_unused` warning.
 
 Defender also accepts the alias `quarantine_files` for `actions.files.quarantine_file` on the loader path only.
 
@@ -178,6 +175,7 @@ Deployers register via `opentide.platforms` entry points. Validators load from `
 - [configuration.md](../configuration.md) — platform TOML merge
 - [deployment.md](../deployment.md) — `status` strategies
 - [validation.md](../validation.md) — `validate` and `validate query`
+- [deployment-state.md](../deployment-state.md) — where Defender, SentinelOne, and CrowdStrike ids live
 - [metaschema-keywords.md](../metaschema-keywords.md) — `tide.config.systems::enabled`, `recomposition`
 - Platform specs linked in the [Summary](#summary)
 
@@ -203,3 +201,4 @@ Vocabulary files are not platform configuration. See [configuration.md](../confi
 |---------|------|-------|
 | 1.0 | 2026-06-25 | Initial matrix for seven bundled platforms |
 | 1.0 | 2026-09-30 | Field contracts moved to per-platform specs. Static validation, registry load, and deploy are specified separately. Generated JSON Schema is no longer described as the field contract. |
+| 1.1 | 2026-10-16 | Platform blocks carry no external ids. `rule_id`, `rule_id_bundle`, and the `rule_id::<tenant>` loader alias are removed from every block and fail `external_id_in_rule`; Defender, SentinelOne, and CrowdStrike ids live in [deployment state](../deployment-state.md) ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Elastic is recorded as addressed by `metadata.uuid` with no stored id. Platform `schema_id`s stay `::1.0`. |

@@ -1,0 +1,31 @@
+name: Defender rule still carrying the spliced rule_id line
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000021
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+description: |
+  The line the pre-RFC 0010 deployer wrote back after a create.
+status: PRODUCTION
+severity: High
+response:
+  alert_severity: High
+configurations:
+  defender_for_endpoint:
+    rule_id::Contoso: 12345
+    enabled: true
+    schema: platform::defender_for_endpoint::1.0
+    status: PRODUCTION
+    query: |
+      DeviceProcessEvents
+      | where FileName =~ "cmd.exe"
+      | take 1
+    scheduling: 1H
+    alert:
+      category: Execution
+    impacted_entities:
+      device: DeviceId
+    scope:
+      selection: All

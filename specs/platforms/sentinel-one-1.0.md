@@ -1,6 +1,6 @@
 ---
 spec: platform-sentinel-one
-version: "1.0"
+version: "1.1"
 schema_id: platform::sentinel_one::1.0
 status: normative
 supersedes: null
@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-`configurations.sentinel_one` is a SentinelOne STAR rule. The detection text is S1QL, either one query (`Single Event`) or an ordered set of queries (`Correlation`). Query validation is supported. SentinelOne assigns the rule id; OpenTide stores it in `rule_id_bundle`.
+`configurations.sentinel_one` is a SentinelOne STAR rule. The detection text is S1QL, either one query (`Single Event`) or an ordered set of queries (`Correlation`). Query validation is supported. SentinelOne assigns the remote rule id; OpenTide stores it per tenant in [deployment state](../deployment-state.md).
 
 Shared fields are defined in [platforms](index.md#shared-platform-block).
 
@@ -22,7 +22,7 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 - `response` and `details` MAY be omitted.
 - `time_window`, when set, SHOULD use an `Nm` or `Nh` duration (`5m`, `1h`). Deploy converts those suffixes to minutes.
 - `cool_off`, when set, SHOULD use the same `Nm` or `Nh` duration. The current deployer tests the value with `is str`, which is never true for a string instance, so a duration string is passed through unconverted. Aligning that comparison is an implementation fix; it does not change this field.
-- `rule_id_bundle` values MUST be integers when present.
+- The block MUST NOT contain `rule_id_bundle`, `rule_id`, or `rule_id::<tenant>`. Each fails `external_id_in_rule` ([External rule ids](index.md#external-rule-ids)).
 
 ## Definition
 
@@ -33,7 +33,6 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 | `condition` | [SentinelOneCondition](#condition-sentinelonecondition) | yes | — | Single-event or correlation query. |
 | `response` | [SentinelOneResponse](#response-sentineloneresponse) | optional | null | Threat verdict and network quarantine. Omitted means neither action is sent. |
 | `details` | [SentinelOneDetails](#details-sentinelonedetails) | optional | null | Overrides for name, description, severity, and expiration. |
-| `rule_id_bundle` | map[string, int] | optional | null | STAR rule id per tenant name. See [External rule ids](index.md#external-rule-ids). |
 
 The rule is scoped to the tenant's `site_id` when that is set, otherwise to `account_id`.
 
@@ -87,13 +86,16 @@ A `details.severity` value is sent as written. It does not pass through the `res
 
 | Block status strategy | SentinelOne result |
 |-----------------------|--------------------|
-| `DISABLEMENT` | STAR status `Disabled` |
-| `DELETION` | Rule deleted when `rule_id_bundle` has an entry for the tenant |
-| any other | STAR status `Active`, created or updated |
+| `DISABLEMENT` | Update the bound remote rule with STAR status `Disabled`; without a binding, report `external_id_missing` and make no HTTP call. |
+| `DELETION` | Delete the bound remote rule and remove the binding after successful deletion; without a binding, report `external_id_missing`. |
+| any other | STAR status `Active`. Update when a binding exists; otherwise create and durably record the returned id. |
+
+The binding is the tenant's entry under `sentinel_one` in `.opentide/states/deployment/<uuid>.json`, a canonical decimal string. A create is refused when the shard directory is gitignored or the run cannot persist state. The decision order and codes are in [deployment-state.md](../deployment-state.md#deploy-decisions).
 
 ## Relationships
 
 - [platforms](index.md) — shared fields and external ids
+- [deployment-state.md](../deployment-state.md) — where the STAR rule id is stored
 - [rule-1.0.md](../objects/rule-1.0.md) — parent object
 - [validation.md](../validation.md) — S1QL query validation
 
@@ -153,3 +155,4 @@ Fixture: [fixtures/platforms/sentinel-one.yaml](../../fixtures/platforms/sentine
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-09-30 | Initial field contract from the SentinelOne configuration model and deployer. |
+| 1.1 | 2026-10-16 | `rule_id_bundle` and the `rule_id::<tenant>` alias are removed and fail `external_id_in_rule`. Deploy reads and writes the STAR rule id in [deployment state](../deployment-state.md); `DISABLEMENT` and `DELETION` without a binding report `external_id_missing` ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Schema id unchanged. |

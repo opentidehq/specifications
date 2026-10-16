@@ -1,6 +1,6 @@
 ---
 spec: platform-carbon-black-cloud
-version: "1.0"
+version: "1.1"
 schema_id: platform::carbon_black_cloud::1.0
 status: normative
 supersedes: null
@@ -17,11 +17,11 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 ## Requirements
 
 - Static validation MUST require a non-blank `query`.
-- `organizations`, `watchlist`, `report`, `tags`, and `rule_id_bundle` MAY be omitted and still validate.
+- `organizations`, `watchlist`, `report`, and `tags` MAY be omitted and still validate.
 - Registry load MUST accept `organization` as an alias of `organizations`.
 - Deploy MUST collapse newlines in `query` to spaces.
 - Deploy MUST refuse to create a report on a watchlist that does not already exist.
-- `rule_id_bundle` MAY be present. The current deployer does not read it. Identity is `metadata.uuid` on the IOC and the report title on the report.
+- Legacy external-id keys are invalid. `rule_id_bundle`, `rule_id`, and `rule_id::<tenant>` fail `external_id_in_rule`. Migration removes them as `external_id_unused`; the IOC remains addressed by `metadata.uuid` and the report by title.
 - Severity MUST be taken from `response.alert_severity`. The block has no severity field.
 
 ## Definition
@@ -35,7 +35,6 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 | `watchlist` | string | optional | null | Watchlist name. Deploy uses the tenant watchlist when omitted. The watchlist must already exist. |
 | `report` | string | optional | null | Report title. Deploy uses the Tide rule `name` when omitted. |
 | `tags` | list[string] | optional | null | Extra report tags, appended after the tags OpenTide always writes. |
-| `rule_id_bundle` | map[string, string] | optional | null | Accepted. Not used to address the IOC or the report. |
 
 ### Report tags and severity
 
@@ -70,7 +69,8 @@ The report description is the Tide rule `description`.
 
 ## Relationships
 
-- [platforms](index.md) — shared fields
+- [platforms](index.md) — shared fields, external ids
+- [deployment-state.md](../deployment-state.md) — `external_id_unused` in migration; Carbon Black Cloud has no shard entry
 - [rule-1.0.md](../objects/rule-1.0.md) — `response.alert_severity`, `detection_model`
 - [validation.md](../validation.md) — Lucene query validation
 - [configuration.md](../configuration.md) — tenant `watchlist`
@@ -107,3 +107,4 @@ Fixture: [fixtures/platforms/carbon-black-cloud.yaml](../../fixtures/platforms/c
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-09-30 | Initial field contract from the Carbon Black configuration model, loader, and deployer. |
+| 1.1 | 2026-10-16 | `rule_id_bundle` is removed. Legacy external-id keys fail `external_id_in_rule`, and migration removes them as `external_id_unused` ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Identity stays `metadata.uuid` for the IOC and the title for the report. Schema id unchanged. |

@@ -1,6 +1,6 @@
 ---
 spec: deployment
-version: "1.0"
+version: "1.1"
 schema_id: null
 status: normative
 supersedes: null
@@ -20,6 +20,7 @@ Defines rule deployment statuses, promotion strategy, proxy settings, and debug 
 - Status promotion MUST respect `[promotion]` settings when `promotion.enabled` is true.
 - Deprecated statuses MUST NOT be used for new rules (opentide emits warnings).
 - Platform-specific `status` on configuration blocks MUST also be valid deployment statuses when set.
+- For Defender for Endpoint, SentinelOne, and CrowdStrike, update, disablement, and deletion MUST use the tenant binding in [deployment state](deployment-state.md). A `RELEASE` or `PREVIEW` action with no binding MUST NOT create a remote rule unless the deployment-state destination is not ignored and the binding can be durably retained.
 
 ## Definition
 
@@ -78,6 +79,19 @@ Intermediate statuses are not stepped through: a rule in the bundled `DESIGN` st
 
 The bundled status names in the table above suggest an editorial workflow (design → build → stage → release → retire), but that ordering is **convention only** and applies solely to the bundled configuration. Clients that override `deployment.toml` define their own statuses, and any progression between them is enforced by their own process, not by OpenTide.
 
+### Vendor-assigned rule ids
+
+For Defender for Endpoint, SentinelOne, and CrowdStrike, update, disablement, and deletion require the tenant binding in deployment state ([deployment-state.md](deployment-state.md)). A release or preview action with no binding creates a remote rule only when the destination is not ignored and the binding can be durably retained. `DISABLEMENT` and `DELETION` with no binding report `external_id_missing` (a warning) and make no vendor call.
+
+| Strategy | Binding present | No binding |
+|----------|-----------------|------------|
+| `PREVIEW`, `RELEASE` | Update the remote rule | Create and record the returned id; refused with `deployment_state_ignored` when the shard directory is gitignored, and with `deployment_state_unpersisted` in a CI run under any deployment plan other than `PRODUCTION` |
+| `DISABLEMENT` | Update the remote rule as disabled; keep the binding | `external_id_missing` (warning), no vendor call |
+| `DELETION` | Delete the remote rule, then remove the binding | `external_id_missing` (warning), no vendor call |
+| `INERT` | Not deployed | Not deployed |
+
+A rule that carries `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>` on any platform block is refused before any platform client is built (`external_id_in_rule`). Deploy continues with independent rules and exits 1 when any selected rule reported an error. The strategies themselves are unchanged. Sentinel, Splunk, HarfangLab, Carbon Black Cloud, and Elastic address rules without a vendor-assigned id and never use deployment state.
+
 ### `[promotion]`
 
 | Field | Type | Default | Description |
@@ -115,6 +129,7 @@ When both `proxy_user` and `proxy_password` are present, authenticated proxy is 
 - [rule-1.0.md](objects/rule-1.0.md) — `status` field on rules and platform blocks
 - [configuration.md](configuration.md) — override mechanism
 - [platforms/index.md](platforms/index.md) — per-platform deployment
+- [deployment-state.md](deployment-state.md) — vendor-assigned rule ids, deploy decisions, and the production write-back
 - [metaschema-keywords.md](metaschema-keywords.md) — `tide.config.statuses` keyword
 
 ## Defaults & overrides
@@ -130,3 +145,4 @@ Default rule status in fixtures: `STAGING` — see [fixtures/valid/rule-1.0.yaml
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-06-25 | Initial spec from opentide `deployment.toml` |
+| 1.1 | 2026-10-16 | Vendor-assigned rule ids: update, disablement, and deletion on Defender for Endpoint, SentinelOne, and CrowdStrike use the binding in [deployment state](deployment-state.md); creates require a destination that is not ignored and a run that can persist state; `external_id_missing` is a warning ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |
