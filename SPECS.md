@@ -15,13 +15,13 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Objective object | 1.0 | `objective::1.0` | normative | [specs/objects/objective-1.0.md](specs/objects/objective-1.0.md) |
 | Rule object | 1.0 | `rule::1.0` | normative | [specs/objects/rule-1.0.md](specs/objects/rule-1.0.md) |
 | Rule object | 1.1 | `rule::1.1` | normative | [specs/objects/rule-1.1.md](specs/objects/rule-1.1.md) |
-| Workspace layout | 1.1 | — | normative | [specs/workspace.md](specs/workspace.md) |
+| Workspace layout | 1.2 | — | normative | [specs/workspace.md](specs/workspace.md) |
 | Inflight preview shard | 1.0 | `inflight.shard::1.0` | normative | [specs/workspace.md](specs/workspace.md#inflight-preview-shards) |
 | Configuration | 1.0 | — | normative | [specs/configuration.md](specs/configuration.md) |
 | Vocabulary format | 1.0 | — | normative | [specs/vocabularies/format.md](specs/vocabularies/format.md) |
 | Vocabulary catalog | 1.0 | — | normative | [specs/vocabularies/catalog.md](specs/vocabularies/catalog.md) |
 | Deployment lifecycle | 1.1 | — | normative | [specs/deployment.md](specs/deployment.md) |
-| Deployment state | 1.0 | `deployment.state::1.0` | normative | [specs/deployment-state.md](specs/deployment-state.md) |
+| Deployment state | 1.1 | `deployment.state::1.0` | normative | [specs/deployment-state.md](specs/deployment-state.md) |
 | Metaschema keywords | 1.0 | — | normative | [specs/metaschema-keywords.md](specs/metaschema-keywords.md) |
 | Platforms | 1.1 | — | normative | [specs/platforms/index.md](specs/platforms/index.md) |
 | Sentinel platform | 1.0 | `platform::sentinel::1.0` | normative | [specs/platforms/sentinel-1.0.md](specs/platforms/sentinel-1.0.md) |

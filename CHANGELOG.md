@@ -39,6 +39,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `models/rule.py` (exemplar template).
 
+## workspace 1.2
+
+- The production deploy job queues without dropping runs: GitHub Actions has no `concurrency` group, because GitHub cancels a pending run and its commit's diff would never deploy ([specifications#43](https://github.com/OpenTideHQ/specifications/issues/43)).
+
 ## workspace 1.1
 
 - `.opentide/states/deployment/` holds committed deployment-state shards ([RFC 0010](rfcs/0010-deployment-external-ids.md)). `.opentide/states/sharing.jsonl` stays a gitignored cache, and `.opentide/states/` is never ignored as a whole.
@@ -72,6 +76,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## deployment 1.0
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
+
+## deployment-state 1.1
+
+- CI requirement 1: GitHub Actions MUST NOT put the production job in a `concurrency` group. GitHub cancels an older pending run even with `cancel-in-progress: false`, and the cancelled commit's diff-scoped deploy would be lost silently. Overlapping runs are bounded by the overlay and replay requirements, which report `deployment_state_conflict` ([specifications#43](https://github.com/OpenTideHQ/specifications/issues/43)). The shard schema `deployment.state::1.0` is unchanged.
 
 ## deployment-state 1.0
 
