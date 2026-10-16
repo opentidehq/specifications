@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opentide.dev/schemas/deployment.state.1.0.schema.json",
+  "title": "OpenTide deployment state shard",
+  "description": "Vendor-assigned rule ids for one rule, per state-backed platform and tenant, stored at .opentide/states/deployment/<uuid>.json (specs/deployment-state.md). The filename stem must equal object_uuid; JSON Schema cannot see the filename, so readers check that separately. Readers may accept empty platform maps; writers never emit them.",
+  "type": "object",
+  "required": ["schema", "object_uuid", "platforms"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "deployment.state::1.0"
+    },
+    "object_uuid": {
+      "type": "string",
+      "description": "metadata.uuid of the rule, lowercase canonical.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "platforms": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "defender_for_endpoint": { "$ref": "#/$defs/decimalTenants" },
+        "sentinel_one": { "$ref": "#/$defs/decimalTenants" },
+        "crowdstrike": { "$ref": "#/$defs/verbatimTenants" }
+      }
+    }
+  },
+  "$defs": {
+    "tenantName": {
+      "type": "string",
+      "description": "Configured tenant name with surrounding whitespace removed: non-empty, no leading or trailing whitespace.",
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+    },
+    "decimalTenants": {
+      "type": "object",
+      "description": "Tenant name to canonical decimal integer id (no sign, no leading zero), as a string.",
+      "propertyNames": { "$ref": "#/$defs/tenantName" },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^(?:0|[1-9][0-9]*)$"
+      }
+    },
+    "verbatimTenants": {
+      "type": "object",
+      "description": "Tenant name to the create-response id, verbatim, as a string with at least one non-whitespace character.",
+      "propertyNames": { "$ref": "#/$defs/tenantName" },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "\\S"
+      }
+    }
+  }
+}

@@ -39,6 +39,11 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `models/rule.py` (exemplar template).
 
+## workspace 1.1
+
+- `.opentide/states/deployment/` holds committed deployment-state shards ([RFC 0010](rfcs/0010-deployment-external-ids.md)). `.opentide/states/sharing.jsonl` stays a gitignored cache, and `.opentide/states/` is never ignored as a whole.
+- The production deploy job (`deploy_production`) serialises, overlays the default branch's deployment state before deploying, and writes it back whenever the deploy started. Staging, pull-request, and merge-request jobs cannot create on Defender for Endpoint, SentinelOne, or CrowdStrike.
+
 ## workspace 1.0
 
 - CI stage `share`, written only when setup selects it: `opentide share push --changed` on a push to the default branch ([RFC 0006](rfcs/0006-sharing-ci.md)).
@@ -60,13 +65,29 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - `responders.vocab.toml` is retired. It shipped with `keys = []` while `response.responders` was pinned to it, so every authored value failed validation and no instance could fix it (vocabularies are not locally extensible). The alert handling team is per-organisation configuration: the field is free text defaulted from `[deployment] default_responders` (opentide#507).
 - Initial catalog of 36 bundled vocabularies copied from opentide.
 
+## deployment 1.1
+
+- Update, disablement, and deletion on Defender for Endpoint, SentinelOne, and CrowdStrike use the tenant binding in deployment state. A create needs a destination that is not ignored and a run that can persist state. `DISABLEMENT` and `DELETION` without a binding report `external_id_missing` as a warning ([RFC 0010](rfcs/0010-deployment-external-ids.md)).
+
 ## deployment 1.0
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
 
+## deployment-state 1.0
+
+- Committed per-rule vendor-id shards (`deployment.state::1.0`) at `.opentide/states/deployment/<uuid>.json` for Defender for Endpoint, SentinelOne, and CrowdStrike, with a lowercase canonical filename, string ids, and a canonical writer form ([RFC 0010](rfcs/0010-deployment-external-ids.md)).
+- Mandatory migration (`opentide deploy migrate-state`): state-backed bindings move to shards; legacy keys on every other platform are removed as `external_id_unused`.
+- Fail-closed deployment: `external_id_in_rule` on every path; `deployment_state_ignored` and `deployment_state_unpersisted` refuse creates before the vendor call; `external_id_missing` is a warning.
+- CI persistence: serialised production jobs, default-branch state overlay, write-back on failure, cancellation, and timeout, per-tenant conflict replay (`deployment_state_conflict`), and a `refs/opentide/deployment-state/<commit>` side ref on every terminal failure.
+- The complete diagnostic catalogue and exit semantics. JSON Schema `schemas/deployment.state.1.0.schema.json` and fixtures under `fixtures/deployment/`.
+
 ## metaschema-keywords 1.0
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
+
+## platforms 1.1
+
+- Platform blocks carry no external ids. `rule_id`, `rule_id_bundle`, and the `rule_id::<tenant>` loader alias are removed from every block and fail `external_id_in_rule`. Defender for Endpoint, SentinelOne, and CrowdStrike ids live in deployment state ([RFC 0010](rfcs/0010-deployment-external-ids.md)). Elastic ([RFC 0007](rfcs/0007-elastic-security-platform.md)) addresses rules by `metadata.uuid` and never stores an external id. Platform `schema_id`s stay `::1.0`.
 
 ## platforms 1.0
 
@@ -78,6 +99,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - `platform::sentinel::1.0`. KQL analytics rule: `query`, `scheduling`, `alert`, plus grouping, entities, exclusions, template, and trigger. `grouping` is required at deploy and optional at validation.
 
+## platform-defender-for-endpoint 1.1
+
+- `rule_id` removed. The Defender rule id is read from and written to deployment state; `DISABLEMENT` and `DELETION` without a binding report `external_id_missing` ([RFC 0010](rfcs/0010-deployment-external-ids.md)). Schema id unchanged.
+
 ## platform-defender-for-endpoint 1.0
 
 - `platform::defender_for_endpoint::1.0`. KQL custom detection: `query`, `alert.category`, `impacted_entities`, `scheduling` (`NRT`, `1H`, `3H`, `12H`, `24H`), response actions, and exclusions. Registry load requires `scope`.
@@ -86,21 +111,41 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - `platform::splunk::1.0`. SPL saved search with scheduling, trigger, notable, risk, and email. `splunk::2.x` flat keys normalise onto this layout for both validate and deploy.
 
+## platform-sentinel-one 1.1
+
+- `rule_id_bundle` removed. The STAR rule id is read from and written to deployment state; `DISABLEMENT` and `DELETION` without a binding report `external_id_missing` ([RFC 0010](rfcs/0010-deployment-external-ids.md)). Schema id unchanged.
+
 ## platform-sentinel-one 1.0
 
 - `platform::sentinel_one::1.0`. STAR rule: `Single Event` or `Correlation`, optional response and details.
+
+## platform-carbon-black-cloud 1.1
+
+- `rule_id_bundle` removed. Legacy external-id keys fail `external_id_in_rule`; migration removes them as `external_id_unused`. Identity is unchanged: `metadata.uuid` for the IOC, the title for the report ([RFC 0010](rfcs/0010-deployment-external-ids.md)). Schema id unchanged.
 
 ## platform-carbon-black-cloud 1.0
 
 - `platform::carbon_black_cloud::1.0`. Lucene IOC on an existing watchlist report. Severity comes from `response.alert_severity`.
 
+## platform-crowdstrike 1.1
+
+- `rule_id_bundle` removed. The Falcon rule id is read from and written to deployment state; `DISABLEMENT` and `DELETION` without a binding report `external_id_missing` ([RFC 0010](rfcs/0010-deployment-external-ids.md)). `DISABLEMENT` sends `inactive` and every other deployed strategy `active`; the note recording the reversed mapping is removed. Schema id unchanged.
+
 ## platform-crowdstrike 1.0
 
 - `platform::crowdstrike::1.0`. Correlation rule: filter `query`, `details.trigger` (`verbose` or `summary`), `details.outcome` (`detection` or `incident`), and `schedule`. No query validator.
 
+## platform-harfanglab 1.1
+
+- `rule_id_bundle` removed. Legacy external-id keys fail `external_id_in_rule`; migration removes them as `external_id_unused`. Identity stays `metadata.uuid` ([RFC 0010](rfcs/0010-deployment-external-ids.md)). Schema id unchanged.
+
 ## platform-harfanglab 1.0
 
 - `platform::harfanglab::1.0`. Sigma or YARA rule. Identity is `metadata.uuid`. No query validator. Deploy requires one of `sigma` or `yara`; validation does not.
+
+## sharing 1.1
+
+- `.opentide/states/` holds sharing's regenerable cache and deployment's committed shards. A future subsystem states whether its state is a cache or an authoritative record and whether it is committed ([RFC 0010](rfcs/0010-deployment-external-ids.md)). Ledger fields are unchanged.
 
 ## sharing 1.0
 
@@ -114,6 +159,11 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.1
+
+- `external_id_in_rule` for a legacy external-id key at the root of any platform block, replacing the generic unknown-key error. Full-workspace validation checks every deployment-state shard, orphans included. Every `--file` target must match an object ([RFC 0010](rfcs/0010-deployment-external-ids.md)).
+- Fixture checker `scripts/deployment_state_fixtures.py` and codes for `fixtures/deployment/`.
 
 ## validation 1.0
 

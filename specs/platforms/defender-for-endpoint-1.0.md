@@ -1,6 +1,6 @@
 ---
 spec: platform-defender-for-endpoint
-version: "1.0"
+version: "1.1"
 schema_id: platform::defender_for_endpoint::1.0
 status: normative
 supersedes: null
@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-`configurations.defender_for_endpoint` is a Microsoft Defender custom detection rule. The detection text is KQL. Query validation is supported. Defender assigns the rule id; OpenTide stores it on the block so the next deploy updates that rule.
+`configurations.defender_for_endpoint` is a Microsoft Defender custom detection rule. The detection text is KQL. Query validation is supported. Defender assigns the remote rule id; OpenTide stores it per tenant in [deployment state](../deployment-state.md) so the next deploy updates that rule.
 
 Shared fields are defined in [platforms](index.md#shared-platform-block).
 
@@ -21,7 +21,8 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 - `impacted_entities` MAY be an empty object. At least the object MUST be present.
 - `scheduling` MUST be one of `NRT`, `1H`, `3H`, `12H`, `24H`.
 - `query` MUST be non-blank KQL.
-- `scope`, `actions`, `exclusions`, and `rule_id` MAY be omitted and still pass static validation.
+- `scope`, `actions`, and `exclusions` MAY be omitted and still pass static validation.
+- The block MUST NOT contain `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>`. Each fails `external_id_in_rule` ([External rule ids](index.md#external-rule-ids)).
 - Registry load MUST require `scope`. A block that validates without `scope` MUST NOT load for deploy.
 - `actions.files.quarantine_files` MAY be used as an alias of `quarantine_file` on the registry-load path.
 
@@ -38,7 +39,6 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 | `scope` | [DefenderGroupScoping](#scope-defendergroupscoping) | optional | null | Device-group scope. Required by registry load. The current deployer does not send it. |
 | `actions` | [DefenderResponseActions](#actions-defenderresponseactions) | optional | null | Response actions run when the detection fires. |
 | `exclusions` | list[[DefenderExclusion](#exclusions-defenderexclusion)] | optional | null | Per-tenant KQL fragments appended to `query`. |
-| `rule_id` | map[string, int] | optional | null | Defender rule id per tenant name. See [External rule ids](index.md#external-rule-ids). |
 
 `scheduling: NRT` is sent as period `0`. The other values are sent unchanged.
 
@@ -131,15 +131,18 @@ Same shape and tenant matching as Sentinel exclusions. See [sentinel-1.0.md](sen
 
 | Block status strategy | Defender result |
 |-----------------------|-----------------|
-| `DISABLEMENT` | Rule updated with `isEnabled: false` |
-| `DELETION` | Rule deleted when `rule_id` has an entry for the tenant. Without an id, deploy logs that the rule must be removed by hand. |
-| any other | Rule created, or updated when `rule_id` has an entry. A create writes `rule_id::<tenant>` back into the rule file. |
+| `DISABLEMENT` | Update the bound remote rule with `isEnabled: false`; without a binding, report `external_id_missing` and make no HTTP call. |
+| `DELETION` | Delete the bound remote rule and remove the binding after successful deletion; without a binding, report `external_id_missing`. |
+| any other | Update when a binding exists; otherwise create and durably record the returned id. |
+
+The binding is the tenant's entry under `defender_for_endpoint` in `.opentide/states/deployment/<uuid>.json`. A create is refused when the shard directory is gitignored or the run cannot persist state, and the rule file is never written. The decision order and codes are in [deployment-state.md](../deployment-state.md#deploy-decisions).
 
 The display name on the Defender rule is the Tide rule `name`.
 
 ## Relationships
 
 - [platforms](index.md) — shared fields and external ids
+- [deployment-state.md](../deployment-state.md) — where the Defender rule id is stored
 - [rule-1.0.md](../objects/rule-1.0.md) — parent object
 - [sentinel-1.0.md](sentinel-1.0.md) — shared KQL exclusion shape
 - [validation.md](../validation.md) — KQL query validation
@@ -189,3 +192,4 @@ Fixture: [fixtures/platforms/defender-for-endpoint.yaml](../../fixtures/platform
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-09-30 | Initial field contract from the Defender configuration model, loader, and deployer. |
+| 1.1 | 2026-10-16 | `rule_id` and the `rule_id::<tenant>` alias are removed and fail `external_id_in_rule`. Deploy reads and writes the Defender id in [deployment state](../deployment-state.md); `DISABLEMENT` and `DELETION` without a binding report `external_id_missing` ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Schema id unchanged. |

@@ -13,6 +13,7 @@
     "specs/workspace",
     "specs/configuration",
     "specs/deployment",
+    "specs/deployment-state",
     "specs/validation",
     "specs/metaschema-keywords",
     "---Platforms---",

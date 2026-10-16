@@ -14,6 +14,7 @@ from object_fixtures import (
     load_vocabularies,
     validate_fixture_file,
 )
+from deployment_state_fixtures import check_deployment_fixtures
 from sharing_fixtures import check_sharing_fixtures
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -158,6 +159,7 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "invalid" / "threat-surface-unscoped.yaml",
         FIXTURES / "cross-object" / "rule-references-objective.yaml",
         FIXTURES / "inflight" / "example-shard.json",
+        FIXTURES / "deployment" / "valid" / "00000000-0000-4000-8003-000000000010.json",
         FIXTURES / "platforms" / "sentinel.yaml",
         FIXTURES / "platforms" / "defender-for-endpoint.yaml",
         FIXTURES / "platforms" / "splunk.yaml",
@@ -307,6 +309,7 @@ def main() -> int:
     errors.extend(_validate_object_fixtures())
     errors.extend(_validate_inflight_fixture())
     errors.extend(check_sharing_fixtures())
+    errors.extend(check_deployment_fixtures())
 
     if errors:
         print("validation failed:", file=sys.stderr)

@@ -1,0 +1,9 @@
+{
+  "object_uuid": "00000000-0000-4000-8003-000000000010",
+  "platforms": {
+    "crowdstrike": {
+      "falcon-prod": ""
+    }
+  },
+  "schema": "deployment.state::1.0"
+}
