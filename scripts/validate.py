@@ -208,6 +208,11 @@ def _validate_objective_pins(path: Path, doc: dict) -> list[str]:
         )
     if pins.get("objective.mitre_attack") != "att&ck::1.1":
         errors.append(f"{path}: [objective::1.0] must pin objective.mitre_attack = 'att&ck::1.1'")
+    if "objective.signals.effort" in pins:
+        errors.append(
+            f"{path}: [objective::1.0] must not pin objective.signals.effort; "
+            "effort is an integer score, not a vocabulary term (#42)"
+        )
     if "objective.signals.data.logsources" in pins:
         errors.append(
             f"{path}: [objective::1.0] must not pin objective.signals.data.logsources; "

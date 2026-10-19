@@ -70,7 +70,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 | `data` | SignalData | yes | — | Data availability and requirements |
 | `methodology` | string | yes | — | Detection methodology vocabulary |
 | `entities` | list[string] | yes | — | Signal entity vocabulary values, stage-scoped (`signal.entities::1.0`; e.g. `Host::Process`, `Cloud::Account`) |
-| `effort` | integer | no | null | Recovery effort (NIST 800-61) |
+| `effort` | integer | no | null | Implementation effort of the signal, a score from `1` (lowest) to `10` (highest). Values SHOULD be within that range. Not a vocabulary term. |
 | `detectors` | list[ExternalDetector] | no | null | External detector references |
 | `examples` | list[DetectionExample] | no | null | Example queries |
 | `parent` | string | no | null | Parent signal UUID |
@@ -106,7 +106,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 - [metadata.md](../metadata.md) — shared metadata
 - [threat-1.0.md](threat-1.0.md) — referenced by `objective.threats`
 - [rule-1.0.md](rule-1.0.md) — rules reference objectives via `detection_model` (objective UUID)
-- Vocabularies: `detection.composition`, `detection.types`, `detection.methodology`, `signal.entities`, `alert_severity`, `efforts`, `att&ck`
+- Vocabularies: `detection.composition`, `detection.types`, `detection.methodology`, `signal.entities`, `alert_severity`, `att&ck`
 
 ## Defaults & overrides
 
@@ -146,6 +146,8 @@ objective:
 ```
 
 - Valid: [fixtures/valid/objective-1.0.yaml](../../fixtures/valid/objective-1.0.yaml)
+- Valid, with a signal `effort` score: [fixtures/valid/objective-1.0-effort.yaml](../../fixtures/valid/objective-1.0-effort.yaml)
+- Invalid, `effort` as a string: [fixtures/invalid/objective-effort-string.yaml](../../fixtures/invalid/objective-effort-string.yaml)
 - Invalid (no signals): [fixtures/invalid/objective-no-signals.yaml](../../fixtures/invalid/objective-no-signals.yaml)
 - Cross-reference: [fixtures/cross-object/rule-references-objective.yaml](../../fixtures/cross-object/rule-references-objective.yaml)
 
@@ -153,5 +155,6 @@ objective:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-10-19 | `signals[].effort` is an integer implementation-effort score (1–10) and is not pinned to the `efforts` vocabulary, whose four named categories no integer could match ([specifications#42](https://github.com/OpenTideHQ/specifications/issues/42)). `schema_id` stays `objective::1.0`. |
 | 1.0 | 2026-10-06 | Technique list key is `mitre_attack`, pinned to `att&ck::1.1`. Signal `severity` uses `alert_severity::1.0`. `signals[].data.logsources` names workspace `visibility.toml` entries. `schema_id` stays `objective::1.0`. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `models/objective.py` |

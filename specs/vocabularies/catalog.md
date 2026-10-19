@@ -33,7 +33,7 @@ Index of canonical vocabulary files bundled with OpenTide. Each file lives in `v
 | `detection.composition.vocab.toml` | Detection Composition Strategy | `detection.composition` |
 | `detection.methodology.vocab.toml` | Detection Methodology | `detection.methodology` |
 | `detection.types.vocab.toml` | Detection Types | `detection.types` |
-| `efforts.vocab.toml` | NIST 800-61 Recoverability Efforts | `efforts` |
+| `efforts.vocab.toml` | NIST 800-61 Recoverability Efforts (no field pins it; `objective.signals[].effort` is an integer score) | `efforts` |
 | `feasibility.vocab.toml` | Difficulty to Detect | `feasibility` |
 | `impact.vocab.toml` | Impact | `impact` |
 | `killchain.vocab.toml` | Unified Kill Chain | `killchain` |
