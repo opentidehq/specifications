@@ -1,6 +1,6 @@
 ---
 spec: metaschema-keywords
-version: "1.0"
+version: "1.2"
 schema_id: null
 status: normative
 supersedes: null
@@ -139,10 +139,16 @@ Configuration keywords reflect merged TOML at `opentide generate schemas` time. 
 
 ## Examples
 
-Rule metaschema binds `detection_model` to objective vocabulary:
+Rule metaschema binds `detection_model` to the objective model vocabulary. That vocabulary lists objective UUIDs only (`objective::1.0` and `objective::1.1`).
 
 ```python
 "detection_model": {"tide.vocab": "objective"}
+```
+
+`objective::1.1` binds `reuse` to the signal model vocabulary. Entries are signal **definitions** already in the workspace, named `{owning objective name}::{signal name}`, with `tide.object.parent` set to the owning objective UUID. `objective::1.0` has no `reuse` key. `signal` is not a file under `vocabularies/` and has no schema pin.
+
+```python
+"reuse": {"tide.vocab": "signal"}
 ```
 
 Threat schema `threat::1.0` pins `threat.killchain` to `killchain::1.0` via [schemas/pins/threat.toml](../schemas/pins/threat.toml). A later `threat::2.1` revision may pin `killchain::1.1` while other pins remain at `::1.0`.
@@ -151,5 +157,6 @@ Threat schema `threat::1.0` pins `threat.killchain` to `killchain::1.0` via [sch
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.2 | 2026-10-19 | `signal` model vocabulary for `objective::1.1` `reuse` ([RFC 0011](../rfcs/0011-signal-reuse.md)). |
 | 1.1 | 2026-06-26 | Versioned `tide.vocab` and schema pin resolution ([RFC 0003](../rfcs/0003-per-key-vocabulary-versioning.md)) |
 | 1.0 | 2026-06-25 | Initial spec from opentide `generation/schema_pipeline.py` and `pydantic_metaschema.py` |

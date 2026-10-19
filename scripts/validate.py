@@ -142,6 +142,11 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "invalid" / "rule-1.0-reviewed.yaml",
         FIXTURES / "valid" / "threat-1.0.yaml",
         FIXTURES / "valid" / "objective-1.0.yaml",
+        FIXTURES / "valid" / "objective-1.1.yaml",
+        FIXTURES / "cross-object" / "objective-reuses-signal.yaml",
+        FIXTURES / "invalid" / "objective-signal-entry-mixed.yaml",
+        FIXTURES / "invalid" / "objective-signal-bad-uuid.yaml",
+        FIXTURES / "invalid" / "objective-1.0-signal-binding.yaml",
         FIXTURES / "invalid" / "rule-missing-metadata.yaml",
         FIXTURES / "invalid" / "threat-missing-body.yaml",
         FIXTURES / "invalid" / "threat-impact-as-string.yaml",
@@ -199,25 +204,27 @@ def _validate_threat_pins(path: Path, doc: dict) -> list[str]:
 
 def _validate_objective_pins(path: Path, doc: dict) -> list[str]:
     errors: list[str] = []
-    pins = doc.get("objective::1.0")
-    if not isinstance(pins, dict):
-        return [f"{path}: missing [objective::1.0]"]
-    if pins.get("objective.signals.severity") != "alert_severity::1.0":
-        errors.append(
-            f"{path}: [objective::1.0] must pin objective.signals.severity = 'alert_severity::1.0'"
-        )
-    if pins.get("objective.mitre_attack") != "att&ck::1.1":
-        errors.append(f"{path}: [objective::1.0] must pin objective.mitre_attack = 'att&ck::1.1'")
-    if "objective.signals.effort" in pins:
-        errors.append(
-            f"{path}: [objective::1.0] must not pin objective.signals.effort; "
-            "effort is an integer score, not a vocabulary term (#42)"
-        )
-    if "objective.signals.data.logsources" in pins:
-        errors.append(
-            f"{path}: [objective::1.0] must not pin objective.signals.data.logsources; "
-            "log sources are visibility names, not ATT&CK datasources"
-        )
+    for section in ("objective::1.0", "objective::1.1"):
+        pins = doc.get(section)
+        if not isinstance(pins, dict):
+            errors.append(f"{path}: missing [{section}]")
+            continue
+        if pins.get("objective.signals.severity") != "alert_severity::1.0":
+            errors.append(
+                f"{path}: [{section}] must pin objective.signals.severity = 'alert_severity::1.0'"
+            )
+        if pins.get("objective.mitre_attack") != "att&ck::1.1":
+            errors.append(f"{path}: [{section}] must pin objective.mitre_attack = 'att&ck::1.1'")
+        if "objective.signals.effort" in pins:
+            errors.append(
+                f"{path}: [{section}] must not pin objective.signals.effort; "
+                "effort is an integer score, not a vocabulary term (#42)"
+            )
+        if "objective.signals.data.logsources" in pins:
+            errors.append(
+                f"{path}: [{section}] must not pin objective.signals.data.logsources; "
+                "log sources are visibility names, not ATT&CK datasources"
+            )
     return errors
 
 

@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.1"
+version: "1.2"
 schema_id: null
 status: normative
 supersedes: null
@@ -113,6 +113,9 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/invalid/rule-reviewed-bad-date.yaml](../fixtures/invalid/rule-reviewed-bad-date.yaml) | `invalid_reviewed` |
 | [fixtures/invalid/rule-1.0-reviewed.yaml](../fixtures/invalid/rule-1.0-reviewed.yaml) | `reviewed_not_in_schema` |
 | [fixtures/invalid/objective-no-signals.yaml](../fixtures/invalid/objective-no-signals.yaml) | `empty_signals` |
+| [fixtures/invalid/objective-signal-entry-mixed.yaml](../fixtures/invalid/objective-signal-entry-mixed.yaml) | `signal_entry_mixed` |
+| [fixtures/invalid/objective-signal-bad-uuid.yaml](../fixtures/invalid/objective-signal-bad-uuid.yaml) | `invalid_uuid` |
+| [fixtures/invalid/objective-1.0-signal-binding.yaml](../fixtures/invalid/objective-1.0-signal-binding.yaml) | `binding_requires_1_1` |
 | [fixtures/sharing/invalid/unknown-distribution.toml](../fixtures/sharing/invalid/unknown-distribution.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/legacy-targets-table.toml](../fixtures/sharing/invalid/legacy-targets-table.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/duplicate-name.toml](../fixtures/sharing/invalid/duplicate-name.toml) | `duplicate_name` |
@@ -188,6 +191,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.2 | 2026-10-19 | `objective::1.1` signal binding codes ([RFC 0011](../rfcs/0011-signal-reuse.md)). The fixture checker proves `signal_entry_mixed`, `invalid_uuid` on `reuse`, and `binding_requires_1_1`. `unresolved_signal`, `self_signal`, `duplicate_signal`, `duplicate_signal_uuid`, and `signal_tlp` are `opentide validate` against the workspace library. |
 | 1.1 | 2026-10-16 | `external_id_in_rule` replaces the generic unknown-key error for legacy external-id keys; full-workspace validation checks every deployment-state shard, orphans included; every `--file` target must match an object; deployment fixture checker codes ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |
 | 1.0 | 2026-09-30 | Fixture checker codes `invalid_reviewed` and `reviewed_not_in_schema` ([RFC 0008](../rfcs/0008-rule-reviewed-date.md)). |
 | 1.0 | 2026-09-28 | `sharing-config` checker codes for `[[misp]]` integration blocks. |
