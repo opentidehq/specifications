@@ -100,7 +100,7 @@ threat:
 ## Relationships
 
 - [metadata.md](../metadata.md) — shared metadata block
-- [objective-1.0.md](objective-1.0.md) — objectives MAY reference threat UUIDs in `objective.threats`
+- [objective-1.0.md](objective-1.0.md) and [objective-1.1.md](objective-1.1.md) — objectives MAY reference threat UUIDs in `objective.threats`
 - [rule-1.0.md](rule-1.0.md) — rules link to objectives via `detection_model`
 - [schemas/pins/threat.toml](../../schemas/pins/threat.toml) — vocabulary pins for `threat::1.0` (`threat.actors.name`, `threat.impact`, `threat.leverage`, …)
 - Vocabularies: `criticality`, `severity`, `impact`, `leverage`, `viability`, `surface`, `att&ck`, `actors`, `killchain`, `chaining_relations`

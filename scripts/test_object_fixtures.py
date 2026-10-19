@@ -14,6 +14,7 @@ from object_fixtures import (
     load_yaml,
     validate_document,
     validate_fixture_file,
+    validate_objective,
     validate_rule,
     validate_threat,
 )
@@ -281,6 +282,50 @@ class RuleReviewedTests(unittest.TestCase):
         doc = copy.deepcopy(self.reviewed)
         doc["metadata"]["schema"] = "rule::1.0"
         self.assertIn("reviewed_not_in_schema", _codes(validate_rule(doc, self.vocabs)))
+
+
+class ObjectiveSignalBindingTests(unittest.TestCase):
+    """objective::1.1 signal bindings (RFC 0011)."""
+
+    vocabs = None
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.vocabs = load_vocabularies(VOCAB_DIR)
+        cls.owner = load_yaml(FIXTURES / "valid" / "objective-1.0.yaml")
+        cls.consumer = load_yaml(FIXTURES / "cross-object" / "objective-reuses-signal.yaml")
+
+    def test_consumer_binds_the_owner_fixture_signal(self) -> None:
+        self.assertEqual(self.consumer["metadata"]["schema"], "objective::1.1")
+        owner_uuids = {signal["uuid"] for signal in self.owner["objective"]["signals"]}
+        bound = [signal["reuse"] for signal in self.consumer["objective"]["signals"] if "reuse" in signal]
+        self.assertEqual(len(bound), 1)
+        self.assertIn(bound[0], owner_uuids)
+        self.assertEqual(validate_objective(self.consumer, self.vocabs), [])
+
+    def test_binding_with_definition_field_is_mixed(self) -> None:
+        doc = copy.deepcopy(self.consumer)
+        doc["objective"]["signals"][0]["severity"] = "High"
+        self.assertIn("signal_entry_mixed", _codes(validate_objective(doc, self.vocabs)))
+
+    def test_binding_on_1_0_is_rejected(self) -> None:
+        doc = copy.deepcopy(self.consumer)
+        doc["metadata"]["schema"] = "objective::1.0"
+        self.assertIn("binding_requires_1_1", _codes(validate_objective(doc, self.vocabs)))
+
+    def test_binding_value_must_be_uuid_v4(self) -> None:
+        doc = copy.deepcopy(self.consumer)
+        doc["objective"]["signals"][0]["reuse"] = "00000000-0000-1000-8099-000000000001"
+        self.assertIn("invalid_uuid", _codes(validate_objective(doc, self.vocabs)))
+
+    def test_reviewed_on_objective_1_1_is_rejected(self) -> None:
+        doc = copy.deepcopy(self.consumer)
+        doc["metadata"]["reviewed"] = "2026-09-01"
+        self.assertIn("reviewed_not_in_schema", _codes(validate_objective(doc, self.vocabs)))
+
+    def test_definition_only_1_1_passes(self) -> None:
+        doc = load_yaml(FIXTURES / "valid" / "objective-1.1.yaml")
+        self.assertEqual(validate_objective(doc, self.vocabs), [])
 
 
 class InvalidFixtureRegistryTests(unittest.TestCase):

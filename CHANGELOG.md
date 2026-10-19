@@ -30,19 +30,30 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Correct `threat.actors` to `list[ThreatActor]` with scoped `name`; pin path is `threat.actors.name` ([#11](https://github.com/OpenTideHQ/specifications/issues/11)).
 - Initial normative spec bootstrapped from opentide `models/threat.py`.
 
+## objective 1.1
+
+- Draft schema `objective::1.1` ([RFC 0011](rfcs/0011-signal-reuse.md)). A signal entry may be a definition or `reuse: <signal-uuid>`, binding a signal defined on another objective already in the repository. `objective::1.0` stays normative for definition-only objectives and is not deprecated.
+
 ## objective 1.0
 
+- Signal bindings are `objective::1.1`. Field tables unchanged ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - `objective.signals[].effort` is an integer implementation-effort score from 1 to 10 and is no longer pinned to the `efforts` vocabulary. The type said integer while the pin named four string categories, so no authored value could satisfy both ([#42](https://github.com/OpenTideHQ/specifications/issues/42)).
 - `objective.signals[].entities` is stage-scoped: an authored value is `<stage>::<key>` (`Host::Process`). Seven of the 28 keys are defined under two stages, so the bare key name could not tell a host account from a cloud account and seven values were unreachable. Stage ids are capitalised to `Host`, `Network`, `Cloud`. No key changes, so `signal.entities::1.0` is unaffected ([RFC 0005](rfcs/0005-scoped-signal-entities.md)).
 - Initial normative spec bootstrapped from opentide `models/objective.py`.
 
 ## rule 1.1
 
+- `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage comes from `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - Minor MDR revision `rule::1.1` with optional `metadata.reviewed` ([RFC 0008](rfcs/0008-rule-reviewed-date.md)). `rule::1.0` remains normative. A consumer treats `rule::1.0`, a missing `reviewed`, or a `reviewed` instant older than a supplied window as unreviewed.
 
 ## rule 1.0
 
+- `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage comes from `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - Initial normative spec bootstrapped from opentide `models/rule.py` (exemplar template).
+
+## workspace 1.4
+
+- `objective.1.1.schema.json` and `objective.1.1.template.yaml` beside the 1.0 artifacts ([RFC 0011](rfcs/0011-signal-reuse.md)).
 
 ## workspace 1.3
 
@@ -101,6 +112,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Fail-closed deployment: `external_id_in_rule` on every path; `deployment_state_ignored` and `deployment_state_unpersisted` refuse creates before the vendor call; `external_id_missing` is a warning.
 - CI persistence: serialised production jobs, default-branch state overlay, write-back on failure, cancellation, and timeout, per-tenant conflict replay (`deployment_state_conflict`), and a `refs/opentide/deployment-state/<commit>` side ref on every terminal failure.
 - The complete diagnostic catalogue and exit semantics. JSON Schema `schemas/deployment.state.1.0.schema.json` and fixtures under `fixtures/deployment/`.
+
+## metaschema-keywords 1.2
+
+- `signal` model vocabulary for `objective::1.1` `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
 
 ## metaschema-keywords 1.0
 
@@ -175,11 +190,16 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## sharing-misp 1.0
 
+- `objective::1.1` `opentide-relation` values include the owner of each `reuse` binding ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - MISP connector `sharing::misp::1.0`. Document transport via upstream `opentide` template version 5.
 - Minimal `[[misp]]` block: required `name`, `url`, `api_key`, and `max_tlp`; optional `enabled`, `object_types`, `rule_statuses`, `organisation_uuid`, `publish`, `verify_ssl`.
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.2
+
+- Checker codes for `objective::1.1` bindings: `signal_entry_mixed`, `invalid_uuid` on `reuse`, `binding_requires_1_1` ([RFC 0011](rfcs/0011-signal-reuse.md)).
 
 ## validation 1.1
 

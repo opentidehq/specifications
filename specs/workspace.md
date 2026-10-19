@@ -1,6 +1,6 @@
 ---
 spec: workspace
-version: "1.3"
+version: "1.4"
 schema_id: null
 status: normative
 supersedes: null
@@ -65,6 +65,7 @@ Registered objects list: `threat`, `objective`, `rule`.
 |--------|-------------------|
 | threat | `threat.1.0.schema.json` |
 | objective | `objective.1.0.schema.json` |
+| objective | `objective.1.1.schema.json` |
 | rule | `rule.1.0.schema.json` |
 | visibility | `visibility.1.0.schema.json` |
 | router | `opentide.schema.json` |
@@ -80,6 +81,7 @@ Inflight shard schema source of truth: [schemas/inflight.shard.1.0.schema.json](
 |--------|-------------------|
 | threat | `threat.1.0.template.yaml` |
 | objective | `objective.1.0.template.yaml` |
+| objective | `objective.1.1.template.yaml` |
 | rule | `rule.1.0.template.yaml` |
 
 ### Export artifacts
@@ -197,6 +199,7 @@ Object fixtures assume the default layout: rules under `objects/rules/`, etc.
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.4 | 2026-10-19 | `objective::1.1` schema and template artifacts beside `objective::1.0` ([RFC 0011](../rfcs/0011-signal-reuse.md)). |
 | 1.3 | 2026-10-19 | Object instances are the YAML files placed directly in each family directory. A file in a subfolder is not an instance and is neither deployed nor shared ([specifications#16](https://github.com/OpenTideHQ/specifications/pull/16), [opentide#312](https://github.com/OpenTideHQ/opentide/issues/312)). |
 | 1.2 | 2026-10-16 | The production deploy job has no GitHub Actions `concurrency` group ([specifications#43](https://github.com/OpenTideHQ/specifications/issues/43)). |
 | 1.1 | 2026-10-16 | `.opentide/states/deployment/` holds committed deployment-state shards; `.opentide/states/` is never ignored whole and setup ignores `sharing.jsonl` only. The production deploy job serialises, overlays the default branch's state, and writes it back, and staging jobs cannot create on state-backed platforms ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |
