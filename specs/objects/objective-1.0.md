@@ -106,7 +106,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 
 - [metadata.md](../metadata.md) — shared metadata
 - [threat-1.0.md](threat-1.0.md) — referenced by `objective.threats`
-- [rule-1.0.md](rule-1.0.md) — rules reference objectives via `detection_model` (objective UUID)
+- [rule-1.0.md](rule-1.0.md) — rules reference an objective, or a signal defined under it, via `detection_model`
 - [objective-1.1.md](objective-1.1.md) — same object, plus a `reuse` binding (draft). This schema stays normative for definition-only objectives.
 - Vocabularies: `detection.composition`, `detection.types`, `detection.methodology`, `signal.entities`, `alert_severity`, `att&ck`
 

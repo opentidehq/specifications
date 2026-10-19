@@ -41,7 +41,7 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 Deploy always tags the report with:
 
 1. The block `status`, stringified. An omitted `status` is the string `None`.
-2. When the rule has `detection_model`: that objective UUID, then the ATT&CK technique ids resolved from it.
+2. When the rule has `detection_model`: that UUID (an objective, or a signal under one), then the ATT&CK technique ids resolved from it.
 3. `tags` from this block.
 
 Severity is the Carbon Black report score for `response.alert_severity`:

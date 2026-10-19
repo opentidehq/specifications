@@ -22,7 +22,7 @@ Files that still say `rule::1.0` or `rule::1.1` keep today's layout. Both shapes
 
 Authors and agents already know the pattern from the other two objects: name and metadata on the outside, the object's own content in a block with the object's name. Rules are the exception, so every reader has to remember a third shape, plus which of `status`, `configurations.*.status`, and `platforms` is real.
 
-Deploy, promotion, and the platform deployers use the status on the platform block. The status on the root of a `rule::1.0` file is not what gets deployed. Sharing's `rule_statuses` filter and generated documentation do still read that root status today (opentide `sharing/engine.py`, `documentation/parts/sections.py`), so this revision has to say what replaces it for them. `detection_model` is an objective UUID wearing a name that sounds like a data model.
+Deploy, promotion, and the platform deployers use the status on the platform block. The status on the root of a `rule::1.0` file is not what gets deployed. Sharing's `rule_statuses` filter and generated documentation do still read that root status today (opentide `sharing/engine.py`, `documentation/parts/sections.py`), so this revision has to say what replaces it for them. `detection_model` holds the UUID of an objective, or of a signal under one, behind a name that sounds like a data model.
 
 ## Detailed design
 
@@ -67,7 +67,7 @@ rule:
 | | `rule::1.0` / `rule::1.1` | `rule::2.0` |
 |--|-------------|-------------|
 | Description, severity, techniques, response | document root | `rule.*` |
-| Objective UUID | `detection_model` | `rule.objective` |
+| Objective or signal UUID | `detection_model` | `rule.objective` |
 | Platform payload | `configurations.sentinel` (or legacy `platforms`) | `rule.sentinel` |
 | Deployment status | root `status`, which deploy ignores (sharing and docs read it), and `configurations.*.status`, which deploy uses | `rule.<platform>.status` only |
 | `metadata.reviewed` | `rule::1.1` only | optional, same meaning as `rule::1.1` |
@@ -105,14 +105,14 @@ Adding a platform later is an optional key. It does not bump `rule::2.0`. A plat
 
 ### Pins
 
-`rule::1.0` and `rule::1.1` pins stay where they are. `rule::2.0` pins the same contracts on the new paths: `rule.severity` (`severity::1.0`), `rule.techniques` (`att&ck::1.1`), `rule.response.alert_severity` (`alert_severity::1.0`), and `metadata.tlp` (`tlp::1.0`). `rule.response.responders` has no pin: the `responders` vocabulary is retired and the field is free text. `objective` is a UUID, not a vocabulary.
+`rule::1.0` and `rule::1.1` pins stay where they are. `rule::2.0` pins the same contracts on the new paths: `rule.severity` (`severity::1.0`), `rule.techniques` (`att&ck::1.1`), `rule.response.alert_severity` (`alert_severity::1.0`), and `metadata.tlp` (`tlp::1.0`). `rule.response.responders` has no pin: the `responders` vocabulary is retired and the field is free text. `rule.objective` binds the `objective` model vocabulary, as `detection_model` does: every objective and every signal defined under one.
 
 ### Migrating a file
 
 One step, from `rule::1.0` or `rule::1.1` to `rule::2.0`, run on purpose. Opening or deploying a 1.x file does not rewrite it.
 
 - `description`, `severity`, `techniques`, and `response` move under `rule`.
-- `detection_model` becomes `rule.objective`.
+- `detection_model` becomes `rule.objective`. The value is copied as is, whether it names an objective or a signal.
 - Each `configurations.<platform>` (or `platforms.<platform>`, if that key was the only copy) becomes `rule.<platform>`.
 - A root `status` is copied onto platform blocks that don't already have one, then removed. A block that already has a status keeps it, because that is the status deploy uses.
 - `metadata.reviewed` on a `rule::1.1` file is kept verbatim. A `rule::1.0` file gets none, so it stays unreviewed.
@@ -128,7 +128,7 @@ On `rule::2.0` a rule matches a sharing block's `rule_statuses` when at least on
 ### Other specs that name rule fields
 
 - [sharing/misp-1.0.md](../specs/sharing/misp-1.0.md): the `rule` relation source is `rule.objective` on 2.0 (top-level `detection_model` on 1.x), and `threat_level_id` comes from `rule.severity`. The technique source `rule.techniques[]` already names the 2.0 path.
-- [RFC 0011](https://github.com/OpenTideHQ/specifications/pull/23) (signal reuse, draft): the direct objective of a `rule::2.0` file is `rule.objective`.
+- [RFC 0011](https://github.com/OpenTideHQ/specifications/pull/23) (signal reuse, draft): the direct objective of a `rule::2.0` file is `rule.objective`, or the owner of the signal it names.
 
 ### What lands after this RFC is accepted
 
@@ -156,6 +156,7 @@ Leaving the fields on the root and only renaming `configurations` keeps rules as
 
 - New rules should be born as `rule::2.0` once that model exists. Existing files stay on whatever they declare. Confirm that `opentide new` should follow the newest revision.
 - Confirm the sharing match on `rule::2.0`: any enabled platform block with a status in `rule_statuses` (proposed), or every enabled block.
+- `rule.objective` also holds signal UUIDs, which the name hides. Confirm the name, or pick one that covers both (for example `rule.implements`).
 - `rule::1.0` and `rule::1.1` should be marked deprecated only after both shapes load and a migrate command exists. Until then they stay normative. Deprecated means "don't write new 1.x files", not "1.x files stop validating".
 
 ## References

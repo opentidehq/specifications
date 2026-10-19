@@ -270,9 +270,9 @@ Updates touch the seven envelope fields, the tag set, and the one `opentide` obj
 |--------|--------|---------|
 | `threat` | — | zero relations |
 | `objective` | `objective.threats[]`, and on `objective::1.1` the owning objective UUID of each signal bound with `reuse` | one per distinct UUID |
-| `rule` | top-level `detection_model` | zero or one |
+| `rule` | top-level `detection_model`, verbatim: an objective UUID, or a signal UUID whose owning objective's Event carries the definition | zero or one |
 
-Values are 36-character lowercase canonical UUIDs of Tide objects, never MISP Event or object UUIDs, at most one attribute per distinct UUID, ordered ascending. A non-canonical UUID fails the object. An absent, null, or empty source emits zero relations. A relation UUID whose object was not shared to that block is still emitted, with an informational note.
+Values are 36-character lowercase canonical UUIDs of Tide objects (or, for a rule, a signal), never MISP Event or object UUIDs, at most one attribute per distinct UUID, ordered ascending. A non-canonical UUID fails the object. An absent, null, or empty source emits zero relations. A relation UUID whose object was not shared to that block is still emitted, with an informational note.
 
 No `extends_uuid` is set and no MISP event extension is created.
 

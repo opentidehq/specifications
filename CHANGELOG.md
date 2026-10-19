@@ -36,6 +36,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## objective 1.0
 
+- Rules reference an objective, or a signal defined under it, through `detection_model`.
 - Signal bindings are `objective::1.1`. Field tables unchanged ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - `objective.signals[].effort` is an integer implementation-effort score from 1 to 10 and is no longer pinned to the `efforts` vocabulary. The type said integer while the pin named four string categories, so no authored value could satisfy both ([#42](https://github.com/OpenTideHQ/specifications/issues/42)).
 - `objective.signals[].entities` is stage-scoped: an authored value is `<stage>::<key>` (`Host::Process`). Seven of the 28 keys are defined under two stages, so the bare key name could not tell a host account from a cloud account and seven values were unreachable. Stage ids are capitalised to `Host`, `Network`, `Cloud`. No key changes, so `signal.entities::1.0` is unaffected ([RFC 0005](rfcs/0005-scoped-signal-entities.md)).
@@ -43,11 +44,13 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
+- Correct `detection_model`: it references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design; a signal reference implements that signal, and its owning objective is the rule's objective. The objective-only wording was wrong. New fixture `fixtures/cross-object/rule-references-signal.yaml`.
 - `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage comes from `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - Minor MDR revision `rule::1.1` with optional `metadata.reviewed` ([RFC 0008](rfcs/0008-rule-reviewed-date.md)). `rule::1.0` remains normative. A consumer treats `rule::1.0`, a missing `reviewed`, or a `reviewed` instant older than a supplied window as unreviewed.
 
 ## rule 1.0
 
+- Correct `detection_model`: it references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design; a signal reference implements that signal, and its owning objective is the rule's objective. The objective-only wording was wrong. New fixture `fixtures/cross-object/rule-references-signal.yaml`.
 - `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage comes from `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - Initial normative spec bootstrapped from opentide `models/rule.py` (exemplar template).
 
@@ -115,7 +118,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## metaschema-keywords 1.2
 
-- `signal` model vocabulary for `objective::1.1` `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
+- `signal` model vocabulary for `objective::1.1` `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)). The `objective` vocabulary bound to `detection_model` keeps listing every objective and every signal defined under one.
 
 ## metaschema-keywords 1.0
 

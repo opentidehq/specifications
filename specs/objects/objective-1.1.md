@@ -37,7 +37,7 @@ This revision is a **draft** ([RFC 0011](../../rfcs/0011-signal-reuse.md)); no i
 - TLP rank, least restrictive first, is `clear` < `green` < `amber` < `amber+strict` < `red`. A binding is valid when the consumer's `metadata.tlp` is the same rank as the owner's or stricter. A less restrictive consumer is `signal_tlp`.
 - The index record for a definition MUST keep authored `parent` (a parent signal UUID, or absent) and MUST record the owning objective UUID separately as `owner`. Ingest MUST NOT write the objective UUID into `parent`. Relation walks use `owner` for the objective → signal hop.
 - `parent`, when set on a definition, MUST be a UUIDv4 in the signal library and SHOULD name a signal in the same objective's effective set. It does not bind a signal and it does not change coverage.
-- A rule's `detection_model` is **direct** coverage of one objective (`objective::1.0` or `objective::1.1`). Let S be `effective_signals` of that objective. The rule also **indirectly** covers every other objective that includes at least one signal in S. Reason `owns` when that objective owns the signal. Reason `shares` when it includes the signal and does not own it. Indirect coverage is partial: the shared signals only, not the other objective's full composition. Reports MUST label it partial and MUST list the via-signal UUIDs and the reason.
+- A rule's `detection_model` is **direct** coverage of one objective (`objective::1.0` or `objective::1.1`), or of one signal and through it of that signal's owning objective. Let S be `effective_signals` of that objective (or, for a signal reference, that signal alone). The rule also **indirectly** covers every other objective that includes at least one signal in S. Reason `owns` when that objective owns the signal. Reason `shares` when it includes the signal and does not own it. Indirect coverage is partial: the shared signals only, not the other objective's full composition. Reports MUST label it partial and MUST list the via-signal UUIDs and the reason.
 - The coverage walk stops at S. A signal bound by an intermediate objective is covered only when that signal is itself in S.
 - `techniques` resolved for a rule come from the direct objective and that objective's threats. Indirect threats appear in coverage output. Their technique ids are not copied onto the rule.
 - A resolved binding counts toward the minimum of one signal. An unresolved binding does not, and is still an error.
@@ -104,7 +104,7 @@ List order is composition order. Definitions and bindings may interleave. The co
 
 A binding has no local name, description, severity, or data. Those values are read from the definition. The binding does not allocate a UUID and does not insert a second library row.
 
-Completion of `reuse` uses the `signal` model vocabulary ([metaschema-keywords.md](../metaschema-keywords.md)): entry id is the definition UUID, display name is `{owning objective name}::{signal name}`, and `tide.object.parent` is the owning objective UUID. The `objective::1.0` schema does not offer this key. Signal UUIDs are not entries in the `objective` vocabulary used by `detection_model`.
+Completion of `reuse` uses the `signal` model vocabulary ([metaschema-keywords.md](../metaschema-keywords.md)): entry id is the definition UUID, display name is `{owning objective name}::{signal name}`, and `tide.object.parent` is the owning objective UUID. The `objective::1.0` schema does not offer this key. The `objective` vocabulary used by `detection_model` is unchanged: it lists objectives and every signal defined under them, since a rule may reference either.
 
 ### `data` (SignalData)
 
@@ -137,7 +137,7 @@ Completion of `reuse` uses the `signal` model vocabulary ([metaschema-keywords.m
 - [objective-1.0.md](objective-1.0.md) — definition-only objectives. A 1.0 definition is a valid 1.1 definition. Moving a definition-only objective to 1.1 rewrites `metadata.schema` only.
 - [metadata.md](../metadata.md) — shared metadata. `metadata.version` is the instance content version and does not select this schema.
 - [threat-1.0.md](threat-1.0.md) — referenced by `objective.threats`. Indirect coverage surfaces those threats as partial, via the shared signals.
-- [rule-1.0.md](rule-1.0.md) — `detection_model` is the direct objective. Indirect objectives are derived from `reuse`.
+- [rule-1.0.md](rule-1.0.md) — `detection_model` is the direct objective, or a signal and its owning objective. Indirect objectives are derived from `reuse`.
 - [validation.md](../validation.md) — binding codes
 - [sharing/misp-1.0.md](../sharing/misp-1.0.md) — `opentide-relation` includes the owner UUID of each bound signal
 - Vocabularies: `detection.composition`, `detection.types`, `detection.methodology`, `signal.entities`, `alert_severity`, `att&ck`, `tlp`. The `signal` completion set is a model vocabulary, not a file under `vocabularies/`.
