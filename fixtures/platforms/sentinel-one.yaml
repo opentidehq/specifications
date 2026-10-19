@@ -1,0 +1,30 @@
+name: SentinelOne platform block
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000015
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+description: |
+  SentinelOne single-event STAR rule.
+status: STAGING
+severity: High
+response:
+  alert_severity: High
+configurations:
+  sentinel_one:
+    enabled: true
+    schema: platform::sentinel_one::1.0
+    status: STAGING
+    condition:
+      type: Single Event
+      single_event:
+        query: |
+          EventType = "Process Creation" AND TgtProcName Contains "cmd.exe"
+      cool_off: 30m
+    response:
+      treat_as_threat: Suspicious
+      network_quarantine: false
+    details:
+      severity: High

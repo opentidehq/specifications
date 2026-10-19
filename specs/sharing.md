@@ -1,6 +1,6 @@
 ---
 spec: sharing
-version: "1.0"
+version: "1.1"
 schema_id: null
 status: normative
 supersedes: null
@@ -22,7 +22,7 @@ Sharing publishes Tide objects (threat, objective, rule) to external intelligenc
 - Every block MUST set `max_tlp`. There is no default ceiling. A block MUST NOT share an object whose `metadata.tlp` exceeds that value, including TLP:RED when the ceiling is below `red`.
 - Bundled defaults MUST ship with no enabled block.
 - `opentide share` with no subcommand MUST mean `push`. Implementations MUST provide `push`, `preview`, `status`, `retract`, and `targets`.
-- MISP MUST NOT be added to the [platforms](platforms.md) capability matrix and MUST NOT appear as `configurations.misp` on `rule::1.0`.
+- MISP MUST NOT be added to the [platforms](platforms/index.md) capability matrix and MUST NOT appear as `configurations.misp` on `rule::1.0`.
 - Scope filters and target selection that match nothing MUST fail with `scope_no_match`. A `--changed` run whose diff is empty, and a `--changed` run with no enabled block, MUST exit 0 instead.
 - Secrets MUST NOT appear in logs, reports, preview payloads, or share state. API keys, authorization header values, and values substituted from `${ENV_VAR}` MUST be replaced with a fixed redaction marker. URLs and organisation UUIDs are not credentials and MUST be emitted unredacted.
 - `opentide setup` and `opentide setup ci` MUST offer a sharing stage. The stage defaults off. When selected, it MUST run only on a push to the default branch, and its command MUST be `opentide share push --changed`. The generated pipeline MUST NOT run `opentide share` on a pull request or a merge request.
@@ -212,7 +212,7 @@ An edit that does not touch those files, including an edit that only changes `sh
 
 There is no sharing export directory. `preview` prints the share report and writes no file.
 
-`.opentide/states/` is the directory for generated synchronization ledgers. Sharing has exactly one, `sharing.jsonl`. A later subsystem (deployment, another sync) gets its own file there. Sharing itself does not grow more files when a new connector or a new sync state is added: both are further lines in this file.
+`.opentide/states/` is the directory for generated synchronization state. Sharing owns the regenerable cache `.opentide/states/sharing.jsonl`. Deployment owns the committed shard directory `.opentide/states/deployment/` defined by [deployment-state.md](deployment-state.md). Each future subsystem MUST specify whether its state is a cache or an authoritative record and whether it is committed. Because deployment state is committed, `.opentide/states/` MUST NOT be gitignored as a whole; ignore `sharing.jsonl` itself. Sharing does not grow more files when a new connector or a new sync state is added: both are further lines in this file.
 
 The file is UTF-8 JSON Lines: one JSON object per line, no wrapping array. It is the **current** state of what was shared, not a history. A writer MUST keep at most one line per triple of `object_uuid`, `integration`, and `target`, rewriting the file to replace the previous line for that triple. A reader that finds a duplicate triple (a crash between write and replace) MUST keep the last line and ignore the earlier ones. A missing or empty file means no local state. Lines an implementation does not understand MUST be preserved when it rewrites the file, so a newer `state` value survives an older CLI.
 
@@ -248,9 +248,10 @@ A connector spec MUST declare its integration key (the top-level array name), it
 - [sharing/misp-1.0.md](sharing/misp-1.0.md) — MISP connector `sharing::misp::1.0`, block `[[misp]]`
 - [configuration.md](configuration.md) — merge order; `sharing.toml` is overridable
 - [workspace.md](workspace.md) — generated sharing paths
+- [deployment-state.md](deployment-state.md) — the committed deployment shards that share `.opentide/states/`
 - [validation.md](validation.md) — `sharing-config` check
 - [metadata.md](metadata.md) — `metadata.tlp`, optional `metadata.pap`, `metadata.organisation`
-- [platforms.md](platforms.md) — deployment targets; MISP is not in this matrix
+- [platforms/index.md](platforms/index.md) — deployment targets; MISP is not in this matrix
 - [RFC 0005](../rfcs/0005-sharing-system.md) — accepted proposal
 - [RFC 0006](../rfcs/0006-sharing-ci.md) — production-merge sharing job
 
@@ -268,5 +269,6 @@ Bundled `sharing.toml` ships with no enabled block. A block MUST set `max_tlp`. 
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-10-16 | `.opentide/states/` holds sharing's cache and deployment's committed shards ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). A future subsystem states whether its state is a cache or a record and whether it is committed. The directory is never ignored whole. Ledger fields are unchanged. |
 | 1.0 | 2026-09-28 | [RFC 0006](../rfcs/0006-sharing-ci.md). Optional sharing stage, default off, runs `opentide share push --changed` only on a push to the default branch. |
 | 1.0 | 2026-09-28 | Initial spec from accepted [RFC 0005](../rfcs/0005-sharing-system.md). Integration blocks are top-level arrays (`[[misp]]`) with per-block selection and a required `max_tlp`, merged by `name`. Share state is `.opentide/states/sharing.jsonl`. `preview` writes no files. |

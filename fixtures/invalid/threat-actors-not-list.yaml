@@ -19,8 +19,8 @@ threat:
   viability: Likely
   terrain: Endpoint workstations and user devices.
   surface:
-    - Windows::Desktop
-  att&ck:
+    - OS::Windows::Desktop
+  mitre_attack:
     - T1059
   actors:
     name: att&ck::G0007

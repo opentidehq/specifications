@@ -66,7 +66,7 @@ Path values in merged configuration MUST resolve to absolute paths, including le
 - [workspace.md](workspace.md) — default paths from `paths.toml`
 - [deployment.md](deployment.md) — `deployment.toml` semantics
 - [specs/vocabularies/format.md](vocabularies/format.md) — vocabulary extension via `schema.toml`
-- [platforms.md](platforms.md) — platform TOML under `platforms/`
+- [platforms/index.md](platforms/index.md) — platform TOML under `platforms/`
 - [sharing.md](sharing.md) — single-file `sharing.toml`, integration arrays merged by `name`
 
 ## Defaults & overrides

@@ -27,7 +27,7 @@ An object **conforms** to a spec when it satisfies every MUST and MUST NOT in th
 - **Referential conformance** — cross-object references resolve and UUIDs are unique.
 - **Vocabulary conformance** — controlled-vocabulary fields use published values.
 
-A conforming **implementation** (such as opentide) validates objects exactly as the specs require and reports capabilities honestly — for example, never reporting query validation as passed for a platform that cannot perform it (see [validation](specs/validation.md) and [platforms](specs/platforms.md)).
+A conforming **implementation** (such as opentide) validates objects exactly as the specs require and reports capabilities honestly — for example, never reporting query validation as passed for a platform that cannot perform it (see [validation](specs/validation.md) and [platforms](specs/platforms/index.md)).
 
 ## Authority
 

@@ -50,7 +50,7 @@ Non-trivial or breaking changes require an RFC before spec edits:
 2. Check [rfcs/](rfcs/) for related accepted RFCs
 3. Use the [publish-rfc skill](.agents/skills/publish-rfc/SKILL.md) or copy [rfcs/0000-template.md](rfcs/0000-template.md)
 4. Number the RFC sequentially (next after highest existing number)
-5. Update specs, fixtures, `SPECS.md`, and `CHANGELOG.md` in the same PR as the RFC (or follow-up after acceptance per maintainer guidance)
+5. In that same PR, update the specs, fixtures, `SPECS.md`, and `CHANGELOG.md` the RFC names. Defer those edits only when the user explicitly asks for an RFC draft and no schema or object changes.
 6. Reference the RFC number in the PR description
 
 Breaking object schema changes: create a new spec file (`rule-1.1.md`), mark the old file `status: deprecated`, do not delete it.

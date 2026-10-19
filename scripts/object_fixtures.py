@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +25,8 @@ else:
 UUID_V4 = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
 )
-REGISTERED_SCHEMAS = frozenset({"threat::1.0", "objective::1.0", "rule::1.0"})
+REGISTERED_SCHEMAS = frozenset({"threat::1.0", "objective::1.0", "rule::1.0", "rule::1.1"})
+RULE_SCHEMAS = frozenset({"rule::1.0", "rule::1.1"})
 THREAT_REQUIRED_BODY = (
     "description",
     "severity",
@@ -33,7 +35,7 @@ THREAT_REQUIRED_BODY = (
     "viability",
     "terrain",
     "surface",
-    "att&ck",
+    "mitre_attack",
 )
 PACKED_SEPARATOR = ";"
 
@@ -185,6 +187,70 @@ def _require_vocab_id(
         )
 
 
+def _require_scoped_token_list(
+    value: Any,
+    vocab: Vocab | None,
+    *,
+    path: str,
+    errors: list[CheckError],
+) -> None:
+    """Validate a list whose vocabulary groups its keys under stages.
+
+    A stage-scoped vocabulary carries the same key name under more than one
+    stage (``VPN``, ``Wireless`` and ``Industrial`` are each defined under both
+    ``Infrastructure`` and ``Protocol`` in ``surface``), so a bare key name is
+    ambiguous and MUST NOT be accepted: the authored value is
+    ``<stage>::<key>``. This mirrors ``ThreatActor.name``, which has required
+    ``att&ck::``/``misp::`` scoping since actors::1.0.
+    """
+    if isinstance(value, str):
+        code = "packed_vocab_string" if _is_packed_token(value) else "field_not_list"
+        errors.append(
+            CheckError(code, "must be a list of stage-scoped vocabulary strings", path)
+        )
+        return
+    if not isinstance(value, list) or not value:
+        errors.append(CheckError("empty_vocab_list", "MUST be a non-empty list", path))
+        return
+    for index, item in enumerate(value):
+        item_path = f"{path}[{index}]"
+        if not isinstance(item, str) or not item.strip():
+            errors.append(
+                CheckError("invalid_vocab_token", "must be a non-empty vocabulary string", item_path)
+            )
+            continue
+        if _is_packed_token(item):
+            errors.append(
+                CheckError(
+                    "packed_vocab_string",
+                    "semicolon-packed strings are not a valid encoding of list[string]",
+                    item_path,
+                )
+            )
+            continue
+        if vocab is None:
+            continue
+        if not vocab.has_scoped(item):
+            # A value that resolves unscoped is a missing stage prefix, which is
+            # a different authoring mistake from naming a key that does not exist.
+            if vocab.has_unscoped(item):
+                errors.append(
+                    CheckError(
+                        "surface_unscoped",
+                        f"{item!r} MUST be stage-scoped (for example OS::{item})",
+                        item_path,
+                    )
+                )
+            else:
+                errors.append(
+                    CheckError(
+                        "unknown_vocab_value",
+                        f"{item!r} is not a scoped {vocab.field} value",
+                        item_path,
+                    )
+                )
+
+
 def _require_token_list(
     value: Any,
     vocab: Vocab | None,
@@ -213,6 +279,44 @@ def _require_token_list(
     checker = _require_vocab_id if id_mode else _require_vocab_name
     for index, item in enumerate(value):
         checker(item, vocab, path=f"{path}[{index}]", errors=errors)
+
+
+def _is_iso_timestamp(value: Any) -> bool:
+    """ISO 8601 date or datetime, the same forms as metadata.created and metadata.modified."""
+    if isinstance(value, date):
+        return True
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if not text:
+        return False
+    try:
+        datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return True
+
+
+def _validate_reviewed(metadata: Any, *, allowed: bool, errors: list[CheckError]) -> None:
+    if not isinstance(metadata, dict) or "reviewed" not in metadata:
+        return
+    if not allowed:
+        errors.append(
+            CheckError(
+                "reviewed_not_in_schema",
+                "metadata.reviewed is defined only on rule::1.1",
+                "metadata.reviewed",
+            )
+        )
+        return
+    if not _is_iso_timestamp(metadata.get("reviewed")):
+        errors.append(
+            CheckError(
+                "invalid_reviewed",
+                "metadata.reviewed must be an ISO 8601 date or datetime",
+                "metadata.reviewed",
+            )
+        )
 
 
 def _validate_metadata(metadata: Any, errors: list[CheckError]) -> str | None:
@@ -307,6 +411,7 @@ def validate_threat(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[Check
         errors.append(CheckError("unknown_schema", f"threat fixture has schema {schema!r}", "metadata.schema"))
     tlp = (doc.get("metadata") or {}).get("tlp") if isinstance(doc.get("metadata"), dict) else None
     _require_vocab_name(tlp, vocabs.get("tlp"), path="metadata.tlp", errors=errors)
+    _validate_reviewed(doc.get("metadata"), allowed=False, errors=errors)
 
     body = doc.get("threat")
     if not isinstance(body, dict):
@@ -327,9 +432,15 @@ def validate_threat(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[Check
     _require_non_empty_string(
         body.get("terrain"), code="missing_field", path="threat.terrain", errors=errors
     )
-    _require_token_list(body.get("surface"), vocabs.get("surface"), path="threat.surface", errors=errors)
+    _require_scoped_token_list(
+        body.get("surface"), vocabs.get("surface"), path="threat.surface", errors=errors
+    )
     _require_token_list(
-        body.get("att&ck"), vocabs.get("att&ck"), path="threat.att&ck", errors=errors, id_mode=True
+        body.get("mitre_attack"),
+        vocabs.get("att&ck"),
+        path="threat.mitre_attack",
+        errors=errors,
+        id_mode=True,
     )
 
     actors = body.get("actors", None)
@@ -354,6 +465,7 @@ def validate_objective(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[Ch
         )
     tlp = (doc.get("metadata") or {}).get("tlp") if isinstance(doc.get("metadata"), dict) else None
     _require_vocab_name(tlp, vocabs.get("tlp"), path="metadata.tlp", errors=errors)
+    _validate_reviewed(doc.get("metadata"), allowed=False, errors=errors)
 
     composition = doc.get("composition")
     if not isinstance(composition, dict):
@@ -395,10 +507,11 @@ def validate_rule(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[CheckEr
         errors.append(CheckError("missing_metadata", "metadata block is required", "metadata"))
         return errors
     schema = _validate_metadata(doc.get("metadata"), errors)
-    if schema and schema != "rule::1.0":
+    if schema and schema not in RULE_SCHEMAS:
         errors.append(CheckError("unknown_schema", f"rule fixture has schema {schema!r}", "metadata.schema"))
     tlp = (doc.get("metadata") or {}).get("tlp") if isinstance(doc.get("metadata"), dict) else None
     _require_vocab_name(tlp, vocabs.get("tlp"), path="metadata.tlp", errors=errors)
+    _validate_reviewed(doc.get("metadata"), allowed=schema == "rule::1.1", errors=errors)
     _require_non_empty_string(
         doc.get("description"), code="missing_field", path="description", errors=errors
     )
@@ -445,8 +558,11 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "threat-actor-missing-name.yaml": "actor_missing_name",
     "threat-actor-unscoped.yaml": "actor_unscoped",
     "threat-actor-wrong-stage.yaml": "actor_unknown",
+    "threat-surface-unscoped.yaml": "surface_unscoped",
     "rule-bad-uuid.yaml": "invalid_uuid",
     "rule-unknown-schema.yaml": "unknown_schema",
     "rule-missing-metadata.yaml": "missing_metadata",
+    "rule-reviewed-bad-date.yaml": "invalid_reviewed",
+    "rule-1.0-reviewed.yaml": "reviewed_not_in_schema",
     "objective-no-signals.yaml": "empty_signals",
 }

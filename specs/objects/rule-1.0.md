@@ -20,7 +20,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 - `name`, `metadata`, and `description` MUST be present.
 - `status` MUST be a valid deployment status from [deployment.md](../deployment.md) (default: `STAGING`).
 - `severity` MUST be a valid rule severity vocabulary value (default: `Informational`).
-- `techniques` MUST be a list of ATT&CK technique IDs (MAY be empty).
+- `techniques` MUST be a list of ATT&CK technique ids from vocabulary `att&ck` (pin `att&ck::1.1`). The list MAY be empty.
 - `platforms` or `configurations` MUST contain at least one enabled platform block for deployable rules.
 - `detection_model` when present MUST reference a valid objective UUID.
 - Platform blocks MUST validate against the platform schema identifier declared in each block's `schema` field.
@@ -46,7 +46,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 | `description` | string | yes | — | Rule narrative (multiline YAML encouraged) |
 | `status` | string | no | `STAGING` | Deployment lifecycle status |
 | `severity` | string | no | `Informational` | Rule severity vocabulary |
-| `techniques` | list[string] | no | `[]` | MITRE ATT&CK technique IDs |
+| `techniques` | list[string] | no | `[]` | MITRE ATT&CK technique ids (`att&ck::1.1`) |
 | `platforms` | map[string, object] | no | `{}` | Legacy flat platform dict (prefer `configurations`) |
 | `configurations` | RuleConfigurations | no | null | Typed per-platform configuration blocks |
 | `references` | ObjectReferences | no | null | External and internal references |
@@ -59,7 +59,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 |-------|------|----------|---------|-------------|
 | `alert_severity` | string | no | `Informational` | Alert severity vocabulary |
 | `playbook` | string | no | null | Playbook identifier or URL |
-| `responders` | string | no | null | Responder team vocabulary |
+| `responders` | string | no | `[deployment] default_responders` | Alert handling team. Free text, NOT a vocabulary: the team is per-organisation configuration (opentide#507) |
 | `procedure` | ResponseProcedure | no | null | Analysis and containment procedure |
 
 ### `procedure` (ResponseProcedure)
@@ -96,26 +96,27 @@ Shared fields on every platform configuration:
 
 Typed optional blocks keyed by platform identifier:
 
-| Key | Model | Schema ID |
-|-----|-------|-----------|
-| `sentinel` | SentinelConfig | `platform::sentinel::1.0` |
-| `defender_for_endpoint` | DefenderConfig | `platform::defender_for_endpoint::1.0` |
-| `splunk` | SplunkConfig | `platform::splunk::1.0` |
-| `sentinel_one` | SentinelOneConfig | `platform::sentinel_one::1.0` |
-| `crowdstrike` | CrowdstrikeConfig | `platform::crowdstrike::1.0` |
-| `harfanglab` | HarfangLabConfig | `platform::harfanglab::1.0` |
-| `carbon_black_cloud` | CarbonBlackConfig | `platform::carbon_black_cloud::1.0` |
+| Key | Model | Schema ID | Spec |
+|-----|-------|-----------|------|
+| `sentinel` | SentinelConfig | `platform::sentinel::1.0` | [sentinel-1.0.md](../platforms/sentinel-1.0.md) |
+| `defender_for_endpoint` | DefenderConfig | `platform::defender_for_endpoint::1.0` | [defender-for-endpoint-1.0.md](../platforms/defender-for-endpoint-1.0.md) |
+| `splunk` | SplunkConfig | `platform::splunk::1.0` | [splunk-1.0.md](../platforms/splunk-1.0.md) |
+| `sentinel_one` | SentinelOneConfig | `platform::sentinel_one::1.0` | [sentinel-one-1.0.md](../platforms/sentinel-one-1.0.md) |
+| `crowdstrike` | CrowdstrikeConfig | `platform::crowdstrike::1.0` | [crowdstrike-1.0.md](../platforms/crowdstrike-1.0.md) |
+| `harfanglab` | HarfangLabConfig | `platform::harfanglab::1.0` | [harfanglab-1.0.md](../platforms/harfanglab-1.0.md) |
+| `carbon_black_cloud` | CarbonBlackConfig | `platform::carbon_black_cloud::1.0` | [carbon-black-cloud-1.0.md](../platforms/carbon-black-cloud-1.0.md) |
 
-See [platforms.md](../platforms.md) for per-platform required fields and capabilities.
+Shared block fields and the capability matrix are in [platforms/index.md](../platforms/index.md). Each link above is the field contract for that block.
 
 ## Relationships
 
 - [metadata.md](../metadata.md) — identity and schema routing
+- [rule-1.1.md](rule-1.1.md) — minor revision with optional `metadata.reviewed`. This revision does not define that field and MUST reject it.
 - [objective-1.0.md](objective-1.0.md) — linked via `detection_model`
 - [deployment.md](../deployment.md) — `status` lifecycle and promotion
-- [platforms.md](../platforms.md) — platform blocks and deploy/validate capabilities
+- [platforms/index.md](../platforms/index.md) — platform blocks and deploy/validate capabilities
 - [validation.md](../validation.md) — schema, vocabulary, and query validation
-- Vocabularies: `severity`, `alert_severity`, `att&ck`, `responders`, deployment statuses
+- Vocabularies: `severity`, `alert_severity`, `att&ck`, deployment statuses
 
 ## Defaults & overrides
 
@@ -175,9 +176,11 @@ configurations:
 | [fixtures/invalid/rule-missing-metadata.yaml](../../fixtures/invalid/rule-missing-metadata.yaml) | Missing required `metadata` |
 | [fixtures/invalid/rule-unknown-schema.yaml](../../fixtures/invalid/rule-unknown-schema.yaml) | Unregistered `metadata.schema` |
 | [fixtures/invalid/rule-bad-uuid.yaml](../../fixtures/invalid/rule-bad-uuid.yaml) | Non-UUIDv4 `metadata.uuid` |
+| [fixtures/invalid/rule-1.0-reviewed.yaml](../../fixtures/invalid/rule-1.0-reviewed.yaml) | `metadata.reviewed` on `rule::1.0` |
 
 ## History
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-10-07 | `techniques` is pinned to `att&ck::1.1`. `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-06-25 | Initial exemplar spec from opentide `models/rule.py` |

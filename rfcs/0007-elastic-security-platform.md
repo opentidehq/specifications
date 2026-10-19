@@ -6,6 +6,7 @@
 - **Status:** accepted
 - **Created:** 2026-09-25
 - **Revised:** 2026-09-29 — author blocks follow the Security create-rule screens
+- **Revised:** 2026-10-15 — aligned with the first implementation ([OpenTideHQ/opentide#481](https://github.com/OpenTideHQ/opentide/pull/481)); see [§8](#8-revisions-after-the-first-implementation)
 - **Accepted:** 2026-09-29 — design accepted for the first implementation. Normative spec text and fixtures follow ([§7](#7-spec-changes-after-acceptance)).
 - **Issue:** [OpenTideHQ/specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)
 - **PR:** [OpenTideHQ/specifications#18](https://github.com/OpenTideHQ/specifications/pull/18)
@@ -22,7 +23,7 @@ Decisions:
 2. **Target the Security detection engine, not generic Kibana.** Detection rules are the only Elastic rules that land in the Security app, write to `.alerts-security.alerts-*`, carry ATT&CK mappings, and support exceptions.
 3. **Every rule type the Security UI can create, except a saved query:** `query`, `eql`, `esql`, `threshold`, `new_terms`, `threat_match`, and `machine_learning`. A saved query is a Kibana object loaded by id on each run, so the detection text would not live in the rule file.
 4. **Identity is the MDR UUID.** Kibana's user-settable `rule_id` is set to `metadata.uuid`. It is unique per space, so one UUID serves every tenant, and alerts carry it as `kibana.alert.rule.rule_id`. Kibana's internal `id` is never stored, and nothing is written back to the rule file.
-5. **Validation:** offline syntax checks per query language, plus live validation through the rule preview API. Two Elasticsearch checks also run before every deploy, because Kibana accepts a mistyped ES\|QL command or aggregation field and the rule then fails silently ([Elasticsearch checks](#elasticsearch-checks)).
+5. **Validation:** live validation through the rule preview API. There is no offline syntax check ([§8](#8-revisions-after-the-first-implementation)). Elasticsearch checks also run before every deploy, because Kibana accepts a mistyped ES\|QL command or aggregation field and the rule then fails silently ([Elasticsearch checks](#elasticsearch-checks)).
 6. **The Security create-rule screens, in the author's words.** Durations are written `5m`, `1h`, `14d`. `index` is optional and, when set, a list of patterns (`[logs-*]`). Severity, risk, the schedule, suppression, guides, exceptions, overrides, and actions are blocks a detection engineer can scan. Keys that exist for only one rule type sit in `eql`, `threshold`, `new_terms`, `threat`, or `machine_learning`. The compiler flattens those blocks to detection-engine fields. Fields the create-rule UI does not show are not authored.
 
 The change is additive: it adds a `configurations.elastic` key and a new platform schema. `rule::1.0` keeps its identifier and every existing rule stays valid.
@@ -127,7 +128,6 @@ name = "elastic-staging"
 description = "Serverless Security project, staging space"
 deployment = "STAGING"
 [tenants.setup]
-proxy = false
 ssl = true
 url = "https://soc-staging.kb.eu-west-1.aws.elastic.cloud"
 elasticsearch_url = "https://soc-staging.es.eu-west-1.aws.elastic.cloud"
@@ -139,7 +139,6 @@ name = "elastic-prod"
 description = "Self-managed cluster on a Basic licence, default space"
 deployment = "PRODUCTION"
 [tenants.setup]
-proxy = true
 ssl = true
 url = "https://kibana.soc.example.internal:5601"
 elasticsearch_url = "https://es.soc.example.internal:9200"
@@ -161,7 +160,7 @@ Bundled defaults ship with `enabled = false` and no tenants, as for every platfo
 | `index` | list[string] | no | null | Index patterns for blocks that set neither `index` nor `data_view_id`. When null, Kibana applies the space's `securitySolution:defaultIndex`. |
 | `tags` | list[string] | no | `[]` | Tags added to every rule deployed to this tenant |
 | `suppression` | bool | no | `true` | Whether the tenant's licence or project tier applies alert suppression. When `false`, the deployer omits `alert_suppression` and warns once per affected rule. |
-| `proxy`, `ssl` | bool | yes | — | Shared tenant setup (proxy use, TLS verification) |
+| `ssl` | bool | yes | — | Shared tenant setup (TLS verification). There is no per-tenant `proxy`: the proxy is the global `opentide --proxy` option, and a tenant that sets `proxy` is refused. |
 
 ```python
 @dataclass
@@ -189,7 +188,7 @@ class Elastic(SystemConfig):
 - Elasticsearch: `read` and `view_index_metadata` on every source index pattern the rules query. The Elasticsearch checks need nothing more, and no cluster privilege is needed.
 - Live validation only: `read` on `.preview.alerts-security.alerts-<space>` and `.internal.preview.alerts-security.alerts-<space>-*`.
 
-Kibana renames feature privileges between versions (`siemV2` on 8.19; `siemV5` and `securitySolutionRulesV4` on 9.5), so `platforms.md` will not pin them. [Appendix A](#appendix-a-reference-test) shows the tested key.
+Kibana renames feature privileges between versions (`siemV2` on 8.19; `siemV5` and `securitySolutionRulesV4` on 9.5), so `platforms/index.md` will not pin them. [Appendix A](#appendix-a-reference-test) shows the tested key.
 
 ### 2. Rule block (`platform::elastic::1.0`)
 
@@ -358,9 +357,10 @@ class ElasticMachineLearning(TideModel):
 | `duration` | Every duration is a positive integer followed by `s`, `m`, `h`, or `d`, or ISO 8601 with whole seconds, and is > 0. `scheduling.lookback` may be `0m`. |
 | `filter_shape` | A filter entry is either `{field, value, negate?}` or a raw `{meta, query}` object, never both. |
 | `exception_type` | `exceptions.lists[].type` is `detection` or `rule_default`. The endpoint list is added only by `exceptions.endpoint: true`. |
+| `severity` | `severity`, or `severity.default`, is a value of the `alert_severity` vocabulary (`Informational`, `Low`, `Medium`, `High`, `Critical`, case-insensitive). An unknown value is invalid; it is never compiled to a fallback. |
 | `response_action` | `actions.respond` is `{endpoint: isolate\|kill-process\|suspend-process\|runscript, comment?, field?}` or `{osquery: {query, ...}}`. `runscript` is 9.4+. |
 
-Validation SHOULD warn when `scheduling.lookback` is `0m` (the next run starts as the window ends; Elastic recommends at least one minute), and when a non-aggregating ES\|QL query (no `STATS`) lacks `METADATA _id` (alerts are not deduplicated).
+Validation SHOULD warn when `scheduling.lookback` is `0m` (the next run starts as the window ends; Elastic recommends at least one minute), and when a non-aggregating ES\|QL query (no `STATS`) lacks `METADATA _id` (alerts are not deduplicated). It SHOULD also warn when `scheduling.lookback` exceeds `1h` (`lookback` is extra overlap added to `interval`, not the total window as in Sentinel), when a `threshold` rule's `lookback` exceeds its `interval` (threshold counts are not deduplicated across overlapping runs), and when an EQL `sequence` `maxspan` exceeds `interval` + `lookback` (the sequence cannot fit in one run) or `lookback` (a sequence that straddles two runs is missed).
 
 **`index` is not required.** On `query`, `eql`, `threshold`, `new_terms`, and the event side of `threat_match`, the compiler uses the block `index` when it is set, otherwise the tenant `setup.index`, and otherwise omits `index` so the detection engine stores the space setting `securitySolution:defaultIndex`. `data_view_id` is one id of an existing data view and replaces that chain. This platform does not create or edit data views, and it does not write `securitySolution:defaultIndex` or `securitySolution:defaultThreatIndex`. `threat.index` is required: the indicator UI pre-fills `logs-ti_*`, but the API does not. `esql` and `machine_learning` set neither `index` nor `data_view_id`.
 
@@ -377,7 +377,7 @@ The deployer compiles each MDR into a detection-engine create or update body:
 | `type` | `type` | verbatim |
 | `name` | block `name`, else rule `name` | |
 | `description` | rule `description` | trailing whitespace stripped |
-| `enabled` | block `status` | `false` iff that status's strategy is `DISABLEMENT`. The rule's own `status` is not read. An omitted block status is `STAGING`. Always sent, because a `PUT` without it keeps the remote value. |
+| `enabled` | block `status` | `false` iff that status's strategy is `DISABLEMENT`. The rule's own `status` is not read. The block `status` is required, as on every platform block ([§8](#8-revisions-after-the-first-implementation)). Always sent, because a `PUT` without it keeps the remote value. |
 | `severity` | `severity` string, or `severity.default`, else `response.alert_severity`, else `Informational` | [Severity](#severity) |
 | `severity_mapping` | `severity.mapping` | Severity override. `operator` defaults to `equals`. |
 | `risk_score` | `risk` integer, or `risk.score`, else the severity table | 0–100 |
@@ -435,7 +435,7 @@ Absent optional sources produce no key. The deployer MUST NOT send `id` or `vers
 | High | high | 73 |
 | Critical | critical | 99 |
 
-The scores follow Elastic's prebuilt-rule convention and sit inside Kibana's risk bands (0–21 low, 22–47 medium, 48–73 high, 74–100 critical). An `alert.risk_score` override SHOULD stay inside its severity's band.
+The scores follow Elastic's prebuilt-rule convention and sit inside Kibana's risk bands (0–21 low, 22–47 medium, 48–73 high, 74–100 critical). An explicit `risk` (or `risk.score`) SHOULD stay inside its severity's band.
 
 #### Schedule
 
@@ -1665,6 +1665,7 @@ machine_learning:
 elastic:
   enabled: true
   schema: platform::elastic::1.0
+  status: STAGING
   type: esql
   language: kuery
   query: FROM logs-* | LIMIT 10
@@ -1718,7 +1719,7 @@ A deployer MAY list managed rules with a single `GET _find?filter=alert.attribut
 
 | Mode | Behaviour |
 |------|-----------|
-| Offline (`validate query`, default) | Structural checks per language. `kuery`: string, bracket, and `and`/`or`/`not` balance. `lucene`: the existing Lucene checker. `eql`: bracket and string balance, and a `where` or `sequence` form. `esql`: bracket and string balance, first command `FROM`, and no dangling `\|`. |
+| Offline | None. `validate query` is tenant-only on every platform: a bare invocation refuses and names `--live`. Syntax errors fail on preview or on the ES\|QL pre-flight. |
 | Live (`validate query --live`) | `POST <base>/preview` with the compiled body plus `{"invocationCount": 1, "timeframeEnd": "<now>"}`. `timeframeEnd` MUST be UTC with a `Z` suffix (`2026-09-25T11:10:00.000Z`); Kibana rejects `+00:00` offsets with 400. The [Elasticsearch checks](#elasticsearch-checks) also run. |
 
 Preview outcomes:
@@ -1734,7 +1735,7 @@ Preview executes the rule once against live data and writes only to the preview 
 
 #### Elasticsearch checks
 
-Kibana accepts some mistakes that make a rule fail silently. Before every `POST` or `PUT`, and during live validation, the deployer MUST run the two checks below against `elasticsearch_url` with the tenant's API key. HTTP 401, 403, 429, and 5xx follow the [deployment error rules](#5-deployment).
+Kibana accepts some mistakes that make a rule fail silently. Before every `POST` or `PUT`, and during live validation, the deployer MUST run the checks below against `elasticsearch_url` with the tenant's API key. HTTP 401, 403, 429, and 5xx follow the [deployment error rules](#5-deployment).
 
 ##### ES\|QL pre-flight
 
@@ -1771,27 +1772,50 @@ Kibana accepts any string as a field name. On 9.5.4, a field that does not exist
 | `threshold.field`, `threshold.cardinality.field` | no alerts | run error |
 | `new_terms_fields` | no alerts | run error |
 
-The deployer checks these fields with `GET <elasticsearch_url>/<sources>/_field_caps?fields=<fields>&ignore_unavailable=true&allow_no_indices=true`. `<sources>` is the compiled `index`, or the `title` of the data view from `GET /api/data_views/data_view/<data_view_id>` in the tenant's space. Every field MUST be present with `aggregatable: true`; otherwise the rule fails. For `esql`, the `group_by` fields MUST instead be among the `columns` the pre-flight returns, because ES\|QL suppression groups on result columns.
+The deployer checks these fields with `GET <elasticsearch_url>/<sources>/_field_caps?fields=<fields>&ignore_unavailable=true&allow_no_indices=true`. `<sources>` is the compiled `index`, or the `title` of the data view from `GET /api/data_views/data_view/<data_view_id>` in the tenant's space. Every field MUST be present with `aggregatable: true`; otherwise the rule fails. A data view lookup or `_field_caps` call that does not return 200 (after the 429 and 5xx retries) also fails the rule: a check that could not run is not a pass, and a data view is a Kibana object that this platform never creates, so a missing one is an authoring error rather than data that is not onboarded yet. For `esql`, the `group_by` fields MUST instead be among the `columns` the pre-flight returns, because ES\|QL suppression groups on result columns.
 
 `_field_caps` reads mappings, not documents, so a field that an integration's index template maps passes before any event carries it. If the response's `indices` list is empty, the sources are not onboarded yet, and the deployer deploys with a warning, as for ES\|QL. A rule with no explicit source (no `index`, `data_view_id`, or tenant `index`) uses the space's default index setting. The deployer skips the check for it with a warning.
+
+##### Timestamp field check
+
+`overrides.timestamp` (`timestamp_override`) and `eql.timestamp_field` name the field the rule's time range runs on. A field mapped with a non-date type makes every run fail. When either is set to anything other than `@timestamp`, the deployer calls `_field_caps` on the same `<sources>` as the aggregation field check. A field mapped with a type other than `date` or `date_nanos` fails the rule. Sources that are not onboarded yet, or a field that is not mapped yet, are a warning.
+
+##### Indicator match field check
+
+For `threat_match`, the deployer checks the `threat.mapping` fields with `_field_caps`: each entry's `field` against the rule's event `<sources>`, and each `value` against `threat.index`. A field mapped as not searchable fails the rule. Sources that are not onboarded yet, or a field that is not mapped yet, are a warning.
 
 ### 7. Spec changes after acceptance
 
 | File | Change |
 |------|--------|
-| `specs/platforms.md` → 1.1 | Add the `elastic` capability row (query languages KQL, Lucene, EQL, and ES\|QL), the required fields (`type`, `query`, plus the type block), and an Elastic block section. Add it to the query-validation allowlist. Raise the platform count by one (seven to eight, or eight to nine if [RFC 0004](https://github.com/OpenTideHQ/specifications/issues/8) lands first). |
+| `specs/platforms/index.md` → 1.1 | Add the `elastic` capability row (query languages KQL, Lucene, EQL, and ES\|QL), the required fields (`type`, `query`, plus the type block), and an Elastic block section. Add it to the query-validation allowlist. Raise the platform count by one (seven to eight, or eight to nine if [RFC 0004](https://github.com/OpenTideHQ/specifications/issues/8) lands first). |
 | `specs/objects/rule-1.0.md` | Add `elastic` / `ElasticConfig` / `platform::elastic::1.0` to the `configurations` table (additive; `rule::1.0` unchanged) |
-| `specs/validation.md` | Add `elastic` to the query-validation table, with offline and live modes as in §6 |
+| `specs/validation.md` | Add `elastic` to the query-validation table, live mode only, as in §6 |
 | `fixtures/valid/rule-elastic-1.0.yaml`, `fixtures/invalid/rule-elastic-esql-index.yaml` | New conformance fixtures from Examples A and "Invalid block" |
 | `SPECS.md`, `CHANGELOG.md` | Index and history entries |
 
 No vocabulary changes are required. A follow-up SHOULD add an explicit `domain` (enterprise, mobile, ics) to `att&ck.vocab.toml` so step 1 of [Threat](#threat) stops relying on name prefixes.
 
-opentide adds an `opentide/platforms/elastic/` package with `client`, `deployer`, and `validator` modules, the entry point `elastic = "opentide.platforms.elastic:declare"`, bundled `elastic.toml`, `ElasticConfig`, the `Elastic` tenant model, and offline checkers for `kuery`, `eql`, and `esql`. It uses `requests`, which is already a core dependency, so no new extra is needed.
+opentide adds an `opentide/platforms/elastic/` package with `client`, `deployer`, and `validator` modules, the entry point `elastic = "opentide.platforms.elastic:declare"`, bundled `elastic.toml`, `ElasticConfig`, and the `Elastic` tenant model. It uses `requests`, which is already a core dependency, so no new extra is needed.
+
+### 8. Revisions after the first implementation
+
+The first implementation ([OpenTideHQ/opentide#481](https://github.com/OpenTideHQ/opentide/pull/481)) was reviewed against this RFC. These changes keep the RFC matching the engine; the text above already reflects them.
+
+| Change | Sections | Why |
+|--------|----------|-----|
+| No per-tenant `proxy` | §1 | opentide 0.10.0 retired the `proxy` setup key on every platform in favour of the global `opentide --proxy` option, and refuses a tenant that still sets it. The §1 example no longer sets it. |
+| No offline query check | Summary, §6, §7, Drawbacks | opentide 0.11.0 removed in-process query scanning on every platform ([opentide#456](https://github.com/OpenTideHQ/opentide/issues/456)); `validate query` is tenant-only. The preview API and the ES\|QL pre-flight catch the syntax errors the offline checks targeted, with the Kibana parser instead of an approximation. |
+| Block `status` is required | §3 `enabled`, Invalid block | [opentide#493](https://github.com/OpenTideHQ/opentide/pull/493) made `status` required on every platform block, so a rule cannot validate and then be undeployable. The `STAGING` default is removed. The invalid example sets `status` so it reports the three constraint codes. |
+| `severity` constraint code | §2 | §2 already limits `severity` to the `alert_severity` vocabulary. Without a code, an unknown value compiled to `Informational` (`low`, risk score 1) and silently demoted the rule. |
+| Timestamp and indicator match field checks | §6 | Both are run-time failures Kibana accepts on create, the same class as the aggregation field check. They follow its not-onboarded leniency. |
+| Failed checks fail the rule | §6 | A data view lookup or `_field_caps` call that cannot complete is not a pass. |
+| Extra validation warnings | §2 | Look-back over `1h`, threshold look-back over `interval`, and EQL `maxspan` against the window. All are warnings; none rejects a rule. |
+| Bulk path precondition | Unresolved questions | Kibana's `_import` requires `version`, which §3 forbids, so a bulk path needs its own revision. |
 
 ## Drawbacks
 
-- **Four query languages on one platform.** Offline validation becomes per-rule rather than per-platform, and it is structural only. Semantic errors (unknown fields, type mismatches) surface only in live mode.
+- **Four query languages on one platform, and no offline check.** Every syntax and semantic error surfaces only against a tenant, through preview or the Elasticsearch checks.
 - **Preview costs a real query.** Live validation runs each rule once against production-sized data. CI SHOULD point `--live` at a staging tenant.
 - **API key coupling.** Rules keep running with the deploying key's privileges. Rotating or revoking that key needs a full redeploy, or the rules stop.
 - **Two calls per rule** (`GET` plus `POST` or `PUT`). This is acceptable for hundreds of rules. `_find` pre-fetch halves it. Bulk import is deferred.
@@ -1824,7 +1848,7 @@ opentide adds an `opentide/platforms/elastic/` package with `client`, `deployer`
 |----------|--------------------|
 | Exceptions as code | Separate RFC mapping per-tenant exclusions (as in Sentinel and Defender) to `/api/exception_lists` and rule `exceptions_list`. Until then, exceptions are Kibana-managed and preserved. |
 | Orphan pruning | Report rules tagged `OpenTide` that have no MDR. Deletion stays opt-in in a later revision. |
-| Bulk path for large catalogues | `_import` fast path behind a tenant flag, after per-rule semantics are proven |
+| Bulk path for large catalogues | `_import` fast path behind a tenant flag, after per-rule semantics are proven. Kibana's `_import` requires `version`, so this needs a revision that allows `version` on that path, and it MUST still copy the preserved fields and refuse prebuilt rules. |
 | Deriving `required_fields` and `related_integrations` | Elastic's `detection-rules` builds both at release time from the query AST, bundled ECS and integration schemas, and a package list (`integration = ["windows"]`). A later revision MAY fill `required_fields` from the query and `_field_caps`, leaving the block optional. |
 | Kibana not parsing ES\|QL on create | Report it upstream. A later revision MAY make the pre-flight optional on Kibana versions that reject invalid ES\|QL on create. |
 
@@ -1888,4 +1912,4 @@ This is the `POST /_security/api_key` body for 9.5.4. On 8.19.22 the application
 - [Kibana API: Security detections](https://www.elastic.co/docs/api/doc/kibana/group/endpoint-security-detections-api) · [Serverless](https://www.elastic.co/docs/api/doc/serverless/group/endpoint-security-detections-api)
 - [Spaces and Elastic Security](https://www.elastic.co/docs/solutions/security/get-started/spaces-elastic-security)
 - [elastic/detection-rules](https://github.com/elastic/detection-rules) · [terraform-provider-elasticstack](https://github.com/elastic/terraform-provider-elasticstack)
-- [platforms.md](../specs/platforms.md) · [rule-1.0.md](../specs/objects/rule-1.0.md) · [deployment.md](../specs/deployment.md) · [validation.md](../specs/validation.md)
+- [platforms/index.md](../specs/platforms/index.md) · [rule-1.0.md](../specs/objects/rule-1.0.md) · [deployment.md](../specs/deployment.md) · [validation.md](../specs/validation.md)

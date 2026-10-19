@@ -1,0 +1,9 @@
+{
+  "object_uuid": "00000000-0000-4000-8003-000000000010",
+  "platforms": {
+    "defender_for_endpoint": {
+      "contoso": "012345"
+    }
+  },
+  "schema": "deployment.state::1.0"
+}

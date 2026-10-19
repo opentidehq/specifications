@@ -289,6 +289,11 @@ def _pattern_list(value: Any) -> bool:
     return isinstance(value, list) and bool(value) and all(isinstance(item, str) and item for item in value)
 
 
+def _alert_severity_names() -> set[str]:
+    vocab = tomllib.loads(ALERT_SEVERITY.read_text(encoding="utf-8"))
+    return {entry["name"].lower() for entry in vocab["keys"]}
+
+
 def check_block(block: dict[str, Any]) -> set[str]:
     codes: set[str] = set()
     rule_type = block.get("type")
@@ -363,6 +368,12 @@ def check_block(block: dict[str, Any]) -> set[str]:
         for action in actions.get("respond") or []:
             if not isinstance(action, dict) or not _valid_response(action):
                 codes.add("response_action")
+    severity = block.get("severity")
+    level = severity.get("default") if isinstance(severity, dict) else severity
+    if level is not None and (
+        not isinstance(level, str) or level.strip().lower() not in _alert_severity_names()
+    ):
+        codes.add("severity")
     suppression = block.get("suppression")
     if suppression is not None:
         group_by = suppression.get("group_by")
@@ -836,6 +847,7 @@ class TableConsistencyTests(unittest.TestCase):
                 "query": "x",
                 "actions": {"respond": [{"endpoint": "reboot"}]},
             },
+            "severity": {"type": "query", "query": "x", "severity": {"default": "Urgent"}},
         }
         self.assertEqual(table_codes, set(probes))
         for code, block in probes.items():

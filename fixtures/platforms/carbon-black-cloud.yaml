@@ -1,0 +1,25 @@
+name: Carbon Black Cloud platform block
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000019
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+description: |
+  Carbon Black Cloud Lucene watchlist report.
+status: STAGING
+severity: High
+response:
+  alert_severity: High
+configurations:
+  carbon_black_cloud:
+    enabled: true
+    schema: platform::carbon_black_cloud::1.0
+    status: STAGING
+    query: process_name:cmd.exe
+    watchlist: OpenTide
+    report: Suspicious command processor
+    tags:
+      - windows
+      - execution

@@ -28,7 +28,7 @@ Stakeholders:
 
 - **Detection engineers** need a repeatable, TLP-aware `opentide share` whose output is predictable: what was authored is what is published.
 - **CTI / ISAC operators** need MISP Events that round-trip OpenTide identity so communities can consume detections as intelligence and hand them back into a workspace, not as a lossy summary.
-- **Implementers (opentide)** need a connector contract analogous to [platforms.md](../specs/platforms.md): capability matrix, TOML shape, honest failure modes, idempotent upsert.
+- **Implementers (opentide)** need a connector contract analogous to [platforms/index.md](../specs/platforms/index.md): capability matrix, TOML shape, honest failure modes, idempotent upsert.
 - **Workspace maintainers** need to publish to more than one MISP instance — an internal instance and a sector ISAC, say — with per-instance credentials, per-instance policy, and no forked configuration.
 
 Two things changed since the first draft of this RFC, and both point away from field decomposition.
@@ -59,7 +59,7 @@ Per **Decision D-1** this is an in-place revision, not a superseding RFC. RFC 00
 | Detection runtime | `opentide deploy` | `deployment.toml`, `platforms/*.toml` | SIEM / EDR |
 | Intelligence publication | `opentide share` | `sharing.toml` | CTI platforms (MISP first) |
 
-MISP MUST NOT be added to the [platforms](../specs/platforms.md) capability matrix. A MISP instance is not a query engine and MUST NOT grow a `configurations.misp` block on `rule::1.0`.
+MISP MUST NOT be added to the [platforms](../specs/platforms/index.md) capability matrix. A MISP instance is not a query engine and MUST NOT grow a `configurations.misp` block on `rule::1.0`.
 
 Connectors register by **connector id** (`misp`), and the connector id is also the integration key in `sharing.toml`. A workspace MAY declare **several blocks** of one integration (for example `[[misp]]` blocks named `misp-internal` and `misp-isac`), each with its own URL, credentials, selection, and TLP ceiling. A block is the unit of destination; the word *target* below means one block.
 
@@ -807,7 +807,7 @@ Dispositions at acceptance, as pinned in [specs/sharing/misp-1.0.md](../specs/sh
 - MISP REST and client: [MISP API documentation](https://github.com/MISP/MISP/blob/2.5/docs/API_Doc.md), [MISP/PyMISP](https://github.com/MISP/PyMISP)
 - Vocabulary `misp` keys consumed here: [specs/vocabularies/format.md](../specs/vocabularies/format.md) (`[[keys]].misp`), [vocabularies/tlp.vocab.toml](../vocabularies/tlp.vocab.toml), [vocabularies/pap.vocab.toml](../vocabularies/pap.vocab.toml)
 - Severity scales without `misp` values, hence the §7.4 translation: [vocabularies/criticality.vocab.toml](../vocabularies/criticality.vocab.toml), [vocabularies/severity.vocab.toml](../vocabularies/severity.vocab.toml), [vocabularies/alert_severity.vocab.toml](../vocabularies/alert_severity.vocab.toml)
-- Analogous target matrix: [specs/platforms.md](../specs/platforms.md), [specs/deployment.md](../specs/deployment.md)
+- Analogous target matrix: [specs/platforms/index.md](../specs/platforms/index.md), [specs/deployment.md](../specs/deployment.md)
 - Reserved RFC number: [specifications#8](https://github.com/OpenTideHQ/specifications/issues/8) (Sysdig / RFC 0004)
 - FIRST TLP: https://www.first.org/tlp/
 - PAP taxonomy: https://www.misp-project.org/taxonomies.html#_pap
