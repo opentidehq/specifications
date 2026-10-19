@@ -129,7 +129,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## platforms 1.2
 
 - Elastic Security (`elastic`) joins the capability matrix as the eighth platform ([RFC 0007](rfcs/0007-elastic-security-platform.md), [specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)). It deploys, and it validates queries live only, through Kibana rule preview plus Elasticsearch checks, for KQL, Lucene, EQL, and ES|QL. It is in the query-validation allowlist, its static-validation bar is `type`, `status`, `query` (except `machine_learning`), and the type object, and it joins the `Nowhere` rows of the external-id table. Its generated-schema `pattern` rejects the canonical `platform::elastic::1.0`, like Splunk's and Carbon Black's.
-- `validate query` is a tenant check on every platform: `--live`, and without it the command refuses.
+- `validate query` is a tenant check on every platform in the query-validation allowlist: `--live`, and without it the command refuses. `crowdstrike` and `harfanglab` still report `supported: false`.
 
 ## platforms 1.1
 
@@ -143,7 +143,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-sentinel 1.1
 
-- Durations (`scheduling.frequency`, `scheduling.lookback`, `alert.suppression`, `grouping.alert.grouping_lookback`): ISO 8601 stays the documented form, and shorthand, single-unit or compound (`30m`, `1h10m`, `1d2h`, `2m30s`), is accepted and converted to ISO 8601 at deploy, with the shorthand grammar of `platform::elastic::1.0` ([opentide#564](https://github.com/OpenTideHQ/opentide/pull/564)). Schema id unchanged.
+- Durations (`scheduling.frequency`, `scheduling.lookback`, `alert.suppression`, `grouping.alert.grouping_lookback`): ISO 8601 stays the documented form, and shorthand, single-unit or compound (`30m`, `1h10m`, `1d2h`, `2m30s`), is accepted and converted to ISO 8601 at deploy, with the shorthand grammar of `platform::elastic::1.0` ([opentide#564](https://github.com/OpenTideHQ/opentide/pull/564) and the opentide 0.16.0 follow-up, which makes shorthand case-sensitive and adds seconds). Schema id unchanged.
 
 ## platform-sentinel 1.0
 
@@ -221,7 +221,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## validation 1.3
 
-- `elastic` joins query validation, live only: Kibana rule preview plus the Elasticsearch checks. The command is `opentide validate query --platform <id> --live` on every platform; without `--live` it refuses and never reports a pass ([RFC 0007](rfcs/0007-elastic-security-platform.md)).
+- `elastic` joins query validation, live only: Kibana rule preview plus the Elasticsearch checks. The command is `opentide validate query --platform <id> --live` on every platform in the query-validation allowlist; without `--live` it refuses and never reports a pass ([RFC 0007](rfcs/0007-elastic-security-platform.md)).
 - The fixture checker applies three Elastic constraint codes (`language`, `esql_source`, `suppression_shape`) to `configurations.elastic` blocks; `fixtures/invalid/rule-elastic-esql-index.yaml` reports all three and is registered under `esql_source`.
 
 ## validation 1.2

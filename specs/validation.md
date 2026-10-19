@@ -87,7 +87,7 @@ Command: `opentide validate query --platform <id> --live`
 | `crowdstrike` | no |
 | `harfanglab` | no |
 
-Requires platform credentials and enabled configuration. Validates deployed or planned rule queries against the live platform API. Query validation is a tenant check on every platform: without `--live` the command MUST refuse and name `--live`, and MUST NOT report a pass. No platform has an offline syntax check; Elastic's query language (KQL, Lucene, EQL, or ES|QL) comes from each rule's block: its `type`, and `language` for the types that take one.
+Requires platform credentials and enabled configuration. Validates deployed or planned rule queries against the live platform API. Query validation is a tenant check on every platform in the query-validation allowlist above: without `--live` the command MUST refuse and name `--live`, and MUST NOT report a pass. `crowdstrike` and `harfanglab` report `supported: false` instead ([platforms](platforms/index.md#query-validation-platforms)). No platform has an offline syntax check; Elastic's query language (KQL, Lucene, EQL, or ES|QL) comes from each rule's block: its `type`, and `language` for the types that take one.
 
 ### Specifications-repo fixture checker
 
@@ -195,7 +195,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.3 | 2026-10-19 | `elastic` joins query validation, live only through Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md)). The command is `validate query --live` on every platform; without `--live` it refuses. The fixture checker applies three Elastic constraint codes (`language`, `esql_source`, `suppression_shape`) to `configurations.elastic` blocks. |
+| 1.3 | 2026-10-19 | `elastic` joins query validation, live only through Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md)). The command is `validate query --live` on every platform in the query-validation allowlist; without `--live` it refuses. The fixture checker applies three Elastic constraint codes (`language`, `esql_source`, `suppression_shape`) to `configurations.elastic` blocks. |
 | 1.2 | 2026-10-19 | `objective::1.1` signal binding codes ([RFC 0011](../rfcs/0011-signal-reuse.md)). The fixture checker proves `signal_entry_mixed`, `invalid_uuid` on `reuse`, and `binding_requires_1_1`. `unresolved_signal`, `self_signal`, `duplicate_signal`, `duplicate_signal_uuid`, and `signal_tlp` are `opentide validate` against the workspace library. |
 | 1.1 | 2026-10-16 | `external_id_in_rule` replaces the generic unknown-key error for legacy external-id keys; full-workspace validation checks every deployment-state shard, orphans included; every `--file` target must match an object; deployment fixture checker codes ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |
 | 1.0 | 2026-09-30 | Fixture checker codes `invalid_reviewed` and `reviewed_not_in_schema` ([RFC 0008](../rfcs/0008-rule-reviewed-date.md)). |

@@ -553,7 +553,7 @@ Validation SHOULD warn, without rejecting the rule, when:
 - [deployment-state.md](../deployment-state.md) — Elastic never writes a shard
 - [validation.md](../validation.md) — schema validation and live query validation
 - [configuration.md](../configuration.md) — platform TOML merge
-- [sentinel-1.0.md](sentinel-1.0.md) — the same duration grammar, with a different `lookback` meaning
+- [sentinel-1.0.md](sentinel-1.0.md) — the same shorthand duration grammar (Sentinel's ISO 8601 form also accepts weeks), with a different `lookback` meaning
 - [RFC 0007](../../rfcs/0007-elastic-security-platform.md) — design, research, and reference test
 
 ## Defaults & overrides

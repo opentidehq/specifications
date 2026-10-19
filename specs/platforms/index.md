@@ -71,7 +71,7 @@ These specs describe the blocks as the engine accepts them today, including ever
 
 `sentinel`, `defender_for_endpoint`, `splunk`, `sentinel_one`, `carbon_black_cloud`, `elastic`
 
-Query validation is a tenant check on every platform: `opentide validate query --live`. Without `--live` the command refuses and names `--live`.
+Query validation is a tenant check on every platform in this allowlist: `opentide validate query --live`. Without `--live` the command refuses and names `--live`.
 
 Excluded: `crowdstrike`, `harfanglab`. Implementations MUST report `supported: false` for those two and MUST NOT invent a passing result.
 
@@ -211,4 +211,4 @@ Vocabulary files are not platform configuration. See [configuration.md](../confi
 | 1.0 | 2026-06-25 | Initial matrix for seven bundled platforms |
 | 1.0 | 2026-09-30 | Field contracts moved to per-platform specs. Static validation, registry load, and deploy are specified separately. Generated JSON Schema is no longer described as the field contract. |
 | 1.1 | 2026-10-16 | Platform blocks carry no external ids. `rule_id`, `rule_id_bundle`, and the `rule_id::<tenant>` loader alias are removed from every block and fail `external_id_in_rule`; Defender, SentinelOne, and CrowdStrike ids live in [deployment state](../deployment-state.md) ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Elastic is recorded as addressed by `metadata.uuid` with no stored id. Platform `schema_id`s stay `::1.0`. |
-| 1.2 | 2026-10-19 | Elastic Security joins the matrix as the eighth platform ([elastic-1.0](elastic-1.0.md), [RFC 0007](../../rfcs/0007-elastic-security-platform.md)): capability row (deploy; live query validation through Kibana rule preview for KQL, Lucene, EQL, and ES\|QL), query-validation allowlist, static-validation bar, `metadata.uuid` identity with no stored id, and its generated-schema `pattern`. `validate query` is a tenant check on every platform (`--live`). |
+| 1.2 | 2026-10-19 | Elastic Security joins the matrix as the eighth platform ([elastic-1.0](elastic-1.0.md), [RFC 0007](../../rfcs/0007-elastic-security-platform.md)): capability row (deploy; live query validation through Kibana rule preview for KQL, Lucene, EQL, and ES\|QL), query-validation allowlist, static-validation bar, `metadata.uuid` identity with no stored id, and its generated-schema `pattern`. `validate query` is a tenant check on every platform in the query-validation allowlist (`--live`). |
