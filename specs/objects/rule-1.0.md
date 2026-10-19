@@ -22,7 +22,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 - `severity` MUST be a valid rule severity vocabulary value (default: `Informational`).
 - `techniques` MUST be a list of ATT&CK technique ids from vocabulary `att&ck` (pin `att&ck::1.1`). The list MAY be empty.
 - `platforms` or `configurations` MUST contain at least one enabled platform block for deployable rules.
-- `detection_model` when present MUST reference a valid objective UUID (`objective::1.0` or `objective::1.1`). That objective is the rule's direct coverage. Indirect coverage of other objectives is derived from signal bindings on `objective::1.1` ([objective-1.1.md](objective-1.1.md), draft). The rule does not gain a second `detection_model`.
+- `detection_model` when present MUST reference either a valid objective UUID or the UUID of a signal defined under an objective (`objective::1.0` or `objective::1.1`). A rule implements a whole objective or one of its signals; both are referenceable by design. A signal reference implements that signal, and the rule's objective is the signal's owning objective. Indirect coverage of other objectives is derived from signal bindings on `objective::1.1` ([objective-1.1.md](objective-1.1.md), draft). A rule has a single `detection_model`.
 - Platform blocks MUST validate against the platform schema identifier declared in each block's `schema` field.
 - `references` MAY be omitted.
 - Registry-backed methods (`deploy`, `validate`, `document`) require a bound opentide registry at runtime — not part of static YAML validation.
@@ -50,7 +50,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 | `platforms` | map[string, object] | no | `{}` | Legacy flat platform dict (prefer `configurations`) |
 | `configurations` | RuleConfigurations | no | null | Typed per-platform configuration blocks |
 | `references` | ObjectReferences | no | null | External and internal references |
-| `detection_model` | string | no | null | Objective UUID this rule implements (`objective::1.0` or `objective::1.1`). Direct coverage only. |
+| `detection_model` | string | no | null | UUID of the objective, or of a signal defined under an objective, that this rule implements (`objective::1.0` or `objective::1.1`) |
 | `response` | RuleResponse | no | null | Alert and response configuration |
 
 ### `response` (RuleResponse)
@@ -112,7 +112,7 @@ Shared block fields and the capability matrix are in [platforms/index.md](../pla
 
 - [metadata.md](../metadata.md) — identity and schema routing
 - [rule-1.1.md](rule-1.1.md) — minor revision with optional `metadata.reviewed`. This revision does not define that field and MUST reject it.
-- [objective-1.0.md](objective-1.0.md) — linked via `detection_model`
+- [objective-1.0.md](objective-1.0.md) — linked via `detection_model` (the objective, or one of its signals)
 - [objective-1.1.md](objective-1.1.md) — same link; `reuse` bindings add indirect coverage (draft)
 - [deployment.md](../deployment.md) — `status` lifecycle and promotion
 - [platforms/index.md](../platforms/index.md) — platform blocks and deploy/validate capabilities
@@ -143,7 +143,7 @@ description: Detects credential access via suspicious process creation
 status: STAGING
 severity: High
 techniques: [T1059]
-detection_model: 00000000-0000-4000-8002-000000000001   # → objective UUID
+detection_model: 00000000-0000-4000-8002-000000000001   # → objective UUID, or a signal UUID under one
 response:
   alert_severity: High
 configurations:
@@ -169,6 +169,7 @@ configurations:
 |---------|--------------|
 | [fixtures/valid/rule-1.0.yaml](../../fixtures/valid/rule-1.0.yaml) | Minimal valid rule with Sentinel configuration |
 | [fixtures/cross-object/rule-references-objective.yaml](../../fixtures/cross-object/rule-references-objective.yaml) | `detection_model` → objective UUID |
+| [fixtures/cross-object/rule-references-signal.yaml](../../fixtures/cross-object/rule-references-signal.yaml) | `detection_model` → signal UUID |
 
 ### Invalid fixtures
 
@@ -183,6 +184,7 @@ configurations:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-10-19 | `detection_model` references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design and implementations always accepted signal UUIDs; the earlier objective-only wording was wrong. |
 | 1.0 | 2026-10-19 | `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage is derived ([RFC 0011](../../rfcs/0011-signal-reuse.md)). |
 | 1.0 | 2026-10-07 | `techniques` is pinned to `att&ck::1.1`. `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-06-25 | Initial exemplar spec from opentide `models/rule.py` |

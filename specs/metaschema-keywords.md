@@ -139,7 +139,7 @@ Configuration keywords reflect merged TOML at `opentide generate schemas` time. 
 
 ## Examples
 
-Rule metaschema binds `detection_model` to the objective model vocabulary. That vocabulary lists objective UUIDs only (`objective::1.0` and `objective::1.1`).
+Rule metaschema binds `detection_model` to the objective model vocabulary. That vocabulary lists every objective UUID (`objective::1.0` and `objective::1.1`) and the UUID of every signal defined under an objective (named `{objective name}::{signal name}`, with `tide.object.parent` set to the objective), because a rule may implement an objective or one of its signals.
 
 ```python
 "detection_model": {"tide.vocab": "objective"}
@@ -157,6 +157,6 @@ Threat schema `threat::1.0` pins `threat.killchain` to `killchain::1.0` via [sch
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.2 | 2026-10-19 | `signal` model vocabulary for `objective::1.1` `reuse` ([RFC 0011](../rfcs/0011-signal-reuse.md)). |
+| 1.2 | 2026-10-19 | `signal` model vocabulary for `objective::1.1` `reuse` ([RFC 0011](../rfcs/0011-signal-reuse.md)). The `objective` vocabulary bound to `detection_model` keeps listing objectives and all their signals. |
 | 1.1 | 2026-06-26 | Versioned `tide.vocab` and schema pin resolution ([RFC 0003](../rfcs/0003-per-key-vocabulary-versioning.md)) |
 | 1.0 | 2026-06-25 | Initial spec from opentide `generation/schema_pipeline.py` and `pydantic_metaschema.py` |

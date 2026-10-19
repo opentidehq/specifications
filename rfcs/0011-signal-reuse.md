@@ -10,7 +10,7 @@
 
 ## Summary
 
-A detection objective (DOM) may incorporate a signal defined on another objective that is already in the repository. That ability is a new objective schema, `objective::1.1`, specified in `specs/objects/objective-1.1.md`. The incorporating entry is a single UUID, completed from the workspace signal library. The signal keeps one UUID and one owning objective. A rule still names a single direct DOM through `detection_model`. Coverage also counts every other DOM that includes that signal, labeled indirect and partial, so one rule covers several DOMs. The YAML key is `reuse`. Normative text is [specs/objects/objective-1.1.md](../specs/objects/objective-1.1.md). `ref` is withdrawn. See [Field name](#field-name).
+A detection objective (DOM) may incorporate a signal defined on another objective that is already in the repository. That ability is a new objective schema, `objective::1.1`, specified in `specs/objects/objective-1.1.md`. The incorporating entry is a single UUID, completed from the workspace signal library. The signal keeps one UUID and one owning objective. A rule still names a single `detection_model`: an objective UUID, or the UUID of a signal defined under an objective. Coverage also counts every other DOM that includes that signal, labeled indirect and partial, so one rule covers several DOMs. The YAML key is `reuse`. Normative text is [specs/objects/objective-1.1.md](../specs/objects/objective-1.1.md). `ref` is withdrawn. See [Field name](#field-name).
 
 ## Motivation
 
@@ -30,8 +30,8 @@ This is the behavior the proposal is built against (opentide at the revision tha
 
 - A signal lives only inside `objective.signals[]`. The spec's optional `parent` is a parent signal UUID ([specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md)).
 - On ingest, the registry copies each signal into the `signal` bucket and **replaces** `parent` with the owning objective UUID (`registry/builder.py`, `indexing/inflight.py`). A repeated signal UUID is last-writer-wins. Object `id-uniqueness` checks `metadata.uuid` only, so two definitions can share a signal UUID without an error.
-- `build_object_vocabularies` inserts those signal UUIDs into the **objective** model vocabulary, named `{objective name}::{signal name}`, with `tide.object.parent` set to the objective. `detection_model` is generated from `tide.vocab: "objective"`, so editor completion offers signal UUIDs for a field that must be an objective UUID.
-- `catalog.coverage_graph` draws a 2-hop graph from the single `detection_model`. A rule is attached to a signal only when something in the relation walker already points `detection_model` at that signal UUID, which authored rules do not do. The usual edge is objective → rule.
+- `build_object_vocabularies` inserts those signal UUIDs into the **objective** model vocabulary, named `{objective name}::{signal name}`, with `tide.object.parent` set to the objective. `detection_model` is generated from `tide.vocab: "objective"`, so editor completion offers objectives and their signals. That is by design: a rule implements a whole objective or one of its signals ([specs/objects/rule-1.0.md](../specs/objects/rule-1.0.md)).
+- `catalog.coverage_graph` draws a 2-hop graph from the single `detection_model`. A rule whose `detection_model` is a signal UUID is attached to that signal. A rule whose `detection_model` is an objective UUID draws the edge objective → rule, and no signal → rule edges.
 - MISP `opentide-relation` on an objective emits `objective.threats[]` only ([specs/sharing/misp-1.0.md](../specs/sharing/misp-1.0.md)). Signal UUIDs are not Tide object identifiers.
 
 There is no content-pack import. An objective is available to the rest of the repo when its YAML is in the workspace object index: a file under `paths.objects.objective`, or an inflight shard that wins over the committed document. That index is the library. A future `share pull` would qualify only after it writes objective files into that tree. Sharing 1.0 has no pull.
@@ -177,7 +177,7 @@ The `objective::1.1` metaschema binds the field. The `objective::1.0` metaschema
 
 The enum is a snapshot from the last `opentide generate schemas`. Validation uses the live index, so a newly imported DOM can be referenced before schemas are regenerated. Completion updates when schemas are regenerated, the same refresh authors already need for new objective UUIDs on `detection_model`.
 
-Signal UUIDs leave the `objective` model vocabulary. After that, `detection_model` completion lists objectives only, which matches the rule spec (the value MUST be an objective UUID).
+Signal UUIDs stay in the `objective` model vocabulary. `detection_model` completion keeps listing objectives and every signal defined under them, because a rule may reference either. The `signal` vocabulary is a second view of the same definitions, for the binding key only. A bound signal is listed once, under its owner, in both vocabularies.
 
 ### Ownership and `parent`
 
@@ -196,15 +196,15 @@ Relation walks follow `owner` for the objective → signal hop (the hop the code
 
 ### Coverage
 
-`detection_model` remains a single objective UUID. Rules do not gain a signal pointer or a list of DOMs. Coverage is derived.
+`detection_model` remains a single UUID: an objective, or a signal defined under an objective. Rules do not gain a list of DOMs. Coverage is derived.
 
-Let D be the objective identified by `rule.detection_model`. If `detection_model` is absent, the rule covers nothing. Let S be `effective_signals(D)`.
+If `detection_model` is absent, the rule covers nothing. When it is an objective UUID, D is that objective and S is `effective_signals(D)`. When it is a signal UUID σ, D is σ's owning objective and S is {σ}: the rule implements that signal, not the rest of D.
 
 A DOM **includes** a signal when that UUID is in its effective set.
 
 | Relation | Rule | Kind |
 |----------|------|------|
-| Covers D | `detection_model` is D | **direct** |
+| Covers D | `detection_model` is D, or a signal D owns | **direct** |
 | Covers another DOM O | O includes at least one signal that is also in S | **indirect** |
 
 Indirect coverage has a reason. Both reasons are required:
@@ -214,7 +214,7 @@ Indirect coverage has a reason. Both reasons are required:
 | `owns` | O is the owner of some signal in S, and O is not D |
 | `shares` | O is not D, O is not that owner, and O includes some signal in S |
 
-A rule implements every signal in S. That is true for a DOM with only local definitions and for a DOM that references foreign signals. Signal → rule edges in the coverage graph use this rule, including the no-reference case, where those edges are mostly absent today.
+A rule implements every signal in S. That is true for a DOM with only local definitions and for a DOM that references foreign signals. Signal → rule edges in the coverage graph use this rule, including the no-reference case, where today they are drawn only for rules that reference a signal directly. A rule that references σ covers D directly but implements σ only; reports SHOULD show that direct cover as scoped to σ.
 
 Indirect coverage is **partial**. It covers the shared signals, not the other DOM's full composition. Diagrams, docs, and explorer output MUST say that it is partial and MUST list the signal UUIDs in `S ∩ effective_signals(O)` plus the reason (`owns` or `shares`). They MUST NOT present the indirect DOM as a second `detection_model`.
 
@@ -348,6 +348,8 @@ The credential-access threat is partial, via that signal. Remote service logon i
 
 A rule with `detection_model` pointing at Credential Access covers Credential Access directly and Lateral Movement indirectly with reason `shares`, via the same signal only. It does not implement Remote service logon.
 
+A rule with `detection_model: 00000000-0000-4000-8099-000000000001` (the shared signal itself) covers Credential Access directly, scoped to that signal, and Lateral Movement indirectly with reason `shares`, via the same signal. It implements no other signal of either DOM.
+
 ### Fixtures (spec PR)
 
 | Fixture | Expectation |
@@ -366,9 +368,9 @@ Workspace-level cases (opentide tests, not a second copy of the object model in 
 |------|----------------------|
 | `specs/objects/objective-1.1.md` | New normative spec. `schema_id: objective::1.1`. Definition or binding. Library, owner, TLP, effective set. |
 | [specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md) | Unchanged field tables. History row and relationship pointer: bindings are `objective::1.1`. Status stays `normative`. |
-| [specs/objects/rule-1.0.md](../specs/objects/rule-1.0.md) | `detection_model` is the direct DOM. The UUID may be `objective::1.0` or `objective::1.1`. Indirect DOMs are derived. Field table unchanged. |
+| [specs/objects/rule-1.0.md](../specs/objects/rule-1.0.md) | `detection_model` names the direct DOM, or a signal and its owning DOM. The objective may be `objective::1.0` or `objective::1.1`. Indirect DOMs are derived. Field table unchanged. |
 | [specs/validation.md](../specs/validation.md) | Codes above. A binding on `objective::1.0` fails schema. Checker vs `opentide validate` split. |
-| [specs/metaschema-keywords.md](../specs/metaschema-keywords.md) | `signal` model vocabulary. Binding key on the 1.1 metaschema only. Objective vocabulary lists both revisions, objectives only. |
+| [specs/metaschema-keywords.md](../specs/metaschema-keywords.md) | `signal` model vocabulary. Binding key on the 1.1 metaschema only. Objective vocabulary lists both revisions, with every signal defined under them. |
 | [specs/workspace.md](../specs/workspace.md) | Artifact rows `objective.1.1.schema.json` and `objective.1.1.template.yaml`. |
 | [schemas/pins/objective.toml](../schemas/pins/objective.toml) | `["objective::1.1"]` copies the `objective::1.0` pins. |
 | [specs/sharing/misp-1.0.md](../specs/sharing/misp-1.0.md) | Objective relations include owners of bound signals. `schema` is still emitted verbatim, so the value may be `objective::1.1`. |
@@ -384,7 +386,7 @@ File in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide) after this
 
 - `models/objective.py` — `objective::1.1` model beside `objective::1.0`; migration rewrites only `metadata.schema`
 - `registry/builder.py` and `indexing/inflight.py` — `owner` vs authored `parent`; reject duplicate definition UUIDs
-- `indexing/object_vocab.py` — `signal` vocabulary; drop signal rows from `objective`
+- `indexing/object_vocab.py` — `signal` vocabulary; signal rows stay in `objective`
 - `generation/framework.py` — `parents` / `childs` use `owner`
 - `documentation/catalog.py` — coverage graph and `rules_for_signal`
 - `export/explorer_export.py` — relation counts
@@ -415,7 +417,7 @@ File in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide) after this
 
 **Local overlays on a reference** (severity, examples). Set aside for this revision. Two severities for one UUID is a second signal. A later revision can add overlays if a consumer has a real case.
 
-**Keep signal UUIDs inside the objective vocabulary.** Set aside. `detection_model` would keep offering signals. The rule spec already rejects those values. A separate `signal` vocabulary is what the binding key completes against.
+**Move signal UUIDs out of the objective vocabulary.** Rejected. A rule referencing a signal is part of the foundation model: `detection_model` is meant to offer every objective and every signal under it. The binding key completes against a separate `signal` vocabulary, which lists definitions only and leaves `detection_model` as it is.
 
 **YAML key `ref`.** Withdrawn. It names a pointer, which is the mechanism, and it sits next to `references` (URLs on the objective) and `opentide-relation` without saying that the author is reusing a signal. Candidates are in [Field name](#field-name).
 

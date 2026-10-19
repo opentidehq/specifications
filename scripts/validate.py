@@ -163,6 +163,7 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "invalid" / "threat-actor-wrong-stage.yaml",
         FIXTURES / "invalid" / "threat-surface-unscoped.yaml",
         FIXTURES / "cross-object" / "rule-references-objective.yaml",
+        FIXTURES / "cross-object" / "rule-references-signal.yaml",
         FIXTURES / "inflight" / "example-shard.json",
         FIXTURES / "deployment" / "valid" / "00000000-0000-4000-8003-000000000010.json",
         FIXTURES / "platforms" / "sentinel.yaml",
