@@ -27,6 +27,7 @@
 - specs/platforms/carbon-black-cloud-1.0.md (schema_id: platform::carbon_black_cloud::1.0)
 - specs/platforms/crowdstrike-1.0.md (schema_id: platform::crowdstrike::1.0)
 - specs/platforms/harfanglab-1.0.md (schema_id: platform::harfanglab::1.0)
+- specs/platforms/elastic-1.0.md (schema_id: platform::elastic::1.0)
 - specs/validation.md
 - specs/sharing.md
 - specs/sharing/misp-1.0.md (schema_id: sharing::misp::1.0)

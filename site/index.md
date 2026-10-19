@@ -67,6 +67,6 @@ flowchart LR
 
 ## Full index
 
-The [spec index](SPECS.md) lists every active spec, its version, and status. Core infrastructure specs cover [workspace layout](specs/workspace.md), [configuration](specs/configuration.md), [deployment](specs/deployment.md), [platforms](specs/platforms/index.md), [metaschema keywords](specs/metaschema-keywords.md), and [vocabularies](specs/vocabularies/format.md). The seven `platform::<identifier>::1.0` field contracts live under [Platforms](specs/platforms/index.md).
+The [spec index](SPECS.md) lists every active spec, its version, and status. Core infrastructure specs cover [workspace layout](specs/workspace.md), [configuration](specs/configuration.md), [deployment](specs/deployment.md), [platforms](specs/platforms/index.md), [metaschema keywords](specs/metaschema-keywords.md), and [vocabularies](specs/vocabularies/format.md). The eight `platform::<identifier>::1.0` field contracts live under [Platforms](specs/platforms/index.md).
 
 Changes follow the process in [Governance](GOVERNANCE.md).

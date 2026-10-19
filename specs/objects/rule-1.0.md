@@ -105,6 +105,7 @@ Typed optional blocks keyed by platform identifier:
 | `crowdstrike` | CrowdstrikeConfig | `platform::crowdstrike::1.0` | [crowdstrike-1.0.md](../platforms/crowdstrike-1.0.md) |
 | `harfanglab` | HarfangLabConfig | `platform::harfanglab::1.0` | [harfanglab-1.0.md](../platforms/harfanglab-1.0.md) |
 | `carbon_black_cloud` | CarbonBlackConfig | `platform::carbon_black_cloud::1.0` | [carbon-black-cloud-1.0.md](../platforms/carbon-black-cloud-1.0.md) |
+| `elastic` | ElasticConfig | `platform::elastic::1.0` | [elastic-1.0.md](../platforms/elastic-1.0.md) |
 
 Shared block fields and the capability matrix are in [platforms/index.md](../platforms/index.md). Each link above is the field contract for that block.
 
@@ -170,6 +171,7 @@ configurations:
 | [fixtures/valid/rule-1.0.yaml](../../fixtures/valid/rule-1.0.yaml) | Minimal valid rule with Sentinel configuration |
 | [fixtures/cross-object/rule-references-objective.yaml](../../fixtures/cross-object/rule-references-objective.yaml) | `detection_model` → objective UUID |
 | [fixtures/cross-object/rule-references-signal.yaml](../../fixtures/cross-object/rule-references-signal.yaml) | `detection_model` → signal UUID |
+| [fixtures/valid/rule-elastic-1.0.yaml](../../fixtures/valid/rule-elastic-1.0.yaml) | Elastic Security custom query block with every shared key set |
 
 ### Invalid fixtures
 
@@ -179,11 +181,13 @@ configurations:
 | [fixtures/invalid/rule-unknown-schema.yaml](../../fixtures/invalid/rule-unknown-schema.yaml) | Unregistered `metadata.schema` |
 | [fixtures/invalid/rule-bad-uuid.yaml](../../fixtures/invalid/rule-bad-uuid.yaml) | Non-UUIDv4 `metadata.uuid` |
 | [fixtures/invalid/rule-1.0-reviewed.yaml](../../fixtures/invalid/rule-1.0-reviewed.yaml) | `metadata.reviewed` on `rule::1.0` |
+| [fixtures/invalid/rule-elastic-esql-index.yaml](../../fixtures/invalid/rule-elastic-esql-index.yaml) | Elastic `esql` block with `index`, `language`, and threshold-style suppression (`esql_source`, `language`, `suppression_shape`) |
 
 ## History
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-10-19 | `configurations.elastic` (`ElasticConfig`, `platform::elastic::1.0`, [elastic-1.0.md](../platforms/elastic-1.0.md)) is added ([RFC 0007](../../rfcs/0007-elastic-security-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-10-19 | `detection_model` references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design and implementations always accepted signal UUIDs; the earlier objective-only wording was wrong. |
 | 1.0 | 2026-10-19 | `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage is derived ([RFC 0011](../../rfcs/0011-signal-reuse.md)). |
 | 1.0 | 2026-10-07 | `techniques` is pinned to `att&ck::1.1`. `schema_id` stays `rule::1.0`. |

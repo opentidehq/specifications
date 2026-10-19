@@ -546,6 +546,59 @@ def validate_objective(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[Ch
     return errors
 
 
+_ELASTIC_NO_LANGUAGE = frozenset({"eql", "esql", "machine_learning"})
+_ELASTIC_NO_SOURCE = frozenset({"esql", "machine_learning"})
+
+
+def validate_elastic_block(block: dict[str, Any]) -> list[CheckError]:
+    """The three platform::elastic::1.0 constraint codes the invalid fixture exercises.
+
+    `language`, `esql_source`, and `suppression_shape` (specs/platforms/elastic-1.0.md).
+    The checker reports the platform's own code names, so a fixture fails with the
+    code opentide reports. The other Elastic codes are left to opentide.
+    """
+    errors: list[CheckError] = []
+    base = "configurations.elastic"
+    rule_type = block.get("type")
+    if rule_type in _ELASTIC_NO_LANGUAGE and block.get("language"):
+        errors.append(
+            CheckError("language", f"language MUST NOT be set for type {rule_type}", f"{base}.language")
+        )
+    if rule_type in _ELASTIC_NO_SOURCE and (
+        block.get("index") or block.get("data_view_id") or block.get("filters")
+    ):
+        errors.append(
+            CheckError(
+                "esql_source",
+                f"type {rule_type} MUST NOT set index, data_view_id, or filters",
+                base,
+            )
+        )
+    suppression = block.get("suppression")
+    if suppression is not None:
+        group_by = suppression.get("group_by") if isinstance(suppression, dict) else None
+        if not isinstance(suppression, dict):
+            valid = False
+        elif rule_type == "threshold":
+            valid = bool(suppression.get("duration")) and not group_by
+        else:
+            valid = (
+                isinstance(group_by, list)
+                and 1 <= len(group_by) <= 3
+                and len(set(map(str, group_by))) == len(group_by)
+                and all(isinstance(item, str) and item for item in group_by)
+            )
+        if not valid:
+            errors.append(
+                CheckError(
+                    "suppression_shape",
+                    "threshold needs duration and no group_by; other types need 1-3 distinct group_by fields",
+                    f"{base}.suppression",
+                )
+            )
+    return errors
+
+
 def validate_rule(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[CheckError]:
     errors: list[CheckError] = []
     _require_non_empty_string(doc.get("name"), code="missing_field", path="name", errors=errors)
@@ -561,6 +614,9 @@ def validate_rule(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[CheckEr
     _require_non_empty_string(
         doc.get("description"), code="missing_field", path="description", errors=errors
     )
+    configurations = doc.get("configurations")
+    if isinstance(configurations, dict) and isinstance(configurations.get("elastic"), dict):
+        errors.extend(validate_elastic_block(configurations["elastic"]))
     return errors
 
 
@@ -615,4 +671,5 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "objective-signal-bad-uuid.yaml": "invalid_uuid",
     "objective-1.0-signal-binding.yaml": "binding_requires_1_1",
     "objective-effort-string.yaml": "invalid_effort",
+    "rule-elastic-esql-index.yaml": "esql_source",
 }

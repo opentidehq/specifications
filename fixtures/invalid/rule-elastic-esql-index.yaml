@@ -1,0 +1,25 @@
+# An ES|QL block that sets index and language, and threshold-style suppression.
+# Expected constraint codes: esql_source, language, suppression_shape.
+name: ES|QL rule with an index
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000024
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+description: |
+  FROM selects the data of an ES|QL rule, so index and language are invalid,
+  and suppression without group_by is valid only on a threshold rule.
+response:
+  alert_severity: Low
+configurations:
+  elastic:
+    enabled: true
+    schema: platform::elastic::1.0
+    status: STAGING
+    type: esql
+    language: kuery
+    query: FROM logs-* | LIMIT 10
+    index: [logs-*]
+    suppression: {duration: 1h}

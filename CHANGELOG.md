@@ -44,12 +44,14 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
+- `configurations.elastic` (`ElasticConfig`, `platform::elastic::1.0`) is added ([RFC 0007](rfcs/0007-elastic-security-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - Correct `detection_model`: it references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design; a signal reference implements that signal, and its owning objective is the rule's objective. The objective-only wording was wrong. New fixture `fixtures/cross-object/rule-references-signal.yaml`.
 - `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage comes from `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - Minor MDR revision `rule::1.1` with optional `metadata.reviewed` ([RFC 0008](rfcs/0008-rule-reviewed-date.md)). `rule::1.0` remains normative. A consumer treats `rule::1.0`, a missing `reviewed`, or a `reviewed` instant older than a supplied window as unreviewed.
 
 ## rule 1.0
 
+- `configurations.elastic` (`ElasticConfig`, `platform::elastic::1.0`) is added ([RFC 0007](rfcs/0007-elastic-security-platform.md)). Additive; every existing rule stays valid and `schema_id` stays `rule::1.0`.
 - Correct `detection_model`: it references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design; a signal reference implements that signal, and its owning objective is the rule's objective. The objective-only wording was wrong. New fixture `fixtures/cross-object/rule-references-signal.yaml`.
 - `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage comes from `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - Initial normative spec bootstrapped from opentide `models/rule.py` (exemplar template).
@@ -124,6 +126,11 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
 
+## platforms 1.2
+
+- Elastic Security (`elastic`) joins the capability matrix as the eighth platform ([RFC 0007](rfcs/0007-elastic-security-platform.md), [specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)). It deploys, and it validates queries live only, through Kibana rule preview plus Elasticsearch checks, for KQL, Lucene, EQL, and ES|QL. It is in the query-validation allowlist, its static-validation bar is `type`, `status`, `query` (except `machine_learning`), and the type object, and it joins the `Nowhere` rows of the external-id table. Its generated-schema `pattern` rejects the canonical `platform::elastic::1.0`, like Splunk's and Carbon Black's.
+- `validate query` is a tenant check on every platform: `--live`, and without it the command refuses.
+
 ## platforms 1.1
 
 - Platform blocks carry no external ids. `rule_id`, `rule_id_bundle`, and the `rule_id::<tenant>` loader alias are removed from every block and fail `external_id_in_rule`. Defender for Endpoint, SentinelOne, and CrowdStrike ids live in deployment state ([RFC 0010](rfcs/0010-deployment-external-ids.md)). Elastic ([RFC 0007](rfcs/0007-elastic-security-platform.md)) addresses rules by `metadata.uuid` and never stores an external id. Platform `schema_id`s stay `::1.0`.
@@ -133,6 +140,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Field tables mark every key `yes` or `optional` for static validation. Exclusion `query` is required (an empty string is accepted). Sentinel, SentinelOne, CrowdStrike, and HarfangLab loaders drop unmapped keys; Defender, Splunk, and Carbon Black reject an unknown key at the block root. The Splunk loader drops unknown keys inside `scheduling`. Generated JSON Schema defaults `schema` to the legacy identifier, and the Splunk and Carbon Black overlays reject the canonical `platform::<identifier>::1.0` with a legacy `pattern`.
 - Per-platform field contracts for the seven bundled blocks (`platform::<identifier>::1.0`). Static validation, registry load, and deploy are specified separately. Generated JSON Schema is not the field contract.
 - Initial capability matrix for seven bundled platforms.
+
+## platform-sentinel 1.1
+
+- Durations (`scheduling.frequency`, `scheduling.lookback`, `alert.suppression`, `grouping.alert.grouping_lookback`): ISO 8601 stays the documented form, and shorthand, single-unit or compound (`30m`, `1h10m`, `1d2h`, `2m30s`), is accepted and converted to ISO 8601 at deploy, with the shorthand grammar of `platform::elastic::1.0` ([opentide#564](https://github.com/OpenTideHQ/opentide/pull/564)). Schema id unchanged.
 
 ## platform-sentinel 1.0
 
@@ -182,6 +193,14 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - `platform::harfanglab::1.0`. Sigma or YARA rule. Identity is `metadata.uuid`. No query validator. Deploy requires one of `sigma` or `yara`; validation does not.
 
+## platform-elastic 1.0
+
+- `platform::elastic::1.0` ([RFC 0007](rfcs/0007-elastic-security-platform.md), [specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)). Elastic Security detection rule through the Kibana detection engine API: seven rule types (`query`, `eql`, `esql`, `threshold`, `new_terms`, `threat_match`, `machine_learning`), grouped author blocks for scheduling, severity, risk, suppression, guides, exceptions, overrides, and actions, and fourteen constraint codes. `status` is required on the block. Identity is `metadata.uuid` as the Kibana `rule_id`; nothing is stored.
+- Durations are single-unit shorthand (`5m`), compound shorthand (`1h10m`, `1d2h`, `2m30s`; units in `d`, `h`, `m`, `s` order, each at most once, lower case), or ISO 8601, all equivalent; Kibana receives a single-unit value ([opentide#564](https://github.com/OpenTideHQ/opentide/pull/564)).
+- `kill-process` and `suspend-process` without `field` compile to `config: {field: process.entity_id, overwrite: true}`, because Kibana rejects them without `config` ([opentide#562](https://github.com/OpenTideHQ/opentide/pull/562)).
+- Live query validation through Kibana rule preview, and the Elasticsearch checks (ES|QL pre-flight, aggregation, timestamp, and indicator match fields) before every deploy. No offline check.
+- Fixtures `fixtures/valid/rule-elastic-1.0.yaml`, `fixtures/invalid/rule-elastic-esql-index.yaml`, and `fixtures/platforms/elastic.yaml`.
+
 ## sharing 1.1
 
 - `.opentide/states/` holds sharing's regenerable cache and deployment's committed shards. A future subsystem states whether its state is a cache or an authoritative record and whether it is committed ([RFC 0010](rfcs/0010-deployment-external-ids.md)). Ledger fields are unchanged.
@@ -199,6 +218,11 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.3
+
+- `elastic` joins query validation, live only: Kibana rule preview plus the Elasticsearch checks. The command is `opentide validate query --platform <id> --live` on every platform; without `--live` it refuses and never reports a pass ([RFC 0007](rfcs/0007-elastic-security-platform.md)).
+- The fixture checker applies three Elastic constraint codes (`language`, `esql_source`, `suppression_shape`) to `configurations.elastic` blocks; `fixtures/invalid/rule-elastic-esql-index.yaml` reports all three and is registered under `esql_source`.
 
 ## validation 1.2
 

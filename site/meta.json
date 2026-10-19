@@ -25,6 +25,7 @@
     "specs/platforms/carbon-black-cloud-1.0",
     "specs/platforms/crowdstrike-1.0",
     "specs/platforms/harfanglab-1.0",
+    "specs/platforms/elastic-1.0",
     "---Objects---",
     "specs/objects/threat-1.0",
     "specs/objects/objective-1.0",

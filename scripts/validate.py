@@ -140,6 +140,8 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "valid" / "rule-1.1-unreviewed.yaml",
         FIXTURES / "invalid" / "rule-reviewed-bad-date.yaml",
         FIXTURES / "invalid" / "rule-1.0-reviewed.yaml",
+        FIXTURES / "valid" / "rule-elastic-1.0.yaml",
+        FIXTURES / "invalid" / "rule-elastic-esql-index.yaml",
         FIXTURES / "valid" / "threat-1.0.yaml",
         FIXTURES / "valid" / "objective-1.0.yaml",
         FIXTURES / "valid" / "objective-1.1.yaml",
@@ -175,6 +177,7 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "platforms" / "harfanglab-sigma.yaml",
         FIXTURES / "platforms" / "harfanglab-yara.yaml",
         FIXTURES / "platforms" / "carbon-black-cloud.yaml",
+        FIXTURES / "platforms" / "elastic.yaml",
     ]
     for path in required:
         if not path.is_file():

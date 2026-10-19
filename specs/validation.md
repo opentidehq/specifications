@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.2"
+version: "1.3"
 schema_id: null
 status: normative
 supersedes: null
@@ -74,7 +74,7 @@ In `full` scope, validation MUST read every `*.json` file under `.opentide/state
 
 ### Query validation
 
-Command: `opentide validate query --platform <id>`
+Command: `opentide validate query --platform <id> --live`
 
 | Platform | Supported |
 |----------|-----------|
@@ -83,10 +83,11 @@ Command: `opentide validate query --platform <id>`
 | `splunk` | yes |
 | `sentinel_one` | yes |
 | `carbon_black_cloud` | yes |
+| `elastic` | yes, live only: Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md#query-validation)) |
 | `crowdstrike` | no |
 | `harfanglab` | no |
 
-Requires platform credentials and enabled configuration. Validates deployed or planned rule queries against the live platform API.
+Requires platform credentials and enabled configuration. Validates deployed or planned rule queries against the live platform API. Query validation is a tenant check on every platform: without `--live` the command MUST refuse and name `--live`, and MUST NOT report a pass. No platform has an offline syntax check; Elastic's query language (KQL, Lucene, EQL, or ES|QL) comes from each rule's block: its `type`, and `language` for the types that take one.
 
 ### Specifications-repo fixture checker
 
@@ -116,6 +117,7 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/invalid/objective-signal-entry-mixed.yaml](../fixtures/invalid/objective-signal-entry-mixed.yaml) | `signal_entry_mixed` |
 | [fixtures/invalid/objective-signal-bad-uuid.yaml](../fixtures/invalid/objective-signal-bad-uuid.yaml) | `invalid_uuid` |
 | [fixtures/invalid/objective-1.0-signal-binding.yaml](../fixtures/invalid/objective-1.0-signal-binding.yaml) | `binding_requires_1_1` |
+| [fixtures/invalid/rule-elastic-esql-index.yaml](../fixtures/invalid/rule-elastic-esql-index.yaml) | `esql_source` (also `language` and `suppression_shape`) |
 | [fixtures/sharing/invalid/unknown-distribution.toml](../fixtures/sharing/invalid/unknown-distribution.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/legacy-targets-table.toml](../fixtures/sharing/invalid/legacy-targets-table.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/duplicate-name.toml](../fixtures/sharing/invalid/duplicate-name.toml) | `duplicate_name` |
@@ -140,6 +142,8 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 Deployment fixtures (`scripts/deployment_state_fixtures.py`) are checked against [schemas/deployment.state.1.0.schema.json](../schemas/deployment.state.1.0.schema.json) plus the filename rules the schema cannot see. Each invalid shard fixture is checked under the shard filename the checker assigns to it (a uuid that differs from `object_uuid` for `uuid-mismatch.json`, the uppercase spelling for `noncanonical-uuid.json`, the valid name otherwise). The valid shard must be byte-identical to writer output, and no rule fixture in `fixtures/valid/`, `fixtures/platforms/`, or `fixtures/cross-object/` may carry a legacy external-id key.
 
 Sharing fixtures (`scripts/sharing_fixtures.py`) also prove the merge rule: [override.toml](../fixtures/sharing/valid/override.toml) merged by `name` onto [sharing.toml](../fixtures/sharing/valid/sharing.toml) MUST equal [merged.toml](../fixtures/sharing/valid/merged.toml).
+
+On a rule's `configurations.elastic` block the checker applies three of the [Elastic constraint codes](platforms/elastic-1.0.md#constraints), the ones the invalid Elastic fixture exercises: `language`, `esql_source`, and `suppression_shape`. They are the platform's own codes, so the checker and `opentide validate` report the same name. The other Elastic codes, and every other platform block, are left to opentide.
 
 A packed semicolon string that happens to start with a valid token MUST still fail `packed_vocab_string`. Accepting only the first token is lossy and non-compliant.
 
@@ -191,6 +195,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.3 | 2026-10-19 | `elastic` joins query validation, live only through Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md)). The command is `validate query --live` on every platform; without `--live` it refuses. The fixture checker applies three Elastic constraint codes (`language`, `esql_source`, `suppression_shape`) to `configurations.elastic` blocks. |
 | 1.2 | 2026-10-19 | `objective::1.1` signal binding codes ([RFC 0011](../rfcs/0011-signal-reuse.md)). The fixture checker proves `signal_entry_mixed`, `invalid_uuid` on `reuse`, and `binding_requires_1_1`. `unresolved_signal`, `self_signal`, `duplicate_signal`, `duplicate_signal_uuid`, and `signal_tlp` are `opentide validate` against the workspace library. |
 | 1.1 | 2026-10-16 | `external_id_in_rule` replaces the generic unknown-key error for legacy external-id keys; full-workspace validation checks every deployment-state shard, orphans included; every `--file` target must match an object; deployment fixture checker codes ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |
 | 1.0 | 2026-09-30 | Fixture checker codes `invalid_reviewed` and `reviewed_not_in_schema` ([RFC 0008](../rfcs/0008-rule-reviewed-date.md)). |
