@@ -69,6 +69,7 @@
 - rfcs/0007-elastic-security-platform.md
 - rfcs/0008-rule-reviewed-date.md
 - rfcs/0010-deployment-external-ids.md
+- rfcs/0012-rule-document-shape.md
 
 ## Agent skills
 

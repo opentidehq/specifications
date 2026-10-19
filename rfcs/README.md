@@ -25,6 +25,7 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0008](0008-rule-reviewed-date.md) | Optional review date on detection rules | draft |
 | [0009](0009-machine-readable-vocabulary-contract.md) | A machine-readable vocabulary contract | draft |
 | [0010](0010-deployment-external-ids.md) | Deployment external ids | accepted |
+| [0012](0012-rule-document-shape.md) | Rules should read like the other objects | draft |
 
 ## Numbering
 
