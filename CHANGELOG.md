@@ -4,7 +4,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## versioning 1.1
 
-- Every supported schema revision works for validation, deployment, documentation, export, query checks, promotion, sharing, and editor validation. A missing schema is an error. Migration is explicit and does not change `metadata.version`.
+- Every supported schema revision works for validation, deployment, documentation, export, query checks, promotion, sharing, and editor validation. A missing schema is an error. Migration is explicit and does not change `metadata.version` ([specifications#27](https://github.com/OpenTideHQ/specifications/pull/27); implementation gap: [opentide#394](https://github.com/OpenTideHQ/opentide/issues/394)).
 
 ## versioning 1.0
 

@@ -12,7 +12,7 @@ supersedes: null
 
 `metadata.schema` says which shape an object has. `metadata.version` says how that object's content has changed. They are not interchangeable.
 
-A workspace may contain more than one shape of the same object at once (`rule::1.0` next to `rule::2.0`, `threat::1.0` next to a later threat revision). Validation, deployment, and every other feature MUST follow the shape the file declares. Supporting a revision means the whole product can read it, not only the schema check.
+A workspace may contain more than one shape of the same object at once (`rule::1.0` next to `rule::1.1`, and the same for any later revision of any family). Validation, deployment, and every other feature MUST follow the shape the file declares. Supporting a revision means the whole product can read it, not only the schema check.
 
 ## Requirements
 
@@ -68,6 +68,7 @@ When a new revision ships, the previous one stays registered beside it. Generati
 - [metadata.md](metadata.md) — `metadata.schema` and `metadata.version`
 - [validation.md](validation.md) — the schema check is one consumer of this contract
 - [deployment.md](deployment.md) — deployment is another; it uses the declared revision's fields
+- [sharing.md](sharing.md) — sharing is another; it carries the document as declared
 - [workspace.md](workspace.md) — where schemas and templates are written
 - Object specs under `objects/` — one spec per revision
 
@@ -78,13 +79,14 @@ Path defaults live in bundled `paths.toml`. Clients MAY override paths via [conf
 ## Examples
 
 - A rule on `rule::1.0`: [fixtures/valid/rule-1.0.yaml](../fixtures/valid/rule-1.0.yaml)
+- A rule on `rule::1.1`: [fixtures/valid/rule-1.1.yaml](../fixtures/valid/rule-1.1.yaml)
 - An unknown identifier: [fixtures/invalid/rule-unknown-schema.yaml](../fixtures/invalid/rule-unknown-schema.yaml)
 
-A workspace that holds both of those rules, once a second rule revision exists, validates each against its own identifier and deploys each from the platform block that revision defines.
+A workspace that holds both valid rules validates each against its own identifier: the `rule::1.1` file may carry `metadata.reviewed`, the `rule::1.0` file may not. It deploys each from the platform block its revision defines (`configurations.<platform>` for both).
 
 ## History
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.1 | 2026-09-30 | Every feature follows `metadata.schema`, not only validation. Missing schema is an error. Migration is explicit and does not change `metadata.version`. |
+| 1.1 | 2026-10-19 | Every feature follows `metadata.schema`, not only validation. Missing schema is an error. Migration is explicit and does not change `metadata.version` ([specifications#27](https://github.com/OpenTideHQ/specifications/pull/27)). |
 | 1.0 | 2026-06-25 | Initial spec bootstrapped from opentide `SCHEMA_REVISION.md` |
