@@ -123,7 +123,7 @@ If the same platform appears under both `configurations` and `platforms`, migrat
 
 ### Status outside deploy
 
-On `rule::2.0` a rule matches a sharing block's `rule_statuses` when at least one enabled platform block has a status in that list. A rule with no enabled block matches nothing. Generated documentation shows the status of each platform block instead of one rule status. `rule::1.0` and `rule::1.1` keep using the root `status` for both until they are migrated.
+On `rule::2.0` a rule matches a sharing block's `rule_statuses` when at least one enabled platform block has a status in that list. A rule with no enabled block matches nothing. Generated documentation shows the status of each platform block instead of one rule status. Sharing already applies the enabled-block match to `rule::1.0` and `rule::1.1`, and falls back to the root `status` only when no enabled block has one ([sharing.md](../specs/sharing.md) 1.2, opentide#583). Generated documentation keeps showing the root `status` of a 1.x file until it is migrated.
 
 ### Other specs that name rule fields
 
@@ -155,7 +155,7 @@ Leaving the fields on the root and only renaming `configurations` keeps rules as
 ## Unresolved questions
 
 - New rules should be born as `rule::2.0` once that model exists. Existing files stay on whatever they declare. Confirm that `opentide new` should follow the newest revision.
-- Confirm the sharing match on `rule::2.0`: any enabled platform block with a status in `rule_statuses` (proposed), or every enabled block.
+- Confirm the sharing match: any enabled platform block with a status in `rule_statuses` (proposed, and what sharing 1.2 does for 1.x files), or every enabled block. Also decide whether a block for a platform the repository has not enabled counts; deploy skips such blocks, sharing 1.2 counts them.
 - `rule.objective` also holds signal UUIDs, which the name hides. Confirm the name, or pick one that covers both (for example `rule.implements`).
 - `rule::1.0` and `rule::1.1` should be marked deprecated only after both shapes load and a migrate command exists. Until then they stay normative. Deprecated means "don't write new 1.x files", not "1.x files stop validating".
 

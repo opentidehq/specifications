@@ -153,6 +153,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-sentinel 1.1
 
+- `tactics`: Stealth, Defense Impairment (ATT&CK v19), and the ICS Evasion tactic deploy as `DefenseEvasion`. A stage with no Sentinel tactic is dropped ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)).
 - Durations (`scheduling.frequency`, `scheduling.lookback`, `alert.suppression`, `grouping.alert.grouping_lookback`): ISO 8601 stays the documented form, and shorthand, single-unit or compound (`30m`, `1h10m`, `1d2h`, `2m30s`), is accepted and converted to ISO 8601 at deploy, with the shorthand grammar of `platform::elastic::1.0` ([opentide#564](https://github.com/OpenTideHQ/opentide/pull/564) and the opentide 0.16.0 follow-up, which makes shorthand case-sensitive and adds seconds). Schema id unchanged.
 
 ## platform-sentinel 1.0
@@ -211,6 +212,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - `kill-process` and `suspend-process` without `field` compile to `config: {field: process.entity_id, overwrite: true}`, because Kibana rejects them without `config` ([opentide#562](https://github.com/OpenTideHQ/opentide/pull/562)).
 - Live query validation through Kibana rule preview, and the Elasticsearch checks (ES|QL pre-flight, aggregation, timestamp, and indicator match fields) before every deploy. No offline check.
 - Fixtures `fixtures/valid/rule-elastic-1.0.yaml`, `fixtures/invalid/rule-elastic-esql-index.yaml`, and `fixtures/platforms/elastic.yaml`.
+
+## sharing 1.2
+
+- `rule_statuses` matches the statuses of a rule's enabled platform blocks (`configurations.<platform>` with `enabled: true`), which deploy uses and promotion rewrites. The root `status` is matched only when no enabled block has one ([opentide#583](https://github.com/OpenTideHQ/opentide/issues/583)).
 
 ## sharing 1.1
 
