@@ -51,7 +51,7 @@ version = "1.0"
 [[keys]]
 name = "NewStage"
 version = "1.1"
-# removed = "2.0"  # optional; excludes key from pins below 2.0
+# removed = "2.0"  # optional; excludes key from contracts at or above 2.0
 ```
 
 #### Bump rules (per key)

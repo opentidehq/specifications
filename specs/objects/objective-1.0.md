@@ -58,7 +58,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 | `composition` | ObjectiveComposition | yes | — | Nested composition (same semantics as top-level) |
 | `investment` | string | no | null | Investment level |
 | `threats` | list[string] | no | null | Threat vector UUIDs |
-| `mitre_attack` | list[string] | no | null | ATT&CK technique ids (`att&ck::1.1`) |
+| `mitre_attack` | list[string] | no | null | ATT&CK technique ids (`att&ck::1.2`) |
 
 ### `signals[]` (DetectionSignal)
 
@@ -157,6 +157,7 @@ objective:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-10-19 | `mitre_attack` is pinned to `att&ck::1.2` (ATT&CK 20.0). Additive: every `att&ck::1.1` technique still validates ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)). `schema_id` stays `objective::1.0`. |
 | 1.0 | 2026-10-19 | Signal bindings are [`objective::1.1`](objective-1.1.md) ([RFC 0011](../../rfcs/0011-signal-reuse.md)). Field tables unchanged. |
 | 1.0 | 2026-10-19 | `signals[].effort` is an integer implementation-effort score (1–10) and is not pinned to the `efforts` vocabulary, whose four named categories no integer could match ([specifications#42](https://github.com/OpenTideHQ/specifications/issues/42)). `schema_id` stays `objective::1.0`. |
 | 1.0 | 2026-10-06 | Technique list key is `mitre_attack`, pinned to `att&ck::1.1`. Signal `severity` uses `alert_severity::1.0`. `signals[].data.logsources` names workspace `visibility.toml` entries. `schema_id` stays `objective::1.0`. |

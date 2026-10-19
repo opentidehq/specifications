@@ -7,6 +7,7 @@
 - **Created:** 2026-09-25
 - **Revised:** 2026-09-29 — author blocks follow the Security create-rule screens
 - **Revised:** 2026-10-15 — aligned with the first implementation ([OpenTideHQ/opentide#481](https://github.com/OpenTideHQ/opentide/pull/481)); see [§8](#8-revisions-after-the-first-implementation)
+- **Revised:** 2026-10-19 — tactic table follows ATT&CK v19 and later (Stealth, Defense Impairment) for `att&ck::1.2` ([OpenTideHQ/opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)); see [§8](#8-revisions-after-the-first-implementation)
 - **Accepted:** 2026-09-29 — design accepted for the first implementation. Normative spec text and fixtures follow ([§7](#7-spec-changes-after-acceptance)).
 - **Landed:** 2026-10-19 — normative text in [specs/platforms/elastic-1.0.md](../specs/platforms/elastic-1.0.md). The spec also accepts compound shorthand durations (`1h10m`) and sends a default `config` for `kill-process` and `suspend-process` without `field`, as opentide does ([opentide#564](https://github.com/OpenTideHQ/opentide/pull/564), [opentide#562](https://github.com/OpenTideHQ/opentide/pull/562)).
 - **Issue:** [OpenTideHQ/specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)
@@ -478,7 +479,8 @@ The ATT&CK array is derived from the resolved technique set: the rule's `techniq
 | Execution | TA0002 |
 | Persistence | TA0003 |
 | Privilege Escalation | TA0004 |
-| Defense Evasion | TA0005 |
+| Stealth | TA0005 |
+| Defense Impairment | TA0112 |
 | Credential Access | TA0006 |
 | Discovery | TA0007 |
 | Lateral Movement | TA0008 |
@@ -486,6 +488,13 @@ The ATT&CK array is derived from the resolved technique set: the rule's `techniq
 | Command and Control | TA0011 |
 | Exfiltration | TA0010 |
 | Impact | TA0040 |
+
+ATT&CK v19 renamed Defense Evasion (TA0005) to Stealth and split Defense Impairment (TA0112) out of it. Keys that ATT&CK has since revoked stay in `att&ck::1.x` with `removed = "2.0"` and keep the stage names they were last published with. A legacy stage maps to the stage that now holds its tactic ID:
+
+<!-- rfc0007:tactic-aliases -->
+| Legacy stage | Stage |
+|--------------|-------|
+| Defense Evasion | Stealth |
 
 ### 4. Examples
 
@@ -1813,6 +1822,7 @@ The first implementation ([OpenTideHQ/opentide#481](https://github.com/OpenTideH
 | Failed checks fail the rule | §6 | A data view lookup or `_field_caps` call that cannot complete is not a pass. |
 | Extra validation warnings | §2 | Look-back over `1h`, threshold look-back over `interval`, and EQL `maxspan` against the window. All are warnings; none rejects a rule. |
 | Bulk path precondition | Unresolved questions | Kibana's `_import` requires `version`, which §3 forbids, so a bulk path needs its own revision. |
+| Stealth and Defense Impairment tactics | §3 Threat | `att&ck::1.2` (ATT&CK 20.0) uses the v19 tactics: TA0005 is Stealth and Defense Impairment is TA0112. Without them, techniques staged only in those tactics would emit no `threat` entry ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)). Removed keys still staged `Defense Evasion` map through the alias table. |
 
 ## Drawbacks
 

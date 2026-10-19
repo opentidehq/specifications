@@ -449,7 +449,7 @@ The alert severity is `severity` (a string), else `severity.default`, else `resp
 The body key `threat` is the ATT&CK array. It is derived from the rule's `techniques` plus the techniques inherited through `detection_model` (objective, then its threats), de-duplicated. Sentinel uses only the inherited set; Elastic takes the union, so a rule's own `techniques` are never dropped.
 
 1. Keep Enterprise techniques only. Mobile and ICS entries in `att&ck.vocab.toml` carry a `Mobile : ` or `Industrial : ` name prefix. Deploy MUST skip them with a warning.
-2. Map each technique's `tide.vocab.stages` to tactics with the table below. A sub-technique uses its own stages.
+2. Map each technique's `tide.vocab.stages` to tactics with the table below. A sub-technique uses its own stages. A legacy stage is first renamed through the legacy-stage table; any other stage outside the table emits no tactic.
 3. Emit one entry per tactic, in table order, with `framework: "MITRE ATT&CK"`. Techniques are sorted by id. A sub-technique appears under its parent technique, named without the `<parent name>: ` prefix. An empty `subtechnique` list is omitted.
 4. `reference` is the vocabulary `link` for a technique and `https://attack.mitre.org/tactics/<id>/` for a tactic.
 
@@ -461,7 +461,8 @@ The body key `threat` is the ATT&CK array. It is derived from the rule's `techni
 | Execution | TA0002 |
 | Persistence | TA0003 |
 | Privilege Escalation | TA0004 |
-| Defense Evasion | TA0005 |
+| Stealth | TA0005 |
+| Defense Impairment | TA0112 |
 | Credential Access | TA0006 |
 | Discovery | TA0007 |
 | Lateral Movement | TA0008 |
@@ -469,6 +470,12 @@ The body key `threat` is the ATT&CK array. It is derived from the rule's `techni
 | Command and Control | TA0011 |
 | Exfiltration | TA0010 |
 | Impact | TA0040 |
+
+ATT&CK v19 renamed Defense Evasion (TA0005) to Stealth and split Defense Impairment (TA0112) out of it. Keys that ATT&CK has since revoked stay in `att&ck::1.x` with `removed = "2.0"` and keep the stage they were last published with. A legacy stage maps to the stage that now holds its tactic id:
+
+| Legacy stage | Stage |
+|--------------|-------|
+| Defense Evasion | Stealth |
 
 ### Deploy
 
@@ -700,4 +707,5 @@ RFC 0007 has a complete rule for every rule type, and the compiled body of its E
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-10-19 | The tactic table follows ATT&CK v19 as `att&ck::1.2` (ATT&CK 20.0) publishes it: TA0005 is `Stealth`, and `Defense Impairment` is TA0112. Removed keys still staged `Defense Evasion` map to `Stealth` through the legacy-stage table. Without this, techniques staged only in those tactics emitted no `threat` entry ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)). |
 | 1.0 | 2026-10-19 | Initial field contract from [RFC 0007](../../rfcs/0007-elastic-security-platform.md) and the opentide implementation ([specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)). Amends the RFC in two places. Durations accept compound shorthand (`1h10m`, `1d2h`, `2m30s`) as well as single-unit shorthand and ISO 8601 ([opentide#564](https://github.com/OpenTideHQ/opentide/pull/564)). `kill-process` and `suspend-process` without `field` send Kibana's default process field, `process.entity_id` with `overwrite: true` ([opentide#562](https://github.com/OpenTideHQ/opentide/pull/562)). |

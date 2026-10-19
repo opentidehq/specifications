@@ -36,6 +36,11 @@ OpenTide vocabularies are TOML files (`.vocab.toml`) defining allowed enum value
 | `model` | boolean | no | When true, vocabulary models a nested object type |
 | `keys` | array of KeyEntry | no | Enum entries |
 | `stages` | array | no | Scoped stage identifiers for multi-stage vocabularies |
+| `source` | string | no | Upstream a generated vocabulary is ingested from (e.g. `mitre-attack`) |
+| `source_version` | string | no | Upstream release the keys were last refreshed from (e.g. ATT&CK `20.0`) |
+| `source_fetched_at` | string | no | UTC timestamp (ISO 8601) of the upstream fetch |
+
+`source`, `source_version` and `source_fetched_at` are provenance only. They are not a contract revision and MUST NOT be read as one; contracts come from per-key `version` and `removed`.
 
 Top-level `version` is **not** permitted. Vocabulary contract revisions (`field::major.minor`) are derived from per-key lifecycle metadata, not file stamps.
 
@@ -46,7 +51,7 @@ Top-level `version` is **not** permitted. Vocabulary contract revisions (`field:
 | `id` | string | no | Stable identifier (e.g. `TLP:AMBER`) |
 | `name` | string | yes* | Display/slug value used in YAML |
 | `version` | string | yes | Contract line when this key enters the vocabulary (`major.minor`, e.g. `1.0`) |
-| `removed` | string | no | Contract line when this key leaves (`major.minor`); excludes key from pins at or below this revision |
+| `removed` | string | no | Contract line when this key leaves (`major.minor`); excludes key from contracts at or above this revision |
 | `description` | string | no | Entry description (markdown in schema) |
 | `icon` | string | no | Entry icon |
 | `misp` | string | no | MISP taxonomy mapping |
@@ -131,5 +136,6 @@ The sync script is an opentide build concern; this spec defines the data contrac
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-10-19 | `removed` excludes a key from contracts at or above its revision; the description said "at or below" while [Contract resolution](#contract-resolution) already required `removed > M.m`. Document the `source`, `source_version` and `source_fetched_at` provenance keys. |
 | 1.1 | 2026-06-26 | Per-key `version`/`removed`; no top-level file version ([RFC 0003](../../rfcs/0003-per-key-vocabulary-versioning.md)) |
 | 1.0 | 2026-06-25 | Initial spec from opentide `vocabulary.schema.json` |

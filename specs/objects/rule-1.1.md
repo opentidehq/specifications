@@ -24,7 +24,7 @@ This revision adds optional `metadata.reviewed`. [rule-1.0.md](rule-1.0.md) (`ru
 - Consumers MUST NOT treat `metadata.created` or `metadata.modified` as a review time. Updating `reviewed` does not require a change to `metadata.version` or `metadata.modified`.
 - `status` MUST be a valid deployment status from [deployment.md](../deployment.md) (default: `STAGING`).
 - `severity` MUST be a valid rule severity vocabulary value (default: `Informational`).
-- `techniques` MUST be a list of ATT&CK technique ids from vocabulary `att&ck` (pin `att&ck::1.1`). The list MAY be empty.
+- `techniques` MUST be a list of ATT&CK technique ids from vocabulary `att&ck` (pin `att&ck::1.2`). The list MAY be empty.
 - `platforms` or `configurations` MUST contain at least one enabled platform block for deployable rules.
 - `detection_model` when present MUST reference either a valid objective UUID or the UUID of a signal defined under an objective (`objective::1.0` or `objective::1.1`). A rule implements a whole objective or one of its signals; both are referenceable by design. A signal reference implements that signal, and the rule's objective is the signal's owning objective. Indirect coverage of other objectives is derived from signal bindings on `objective::1.1` ([objective-1.1.md](objective-1.1.md), draft). A rule has a single `detection_model`.
 - Platform blocks MUST validate against the platform schema identifier declared in each block's `schema` field.
@@ -50,7 +50,7 @@ This revision adds optional `metadata.reviewed`. [rule-1.0.md](rule-1.0.md) (`ru
 | `description` | string | yes | — | Rule narrative (multiline YAML encouraged) |
 | `status` | string | no | `STAGING` | Deployment lifecycle status |
 | `severity` | string | no | `Informational` | Rule severity vocabulary |
-| `techniques` | list[string] | no | `[]` | MITRE ATT&CK technique ids (`att&ck::1.1`) |
+| `techniques` | list[string] | no | `[]` | MITRE ATT&CK technique ids (`att&ck::1.2`) |
 | `platforms` | map[string, object] | no | `{}` | Legacy flat platform dict (prefer `configurations`) |
 | `configurations` | RuleConfigurations | no | null | Typed per-platform configuration blocks |
 | `references` | ObjectReferences | no | null | External and internal references |
@@ -205,6 +205,7 @@ configurations:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-10-19 | `techniques` is pinned to `att&ck::1.2` (ATT&CK 20.0). Additive: every `att&ck::1.1` technique still validates ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)). `schema_id` stays `rule::1.1`. |
 | 1.1 | 2026-10-19 | `configurations.elastic` (`ElasticConfig`, `platform::elastic::1.0`, [elastic-1.0.md](../platforms/elastic-1.0.md)) is added ([RFC 0007](../../rfcs/0007-elastic-security-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.1`. |
 | 1.1 | 2026-10-19 | `detection_model` references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design and implementations always accepted signal UUIDs; the earlier objective-only wording was wrong. |
 | 1.1 | 2026-10-19 | `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage is derived ([RFC 0011](../../rfcs/0011-signal-reuse.md)). |

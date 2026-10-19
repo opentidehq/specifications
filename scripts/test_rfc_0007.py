@@ -147,6 +147,10 @@ def _tactics() -> dict[str, str]:
     return {row["Stage"]: row["Tactic ID"] for row in _table("tactic-table")}
 
 
+def _tactic_aliases() -> dict[str, str]:
+    return {row["Legacy stage"]: row["Stage"] for row in _table("tactic-aliases")}
+
+
 def _mapping_fields() -> set[str]:
     fields: set[str] = set()
     for row in _table("mapping-table"):
@@ -216,6 +220,7 @@ def related_integration(entry: str | dict[str, Any]) -> dict[str, str]:
 
 def derive_threat(techniques: list[str], vocab: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     tactics = _tactics()
+    aliases = _tactic_aliases()
     grouped: dict[str, dict[str, set[str]]] = {}
     for tid in dict.fromkeys(techniques):
         entry = vocab[tid]
@@ -223,6 +228,7 @@ def derive_threat(techniques: list[str], vocab: dict[str, dict[str, Any]]) -> li
             continue
         parent = tid.split(".")[0]
         for stage in entry["tide.vocab.stages"]:
+            stage = aliases.get(stage, stage)
             subs = grouped.setdefault(stage, {}).setdefault(parent, set())
             if "." in tid:
                 subs.add(tid)
@@ -891,7 +897,28 @@ class TableConsistencyTests(unittest.TestCase):
             if not entry["name"].startswith(NON_ENTERPRISE_PREFIXES)
             for stage in entry["tide.vocab.stages"]
         }
-        self.assertLessEqual(stages, set(tactics))
+        aliases = _tactic_aliases()
+        self.assertLessEqual(set(aliases.values()), set(tactics))
+        self.assertFalse(set(aliases) & set(tactics))
+        self.assertLessEqual(stages, set(tactics) | set(aliases))
+
+    def test_legacy_stages_map_to_their_tactic_id(self) -> None:
+        # ATT&CK v19: TA0005 Defense Evasion became Stealth; Defense Impairment
+        # is TA0112. Removed keys keep "Defense Evasion" and map through the alias.
+        vocab = _attack()
+        cases = {
+            "T1027": [("TA0005", "Stealth")],
+            "T1685": [("TA0112", "Defense Impairment")],
+            "T1562.001": [("TA0005", "Stealth")],
+        }
+        for tid, expected in cases.items():
+            with self.subTest(technique=tid):
+                threat = derive_threat([tid], vocab)
+                self.assertEqual(
+                    [(item["tactic"]["id"], item["tactic"]["name"]) for item in threat], expected
+                )
+        self.assertEqual(vocab["T1562.001"]["removed"], "2.0")
+        self.assertIn("Defense Evasion", vocab["T1562.001"]["tide.vocab.stages"])
 
     def test_enterprise_subtechnique_names_carry_parent_prefix(self) -> None:
         vocab = _attack()

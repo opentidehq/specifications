@@ -85,8 +85,76 @@ def _validate_vocab_file(path: Path, schema: dict) -> list[str]:
     return errors
 
 
+def _version_sort_key(version: str) -> tuple[int, ...]:
+    if CONTRACT_PATTERN.match(version):
+        return tuple(int(part) for part in version.split("."))
+    return ()
+
+
+def _vocab_key_versions(field: str, vocab_dir: Path) -> set[str] | None:
+    """Return the revisions where a key of *field* is introduced or removed.
+
+    Returns None if the vocabulary is unreadable. Under RFC 0003 a removal
+    opens a new major with no key introduced at it, so a ``removed``
+    revision backs a pin just as a ``version`` does.
+    """
+    path = vocab_dir / f"{field}{VOCAB_SUFFIX}"
+    try:
+        doc = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+    return {
+        str(entry[attr])
+        for entry in doc.get("keys") or []
+        for attr in ("version", "removed")
+        if entry.get(attr)
+    }
+
+
+def _validate_pins_introduced(
+    path: Path,
+    doc: dict,
+    vocab_dir: Path = VOCAB_DIR,
+    cache: dict[str, set[str] | None] | None = None,
+) -> list[str]:
+    """Every pinned ``field::M.m`` must be a revision some key changes at.
+
+    A key backs a revision when it is introduced there (``version``) or
+    removed there (``removed``, which opens a major). A pin at a revision no
+    key changes at resolves to the same set as the previous one, so the ingest
+    that should back it is missing (opentide#568: ``att&ck::1.1`` was pinned
+    while every canonical key was at ``1.0``).
+    """
+    errors: list[str] = []
+    versions = cache if cache is not None else {}
+    for section, pins in doc.items():
+        if section == "extends" or not isinstance(pins, dict):
+            continue
+        for field_path, contract in pins.items():
+            if field_path == "extends" or not isinstance(contract, str) or "::" not in contract:
+                continue
+            field, revision = contract.split("::", 1)
+            if field not in versions:
+                versions[field] = _vocab_key_versions(field, vocab_dir)
+            known = versions[field]
+            if known is None:
+                errors.append(
+                    f"{path}: [{section}] {field_path!r} pins {contract!r} but "
+                    f"vocabularies/{field}{VOCAB_SUFFIX} is missing or unreadable"
+                )
+            elif revision not in known:
+                listed = ", ".join(sorted(known, key=_version_sort_key)) or "none"
+                errors.append(
+                    f"{path}: [{section}] {field_path!r} pins {contract!r} but no "
+                    f"{field} key is introduced or removed at {revision} "
+                    f"(key revisions: {listed})"
+                )
+    return errors
+
+
 def _validate_pin_files() -> list[str]:
     errors: list[str] = []
+    key_versions: dict[str, set[str] | None] = {}
     required = ["threat.toml", "objective.toml", "rule.toml"]
     for name in required:
         path = PINS_DIR / name
@@ -122,6 +190,7 @@ def _validate_pin_files() -> list[str]:
                     errors.append(
                         f"{path}: [{section}] {field_path!r} contract revision invalid: {contract!r}"
                     )
+        errors.extend(_validate_pins_introduced(path, doc, cache=key_versions))
         if path.name == "threat.toml":
             errors.extend(_validate_threat_pins(path, doc))
         elif path.name == "objective.toml":
@@ -201,8 +270,8 @@ def _validate_threat_pins(path: Path, doc: dict) -> list[str]:
             errors.append(
                 f"{path}: [{section}] must pin threat.actors.name = 'actors::1.1'"
             )
-        if pins.get("threat.mitre_attack") != "att&ck::1.1":
-            errors.append(f"{path}: [{section}] must pin threat.mitre_attack = 'att&ck::1.1'")
+        if pins.get("threat.mitre_attack") != "att&ck::1.2":
+            errors.append(f"{path}: [{section}] must pin threat.mitre_attack = 'att&ck::1.2'")
     return errors
 
 
@@ -217,8 +286,8 @@ def _validate_objective_pins(path: Path, doc: dict) -> list[str]:
             errors.append(
                 f"{path}: [{section}] must pin objective.signals.severity = 'alert_severity::1.0'"
             )
-        if pins.get("objective.mitre_attack") != "att&ck::1.1":
-            errors.append(f"{path}: [{section}] must pin objective.mitre_attack = 'att&ck::1.1'")
+        if pins.get("objective.mitre_attack") != "att&ck::1.2":
+            errors.append(f"{path}: [{section}] must pin objective.mitre_attack = 'att&ck::1.2'")
         if "objective.signals.effort" in pins:
             errors.append(
                 f"{path}: [{section}] must not pin objective.signals.effort; "
@@ -239,8 +308,8 @@ def _validate_rule_pins(path: Path, doc: dict) -> list[str]:
         if not isinstance(pins, dict):
             errors.append(f"{path}: missing [{section}]")
             continue
-        if pins.get("techniques") != "att&ck::1.1":
-            errors.append(f"{path}: [{section}] must pin techniques = 'att&ck::1.1'")
+        if pins.get("techniques") != "att&ck::1.2":
+            errors.append(f"{path}: [{section}] must pin techniques = 'att&ck::1.2'")
     return errors
 
 
