@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for validate.py's pin guard: every pinned field::M.m has keys at M.m."""
+"""Tests for validate.py's pin guard: every pinned field::M.m is a revision keys change at."""
 
 from __future__ import annotations
 
@@ -45,12 +45,26 @@ class PinsIntroducedTests(unittest.TestCase):
         self.assertEqual(self._errors("demo::1.0"), [])
         self.assertEqual(self._errors("demo::1.1"), [])
 
+    def test_pin_at_a_removal_only_major_passes(self) -> None:
+        # RFC 0003: removing B opens demo::2.0 with no key introduced at it.
+        self.assertEqual(self._errors("demo::2.0"), [])
+
     def test_pin_at_a_minor_no_key_introduces_fails(self) -> None:
         # opentide#568: att&ck::1.1 was pinned while every key was at 1.0.
         errors = self._errors("demo::1.2")
         self.assertEqual(len(errors), 1)
-        self.assertIn("no demo key is introduced at 1.2", errors[0])
-        self.assertIn("key versions: 1.0, 1.1", errors[0])
+        self.assertIn("no demo key is introduced or removed at 1.2", errors[0])
+        self.assertIn("key revisions: 1.0, 1.1, 2.0", errors[0])
+
+    def test_attack_removal_major_is_pinnable(self) -> None:
+        # 27 att&ck keys carry removed = "2.0" and none is introduced at 2.0.
+        doc = {"demo::1.0": {"techniques": "att&ck::2.0"}}
+        self.assertEqual(_validate_pins_introduced(self.pin_path, doc, VOCAB_DIR), [])
+
+    def test_pin_past_the_last_removal_fails(self) -> None:
+        errors = self._errors("demo::2.1")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("no demo key is introduced or removed at 2.1", errors[0])
 
     def test_pin_to_a_missing_vocabulary_fails(self) -> None:
         errors = self._errors("nope::1.0")

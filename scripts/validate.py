@@ -92,13 +92,23 @@ def _version_sort_key(version: str) -> tuple[int, ...]:
 
 
 def _vocab_key_versions(field: str, vocab_dir: Path) -> set[str] | None:
-    """Return the per-key ``version`` values of *field*, or None if unreadable."""
+    """Return the revisions where a key of *field* is introduced or removed.
+
+    Returns None if the vocabulary is unreadable. Under RFC 0003 a removal
+    opens a new major with no key introduced at it, so a ``removed``
+    revision backs a pin just as a ``version`` does.
+    """
     path = vocab_dir / f"{field}{VOCAB_SUFFIX}"
     try:
         doc = tomllib.loads(path.read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError):
         return None
-    return {str(entry["version"]) for entry in doc.get("keys") or [] if entry.get("version")}
+    return {
+        str(entry[attr])
+        for entry in doc.get("keys") or []
+        for attr in ("version", "removed")
+        if entry.get(attr)
+    }
 
 
 def _validate_pins_introduced(
@@ -107,11 +117,13 @@ def _validate_pins_introduced(
     vocab_dir: Path = VOCAB_DIR,
     cache: dict[str, set[str] | None] | None = None,
 ) -> list[str]:
-    """Every pinned ``field::M.m`` must be introduced by at least one key.
+    """Every pinned ``field::M.m`` must be a revision some key changes at.
 
-    A pin whose minor no key carries resolves to the same set as the previous
-    minor, so the ingest that should back it is missing (opentide#568:
-    ``att&ck::1.1`` was pinned while every canonical key was at ``1.0``).
+    A key backs a revision when it is introduced there (``version``) or
+    removed there (``removed``, which opens a major). A pin at a revision no
+    key changes at resolves to the same set as the previous one, so the ingest
+    that should back it is missing (opentide#568: ``att&ck::1.1`` was pinned
+    while every canonical key was at ``1.0``).
     """
     errors: list[str] = []
     versions = cache if cache is not None else {}
@@ -134,7 +146,8 @@ def _validate_pins_introduced(
                 listed = ", ".join(sorted(known, key=_version_sort_key)) or "none"
                 errors.append(
                     f"{path}: [{section}] {field_path!r} pins {contract!r} but no "
-                    f"{field} key is introduced at {revision} (key versions: {listed})"
+                    f"{field} key is introduced or removed at {revision} "
+                    f"(key revisions: {listed})"
                 )
     return errors
 
