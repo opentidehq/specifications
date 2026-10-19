@@ -1,6 +1,6 @@
 ---
 spec: platform-sentinel
-version: "1.0"
+version: "1.1"
 schema_id: platform::sentinel::1.0
 status: normative
 supersedes: null
@@ -25,6 +25,7 @@ Shared fields (`enabled`, `name`, `schema`, `status`, `flags`, `tenants`, `contr
 - Deploy of a non-NRT rule MUST fail when `scheduling.frequency` or `scheduling.lookback` is missing.
 - Deploy MUST fail when `grouping` is missing, and MUST fail when `grouping.alert` is missing.
 - Deploy MUST fail when `alert.suppression` is boolean `true`. The value MUST be `false` or a duration string.
+- Every duration (`scheduling.frequency`, `scheduling.lookback`, `alert.suppression`, `grouping.alert.grouping_lookback`) MUST be ISO 8601 or shorthand ([Durations](#durations)). Deploy MUST fail on a duration in neither form. Static validation accepts any string.
 - When `grouping.alert.enabled` is true, deploy MUST fail when `grouping.alert.grouping_lookback` is missing.
 - `scheduling.nrt: true` MUST deploy an NRT rule and MUST NOT require `frequency`, `lookback`, or `trigger`.
 
@@ -48,10 +49,10 @@ Shared fields (`enabled`, `name`, `schema`, `status`, `flags`, `tenants`, `contr
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `nrt` | boolean | optional | null | `true` deploys `kind: NRT` and skips frequency, lookback, and trigger. |
-| `frequency` | string | optional | null | ISO 8601 duration. How often a scheduled rule runs (`PT1H`). Required at deploy unless `nrt` is true. |
-| `lookback` | string | optional | null | ISO 8601 duration. Query window (`PT2H`). Required at deploy unless `nrt` is true. |
+| `frequency` | string | optional | null | [Duration](#durations): ISO 8601, or shorthand converted to ISO 8601. How often a scheduled rule runs (`PT1H`). Required at deploy unless `nrt` is true. |
+| `lookback` | string | optional | null | [Duration](#durations): ISO 8601, or shorthand converted to ISO 8601. Query window (`PT2H`). Required at deploy unless `nrt` is true. |
 
-Durations are converted to Sentinel `queryFrequency` and `queryPeriod`.
+Deploy sends `frequency` as Sentinel `queryFrequency` and `lookback` as `queryPeriod`.
 
 ### `alert` (SentinelAlert)
 
@@ -60,7 +61,7 @@ Durations are converted to Sentinel `queryFrequency` and `queryPeriod`.
 | `title` | string | optional | null | Alert display-name format. Empty leaves the Sentinel default. The rule `name` is still the analytics-rule display name. |
 | `description` | string | optional | null | Alert description format. |
 | `severity` | string | optional | null | Sentinel severity. When omitted, deploy uses `response.alert_severity`. `Critical` is sent as `High`. |
-| `suppression` | string \| boolean | optional | `false` | `false` disables suppression and sends a one-hour duration. A duration string enables suppression for that long. Boolean `true` fails deploy. |
+| `suppression` | string \| boolean | optional | `false` | `false` disables suppression and sends a one-hour duration. A [duration](#durations), ISO 8601 or shorthand, enables suppression for that long. Boolean `true` fails deploy. |
 | `create_incident` | boolean | optional | `true` | Whether a firing alert opens an incident. |
 | `tactics` | list[string] | optional | null | Sentinel tactic names. Replaced when the rule's ATT&CK techniques resolve to tactics. |
 | `techniques` | list[string] | optional | null | Technique ids. Replaced by the rule's resolved techniques when those exist. |
@@ -94,7 +95,7 @@ Durations are converted to Sentinel `queryFrequency` and `queryPeriod`.
 |-------|------|----------|---------|-------------|
 | `enabled` | boolean | yes | — | Group alerts into one incident. |
 | `reopen_closed_incidents` | boolean | optional | null | Reopen a matching closed incident. Deploy sends `false` when omitted. |
-| `grouping_lookback` | string | optional | null | ISO 8601 duration. Required at deploy when `enabled` is true. When `enabled` is false and this is omitted, deploy sends `PT1H`. |
+| `grouping_lookback` | string | optional | null | [Duration](#durations): ISO 8601, or shorthand converted to ISO 8601. Required at deploy when `enabled` is true. When `enabled` is false and this is omitted, deploy sends `PT1H`. |
 | `matching` | string | optional | null | Sentinel matching method. Deploy sends `AllEntities` when omitted. |
 | `group_by_entities` | list[string] | optional | null | Entity types used when matching is selective. |
 | `group_by_alert_details` | list[string] | optional | null | Alert-detail fields used when matching is selective. |
@@ -141,6 +142,22 @@ Applied at deploy for the target tenant. An exclusion with no `tenant`, or with 
 
 Sent only for scheduled rules. Omitted on NRT rules.
 
+### Durations
+
+ISO 8601 is the documented form of every Sentinel duration (`PT1H`, `PT30M`, `P1D`, `P1DT2H`), and the form templates and examples use. Sentinel durations are whole weeks, days, hours, minutes, and seconds; years, months, and fractions are not supported.
+
+Shorthand is also accepted: single-unit (`30m`, `1h`, `1d`) or compound (`1h10m`, `1d2h`, `2m30s`). It is the shorthand grammar of [Elastic Security](elastic-1.0.md#durations): whole numbers with the lower-case units `d`, `h`, `m`, and `s`, in that order, each at most once. A shorthand value is the same duration as its ISO 8601 form (`1h10m` is `PT1H10M`). Deploy converts every duration to ISO 8601 before it reaches Sentinel, so the API never receives shorthand.
+
+| Written | Sent |
+|---------|------|
+| `PT1H` | `PT1H` |
+| `1h` | `PT1H` |
+| `1h10m` | `PT1H10M` |
+| `1d2h` | `P1DT2H` |
+| `2m30s` | `PT2M30S` |
+
+The Sent column is the duration. An implementation MAY zero-pad the time fields (`PT01H00M00S`); Sentinel reads both spellings as the same duration.
+
 ### Deploy
 
 | Block status strategy | Sentinel result |
@@ -157,6 +174,7 @@ The rule display name is the Tide rule `name`. The description is the Tide rule 
 - [rule-1.0.md](../objects/rule-1.0.md) — parent object
 - [deployment.md](../deployment.md) — `status`
 - [validation.md](../validation.md) — KQL query validation
+- [elastic-1.0.md](elastic-1.0.md#durations) — the shared shorthand duration grammar
 
 ## Defaults & overrides
 
@@ -215,3 +233,4 @@ Fixture: [fixtures/platforms/sentinel.yaml](../../fixtures/platforms/sentinel.ya
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-09-30 | Initial field contract from the Sentinel configuration model and deployer. |
+| 1.1 | 2026-10-19 | [Durations](#durations): ISO 8601 stays the documented form; shorthand, single-unit or compound (`30m`, `1h10m`, `1d2h`, `2m30s`), with the grammar of [Elastic Security](elastic-1.0.md#durations), is accepted and converted to ISO 8601 at deploy ([opentide#564](https://github.com/OpenTideHQ/opentide/pull/564) and the opentide 0.16.0 follow-up, which makes shorthand case-sensitive and adds seconds). Applies to `scheduling.frequency`, `scheduling.lookback`, `alert.suppression`, and `grouping.alert.grouping_lookback`. Schema id unchanged. |

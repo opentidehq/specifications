@@ -15,6 +15,7 @@ from object_fixtures import (
     validate_document,
     validate_fixture_file,
     validate_objective,
+    validate_elastic_block,
     validate_rule,
     validate_threat,
 )
@@ -326,6 +327,63 @@ class ObjectiveSignalBindingTests(unittest.TestCase):
     def test_definition_only_1_1_passes(self) -> None:
         doc = load_yaml(FIXTURES / "valid" / "objective-1.1.yaml")
         self.assertEqual(validate_objective(doc, self.vocabs), [])
+
+
+class ElasticBlockTests(unittest.TestCase):
+    """The platform::elastic::1.0 codes the fixture checker applies."""
+
+    vocabs = None
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.vocabs = load_vocabularies(VOCAB_DIR)
+
+    def test_invalid_fixture_reports_exactly_its_three_codes(self) -> None:
+        issues = validate_fixture_file(FIXTURES / "invalid" / "rule-elastic-esql-index.yaml", self.vocabs)
+        self.assertEqual(_codes(issues), {"esql_source", "language", "suppression_shape"})
+
+    def test_valid_elastic_fixtures_pass(self) -> None:
+        for path in (FIXTURES / "valid" / "rule-elastic-1.0.yaml", FIXTURES / "platforms" / "elastic.yaml"):
+            with self.subTest(path=path.name):
+                self.assertEqual(validate_fixture_file(path, self.vocabs), [])
+
+    def test_each_code_alone(self) -> None:
+        probes = {
+            "language": {"type": "eql", "query": "x", "language": "kuery"},
+            "esql_source": {"type": "machine_learning", "data_view_id": "d"},
+            "suppression_shape": {"type": "query", "query": "x", "suppression": {"group_by": ["a", "a"]}},
+        }
+        for code, block in probes.items():
+            with self.subTest(code=code):
+                self.assertEqual(_codes(validate_elastic_block(block)), {code})
+
+    def test_suppression_shapes(self) -> None:
+        ok = [
+            {"type": "threshold", "suppression": {"duration": "1h"}},
+            {"type": "query", "suppression": {"group_by": ["a", "b", "c"]}},
+        ]
+        bad = [
+            {"type": "threshold", "suppression": {"duration": "1h", "group_by": ["a"]}},
+            {"type": "threshold", "suppression": {"group_by": []}},
+            {"type": "query", "suppression": {"duration": "1h"}},
+            {"type": "query", "suppression": {"group_by": ["a", "b", "c", "d"]}},
+            {"type": "query", "suppression": {"group_by": [""]}},
+            {"type": "query", "suppression": "1h"},
+        ]
+        for block in ok:
+            with self.subTest(block=block):
+                self.assertEqual(validate_elastic_block(block), [])
+        for block in bad:
+            with self.subTest(block=block):
+                self.assertEqual(_codes(validate_elastic_block(block)), {"suppression_shape"})
+
+    def test_other_codes_are_left_to_opentide(self) -> None:
+        block = {"type": "query", "query": "x", "index": "logs-*", "data_view_id": "d"}
+        self.assertEqual(validate_elastic_block(block), [])
+
+    def test_rule_without_elastic_block_is_unaffected(self) -> None:
+        doc = load_yaml(FIXTURES / "valid" / "rule-1.0.yaml")
+        self.assertEqual(validate_rule(doc, self.vocabs), [])
 
 
 class InvalidFixtureRegistryTests(unittest.TestCase):

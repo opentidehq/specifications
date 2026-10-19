@@ -1,0 +1,27 @@
+name: Elastic Security platform block
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000023
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+  author: Detection Engineering
+description: |
+  Elastic Security custom query rule: the smallest useful block.
+status: STAGING
+severity: Medium
+response:
+  alert_severity: Medium
+configurations:
+  elastic:
+    enabled: true
+    schema: platform::elastic::1.0
+    status: STAGING
+    type: query
+    language: kuery
+    query: 'event.category : "process"'
+    index: [logs-*]
+    scheduling:
+      interval: 5m
+      lookback: 1m

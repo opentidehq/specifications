@@ -8,6 +8,7 @@
 - **Revised:** 2026-09-29 — author blocks follow the Security create-rule screens
 - **Revised:** 2026-10-15 — aligned with the first implementation ([OpenTideHQ/opentide#481](https://github.com/OpenTideHQ/opentide/pull/481)); see [§8](#8-revisions-after-the-first-implementation)
 - **Accepted:** 2026-09-29 — design accepted for the first implementation. Normative spec text and fixtures follow ([§7](#7-spec-changes-after-acceptance)).
+- **Landed:** 2026-10-19 — normative text in [specs/platforms/elastic-1.0.md](../specs/platforms/elastic-1.0.md). The spec also accepts compound shorthand durations (`1h10m`) and sends a default `config` for `kill-process` and `suspend-process` without `field`, as opentide does ([opentide#564](https://github.com/OpenTideHQ/opentide/pull/564), [opentide#562](https://github.com/OpenTideHQ/opentide/pull/562)).
 - **Issue:** [OpenTideHQ/specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)
 - **PR:** [OpenTideHQ/specifications#18](https://github.com/OpenTideHQ/specifications/pull/18)
 
