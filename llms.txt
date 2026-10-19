@@ -17,15 +17,26 @@
 - specs/workspace.md
 - specs/configuration.md
 - specs/deployment.md
+- specs/deployment-state.md (schema_id: deployment.state::1.0)
 - specs/metaschema-keywords.md
-- specs/platforms.md
+- specs/platforms/index.md
+- specs/platforms/sentinel-1.0.md (schema_id: platform::sentinel::1.0)
+- specs/platforms/defender-for-endpoint-1.0.md (schema_id: platform::defender_for_endpoint::1.0)
+- specs/platforms/splunk-1.0.md (schema_id: platform::splunk::1.0)
+- specs/platforms/sentinel-one-1.0.md (schema_id: platform::sentinel_one::1.0)
+- specs/platforms/carbon-black-cloud-1.0.md (schema_id: platform::carbon_black_cloud::1.0)
+- specs/platforms/crowdstrike-1.0.md (schema_id: platform::crowdstrike::1.0)
+- specs/platforms/harfanglab-1.0.md (schema_id: platform::harfanglab::1.0)
 - specs/validation.md
+- specs/sharing.md
+- specs/sharing/misp-1.0.md (schema_id: sharing::misp::1.0)
 
 ## Object specs (specs/objects/)
 
 - specs/objects/threat-1.0.md (schema_id: threat::1.0)
 - specs/objects/objective-1.0.md (schema_id: objective::1.0)
 - specs/objects/rule-1.0.md (schema_id: rule::1.0)
+- specs/objects/rule-1.1.md (schema_id: rule::1.1)
 
 ## Vocabulary specs (specs/vocabularies/)
 
@@ -37,7 +48,12 @@
 - vocabularies/*.vocab.toml: Canonical vocabulary TOML (36 files)
 - schemas/vocabulary.schema.json: Vocabulary file JSON Schema
 - schemas/inflight.shard.1.0.schema.json: Inflight preview shard envelope JSON Schema
+- schemas/deployment.state.1.0.schema.json: Deployment-state shard JSON Schema
+- schemas/misp/opentide.definition.json: Pinned upstream MISP opentide object template (version 5)
+- fixtures/sharing/: Sharing TOML and golden MISP Event JSON
+- fixtures/deployment/: Deployment-state conformance fixtures (shards and rules with legacy external-id keys)
 - fixtures/valid/: Valid conformance YAML
+- fixtures/platforms/: Per-platform rule-block examples
 - fixtures/invalid/: Invalid conformance YAML
 - fixtures/cross-object/: Cross-reference conformance YAML
 
@@ -49,6 +65,10 @@
 - rfcs/0002-vocabulary-versioning.md
 - rfcs/0003-per-key-vocabulary-versioning.md
 - rfcs/0005-sharing-system.md
+- rfcs/0006-sharing-ci.md
+- rfcs/0007-elastic-security-platform.md
+- rfcs/0008-rule-reviewed-date.md
+- rfcs/0010-deployment-external-ids.md
 
 ## Agent skills
 

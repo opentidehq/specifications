@@ -7,7 +7,7 @@ Request for Comments (RFCs) document significant specification changes before th
 1. Open a GitHub [spec-change issue](../.github/ISSUE_TEMPLATE/spec-change.yml) (never Linear; OpenTide tracking is public GitHub only)
 2. Draft an RFC from [0000-template.md](0000-template.md)
 3. Maintainer review and acceptance
-4. Implement spec + fixture updates in a follow-up PR
+4. Update specs, fixtures, `SPECS.md`, and `CHANGELOG.md` in the same PR as the RFC, unless the request is for an RFC draft only
 5. Implement opentide changes separately
 
 ## Index
@@ -18,7 +18,13 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0002](0002-vocabulary-versioning.md) | Vocabulary identifier versioning and schema pins | proposed |
 | [0003](0003-per-key-vocabulary-versioning.md) | Per-key vocabulary versioning and schema pins | proposed |
 | [0004](https://github.com/OpenTideHQ/specifications/issues/8) | Sysdig Falco deployer (reserved by issue #8; file not yet in tree) | reserved |
-| [0005](0005-sharing-system.md) | Sharing system and MISP connector | draft |
+| [0005](0005-scoped-signal-entities.md) | Stage-scoped `signal.entities`, and one prefixing rule for every staged vocabulary | accepted |
+| [0005](0005-sharing-system.md) | Sharing system and MISP connector | accepted |
+| [0006](0006-sharing-ci.md) | Sharing on the production merge | accepted |
+| [0007](0007-elastic-security-platform.md) | Elastic Security detection platform | accepted |
+| [0008](0008-rule-reviewed-date.md) | Optional review date on detection rules | draft |
+| [0009](0009-machine-readable-vocabulary-contract.md) | A machine-readable vocabulary contract | draft |
+| [0010](0010-deployment-external-ids.md) | Deployment external ids | accepted |
 
 ## Numbering
 

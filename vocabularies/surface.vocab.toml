@@ -1,6 +1,6 @@
 name = "Threat Surface"
 field = "surface"
-description = "Hierarchical scoping of the technologies, systems and environments applicable to a threat vector. Uses scoped '::' delimited categories via stages. Replaces the deprecated targets, platforms and domains vocabularies."
+description = "Hierarchical catalogue of the technologies, systems, and environments applicable to a threat vector. Stages group keys, and an authored value is ALWAYS prefixed with its stage id (for example OS::Windows::Desktop, or Protocol::VPN). The prefix is what tells two stages' identically-named keys apart: VPN, Wireless and Industrial are each defined under both Infrastructure and Protocol. A name may also contain '::' as hierarchy inside the key itself. Replaces the deprecated targets, platforms and domains vocabularies."
 
 key = "name"
 [[stages]]

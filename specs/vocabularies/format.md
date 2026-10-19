@@ -76,6 +76,11 @@ Object schema revisions pin explicit contracts via [schemas/pins/](../../schemas
 
 Entries MAY be scoped to lifecycle stages via `tide.vocab.stages`. Metaschema fields use `tide.vocab.scoped` and `tide.vocab.stages` keywords to filter allowed values at generation and validation time.
 
+- A field bound to a staged vocabulary MUST declare `tide.vocab.scoped`, and its authored values MUST be `<stage>::<key>`. The prefix is what tells two stages' identically-named keys apart, and omitting it makes those values unreachable (see [RFC 0005](../../rfcs/0005-scoped-signal-entities.md)).
+- Stage identifiers naming a human-facing category SHOULD be capitalised (`Host`, `Protocol`). A stage naming an external framework keeps that framework's own spelling (`misp`, `att&ck`).
+- Key names MAY themselves contain `::` as hierarchy within the key (`AWS::Compute::EC2`), and a key's first token MAY coincide with a stage identifier (`Security::Kerberos` is a `Protocol` key). A consumer resolving an authored value MUST therefore try the whole value as a key name **before** reading its leading token as a stage identifier.
+- Scoping a field changes no key's lifecycle, so it MUST NOT trigger a vocabulary contract revision under [RFC 0003](../../rfcs/0003-per-key-vocabulary-versioning.md).
+
 ### Example file
 
 ```toml

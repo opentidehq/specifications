@@ -1,0 +1,40 @@
+name: Sentinel platform block
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000011
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+description: |
+  Scheduled Sentinel analytics rule with grouping and an account entity.
+status: STAGING
+severity: High
+response:
+  alert_severity: High
+configurations:
+  sentinel:
+    enabled: true
+    schema: platform::sentinel::1.0
+    status: STAGING
+    query: |
+      SecurityEvent
+      | where EventID == 4688
+      | take 1
+    scheduling:
+      frequency: PT1H
+      lookback: PT2H
+    alert:
+      title: Suspicious process creation
+      severity: High
+      suppression: false
+      create_incident: true
+    grouping:
+      event: SingleAlert
+      alert:
+        enabled: false
+    entities:
+      - entity: Account
+        mappings:
+          - identifier: Name
+            column: Account

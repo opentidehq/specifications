@@ -1,6 +1,6 @@
 ---
 spec: workspace
-version: "1.0"
+version: "1.2"
 schema_id: null
 status: normative
 supersedes: null
@@ -16,6 +16,7 @@ Defines the standard detection-repository directory layout scaffolded by `openti
 
 - A healthy OpenTide workspace MUST contain `objects/` with subdirectories for each core object family.
 - Generated artifacts MUST live under `.opentide/` — not committed as hand-edited sources.
+- `.opentide/states/deployment/` is generated deployment state and MUST be committed. `.opentide/states/sharing.jsonl` is a regenerable cache and SHOULD be gitignored. Implementations MUST NOT gitignore the whole `.opentide/states/` directory ([deployment-state.md](deployment-state.md#git-policy)).
 - Client configuration overrides MUST live only under `.opentide/configurations/`.
 - Object YAML files MUST reside in the paths defined by merged `paths.toml` configuration.
 - An object instance MUST be a YAML file placed directly in its family directory (`objects/rules/rule.yaml`, not `objects/rules/team/rule.yaml`). A file in a subdirectory of that directory is not an object instance. Implementations MUST NOT deploy it. Nested folders under a family directory are outside this specification.
@@ -41,6 +42,9 @@ Registered objects list: `threat`, `objective`, `rule`.
 |------|---------|----------------------------|
 | `.opentide/configurations/` | TOML overrides (paths, deployment, schema, platforms) | Yes |
 | `.opentide/configurations/platforms/` | Per-platform TOML | Yes |
+| `.opentide/configurations/sharing.toml` | Every sharing integration block (`[[misp]]`) | Yes |
+| `.opentide/states/sharing.jsonl` | Current sharing synchronization ledger. One JSON object per line. Regenerable cache; SHOULD be gitignored. | No |
+| `.opentide/states/deployment/` | Deployment state: one `<uuid>.json` shard (`deployment.state::1.0`) per rule holding the Defender for Endpoint, SentinelOne, and CrowdStrike rule ids per tenant. Authoritative; MUST be committed. | No |
 | `.opentide/schemas/` | Generated JSON Schema | No |
 | `.opentide/templates/` | Generated YAML templates | No |
 | `.opentide/exports/` | Generated exports | No |
@@ -66,7 +70,7 @@ Registered objects list: `threat`, `objective`, `rule`.
 | router | `opentide.schema.json` |
 | inflight shard | `inflight.shard.1.0.schema.json` |
 
-Inflight shard schema source of truth: [schemas/inflight.shard.1.0.schema.json](../schemas/inflight.shard.1.0.schema.json). Generated copies MAY be emitted to `.opentide/schemas/` by `opentide generate schemas` when supported.
+Inflight shard schema source of truth: [schemas/inflight.shard.1.0.schema.json](../schemas/inflight.shard.1.0.schema.json). Deployment state shard schema source of truth: [schemas/deployment.state.1.0.schema.json](../schemas/deployment.state.1.0.schema.json). Generated copies MAY be emitted to `.opentide/schemas/` by `opentide generate schemas` when supported.
 
 `visibility.1.0.schema.json` is **not** an object family — there are no `visibility` objects under `objects/`. It is the schema used to validate the client `visibility.toml` [configuration](configuration.md), emitted here alongside the object schemas. `opentide.schema.json` is the IDE router that dispatches object YAML to the correct object schema by `metadata.schema`.
 
@@ -114,7 +118,11 @@ detection-repo/
 │   ├── schemas/
 │   ├── templates/
 │   ├── exports/
-│   └── inflight/
+│   ├── inflight/
+│   └── states/
+│       ├── deployment/
+│       │   └── <uuid>.json
+│       └── sharing.jsonl
 ├── .vscode/
 ├── .github/workflows/
 ├── README.md
@@ -151,10 +159,29 @@ Consumers overlay shards onto the committed registry when the shard object `meta
 |--------|---------|---------|
 | `inflight_shards` | pull request / merge request | `opentide generate inflight` |
 | `inflight_prune` | push to default branch | `opentide generate inflight prune` |
+| `share` | push to the default branch only, and only when setup selected the sharing stage | `opentide share push --changed` |
+| `deploy_production` | push to the default branch | `opentide deploy --plan PRODUCTION`, then the deployment-state write-back whenever the deploy started ([below](#production-deployment-state)) |
+
+`share` is the production release. Setup defaults the stage off (`--no-sharing`; the wizard checkbox is unchecked). `opentide setup` MUST NOT emit it, or any other `opentide share` command, on a pull request or merge request. The trigger, the setup choice, and the diff are specified in [sharing.md](sharing.md#setup).
+
+### Production deployment state
+
+The production deploy job (`opentide deploy --plan PRODUCTION` on the default branch) is the only generated job that commits deployment state. `opentide setup` and `opentide setup ci` MUST generate it to meet [deployment-state.md CI requirements 1–7](deployment-state.md#continuous-integration):
+
+1. Queue production jobs without dropping runs (no GitHub `concurrency` group, GitLab `resource_group`, Azure the strongest available lock, documented).
+2. Before the dry run and the deploy, overlay `.opentide/states/deployment/` from the default-branch tip.
+3. Run the write-back whenever the deploy started, including after a failure, a cancellation, or a timeout.
+4. Stage shards independently of rule files; commit rule files only when `opentide validate --strict` passes on exactly those files, read NUL-delimited.
+5. On a rebase conflict, replay this run's state delta per platform and tenant (`opentide deploy replay-state`); a concurrent change to the same binding is `deployment_state_conflict` and fails the job.
+6. On every terminal write-back failure, print the state diff and push the commit to `refs/opentide/deployment-state/<commit>` before failing.
+7. Log every recorded id as `external_id_recorded` at `WARNING`.
+
+Staging, pull-request, and merge-request deploy jobs MUST NOT commit deployment state. A create on Defender for Endpoint, SentinelOne, or CrowdStrike in those jobs is refused with `deployment_state_unpersisted` before the vendor call ([deployment-state.md](deployment-state.md#the-run-cannot-persist-state)).
 
 ## Relationships
 
 - [configuration.md](configuration.md) — how `paths.toml` is merged and overridden
+- [deployment-state.md](deployment-state.md) — `.opentide/states/deployment/` and the production write-back
 - [versioning.md](versioning.md) — schema artifact naming
 - Object specs — where instances are stored
 
@@ -170,5 +197,9 @@ Object fixtures assume the default layout: rules under `objects/rules/`, etc.
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.2 | 2026-10-16 | The production deploy job has no GitHub Actions `concurrency` group ([specifications#43](https://github.com/OpenTideHQ/specifications/issues/43)). |
+| 1.1 | 2026-10-16 | `.opentide/states/deployment/` holds committed deployment-state shards; `.opentide/states/` is never ignored whole and setup ignores `sharing.jsonl` only. The production deploy job serialises, overlays the default branch's state, and writes it back, and staging jobs cannot create on state-backed platforms ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |
+| 1.0 | 2026-09-28 | Optional CI stage `share` runs `opentide share push --changed` on a push to the default branch. |
+| 1.0 | 2026-09-28 | Sharing uses one client file, `sharing.toml`, and one generated ledger, `.opentide/states/sharing.jsonl`. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `paths.toml` |
 | 1.0 | 2026-09-23 | Object instances are the YAML files directly in each family directory; nested folders are out of scope and are not deployed |

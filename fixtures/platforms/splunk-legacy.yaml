@@ -1,0 +1,26 @@
+name: Splunk legacy platform block
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000014
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+description: |
+  splunk::2.x flat keys. Validate and deploy normalise them onto the v3 layout.
+status: STAGING
+severity: High
+response:
+  alert_severity: High
+configurations:
+  splunk:
+    enabled: true
+    schema: splunk::2.0
+    status: STAGING
+    search: index=main | head 1
+    cron_schedule: "0 * * * *"
+    threshold: 0
+    throttling:
+      fields:
+        - host
+      duration: 1h

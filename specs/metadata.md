@@ -1,6 +1,6 @@
 ---
 spec: metadata
-version: "1.0"
+version: "1.2"
 schema_id: null
 status: normative
 supersedes: null
@@ -20,7 +20,9 @@ Shared metadata block present on all Tide objects (threat, objective, rule). Pro
 - `metadata.version` MUST be present (semver string or integer).
 - `metadata.created` and `metadata.modified` MUST be ISO 8601 date or datetime strings (coerced to string on load).
 - `metadata.tlp` MUST be a valid Traffic Light Protocol value from the `tlp` vocabulary.
+- `metadata.pap`, when present, MUST be a `pap` vocabulary `name` (`white`, `green`, `amber`, `red`).
 - `metadata.author`, `metadata.contributors`, and `metadata.organisation` MAY be omitted.
+- `metadata.reviewed`, when present, MUST be an ISO 8601 date or datetime string (coerced to string on load). A date-only value denotes 00:00:00Z on that date. The field is defined only for `metadata.schema: rule::1.1`. `threat::1.0`, `objective::1.0`, and `rule::1.0` MUST reject it.
 
 ## Definition
 
@@ -34,15 +36,17 @@ Shared metadata block present on all Tide objects (threat, objective, rule). Pro
 | `created` | string | yes | Creation date |
 | `modified` | string | yes | Last modification date |
 | `tlp` | string | yes | Traffic Light Protocol classification |
+| `pap` | string | no | Permissible Actions Protocol classification. Omitted means no PAP tag on share. |
 | `author` | string | no | Primary author |
 | `contributors` | list[string] | no | Additional contributors |
 | `organisation` | Organisation | no | Owning organisation |
+| `reviewed` | string | no | Last human review of a detection rule. Defined only for `rule::1.1`. Omitted means no recorded review. Staleness is defined in [rule-1.1.md](objects/rule-1.1.md#review-staleness). |
 
 ### `organisation` (Organisation)
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `uuid` | string | yes | Organisation UUID |
+| `uuid` | string | yes | Organisation UUID. Sharing uses it as the default publishing organisation. |
 | `name` | string | yes | Organisation display name |
 
 ### `references` (ObjectReferences)
@@ -58,8 +62,10 @@ Optional on threat, objective, and rule objects.
 ## Relationships
 
 - [versioning.md](versioning.md) — `metadata.schema` and `metadata.version` semantics
-- [specs/vocabularies/catalog.md](vocabularies/catalog.md) — `tlp` vocabulary
+- [specs/vocabularies/catalog.md](vocabularies/catalog.md) — `tlp` and `pap` vocabularies
+- [sharing/misp-1.0.md](sharing/misp-1.0.md) — consumes `metadata.tlp`, optional `metadata.pap`, and `metadata.organisation.uuid` as the publishing organisation unless the `[[misp]]` block overrides it
 - Object specs — embed `metadata` as required top-level block
+- [objects/rule-1.1.md](objects/rule-1.1.md) — optional `metadata.reviewed` and the unreviewed-rule predicate
 
 ## Defaults & overrides
 
@@ -84,4 +90,6 @@ metadata:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.2 | 2026-09-30 | Optional `metadata.reviewed` on `rule::1.1` only ([RFC 0008](../rfcs/0008-rule-reviewed-date.md)). |
+| 1.1 | 2026-09-28 | Optional `metadata.pap` for sharing ([RFC 0005](../rfcs/0005-sharing-system.md)). Sharing uses `organisation.uuid` as the default publishing organisation. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `models/metadata.py` |

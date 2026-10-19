@@ -18,6 +18,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 - `name` and top-level `composition` MUST be present.
 - `objective` body MUST include at least one `signals` entry.
 - Each signal MUST have `name`, `uuid`, `description`, `severity`, `methodology`, `entities`, and `data`.
+- `entities` values MUST be stage-scoped as `<stage>::<key>` — `Host::Process`, not `Process` — because the same key name is defined under more than one stage (see [RFC 0005](../../rfcs/0005-scoped-signal-entities.md)).
 - `objective.composition` MUST mirror the top-level `composition` strategy and description.
 - `objective.threats` entries MUST reference valid threat UUIDs when cross-validation is enabled.
 - `references` MAY be omitted.
@@ -56,7 +57,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 | `composition` | ObjectiveComposition | yes | — | Nested composition (same semantics as top-level) |
 | `investment` | string | no | null | Investment level |
 | `threats` | list[string] | no | null | Threat vector UUIDs |
-| `attack` | list[string] | no | null | ATT&CK technique IDs |
+| `mitre_attack` | list[string] | no | null | ATT&CK technique ids (`att&ck::1.1`) |
 
 ### `signals[]` (DetectionSignal)
 
@@ -65,10 +66,10 @@ A detection objective defines what to detect: prioritized signals, composition s
 | `name` | string | yes | — | Signal name |
 | `uuid` | string | yes | — | Signal UUID |
 | `description` | string | yes | — | Signal description |
-| `severity` | string | yes | — | Severity vocabulary |
+| `severity` | string | yes | — | Alert severity vocabulary (`alert_severity::1.0`) |
 | `data` | SignalData | yes | — | Data availability and requirements |
 | `methodology` | string | yes | — | Detection methodology vocabulary |
-| `entities` | list[string] | yes | — | Signal entity vocabulary values |
+| `entities` | list[string] | yes | — | Signal entity vocabulary values, stage-scoped (`signal.entities::1.0`; e.g. `Host::Process`, `Cloud::Account`) |
 | `effort` | integer | no | null | Recovery effort (NIST 800-61) |
 | `detectors` | list[ExternalDetector] | no | null | External detector references |
 | `examples` | list[DetectionExample] | no | null | Example queries |
@@ -80,7 +81,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 |-------|------|----------|-------------|
 | `availability` | string | yes | Data availability level |
 | `requirements` | string | yes | Data source requirements |
-| `logsources` | list[string] | no | MITRE data source references |
+| `logsources` | list[string] | no | Log source names from the workspace `visibility.toml` (`tide.config.visibility.logsources`) |
 
 ### `detectors[]` (ExternalDetector)
 
@@ -105,7 +106,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 - [metadata.md](../metadata.md) — shared metadata
 - [threat-1.0.md](threat-1.0.md) — referenced by `objective.threats`
 - [rule-1.0.md](rule-1.0.md) — rules reference objectives via `detection_model` (objective UUID)
-- Vocabularies: `detection.composition`, `detection.types`, `detection.methodology`, `signal.entities`, `severity`, `datasources`, `efforts`
+- Vocabularies: `detection.composition`, `detection.types`, `detection.methodology`, `signal.entities`, `alert_severity`, `efforts`, `att&ck`
 
 ## Defaults & overrides
 
@@ -138,7 +139,7 @@ objective:
       description: Suspicious authentication activity
       severity: Medium
       methodology: analytics
-      entities: [host]
+      entities: [Host::Hostname]          # stage-scoped: <stage>::<key>
       data:
         availability: Complete
         requirements: Security event logs
@@ -152,4 +153,5 @@ objective:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-10-06 | Technique list key is `mitre_attack`, pinned to `att&ck::1.1`. Signal `severity` uses `alert_severity::1.0`. `signals[].data.logsources` names workspace `visibility.toml` entries. `schema_id` stays `objective::1.0`. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `models/objective.py` |

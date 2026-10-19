@@ -1,0 +1,16 @@
+{
+  "object_uuid": "00000000-0000-4000-8003-0000000000AB",
+  "platforms": {
+    "crowdstrike": {
+      "falcon-prod": "c5e1b2a0e4c84f0a9d3b7e6a1c8f0d22"
+    },
+    "defender_for_endpoint": {
+      "contoso": "12345",
+      "fabrikam": "67890"
+    },
+    "sentinel_one": {
+      "s1-prod": "4242"
+    }
+  },
+  "schema": "deployment.state::1.0"
+}
