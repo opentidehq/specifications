@@ -1,6 +1,6 @@
 ---
 spec: deployment
-version: "1.1"
+version: "1.2"
 schema_id: null
 status: normative
 supersedes: null
@@ -21,6 +21,7 @@ Defines rule deployment statuses, promotion strategy, proxy settings, and debug 
 - Deprecated statuses MUST NOT be used for new rules (opentide emits warnings).
 - Platform-specific `status` on configuration blocks MUST also be valid deployment statuses when set.
 - For Defender for Endpoint, SentinelOne, and CrowdStrike, update, disablement, and deletion MUST use the tenant binding in [deployment state](deployment-state.md). A `RELEASE` or `PREVIEW` action with no binding MUST NOT create a remote rule unless the deployment-state destination is not ignored and the binding can be durably retained.
+- `opentide deploy` MUST select only the rule files placed directly in the configured rules directory (`paths.objects.rule`, see [workspace layout](workspace.md)). A rule file in a subdirectory of that folder MUST NOT be deployed.
 
 ## Definition
 
@@ -146,3 +147,4 @@ Default rule status in fixtures: `STAGING` — see [fixtures/valid/rule-1.0.yaml
 |---------|------|-------|
 | 1.0 | 2026-06-25 | Initial spec from opentide `deployment.toml` |
 | 1.1 | 2026-10-16 | Vendor-assigned rule ids: update, disablement, and deletion on Defender for Endpoint, SentinelOne, and CrowdStrike use the binding in [deployment state](deployment-state.md); creates require a destination that is not ignored and a run that can persist state; `external_id_missing` is a warning ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |
+| 1.2 | 2026-10-19 | `opentide deploy` selects only rule files placed directly in the configured rules directory; a rule file in a subfolder is not deployed ([specifications#16](https://github.com/OpenTideHQ/specifications/pull/16)). |
