@@ -1,6 +1,6 @@
 ---
 spec: sharing
-version: "1.1"
+version: "1.2"
 schema_id: null
 status: normative
 supersedes: null
@@ -90,7 +90,7 @@ A two-instance MISP setup is two `[[misp]]` entries. A MISP instance plus an Ope
 | `enabled` | bool | no | `false` | Participate in share runs. |
 | `max_tlp` | string | yes | — | A `tlp` vocabulary `name`. Objects above this ceiling are `skipped_tlp`. Order: `clear` < `green` < `amber` < `amber+strict` < `red`. |
 | `object_types` | list[string] | no | `["threat", "objective", "rule"]` | Families this block shares. |
-| `rule_statuses` | list[string] | no | `["PRODUCTION"]` | Rule statuses this block shares. Values MUST be names from merged `deployment.toml`. Threats and objectives ignore this key. |
+| `rule_statuses` | list[string] | no | `["PRODUCTION"]` | Rule statuses this block shares. A rule matches when the status of at least one enabled platform block (`configurations.<platform>` with `enabled: true`) is in the list. The root `status` is matched only when no enabled platform block has a status. Values MUST be names from merged `deployment.toml`. Threats and objectives ignore this key. |
 
 The connector spec defines every other key in its block. Within a known integration, an unrecognised key MUST be a configuration error naming the key and the block `name`, raised before any destination is contacted. A top-level array whose key names no known connector is a warning, and that array is skipped, so a workspace can declare `[[opencti]]` before its CLI supports it.
 
@@ -269,6 +269,7 @@ Bundled `sharing.toml` ships with no enabled block. A block MUST set `max_tlp`. 
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.2 | 2026-10-19 | `rule_statuses` matches the statuses of a rule's enabled platform blocks, which deploy uses and promotion rewrites, and falls back to the root `status` only when no enabled block has one ([opentide#583](https://github.com/OpenTideHQ/opentide/issues/583)). |
 | 1.1 | 2026-10-16 | `.opentide/states/` holds sharing's cache and deployment's committed shards ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). A future subsystem states whether its state is a cache or a record and whether it is committed. The directory is never ignored whole. Ledger fields are unchanged. |
 | 1.0 | 2026-09-28 | [RFC 0006](../rfcs/0006-sharing-ci.md). Optional sharing stage, default off, runs `opentide share push --changed` only on a push to the default branch. |
 | 1.0 | 2026-09-28 | Initial spec from accepted [RFC 0005](../rfcs/0005-sharing-system.md). Integration blocks are top-level arrays (`[[misp]]`) with per-block selection and a required `max_tlp`, merged by `name`. Share state is `.opentide/states/sharing.jsonl`. `preview` writes no files. |

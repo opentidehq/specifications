@@ -63,7 +63,7 @@ Deploy sends `frequency` as Sentinel `queryFrequency` and `lookback` as `queryPe
 | `severity` | string | optional | null | Sentinel severity. When omitted, deploy uses `response.alert_severity`. `Critical` is sent as `High`. |
 | `suppression` | string \| boolean | optional | `false` | `false` disables suppression and sends a one-hour duration. A [duration](#durations), ISO 8601 or shorthand, enables suppression for that long. Boolean `true` fails deploy. |
 | `create_incident` | boolean | optional | `true` | Whether a firing alert opens an incident. |
-| `tactics` | list[string] | optional | null | Sentinel tactic names. Replaced when the rule's ATT&CK techniques resolve to tactics. |
+| `tactics` | list[string] | optional | null | Sentinel tactic names (the ARM `AttackTactic` enum). Replaced when the rule's ATT&CK techniques resolve to tactics: each `att&ck` stage maps to the tactic of the same name. Stealth, Defense Impairment, and the ICS Evasion tactic map to `DefenseEvasion`. A stage with no Sentinel tactic is dropped. |
 | `techniques` | list[string] | optional | null | Technique ids. Replaced by the rule's resolved techniques when those exist. |
 | `custom_details` | list[CustomDetail] | optional | null | Extra alert properties. |
 | `dynamic_properties` | list[DynamicProperty] | optional | null | Column-driven alert properties. |
@@ -233,4 +233,5 @@ Fixture: [fixtures/platforms/sentinel.yaml](../../fixtures/platforms/sentinel.ya
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-09-30 | Initial field contract from the Sentinel configuration model and deployer. |
+| 1.1 | 2026-10-19 | `tactics`: ATT&CK v19 renamed Defense Evasion (TA0005) to Stealth and split out Defense Impairment (TA0112). Both, and the ICS Evasion tactic, deploy as `DefenseEvasion`, the only Sentinel tactic for them. A stage with no Sentinel tactic is dropped ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)). Schema id unchanged. |
 | 1.1 | 2026-10-19 | [Durations](#durations): ISO 8601 stays the documented form; shorthand, single-unit or compound (`30m`, `1h10m`, `1d2h`, `2m30s`), with the grammar of [Elastic Security](elastic-1.0.md#durations), is accepted and converted to ISO 8601 at deploy ([opentide#564](https://github.com/OpenTideHQ/opentide/pull/564) and the opentide 0.16.0 follow-up, which makes shorthand case-sensitive and adds seconds). Applies to `scheduling.frequency`, `scheduling.lookback`, `alert.suppression`, and `grouping.alert.grouping_lookback`. Schema id unchanged. |
