@@ -19,6 +19,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 - `objective` body MUST include at least one `signals` entry.
 - Each signal MUST have `name`, `uuid`, `description`, `severity`, `methodology`, `entities`, and `data`.
 - `entities` values MUST be stage-scoped as `<stage>::<key>` — `Host::Process`, not `Process` — because the same key name is defined under more than one stage (see [RFC 0005](../../rfcs/0005-scoped-signal-entities.md)).
+- A signal binding (`reuse`) is not valid on this schema. Bindings require [`objective::1.1`](objective-1.1.md) (`binding_requires_1_1`).
 - `objective.composition` MUST mirror the top-level `composition` strategy and description.
 - `objective.threats` entries MUST reference valid threat UUIDs when cross-validation is enabled.
 - `references` MAY be omitted.
@@ -106,6 +107,7 @@ A detection objective defines what to detect: prioritized signals, composition s
 - [metadata.md](../metadata.md) — shared metadata
 - [threat-1.0.md](threat-1.0.md) — referenced by `objective.threats`
 - [rule-1.0.md](rule-1.0.md) — rules reference objectives via `detection_model` (objective UUID)
+- [objective-1.1.md](objective-1.1.md) — same object, plus a `reuse` binding (draft). This schema stays normative for definition-only objectives.
 - Vocabularies: `detection.composition`, `detection.types`, `detection.methodology`, `signal.entities`, `alert_severity`, `att&ck`
 
 ## Defaults & overrides
@@ -155,6 +157,7 @@ objective:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-10-19 | Signal bindings are [`objective::1.1`](objective-1.1.md) ([RFC 0011](../../rfcs/0011-signal-reuse.md)). Field tables unchanged. |
 | 1.0 | 2026-10-19 | `signals[].effort` is an integer implementation-effort score (1–10) and is not pinned to the `efforts` vocabulary, whose four named categories no integer could match ([specifications#42](https://github.com/OpenTideHQ/specifications/issues/42)). `schema_id` stays `objective::1.0`. |
 | 1.0 | 2026-10-06 | Technique list key is `mitre_attack`, pinned to `att&ck::1.1`. Signal `severity` uses `alert_severity::1.0`. `signals[].data.logsources` names workspace `visibility.toml` entries. `schema_id` stays `objective::1.0`. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `models/objective.py` |

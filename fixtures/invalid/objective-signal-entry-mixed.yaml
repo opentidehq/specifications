@@ -1,0 +1,24 @@
+name: Mixed Signal Entry
+
+metadata:
+  uuid: 00000000-0000-4000-8002-000000000021
+  schema: objective::1.1
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+
+composition:
+  strategy: synergetic
+  description: Binding combined with a local name
+
+objective:
+  priority: High
+  type: Threat
+  description: reuse plus a definition field
+  composition:
+    strategy: synergetic
+    description: Binding combined with a local name
+  signals:
+    - reuse: 00000000-0000-4000-8099-000000000001
+      name: Local name is not allowed on a binding
