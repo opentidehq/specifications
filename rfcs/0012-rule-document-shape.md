@@ -105,7 +105,7 @@ Adding a platform later is an optional key. It does not bump `rule::2.0`. A plat
 
 ### Pins
 
-`rule::1.0` and `rule::1.1` pins stay where they are. `rule::2.0` pins the same contracts on the new paths: `rule.severity` (`severity::1.0`), `rule.techniques` (`att&ck::1.1`), `rule.response.alert_severity` (`alert_severity::1.0`), and `metadata.tlp` (`tlp::1.0`). `rule.response.responders` has no pin: the `responders` vocabulary is retired and the field is free text. `rule.objective` binds the `objective` model vocabulary, as `detection_model` does: every objective and every signal defined under one.
+`rule::1.0` and `rule::1.1` pins stay where they are. `rule::2.0` pins the same contracts on the new paths: `rule.severity` (`severity::1.0`), `rule.techniques` (`att&ck::1.2`), `rule.response.alert_severity` (`alert_severity::1.0`), and `metadata.tlp` (`tlp::1.0`). `rule.response.responders` has no pin: the `responders` vocabulary is retired and the field is free text. `rule.objective` binds the `objective` model vocabulary, as `detection_model` does: every objective and every signal defined under one.
 
 ### Migrating a file
 

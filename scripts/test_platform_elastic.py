@@ -172,6 +172,10 @@ class ElasticSpecMatchesRfcTests(unittest.TestCase):
         spec = {row["Stage"]: row["Tactic id"] for row in _table(_read(SPEC), "Stage")}
         self.assertEqual(spec, rfc._tactics())
 
+    def test_tactic_aliases(self) -> None:
+        spec = {row["Legacy stage"]: row["Stage"] for row in _table(_read(SPEC), "Legacy stage")}
+        self.assertEqual(spec, rfc._tactic_aliases())
+
     def test_preserved_fields(self) -> None:
         spec: set[str] = set()
         for row in _table(_read(SPEC), "Preserved field"):

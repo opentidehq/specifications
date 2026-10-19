@@ -24,6 +24,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## threat 1.0
 
+- Bump `threat.mitre_attack` pin to `att&ck::1.2` (ATT&CK 20.0). Additive minor; `att&ck::1.1` keys are unaffected ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)).
 - Correct `threat.surface` to stage-scoped values (`<stage>::<key>`, e.g. `OS::Windows::Desktop`). The vocabulary groups keys under stages and the same key name is defined under two of them — `VPN`, `VPN::OpenVPN`, `VPN::WireGuard`, `Wireless` and `Industrial` are each both `Infrastructure` and `Protocol` — so a bare key name was ambiguous and those five values were unreachable. The prior description asserting values "are not prefixed with the stage id" was wrong and is corrected in place; no vocabulary version bump, as `surface::1.0` key names are unchanged and only the authored encoding is corrected.
 - Bump `threat.actors.name` pin to `actors::1.1`. The 220 galaxy clusters added at `actors::1.1` were present in the vocabulary but unreachable behind the `actors::1.0` pin, so a correctly-authored MISP cluster UUID was reported as an unknown vocabulary value. Additive minor; `actors::1.0` keys are unaffected.
 - Correct `threat.impact` and `threat.leverage` to non-empty `list[string]`; semicolon-packed strings are invalid and MUST NOT collapse to the first token ([#12](https://github.com/OpenTideHQ/specifications/issues/12)).
@@ -32,10 +33,12 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## objective 1.1
 
+- `objective.mitre_attack` is pinned to `att&ck::1.2` (ATT&CK 20.0), as in `objective::1.0` ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)).
 - Draft schema `objective::1.1` ([RFC 0011](rfcs/0011-signal-reuse.md)). A signal entry may be a definition or `reuse: <signal-uuid>`, binding a signal defined on another objective already in the repository. `objective::1.0` stays normative for definition-only objectives and is not deprecated.
 
 ## objective 1.0
 
+- Bump `objective.mitre_attack` pin to `att&ck::1.2` (ATT&CK 20.0). Additive minor; `att&ck::1.1` keys are unaffected ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)).
 - Rules reference an objective, or a signal defined under it, through `detection_model`.
 - Signal bindings are `objective::1.1`. Field tables unchanged ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - `objective.signals[].effort` is an integer implementation-effort score from 1 to 10 and is no longer pinned to the `efforts` vocabulary. The type said integer while the pin named four string categories, so no authored value could satisfy both ([#42](https://github.com/OpenTideHQ/specifications/issues/42)).
@@ -44,6 +47,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
+- Bump `techniques` pin to `att&ck::1.2` (ATT&CK 20.0). Additive minor; `att&ck::1.1` keys are unaffected ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)).
 - `configurations.elastic` (`ElasticConfig`, `platform::elastic::1.0`) is added ([RFC 0007](rfcs/0007-elastic-security-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - Correct `detection_model`: it references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design; a signal reference implements that signal, and its owning objective is the rule's objective. The objective-only wording was wrong. New fixture `fixtures/cross-object/rule-references-signal.yaml`.
 - `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage comes from `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
@@ -51,6 +55,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.0
 
+- Bump `techniques` pin to `att&ck::1.2` (ATT&CK 20.0). Additive minor; `att&ck::1.1` keys are unaffected ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)).
 - `configurations.elastic` (`ElasticConfig`, `platform::elastic::1.0`) is added ([RFC 0007](rfcs/0007-elastic-security-platform.md)). Additive; every existing rule stays valid and `schema_id` stays `rule::1.0`.
 - Correct `detection_model`: it references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design; a signal reference implements that signal, and its owning objective is the rule's objective. The objective-only wording was wrong. New fixture `fixtures/cross-object/rule-references-signal.yaml`.
 - `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage comes from `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
@@ -86,11 +91,15 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## vocabulary format 1.0
 
+- `removed` excludes a key from contracts at or above its revision. The key table said "at or below", contradicting Contract resolution (`removed > M.m`); the rule itself is unchanged. Document the `source`, `source_version` and `source_fetched_at` provenance keys that generated vocabularies carry.
 - Staged vocabularies state one prefixing rule: a field bound to a staged vocabulary declares `tide.vocab.scoped` and authors `<stage>::<key>`. Records that a key name may itself contain `::`, and that resolution is therefore raw-first; and that scoping triggers no contract revision under RFC 0003.
 - Initial normative spec bootstrapped from opentide `vocabulary.schema.json`.
 
 ## vocabulary catalog 1.0
 
+- `att&ck` restored to ATT&CK 19.2 at `1.1` and refreshed to ATT&CK 20.0 at `1.2` ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)). The canonical copy was ATT&CK v17 with no key at `1.1` while every technique pin named `att&ck::1.1`, so T1685–T1690, T1059.013 and the other v18/v19 techniques were rejected. `1.1` adds 60 keys (the set opentide 0.9.0–0.12.1 shipped) and `1.2` adds 19 (T1696–T1701 and sub-techniques, T1685.007, T1608.007, T1476, T0869.001/.002). 27 IDs that ATT&CK revoked or deprecated (T1562 and its sub-techniques, T1070.001/.002, T1656, T1672, eleven ICS techniques) get `removed = "2.0"`, so they still resolve under every `att&ck::1.x` pin. Live keys use the v19 tactics `Stealth` (TA0005, formerly Defense Evasion) and `Defense Impairment` (TA0112); RFC 0007's tactic table follows, and maps the legacy `Defense Evasion` stage of removed keys to `Stealth`. Six techniques take MITRE's renames (for example T1211 "Exploitation for Stealth"). Enterprise sub-technique names keep the `Parent: Sub` form. The header gains `source = "mitre-attack"` and `source_version = "20.0"`.
+- `att&ck.groups` adds 41 groups at `1.1` and 2 at `1.2`; `mitigations` adds 1 at `1.1`; `datasources` adds 4 at `1.1`. No schema pins these vocabularies.
+- `scripts/validate.py` rejects a pin `field::M.m` that no key of `field` is introduced at, so a pin can no longer name an empty minor.
 - `responders.vocab.toml` is retired. It shipped with `keys = []` while `response.responders` was pinned to it, so every authored value failed validation and no instance could fix it (vocabularies are not locally extensible). The alert handling team is per-organisation configuration: the field is free text defaulted from `[deployment] default_responders` (opentide#507).
 - Initial catalog of 36 bundled vocabularies copied from opentide.
 
@@ -195,6 +204,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-elastic 1.0
 
+- The ATT&CK tactic table follows `att&ck::1.2` (ATT&CK 20.0): TA0005 is `Stealth` and `Defense Impairment` is TA0112, as in RFC 0007. Removed keys still staged `Defense Evasion` map to `Stealth` through a legacy-stage table. With the old `Defense Evasion` row, techniques staged only in the v19 tactics emitted no `threat` entry ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)).
 - `platform::elastic::1.0` ([RFC 0007](rfcs/0007-elastic-security-platform.md), [specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)). Elastic Security detection rule through the Kibana detection engine API: seven rule types (`query`, `eql`, `esql`, `threshold`, `new_terms`, `threat_match`, `machine_learning`), grouped author blocks for scheduling, severity, risk, suppression, guides, exceptions, overrides, and actions, and fourteen constraint codes. `status` is required on the block. Identity is `metadata.uuid` as the Kibana `rule_id`; nothing is stored.
 - Durations are single-unit shorthand (`5m`), compound shorthand (`1h10m`, `1d2h`, `2m30s`; units in `d`, `h`, `m`, `s` order, each at most once, lower case), or ISO 8601, all equivalent; Kibana receives a single-unit value ([opentide#564](https://github.com/OpenTideHQ/opentide/pull/564)).
 - `kill-process` and `suspend-process` without `field` compile to `config: {field: process.entity_id, overwrite: true}`, because Kibana rejects them without `config` ([opentide#562](https://github.com/OpenTideHQ/opentide/pull/562)).
