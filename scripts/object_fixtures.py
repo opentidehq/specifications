@@ -497,6 +497,15 @@ def validate_objective(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[Ch
                     )
                 )
         _require_uuid_v4(signal.get("uuid"), path=f"objective.signals[{index}].uuid", errors=errors)
+        effort = signal.get("effort")
+        if effort is not None and (isinstance(effort, bool) or not isinstance(effort, int)):
+            errors.append(
+                CheckError(
+                    "invalid_effort",
+                    "signal.effort MUST be an integer score, not a string or a vocabulary term",
+                    f"objective.signals[{index}].effort",
+                )
+            )
     return errors
 
 
@@ -565,4 +574,5 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "rule-reviewed-bad-date.yaml": "invalid_reviewed",
     "rule-1.0-reviewed.yaml": "reviewed_not_in_schema",
     "objective-no-signals.yaml": "empty_signals",
+    "objective-effort-string.yaml": "invalid_effort",
 }

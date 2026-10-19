@@ -32,6 +32,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## objective 1.0
 
+- `objective.signals[].effort` is an integer implementation-effort score from 1 to 10 and is no longer pinned to the `efforts` vocabulary. The type said integer while the pin named four string categories, so no authored value could satisfy both ([#42](https://github.com/OpenTideHQ/specifications/issues/42)).
 - `objective.signals[].entities` is stage-scoped: an authored value is `<stage>::<key>` (`Host::Process`). Seven of the 28 keys are defined under two stages, so the bare key name could not tell a host account from a cloud account and seven values were unreachable. Stage ids are capitalised to `Host`, `Network`, `Cloud`. No key changes, so `signal.entities::1.0` is unaffected ([RFC 0005](rfcs/0005-scoped-signal-entities.md)).
 - Initial normative spec bootstrapped from opentide `models/objective.py`.
 
