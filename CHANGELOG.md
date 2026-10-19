@@ -39,6 +39,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `models/rule.py` (exemplar template).
 
+## workspace 1.3
+
+- An object instance is a YAML file placed directly in its family directory; a file in a subfolder is not an instance and MUST NOT be deployed or shared ([specifications#16](https://github.com/OpenTideHQ/specifications/pull/16), [opentide#312](https://github.com/OpenTideHQ/opentide/issues/312)).
+
 ## workspace 1.2
 
 - The production deploy job queues without dropping runs: GitHub Actions has no `concurrency` group, because GitHub cancels a pending run and its commit's diff would never deploy ([specifications#43](https://github.com/OpenTideHQ/specifications/issues/43)).
@@ -68,6 +72,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - `responders.vocab.toml` is retired. It shipped with `keys = []` while `response.responders` was pinned to it, so every authored value failed validation and no instance could fix it (vocabularies are not locally extensible). The alert handling team is per-organisation configuration: the field is free text defaulted from `[deployment] default_responders` (opentide#507).
 - Initial catalog of 36 bundled vocabularies copied from opentide.
+
+## deployment 1.2
+
+- `opentide deploy` selects only the rule files placed directly in the configured rules directory ([specifications#16](https://github.com/OpenTideHQ/specifications/pull/16)).
 
 ## deployment 1.1
 

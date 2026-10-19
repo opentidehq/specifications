@@ -173,17 +173,27 @@ class DeploymentStateSpecTests(unittest.TestCase):
             self.assertIn("metadata.uuid", text)
 
 
+def _version_key(version: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in version.split("."))
+
+
 class SpecVersionTests(unittest.TestCase):
     def test_versions_bumped_with_history(self) -> None:
+        """Each spec RFC 0010 touched is at least at that version, with its history.
+
+        Later changes may bump a spec further, so the current version is only
+        required to be no older than the RFC 0010 one.
+        """
         specs = _read(ROOT / "SPECS.md")
         changelog = _read(ROOT / "CHANGELOG.md")
         for rel, version in BUMPED.items():
             text = _read(ROOT / rel)
             meta = _frontmatter(text)
-            self.assertEqual(meta["version"], version, rel)
+            current = meta["version"]
+            self.assertGreaterEqual(_version_key(current), _version_key(version), rel)
             self.assertIn(f"| {version} | 2026-10-16 |", text, rel)
             self.assertIn(f"## {meta['spec']} {version}", changelog, rel)
-            self.assertRegex(specs, rf"\| {re.escape(version)} \| [^|]+ \| normative \| \[{re.escape(rel)}\]")
+            self.assertRegex(specs, rf"\| {re.escape(current)} \| [^|]+ \| normative \| \[{re.escape(rel)}\]")
 
     def test_platform_schema_ids_unchanged(self) -> None:
         for path in sorted(PLATFORMS.glob("*-1.0.md")):
