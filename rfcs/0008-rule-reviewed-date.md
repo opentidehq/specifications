@@ -2,11 +2,11 @@
 
 - **RFC:** 0008
 - **Title:** Optional review date on detection rules
-- **Author:** OpenTide
+- **Author:** opentide
 - **Status:** draft
 - **Created:** 2026-09-30
-- **Issue:** [#28](https://github.com/OpenTideHQ/specifications/issues/28)
-- **PR:** [#29](https://github.com/OpenTideHQ/specifications/pull/29)
+- **Issue:** [#28](https://github.com/opentidehq/specifications/issues/28)
+- **PR:** [#29](https://github.com/opentidehq/specifications/pull/29)
 
 ## Summary
 
@@ -110,12 +110,12 @@ No change to `vocabularies/`, threat, objective, deployment statuses, platform s
 
 ## Unresolved questions
 
-- The opentide command that prints unreviewed rules (name, flags, default window) is an implementation issue in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide), opened after this RFC is accepted.
+- The opentide command that prints unreviewed rules (name, flags, default window) is an implementation issue in [opentidehq/opentide](https://github.com/opentidehq/opentide), opened after this RFC is accepted.
 - Whether a later revision should record the reviewer separately from `author`. Not required to answer the staleness query.
 
 ## References
 
-- Issue: [#28](https://github.com/OpenTideHQ/specifications/issues/28)
+- Issue: [#28](https://github.com/opentidehq/specifications/issues/28)
 - [specs/metadata.md](../specs/metadata.md) — `created` and `modified`; `metadata` 1.1 added optional `pap` without an object schema bump
 - [specs/objects/rule-1.0.md](../specs/objects/rule-1.0.md) — MDR object, `rule::1.0`
 - [specs/versioning.md](../specs/versioning.md) — minor revisions coexist; objects opt in via `metadata.schema`

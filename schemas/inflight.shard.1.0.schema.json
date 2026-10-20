@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://opentide.dev/schemas/inflight.shard.1.0.schema.json",
-  "title": "OpenTide inflight preview shard",
+  "title": "opentide inflight preview shard",
   "description": "Envelope for a per-object preview overlay written under .opentide/inflight/ during open pull requests or merge requests.",
   "type": "object",
   "required": ["schema", "written_at", "object", "change"],

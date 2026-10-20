@@ -13,7 +13,7 @@ This RFC introduces versioned vocabulary identifiers in the form `field::major.m
 
 Vocabulary files in `vocabularies/*.vocab.toml` are canonical today but effectively unversioned. As a result, object schemas can change behavior when enum sets drift over time, even if `metadata.schema` remains unchanged (for example, `threat::1.0` may validate differently depending on when validation runs).
 
-OpenTide already version-controls object schemas (`metadata.schema` like `rule::1.0`). Vocabulary resolution should provide equivalent determinism:
+opentide already version-controls object schemas (`metadata.schema` like `rule::1.0`). Vocabulary resolution should provide equivalent determinism:
 
 - Schema `X::M.N` resolves against explicit vocabulary revisions.
 - Additive vocabulary changes can roll out through minor revisions.
@@ -40,7 +40,7 @@ Examples:
 - Each canonical vocabulary file will carry an explicit version value (follow-up in SPEC-V3/SPEC-V5).
 - Implementations MUST treat `(field, version)` as the lookup key, not filename alone.
 
-> **Note (2026-06-26):** File-level vocabulary `version` proposed here and in [PR #2](https://github.com/OpenTideHQ/specifications/pull/2) is **superseded** by per-key lifecycle metadata in [RFC 0003](0003-per-key-vocabulary-versioning.md). Identifier format, schema pins, and bump semantics in this RFC remain directionally valid; only the version *granularity* moves from file to `[[keys]]` entries.
+> **Note (2026-06-26):** File-level vocabulary `version` proposed here and in [PR #2](https://github.com/opentidehq/specifications/pull/2) is **superseded** by per-key lifecycle metadata in [RFC 0003](0003-per-key-vocabulary-versioning.md). Identifier format, schema pins, and bump semantics in this RFC remain directionally valid; only the version *granularity* moves from file to `[[keys]]` entries.
 
 ### Schema pinning (`tide.vocab`)
 

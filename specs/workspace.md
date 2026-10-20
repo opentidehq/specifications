@@ -14,7 +14,7 @@ Defines the standard detection-repository directory layout scaffolded by `openti
 
 ## Requirements
 
-- A healthy OpenTide workspace MUST contain `objects/` with subdirectories for each core object family.
+- A healthy opentide workspace MUST contain `objects/` with subdirectories for each core object family.
 - Generated artifacts MUST live under `.opentide/` — not committed as hand-edited sources.
 - `.opentide/states/deployment/` is generated deployment state and MUST be committed. `.opentide/states/sharing.jsonl` is a regenerable cache and SHOULD be gitignored. Implementations MUST NOT gitignore the whole `.opentide/states/` directory ([deployment-state.md](deployment-state.md#git-policy)).
 - Client configuration overrides MUST live only under `.opentide/configurations/`.
@@ -200,8 +200,8 @@ Object fixtures assume the default layout: rules under `objects/rules/`, etc.
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.4 | 2026-10-19 | `objective::1.1` schema and template artifacts beside `objective::1.0` ([RFC 0011](../rfcs/0011-signal-reuse.md)). |
-| 1.3 | 2026-10-19 | Object instances are the YAML files placed directly in each family directory. A file in a subfolder is not an instance and is neither deployed nor shared ([specifications#16](https://github.com/OpenTideHQ/specifications/pull/16), [opentide#312](https://github.com/OpenTideHQ/opentide/issues/312)). |
-| 1.2 | 2026-10-16 | The production deploy job has no GitHub Actions `concurrency` group ([specifications#43](https://github.com/OpenTideHQ/specifications/issues/43)). |
+| 1.3 | 2026-10-19 | Object instances are the YAML files placed directly in each family directory. A file in a subfolder is not an instance and is neither deployed nor shared ([specifications#16](https://github.com/opentidehq/specifications/pull/16), [opentide#312](https://github.com/opentidehq/opentide/issues/312)). |
+| 1.2 | 2026-10-16 | The production deploy job has no GitHub Actions `concurrency` group ([specifications#43](https://github.com/opentidehq/specifications/issues/43)). |
 | 1.1 | 2026-10-16 | `.opentide/states/deployment/` holds committed deployment-state shards; `.opentide/states/` is never ignored whole and setup ignores `sharing.jsonl` only. The production deploy job serialises, overlays the default branch's state, and writes it back, and staging jobs cannot create on state-backed platforms ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |
 | 1.0 | 2026-09-28 | Optional CI stage `share` runs `opentide share push --changed` on a push to the default branch. |
 | 1.0 | 2026-09-28 | Sharing uses one client file, `sharing.toml`, and one generated ledger, `.opentide/states/sharing.jsonl`. |

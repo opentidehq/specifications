@@ -4,7 +4,7 @@ Request for Comments (RFCs) document significant specification changes before th
 
 ## Process
 
-1. Open a GitHub [spec-change issue](../.github/ISSUE_TEMPLATE/spec-change.yml) (never Linear; OpenTide tracking is public GitHub only)
+1. Open a GitHub [spec-change issue](../.github/ISSUE_TEMPLATE/spec-change.yml) (never Linear; opentide tracking is public GitHub only)
 2. Draft an RFC from [0000-template.md](0000-template.md)
 3. Maintainer review and acceptance
 4. Update specs, fixtures, `SPECS.md`, and `CHANGELOG.md` in the same PR as the RFC, unless the request is for an RFC draft only
@@ -17,7 +17,7 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0001](0001-authority-model.md) | Authority model and change process | accepted |
 | [0002](0002-vocabulary-versioning.md) | Vocabulary identifier versioning and schema pins | proposed |
 | [0003](0003-per-key-vocabulary-versioning.md) | Per-key vocabulary versioning and schema pins | proposed |
-| [0004](https://github.com/OpenTideHQ/specifications/issues/8) | Sysdig Falco deployer (reserved by issue #8; file not yet in tree) | reserved |
+| [0004](https://github.com/opentidehq/specifications/issues/8) | Sysdig Falco deployer (reserved by issue #8; file not yet in tree) | reserved |
 | [0005](0005-scoped-signal-entities.md) | Stage-scoped `signal.entities`, and one prefixing rule for every staged vocabulary | accepted |
 | [0005](0005-sharing-system.md) | Sharing system and MISP connector | accepted |
 | [0006](0006-sharing-ci.md) | Sharing on the production merge | accepted |

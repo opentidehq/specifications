@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-`configurations.defender_for_endpoint` is a Microsoft Defender custom detection rule. The detection text is KQL. Query validation is supported. Defender assigns the remote rule id; OpenTide stores it per tenant in [deployment state](../deployment-state.md) so the next deploy updates that rule.
+`configurations.defender_for_endpoint` is a Microsoft Defender custom detection rule. The detection text is KQL. Query validation is supported. Defender assigns the remote rule id; opentide stores it per tenant in [deployment state](../deployment-state.md) so the next deploy updates that rule.
 
 Shared fields are defined in [platforms](index.md#shared-platform-block).
 

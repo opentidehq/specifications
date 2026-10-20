@@ -1,12 +1,12 @@
-# OpenTide Specifications
+# opentide Specifications
 
-> Normative specification library for OpenTide. Not a documentation website.
+> Normative specification library for opentide. Not a documentation website.
 
 ## Governance
 
 - GOVERNANCE.md: Change process (GitHub Issue → RFC → spec → opentide)
 - AGENTS.md: Instructions for AI agents (tracking is public GitHub only; never Linear)
-- Tracking: OpenTideHQ/specifications and OpenTideHQ/opentide issues. Never Linear.
+- Tracking: opentidehq/specifications and opentidehq/opentide issues. Never Linear.
 - SPECS.md: Index of active spec versions
 - rfcs/0001-authority-model.md: Authority model (spec → Pydantic → JSON Schema)
 

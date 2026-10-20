@@ -1,11 +1,11 @@
 ---
 title: Specifications
-description: What a Tide object is, how the object families chain, and how to read the normative OpenTide specifications.
+description: What a Tide object is, how the object families chain, and how to read the normative opentide specifications.
 ---
 
-# OpenTide Specifications
+# opentide Specifications
 
-These are the **normative specifications** for OpenTide — the contract that every detection object, tool, and agent relies on. The [opentide](https://github.com/OpenTideHQ/opentide) package implements this contract; the generated JSON Schema is a build artifact, never the source of truth. Each spec is versioned independently — there is no framework-wide version.
+These are the **normative specifications** for opentide — the contract that every detection object, tool, and agent relies on. The [opentide](https://github.com/opentidehq/opentide) package implements this contract; the generated JSON Schema is a build artifact, never the source of truth. Each spec is versioned independently — there is no framework-wide version.
 
 <Callout type="info">
 Writing detections rather than the spec? Start with [Usage → Object model](/docs/usage/concepts/object-model/) for the hands-on view. These pages are the precise, normative reference behind it.
@@ -13,7 +13,7 @@ Writing detections rather than the spec? Start with [Usage → Object model](/do
 
 ## What is a Tide object?
 
-Detection content in OpenTide is a small graph of typed **objects**, each a YAML file with a shared `metadata` block. Three families exist:
+Detection content in opentide is a small graph of typed **objects**, each a YAML file with a shared `metadata` block. Three families exist:
 
 | Family | Schema | Answers | Spec |
 |--------|--------|---------|------|
@@ -45,9 +45,9 @@ Every object declares both, and they are independent:
 | Artifact | Location |
 |----------|----------|
 | Normative specs | this section, `specs/` |
-| Conformance fixtures (valid/invalid YAML) | [`fixtures/`](https://github.com/OpenTideHQ/specifications/tree/main/fixtures) |
-| Canonical vocabularies (allowed values) | [`vocabularies/`](https://github.com/OpenTideHQ/specifications/tree/main/vocabularies) |
-| Implementation | [opentide](https://github.com/OpenTideHQ/opentide) Python package |
+| Conformance fixtures (valid/invalid YAML) | [`fixtures/`](https://github.com/opentidehq/specifications/tree/main/fixtures) |
+| Canonical vocabularies (allowed values) | [`vocabularies/`](https://github.com/opentidehq/specifications/tree/main/vocabularies) |
+| Implementation | [opentide](https://github.com/opentidehq/opentide) Python package |
 
 ## Reading order
 

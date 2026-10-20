@@ -1,7 +1,7 @@
 {
   "root": true,
   "title": "Specifications",
-  "description": "Normative OpenTide specifications for authors, maintainers, and agents",
+  "description": "Normative opentide specifications for authors, maintainers, and agents",
   "icon": "FileText",
   "pages": [
     "index",

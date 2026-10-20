@@ -7,35 +7,35 @@
 - **Created:** 2026-09-15
 - **Revised:** 2026-09-28 — `[[misp]]` integration blocks in one `sharing.toml`; minimal MISP key set; pinned `opentide` template version 5 (see [Revision history](#revision-history))
 - **Accepted:** 2026-09-28 — normative text in [specs/sharing.md](../specs/sharing.md) and [specs/sharing/misp-1.0.md](../specs/sharing/misp-1.0.md)
-- **Issue:** [#10](https://github.com/OpenTideHQ/specifications/issues/10)
-- **PR:** [#9](https://github.com/OpenTideHQ/specifications/pull/9); acceptance and normative specs in [#19](https://github.com/OpenTideHQ/specifications/pull/19)
+- **Issue:** [#10](https://github.com/opentidehq/specifications/issues/10)
+- **PR:** [#9](https://github.com/opentidehq/specifications/pull/9); acceptance and normative specs in [#19](https://github.com/opentidehq/specifications/pull/19)
 
-> Numbering note: [issue #8](https://github.com/OpenTideHQ/specifications/issues/8) reserved **RFC 0004** for the Sysdig Falco deployer. That RFC file is not in this repository yet. This proposal takes **0005** to avoid colliding with that reservation.
+> Numbering note: [issue #8](https://github.com/opentidehq/specifications/issues/8) reserved **RFC 0004** for the Sysdig Falco deployer. That RFC file is not in this repository yet. This proposal takes **0005** to avoid colliding with that reservation.
 
 ## Summary
 
-Add a first-class **sharing** subsystem to OpenTide: pluggable connectors, one workspace file `sharing.toml` in which every destination is a block under its integration (`[[misp]]`, later `[[opencti]]`) carrying its own selection and TLP ceiling, and a CLI family `opentide share` that publishes Tide objects (threat, objective, rule) to external intelligence platforms. Sharing is **not** detection-platform deployment — `opentide deploy` remains the path to SIEMs and EDRs. The first connector is **MISP**.
+Add a first-class **sharing** subsystem to opentide: pluggable connectors, one workspace file `sharing.toml` in which every destination is a block under its integration (`[[misp]]`, later `[[opencti]]`) carrying its own selection and TLP ceiling, and a CLI family `opentide share` that publishes Tide objects (threat, objective, rule) to external intelligence platforms. Sharing is **not** detection-platform deployment — `opentide deploy` remains the path to SIEMs and EDRs. The first connector is **MISP**.
 
-The MISP connector is a **document transport**, not a field mapper. One MISP Event carries one Tide object, and that Event carries exactly one instance of the upstream [`opentide`](https://github.com/MISP/misp-objects/tree/main/objects/opentide) MISP object, whose `opentide-object` attribute holds the object document verbatim — comments, key order, and formatting preserved. Nothing is removed from that document. Exposure is decided by the block's TLP ceiling and the MISP `distribution` that the object's `metadata.tlp` value maps to; it is never decided by filtering fields out of the payload. Tagging is restricted to TLP, PAP, and galaxy clusters from two galaxies (`threat-actor` and `mitre-attack-pattern`). Event identity belongs to the receiving instance: the Event UUID is MISP-assigned, and the connector finds an existing Event by a composite key — creator organisation plus the object UUID carried in the `opentide` object — so several organisations can publish their own version of the same OpenTide object without colliding.
+The MISP connector is a **document transport**, not a field mapper. One MISP Event carries one Tide object, and that Event carries exactly one instance of the upstream [`opentide`](https://github.com/MISP/misp-objects/tree/main/objects/opentide) MISP object, whose `opentide-object` attribute holds the object document verbatim — comments, key order, and formatting preserved. Nothing is removed from that document. Exposure is decided by the block's TLP ceiling and the MISP `distribution` that the object's `metadata.tlp` value maps to; it is never decided by filtering fields out of the payload. Tagging is restricted to TLP, PAP, and galaxy clusters from two galaxies (`threat-actor` and `mitre-attack-pattern`). Event identity belongs to the receiving instance: the Event UUID is MISP-assigned, and the connector finds an existing Event by a composite key — creator organisation plus the object UUID carried in the `opentide` object — so several organisations can publish their own version of the same opentide object without colliding.
 
 This RFC is additive with respect to the object model. It does not revise `threat::1.0`, `objective::1.0`, or `rule::1.0`, and it adds or modifies no file under `specs/objects/` or `schemas/pins/`. After acceptance, follow-up PRs add `specs/sharing.md`, `specs/sharing/misp-1.0.md`, an additive `specs/metadata.md` `1.1` revision carrying an optional `metadata.pap` field, the pinned upstream template copy, and conformance fixtures. opentide implements the CLI and connector in a separate repository.
 
 ## Motivation
 
-Detection-engineering teams already keep ATT&CK-mapped threats, objectives, and rules in an OpenTide workspace, with TLP on every object. They still copy that content into MISP by hand — or do not share it at all — because OpenTide can **deploy** a rule to Sentinel but cannot **publish** the surrounding detection knowledge to a CTI community.
+Detection-engineering teams already keep ATT&CK-mapped threats, objectives, and rules in an opentide workspace, with TLP on every object. They still copy that content into MISP by hand — or do not share it at all — because opentide can **deploy** a rule to Sentinel but cannot **publish** the surrounding detection knowledge to a CTI community.
 
 Stakeholders:
 
 - **Detection engineers** need a repeatable, TLP-aware `opentide share` whose output is predictable: what was authored is what is published.
-- **CTI / ISAC operators** need MISP Events that round-trip OpenTide identity so communities can consume detections as intelligence and hand them back into a workspace, not as a lossy summary.
+- **CTI / ISAC operators** need MISP Events that round-trip opentide identity so communities can consume detections as intelligence and hand them back into a workspace, not as a lossy summary.
 - **Implementers (opentide)** need a connector contract analogous to [platforms/index.md](../specs/platforms/index.md): capability matrix, TOML shape, honest failure modes, idempotent upsert.
 - **Workspace maintainers** need to publish to more than one MISP instance — an internal instance and a sector ISAC, say — with per-instance credentials, per-instance policy, and no forked configuration.
 
 Two things changed since the first draft of this RFC, and both point away from field decomposition.
 
-**A document is the useful unit.** The first draft decomposed every object into MISP `detection` object attributes, event-level typed attributes, and a wide taxonomy tag set. That mapping is lossy in one direction and unfaithful in the other: OpenTide fields that no MISP template models (TVM `terrain`, `leverage`, `viability`, chaining; signal composition) had to become untyped `text` attributes with comments, while required template attributes OpenTide cannot fill needed placeholders. A consumer could not reconstruct the object, and an implementer had to re-derive dozens of per-family rules. Carrying the document itself makes consumption a single parse and makes a future inbound path (`share pull`) tractable rather than speculative. Upstream MISP now ships an `opentide` object template built for exactly this, which removes the earlier objection that document transport would require every receiving instance to install a custom template first.
+**A document is the useful unit.** The first draft decomposed every object into MISP `detection` object attributes, event-level typed attributes, and a wide taxonomy tag set. That mapping is lossy in one direction and unfaithful in the other: opentide fields that no MISP template models (TVM `terrain`, `leverage`, `viability`, chaining; signal composition) had to become untyped `text` attributes with comments, while required template attributes opentide cannot fill needed placeholders. A consumer could not reconstruct the object, and an implementer had to re-derive dozens of per-family rules. Carrying the document itself makes consumption a single parse and makes a future inbound path (`share pull`) tractable rather than speculative. Upstream MISP now ships an `opentide` object template built for exactly this, which removes the earlier objection that document transport would require every receiving instance to install a custom template first.
 
-**Filtering the payload was the wrong control.** The first draft carried five `include_*` switches plus a redacted-YAML attachment option, each deciding whether queries, internal references, tenants, or platform blocks were emitted. That is a second, weaker access-control system sitting beside the one OpenTide already has. TLP is on every object; MISP distribution and sharing groups already express reach. Deciding exposure twice — once by TLP and once by a per-field switch — produces objects that are neither faithful nor safe, and it makes conformance unverifiable because the emitted shape depends on flag combinations. This revision keeps one control surface: the object's TLP, checked against each block's ceiling and mapped to a MISP distribution.
+**Filtering the payload was the wrong control.** The first draft carried five `include_*` switches plus a redacted-YAML attachment option, each deciding whether queries, internal references, tenants, or platform blocks were emitted. That is a second, weaker access-control system sitting beside the one opentide already has. TLP is on every object; MISP distribution and sharing groups already express reach. Deciding exposure twice — once by TLP and once by a per-field switch — produces objects that are neither faithful nor safe, and it makes conformance unverifiable because the emitted shape depends on flag combinations. This revision keeps one control surface: the object's TLP, checked against each block's ceiling and mapped to a MISP distribution.
 
 Without a spec, each workspace would invent its own export script, TLP handling would drift, and a later OpenCTI or TAXII connector would not share a CLI or config model.
 
@@ -74,7 +74,7 @@ flowchart LR
 
 ### 2. Deliverables after acceptance
 
-The draft revisions of this RFC shipped no spec text, so reviewers could agree on the model before text was written against it. [AGENTS.md](../AGENTS.md) permits that sequencing — spec, fixture, `SPECS.md`, and `CHANGELOG.md` updates go in the RFC PR *or* "follow-up after acceptance per maintainer guidance". Acceptance lands every deliverable below in one PR, [#19](https://github.com/OpenTideHQ/specifications/pull/19).
+The draft revisions of this RFC shipped no spec text, so reviewers could agree on the model before text was written against it. [AGENTS.md](../AGENTS.md) permits that sequencing — spec, fixture, `SPECS.md`, and `CHANGELOG.md` updates go in the RFC PR *or* "follow-up after acceptance per maintainer guidance". Acceptance lands every deliverable below in one PR, [#19](https://github.com/opentidehq/specifications/pull/19).
 
 | Path | Action | `schema_id` |
 |------|--------|-------------|
@@ -244,7 +244,7 @@ A connector implementation MUST declare:
 | `preview` | yes (payload without HTTP mutation) |
 | `status` | yes (local state; MAY optionally view the remote) |
 | `retract` | yes (unpublish; optional delete) |
-| `pull` | **no** (inbound MISP → OpenTide is out of scope) |
+| `pull` | **no** (inbound MISP → opentide is out of scope) |
 
 Connectors without `pull` MUST NOT advertise import. Each connector spec MUST list every key its block accepts; the loader rejects any other key in that integration's blocks before contacting any destination, so a future connector neither inherits MISP's keys nor needs a removed-keys list.
 
@@ -376,7 +376,7 @@ TLP and PAP tag strings are copied character-for-character from the `misp` field
 
 **Removed from the first draft:** the tag rows for maturity, RSIT, kill chain, sectors, criticality, and viability, and the whole `opentide:*` bookkeeping namespace with its `tag_namespace` option. Those six vocabularies now travel inside the object document only. Family, schema, version, object UUID, and rule status travel as `opentide` object attributes and inside the document, so duplicating them as tags added maintenance without adding information.
 
-**Cluster resolution is a lookup, never a construction.** The connector MUST resolve every cluster against the receiving instance and MUST emit the cluster `value` string exactly as the instance returns it. It MUST NOT derive a cluster value from an OpenTide vocabulary field: `att&ck::1.0` `name` values use a `<Parent>: <Sub-technique>` form that does not equal a MISP cluster value, and silently constructing one produces a tag that looks right and matches nothing.
+**Cluster resolution is a lookup, never a construction.** The connector MUST resolve every cluster against the receiving instance and MUST emit the cluster `value` string exactly as the instance returns it. It MUST NOT derive a cluster value from an opentide vocabulary field: `att&ck::1.0` `name` values use a `<Parent>: <Sub-technique>` form that does not equal a MISP cluster value, and silently constructing one produces a tag that looks right and matches nothing.
 
 | Identifier source | Galaxy | Lookup — first key yielding exactly one match |
 |-------------------|--------|----------------------------------------------|
@@ -417,9 +417,9 @@ The Event title is the object `name` alone. The first draft's question 10 asked 
 
 An object whose top-level `name` is absent or empty after trimming, or whose `metadata.created` is absent or not a valid `YYYY-MM-DD` date, is `failed` with the offending field named, and no remote Event is created or modified.
 
-**`threat_level_id`** (MISP: `1` High, `2` Medium, `3` Low, `4` Undefined) is derived from the object, never configured. The source field is per family: threat → top-level `criticality`; rule → top-level `severity`; objective → none. One table covers all three OpenTide severity scales. The OpenTide scales and the MISP scale are separate namespaces, and neither `severity.vocab.toml` nor `alert_severity.vocab.toml` carries a `misp` field, so this translation is introduced here rather than read from vocabulary data.
+**`threat_level_id`** (MISP: `1` High, `2` Medium, `3` Low, `4` Undefined) is derived from the object, never configured. The source field is per family: threat → top-level `criticality`; rule → top-level `severity`; objective → none. One table covers all three opentide severity scales. The opentide scales and the MISP scale are separate namespaces, and neither `severity.vocab.toml` nor `alert_severity.vocab.toml` carries a `misp` field, so this translation is introduced here rather than read from vocabulary data.
 
-| OpenTide scale | Source values | `threat_level_id` |
+| opentide scale | Source values | `threat_level_id` |
 |---|---|---|
 | `criticality::1.0` | `Emergency`, `Severe`, `High` | `1` |
 | `criticality::1.0` | `Medium` | `2` |
@@ -474,7 +474,7 @@ A missing required relation on the receiving instance's template fails the objec
 
 Updates are confined to the seven envelope fields, the tag set, and the one `opentide` object. Remote objects or Event-level attributes the connector did not emit are left in place with an informational note, and the remote Event `uuid` and creator organisation are never rewritten.
 
-**Relations point from child to parent.** The template documents `opentide-relation` only as "UUID of other OpenTIDE Objects with a relation to this Object", so direction is a choice this RFC makes:
+**Relations point from child to parent.** The template documents `opentide-relation` only as "UUID of other opentide Objects with a relation to this Object", so direction is a choice this RFC makes:
 
 | Family | Source field | Emitted |
 |--------|--------------|---------|
@@ -482,11 +482,11 @@ Updates are confined to the seven envelope fields, the tag set, and the one `ope
 | `objective` | `objective.threats[]` | one per distinct UUID |
 | `rule` | top-level `detection_model` | zero or one |
 
-Child-to-parent is chosen because a child always knows its parent while a parent does not enumerate its children. Emitting from the child needs no workspace-wide graph walk, and adding a rule never forces a re-push of the objective or threat above it. Values are 36-character lowercase canonical UUIDs of Tide objects — never MISP Event or object UUIDs — at most one attribute per distinct UUID, ordered ascending lexicographically so a golden fixture is stable. A relation value that is not a canonical UUID fails the object. A relation source that is absent, null, or an empty list emits zero relations and is a normal success. A relation UUID whose object was not shared to that block is still emitted, with an informational note (D-4): the value is OpenTide identity, and withholding it would make the record depend on share history.
+Child-to-parent is chosen because a child always knows its parent while a parent does not enumerate its children. Emitting from the child needs no workspace-wide graph walk, and adding a rule never forces a re-push of the objective or threat above it. Values are 36-character lowercase canonical UUIDs of Tide objects — never MISP Event or object UUIDs — at most one attribute per distinct UUID, ordered ascending lexicographically so a golden fixture is stable. A relation value that is not a canonical UUID fails the object. A relation source that is absent, null, or an empty list emits zero relations and is a normal success. A relation UUID whose object was not shared to that block is still emitted, with an informational note (D-4): the value is opentide identity, and withholding it would make the record depend on share history.
 
 No `extends_uuid` value is set and no MISP event extension is created. The first draft's parent-presence machinery — a pre-HTTP share plan, a remote presence probe, and rules about MISP `published` state — existed only to keep `extends_uuid` from dangling. Carrying the parent UUID as an attribute value removes the whole problem: the record is correct on emission, needs no ordering guarantee, and repairs itself when the parent is shared later.
 
-**Event identity.** The Event UUID is assigned by the receiving instance and is never forced to equal `metadata.uuid`. The reason is the multi-publisher case, not an implementation convenience: in a shared community, several organisations may each publish their own version of the same OpenTide object, each under their own MISP organisation. If the Event UUID were the object UUID, the second publisher's Event would collide with the first's, and every instance would have to choose between rejecting the publication and overwriting another organisation's record. So the connector locates its own Event by a composite key, and both halves are required (D-2):
+**Event identity.** The Event UUID is assigned by the receiving instance and is never forced to equal `metadata.uuid`. The reason is the multi-publisher case, not an implementation convenience: in a shared community, several organisations may each publish their own version of the same opentide object, each under their own MISP organisation. If the Event UUID were the object UUID, the second publisher's Event would collide with the first's, and every instance would have to choose between rejecting the publication and overwriting another organisation's record. So the connector locates its own Event by a composite key, and both halves are required (D-2):
 
 ```
 lookup key = (Event.Orgc.uuid == resolved publishing organisation, §7.1)
@@ -646,7 +646,7 @@ This is configuration validation, not object-schema validation.
 
 ### 9. Conformance fixtures
 
-Sharing fixtures live in their own tree, `fixtures/sharing/valid/` and `fixtures/sharing/invalid/`, because this repository's checker treats `fixtures/invalid/*.yaml` as OpenTide object documents (D-9). `scripts/sharing_fixtures.py` covers the TOML and JSON sharing fixtures.
+Sharing fixtures live in their own tree, `fixtures/sharing/valid/` and `fixtures/sharing/invalid/`, because this repository's checker treats `fixtures/invalid/*.yaml` as opentide object documents (D-9). `scripts/sharing_fixtures.py` covers the TOML and JSON sharing fixtures.
 
 | Fixture | Expectation |
 |---------|-------------|
@@ -744,7 +744,7 @@ The refresh direction is **upstream MISP → this repository**, which is the *re
 
 ## Alternatives
 
-- **Keep the per-family field decomposition** (first draft §7.5). Rejected: lossy for TVM and signal fields, requires placeholders for template-required attributes OpenTide cannot fill, cannot round-trip, and multiplies per-family rules an implementer must reproduce exactly.
+- **Keep the per-family field decomposition** (first draft §7.5). Rejected: lossy for TVM and signal fields, requires placeholders for template-required attributes opentide cannot fill, cannot round-trip, and multiplies per-family rules an implementer must reproduce exactly.
 - **Treat MISP as a detection platform** (`configurations.misp` + `opentide deploy`). Rejected: MISP is not a detection runtime; deploy strategies (`INERT`/`PREVIEW`/`RELEASE`) do not map to CTI publication.
 - **One-off `opentide generate misp` export** with no connector or destination configuration. Rejected: no TLP policy, no idempotent upsert, no multi-server, no retract.
 - **One file per target under `sharing/targets/`.** Rejected: sharing destinations are workspace-authored blocks of a connector, not bundled products. One `sharing.toml` keeps every URL, credential reference, and ceiling in one diff. Platform subfolders stay as they are; they are a different registry.
@@ -780,7 +780,7 @@ Every numbered item from the first draft carries a disposition. Item numbers are
 | 10 | Event `info` prefix | **Settled** at acceptance: no prefix. `info` is the object `name`; the creator organisation MISP shows beside each Event carries the publisher marker (§7.4). |
 | 11 | CLI exit codes | **Settled.** The ordered rules of §4 are retained unchanged in order and outcome; only the reason names in the code table changed. |
 
-New questions this revision opens. Each is a point where the emitted shape depends on MISP data-model behaviour this RFC does not have confirmed, and each MUST be pinned before `specs/sharing/misp-1.0.md` is written. Local reference material establishes only that a live MISP instance accepts an `opentide` object carrying a full OpenTide object document in a single `text` attribute; it is one organisation's lab output and is not a normative reference, so nothing below is settled by pointing at it.
+New questions this revision opens. Each is a point where the emitted shape depends on MISP data-model behaviour this RFC does not have confirmed, and each MUST be pinned before `specs/sharing/misp-1.0.md` is written. Local reference material establishes only that a live MISP instance accepts an `opentide` object carrying a full opentide object document in a single `text` attribute; it is one organisation's lab output and is not a normative reference, so nothing below is settled by pointing at it.
 
 | # | Question | Why it matters |
 |---|----------|----------------|
@@ -796,18 +796,18 @@ Dispositions at acceptance, as pinned in [specs/sharing/misp-1.0.md](../specs/sh
 
 ## References
 
-- Spec-change issue: [specifications#10](https://github.com/OpenTideHQ/specifications/issues/10)
-- RFC PR: [specifications#9](https://github.com/OpenTideHQ/specifications/pull/9)
-- Threat field-type corrections consumed by this mapping: [specifications#11](https://github.com/OpenTideHQ/specifications/issues/11), [specifications#12](https://github.com/OpenTideHQ/specifications/issues/12), [specifications#13](https://github.com/OpenTideHQ/specifications/pull/13)
-- opentide implementation issue: [opentide#184](https://github.com/OpenTideHQ/opentide/issues/184)
+- Spec-change issue: [specifications#10](https://github.com/opentidehq/specifications/issues/10)
+- RFC PR: [specifications#9](https://github.com/opentidehq/specifications/pull/9)
+- Threat field-type corrections consumed by this mapping: [specifications#11](https://github.com/opentidehq/specifications/issues/11), [specifications#12](https://github.com/opentidehq/specifications/issues/12), [specifications#13](https://github.com/opentidehq/specifications/pull/13)
+- opentide implementation issue: [opentide#184](https://github.com/opentidehq/opentide/issues/184)
 - Governance: [GOVERNANCE.md](../GOVERNANCE.md), [RFC 0001](0001-authority-model.md), [AGENTS.md](../AGENTS.md)
-- Tracking: public GitHub only (`OpenTideHQ/specifications`, `OpenTideHQ/opentide`). Never Linear.
+- Tracking: public GitHub only (`opentidehq/specifications`, `opentidehq/opentide`). Never Linear.
 - Upstream MISP object this connector transports: [MISP/misp-objects `objects/opentide`](https://github.com/MISP/misp-objects/tree/main/objects/opentide)
 - MISP objects repository: [MISP/misp-objects](https://github.com/MISP/misp-objects)
 - MISP REST and client: [MISP API documentation](https://github.com/MISP/MISP/blob/2.5/docs/API_Doc.md), [MISP/PyMISP](https://github.com/MISP/PyMISP)
 - Vocabulary `misp` keys consumed here: [specs/vocabularies/format.md](../specs/vocabularies/format.md) (`[[keys]].misp`), [vocabularies/tlp.vocab.toml](../vocabularies/tlp.vocab.toml), [vocabularies/pap.vocab.toml](../vocabularies/pap.vocab.toml)
 - Severity scales without `misp` values, hence the §7.4 translation: [vocabularies/criticality.vocab.toml](../vocabularies/criticality.vocab.toml), [vocabularies/severity.vocab.toml](../vocabularies/severity.vocab.toml), [vocabularies/alert_severity.vocab.toml](../vocabularies/alert_severity.vocab.toml)
 - Analogous target matrix: [specs/platforms/index.md](../specs/platforms/index.md), [specs/deployment.md](../specs/deployment.md)
-- Reserved RFC number: [specifications#8](https://github.com/OpenTideHQ/specifications/issues/8) (Sysdig / RFC 0004)
+- Reserved RFC number: [specifications#8](https://github.com/opentidehq/specifications/issues/8) (Sysdig / RFC 0004)
 - FIRST TLP: https://www.first.org/tlp/
 - PAP taxonomy: https://www.misp-project.org/taxonomies.html#_pap

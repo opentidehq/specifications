@@ -285,7 +285,7 @@ class ListingTests(unittest.TestCase):
     def test_platforms_index(self) -> None:
         text = _read(INDEX)
         self.assertGreaterEqual(_version(text), (1, 2))
-        self.assertIn("OpenTide ships eight detection platform integrations.", text)
+        self.assertIn("opentide ships eight detection platform integrations.", text)
         self.assertNotIn("not yet in this matrix", text)
         self.assertIn("| `elastic` | `platform::elastic::1.0` | [elastic-1.0.md](elastic-1.0.md) |", text)
         self.assertRegex(text, r"\| `elastic` \| Elastic Security \| yes\* \| yes† \| KQL, Lucene, EQL, or ES\\\|QL")

@@ -4,7 +4,7 @@
 - **Title:** Per-key vocabulary versioning and schema pins
 - **Status:** proposed
 - **Created:** 2026-06-26
-- **Supersedes:** file-level vocabulary `version` semantics proposed in [RFC 0002](0002-vocabulary-versioning.md) and [PR #2](https://github.com/OpenTideHQ/specifications/pull/2)
+- **Supersedes:** file-level vocabulary `version` semantics proposed in [RFC 0002](0002-vocabulary-versioning.md) and [PR #2](https://github.com/opentidehq/specifications/pull/2)
 
 ## Summary
 
@@ -12,7 +12,7 @@ This RFC replaces file-level vocabulary versioning with **per-key lifecycle meta
 
 ## Motivation
 
-[RFC 0002](0002-vocabulary-versioning.md) introduces versioned vocabulary identifiers and schema pins — the right direction — but its § Version source still assumes each vocabulary **file** carries a top-level `version`. [PR #2](https://github.com/OpenTideHQ/specifications/pull/2) implements that file-level approach.
+[RFC 0002](0002-vocabulary-versioning.md) introduces versioned vocabulary identifiers and schema pins — the right direction — but its § Version source still assumes each vocabulary **file** carries a top-level `version`. [PR #2](https://github.com/opentidehq/specifications/pull/2) implements that file-level approach.
 
 File-level versioning cannot answer: *what enum did `threat::1.0` allow for `killchain` when it was authored?* Adding a key to `killchain.vocab.toml` would bump the whole file, yet existing schema revisions must keep their original allowed values.
 
@@ -160,4 +160,4 @@ One-time backfill: `version = "1.0"` on all existing `[[keys]]` entries. All cur
 - [RFC 0002](0002-vocabulary-versioning.md) — identifier format and schema pins (file-level version superseded by this RFC)
 - [specs/vocabularies/format.md](../specs/vocabularies/format.md)
 - [specs/metaschema-keywords.md](../specs/metaschema-keywords.md)
-- [PR #2](https://github.com/OpenTideHQ/specifications/pull/2) — superseded approach
+- [PR #2](https://github.com/opentidehq/specifications/pull/2) — superseded approach

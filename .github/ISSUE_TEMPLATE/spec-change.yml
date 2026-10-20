@@ -1,5 +1,5 @@
 name: Spec change proposal
-description: Propose a change to OpenTide normative specifications
+description: Propose a change to opentide normative specifications
 title: "[Spec] "
 labels: ["spec-change"]
 body:
@@ -9,7 +9,7 @@ body:
         Use this template to propose changes to normative specs in the `specifications` repo.
         See [GOVERNANCE.md](../GOVERNANCE.md) for the full change process.
 
-        OpenTide work is public GitHub only. Do not track spec changes in Linear.
+        opentide work is public GitHub only. Do not track spec changes in Linear.
 
   - type: textarea
     id: problem

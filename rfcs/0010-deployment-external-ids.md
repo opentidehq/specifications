@@ -7,21 +7,21 @@
 - **Created:** 2026-09-30
 - **Revised:** 2026-10-16 — renumbered to 0010; resolved CI persistence, staging creates, migration scope, deploy guards, canonical shard form, exit codes, and error semantics
 - **Accepted:** 2026-10-16 — normative text in [specs/deployment-state.md](../specs/deployment-state.md) and the affected platform, workspace, deployment, validation, and sharing specs
-- **Issue:** [#30](https://github.com/OpenTideHQ/specifications/issues/30)
-- **PR:** [#32](https://github.com/OpenTideHQ/specifications/pull/32)
-- **Implementation issue:** [opentide#396](https://github.com/OpenTideHQ/opentide/issues/396)
-- **Implementation PR:** [opentide#555](https://github.com/OpenTideHQ/opentide/pull/555)
-- **Deferred:** inflight moves to `.opentide/states/inflight/` in [#31](https://github.com/OpenTideHQ/specifications/issues/31). This RFC does not move it.
+- **Issue:** [#30](https://github.com/opentidehq/specifications/issues/30)
+- **PR:** [#32](https://github.com/opentidehq/specifications/pull/32)
+- **Implementation issue:** [opentide#396](https://github.com/opentidehq/opentide/issues/396)
+- **Implementation PR:** [opentide#555](https://github.com/opentidehq/opentide/pull/555)
+- **Deferred:** inflight moves to `.opentide/states/inflight/` in [#31](https://github.com/opentidehq/specifications/issues/31). This RFC does not move it.
 
 ## Summary
 
-Vendor-assigned rule ids leave the rule file and move to `.opentide/states/deployment/<metadata.uuid>.json` (`deployment.state::1.0`). Each shard is the map from that rule to the external id of each tenant, for the platforms that assign an id OpenTide does not choose: Microsoft Defender for Endpoint, SentinelOne, and CrowdStrike. Deploy reads and writes the shard. It no longer splices `rule_id::<tenant>:` into the rule YAML.
+Vendor-assigned rule ids leave the rule file and move to `.opentide/states/deployment/<metadata.uuid>.json` (`deployment.state::1.0`). Each shard is the map from that rule to the external id of each tenant, for the platforms that assign an id opentide does not choose: Microsoft Defender for Endpoint, SentinelOne, and CrowdStrike. Deploy reads and writes the shard. It no longer splices `rule_id::<tenant>:` into the rule YAML.
 
 `rule_id`, `rule_id_bundle`, and every `rule_id::<tenant>` key come off every platform block, including the HarfangLab and Carbon Black fields deploy never reads. Platform schema ids stay `platform::<identifier>::1.0`; only the spec documents' versions advance. `rule::1.0` stays `rule::1.0`. A rule that still contains those keys is invalid, and deploy refuses it before any client is built.
 
 **Catalogues that already have those keys must migrate, and the migration has to land in git, or the next deploy creates a second live rule.** Defender, SentinelOne, and CrowdStrike do not address the remote rule by `metadata.uuid`. The YAML line is the only copy of the id. There is no compatibility read that keeps using the rule file once this lands.
 
-The shard is only safe if every created id reaches the default branch. The generated production job therefore serialises, starts from the default branch's state, and commits every shard change even after a partial failure, a cancellation, or a timeout. A CI run that cannot commit state (any plan other than `PRODUCTION`) is refused a create before the vendor call. That closes [opentide#554](https://github.com/OpenTideHQ/opentide/issues/554), where every staging rerun created another remote rule.
+The shard is only safe if every created id reaches the default branch. The generated production job therefore serialises, starts from the default branch's state, and commits every shard change even after a partial failure, a cancellation, or a timeout. A CI run that cannot commit state (any plan other than `PRODUCTION`) is refused a create before the vendor call. That closes [opentide#554](https://github.com/opentidehq/opentide/issues/554), where every staging rerun created another remote rule.
 
 ## Motivation
 
@@ -95,11 +95,11 @@ A deployment shard is not that kind of file. Deleting it, or never committing it
 
 ### Inflight
 
-CI writes `.opentide/inflight/<uuid>.json` (`inflight.shard::1.0`). Setup creates that directory and does not gitignore it. Moving it to `.opentide/states/inflight/` is [#31](https://github.com/OpenTideHQ/specifications/issues/31), after this RFC, so the git policy for `.opentide/states/` is settled before a third occupant arrives. This RFC does not change the inflight path, the shard schema, or the `generate inflight` jobs.
+CI writes `.opentide/inflight/<uuid>.json` (`inflight.shard::1.0`). Setup creates that directory and does not gitignore it. Moving it to `.opentide/states/inflight/` is [#31](https://github.com/opentidehq/specifications/issues/31), after this RFC, so the git policy for `.opentide/states/` is settled before a third occupant arrives. This RFC does not change the inflight path, the shard schema, or the `generate inflight` jobs.
 
 ### Sysdig
 
-[Issue #8](https://github.com/OpenTideHQ/specifications/issues/8) drafts a `rule_id_bundle` on `configurations.sysdig`, described as the same per-tenant map. RFC 0004 is still reserved and has no file here. When that RFC is written, a Sysdig-assigned id goes in the deployment shard. It does not go on the block.
+[Issue #8](https://github.com/opentidehq/specifications/issues/8) drafts a `rule_id_bundle` on `configurations.sysdig`, described as the same per-tenant map. RFC 0004 is still reserved and has no file here. When that RFC is written, a Sysdig-assigned id goes in the deployment shard. It does not go on the block.
 
 ## Detailed design
 
@@ -209,7 +209,7 @@ Acceptance edits the `::1.0` files in place, bumps each document's `version` to 
 - The deploy table's `DELETION` row deletes the bound rule and removes the binding after the delete succeeds; without a binding, `external_id_missing`.
 - The other row updates when a binding exists, and otherwise creates and durably records the returned id in the shard. It does not write the rule file.
 
-`sentinel-one-1.0.md` and `crowdstrike-1.0.md`: the same replacement of `rule_id_bundle` with the shard and the same three rows (STAR status `Disabled`; Falcon `inactive`). The CrowdStrike paragraph that recorded the deployer's reversed `active`/`inactive` mapping goes: [opentide#555](https://github.com/OpenTideHQ/opentide/pull/555) fixes the mapping, and the spec states the shared strategy.
+`sentinel-one-1.0.md` and `crowdstrike-1.0.md`: the same replacement of `rule_id_bundle` with the shard and the same three rows (STAR status `Disabled`; Falcon `inactive`). The CrowdStrike paragraph that recorded the deployer's reversed `active`/`inactive` mapping goes: [opentide#555](https://github.com/opentidehq/opentide/pull/555) fixes the mapping, and the spec states the shared strategy.
 
 `harfanglab-1.0.md` and `carbon-black-cloud-1.0.md`: delete the field row and the requirements that say the bundle may be present and is not read. State that legacy keys are invalid and that migration removes them as `external_id_unused`. Deploy behaviour is otherwise the same text.
 
@@ -262,7 +262,7 @@ flowchart TD
   persist -->|no| create["create, then write the returned id into the shard"]
 ```
 
-`DELETION` or `DISABLEMENT` with no shard entry does not create. It reports `external_id_missing` and does not call the vendor, which is today's missing-id path. It is a warning, not an error: nothing is known to exist on that tenant, so there is nothing OpenTide can act on, and a rule retired before it was ever deployed must not fail every later run. The message says that a remote copy, if one exists, has to be removed by hand. [§5](#5-what-deploy-does-with-the-shard) has the full table.
+`DELETION` or `DISABLEMENT` with no shard entry does not create. It reports `external_id_missing` and does not call the vendor, which is today's missing-id path. It is a warning, not an error: nothing is known to exist on that tenant, so there is nothing opentide can act on, and a rule retired before it was ever deployed must not fail every later run. The message says that a remote copy, if one exists, has to be removed by hand. [§5](#5-what-deploy-does-with-the-shard) has the full table.
 
 #### What has to be migrated
 
@@ -365,7 +365,7 @@ The next deploy to tenant `Contoso` patches detection rule `12345`. It does not 
 | `.opentide/states/sharing.jsonl` | SHOULD be gitignored. Cache. |
 | `.opentide/states/deployment/` | MUST be committed. MUST NOT be gitignored. |
 | `.opentide/states/` | MUST NOT be gitignored as a whole. |
-| `.opentide/inflight/` | Unchanged until [#31](https://github.com/OpenTideHQ/specifications/issues/31). |
+| `.opentide/inflight/` | Unchanged until [#31](https://github.com/opentidehq/specifications/issues/31). |
 
 `opentide setup` MUST stop writing `.opentide/states/` as an ignore rule. The ignore it writes for a new repository is `.opentide/states/sharing.jsonl`. Setup does not rewrite an existing `.gitignore`; `migrate-state` and the create guard are what stop an old ignore from hiding the shards.
 
@@ -387,7 +387,7 @@ For Defender, SentinelOne, and CrowdStrike, per tenant the deployment plan alrea
 
 Disablement is an update that sets the vendor's disabled state, using the shard id. It does not remove the entry.
 
-**The run cannot persist state** when it runs in CI (Azure Pipelines, GitHub Actions, or GitLab CI is detected) under any deployment plan other than `PRODUCTION`: `STAGING`, `FULL`, `ALWAYS`, `MANUAL`, `DEBUG`. Only the generated production job commits shards ([§6](#6-ci-persistence)). Before this rule, every pull-request rerun of `deploy --plan STAGING` created another Defender, SentinelOne, or CrowdStrike rule on the staging tenant, and a tenant with `deployment = "ALWAYS"` received one untracked staging copy and then a production copy after merge ([opentide#554](https://github.com/OpenTideHQ/opentide/issues/554)). Documenting "use separate tenants and clean up by hand" would have kept the very duplicate this RFC exists to remove.
+**The run cannot persist state** when it runs in CI (Azure Pipelines, GitHub Actions, or GitLab CI is detected) under any deployment plan other than `PRODUCTION`: `STAGING`, `FULL`, `ALWAYS`, `MANUAL`, `DEBUG`. Only the generated production job commits shards ([§6](#6-ci-persistence)). Before this rule, every pull-request rerun of `deploy --plan STAGING` created another Defender, SentinelOne, or CrowdStrike rule on the staging tenant, and a tenant with `deployment = "ALWAYS"` received one untracked staging copy and then a production copy after merge ([opentide#554](https://github.com/opentidehq/opentide/issues/554)). Documenting "use separate tenants and clean up by hand" would have kept the very duplicate this RFC exists to remove.
 
 - A local run (no CI detected) may create. The operator commits the shard.
 - `opentide deploy --persist-state-externally` lifts the refusal for an operator who persists `.opentide/states/deployment/` some other way. It is documented, opt-in, and never emitted by generated CI. It does not lift `deployment_state_ignored`.
@@ -395,13 +395,13 @@ Disablement is an update that sets the vendor's disabled state, using the shard 
 
 Deploy continues with independent rules after a per-rule error and exits `1` if any selected rule reported an error-level code. Warnings alone (`external_id_missing`, `deployment_state_ignored` on an update or delete) exit `0`.
 
-The shard is the record of what OpenTide created. It is not rebuilt by listing the tenant's rules and matching titles. A title match is how a renamed rule, or two rules with one name, would update the wrong remote object.
+The shard is the record of what opentide created. It is not rebuilt by listing the tenant's rules and matching titles. A title match is how a renamed rule, or two rules with one name, would update the wrong remote object.
 
 ### 6. CI persistence
 
 A created id that never reaches the default branch is a future duplicate. So the production job that `opentide setup` generates for GitHub Actions, GitLab CI, and Azure Pipelines (`opentide deploy --plan PRODUCTION` on the default branch) commits deployment state itself. It MUST:
 
-1. **Serialise production jobs.** GitHub: job-level `concurrency: {group: opentide-production-<branch>, cancel-in-progress: false}` (superseded by deployment-state 1.1, [specifications#43](https://github.com/OpenTideHQ/specifications/issues/43): GitHub cancels pending runs, so the production job has no concurrency group). GitLab: `resource_group: opentide-production`. Azure: the strongest serialisation available from YAML (`lockBehavior: sequential`), with the generated file stating that it only takes effect when an Exclusive Lock check is configured on the resource the stage uses.
+1. **Serialise production jobs.** GitHub: job-level `concurrency: {group: opentide-production-<branch>, cancel-in-progress: false}` (superseded by deployment-state 1.1, [specifications#43](https://github.com/opentidehq/specifications/issues/43): GitHub cancels pending runs, so the production job has no concurrency group). GitLab: `resource_group: opentide-production`. Azure: the strongest serialisation available from YAML (`lockBehavior: sequential`), with the generated file stating that it only takes effect when an Exclusive Lock check is configured on the resource the stage uses.
 2. **Overlay the default-branch tip's state before deploying.** Before the dry run and the deploy, fetch the default branch and replace `.opentide/states/deployment/` in the working tree with the tip's copy: remove the directory first so the tip's deletions hold, and leave it absent if the tip has none. The tip descends from the triggering commit, so it already contains that commit's state and every later production write-back. Without this, a job that starts on an older commit cannot see the ids a newer job recorded and creates them again.
 3. **Write back whenever the deploy started**, including after a partial failure, a cancellation, or a timeout. GitHub: `if: ${{ always() && steps.deploy.outcome != 'skipped' }}`. Azure: `condition: and(always(), eq(variables['OPENTIDE_DEPLOY_STARTED'], 'true'))`. GitLab: the equivalent, preferably from `after_script` gated on a marker the deploy writes; where the job cannot run the write-back on cancellation or timeout, the generated file says so.
 4. **Stage shards independently of rule files.** Every shard change is staged unconditionally. A rule file the deploy changed (promotion rewrites `status`) is committed only if `opentide validate --strict` passes on exactly those files. The file list is read NUL-delimited (`git diff -z --name-only`, `read -r -d ''`), and `opentide validate --file` fails when any `--file` target matches no object, so a path with a newline or an unmatched path cannot slip past validation. A rule file that fails is left out and the job fails after the state is pushed; it never costs a shard.
@@ -459,12 +459,12 @@ Staging, pull-request, and merge-request jobs do not commit state; §5 refuses t
 - **Store integer ids as JSON numbers.** CrowdStrike ids are strings, and one field type keeps the shard uniform. The integer constraint is a pattern on the string.
 - **A bare directory outside `.opentide/states/` so the current gitignore can stay.** The states directory is the place sharing defined for this. The gitignore is what changes. It was written when that directory held only a cache.
 - **Gitignore the shards and keep them on the deploy runner.** A clean CI checkout would create a second rule on every run.
-- **Let staging CI create and document the duplicates.** That was the first implementation's behaviour ([opentide#554](https://github.com/OpenTideHQ/opentide/issues/554)). Every rerun is a new remote rule, and an `ALWAYS` tenant gets a staging copy and a production copy. Refusing the create before the vendor call is the only outcome that keeps the invariant without a new commit path from pull requests.
+- **Let staging CI create and document the duplicates.** That was the first implementation's behaviour ([opentide#554](https://github.com/opentidehq/opentide/issues/554)). Every rerun is a new remote rule, and an `ALWAYS` tenant gets a staging copy and a production copy. Refusing the create before the vendor call is the only outcome that keeps the invariant without a new commit path from pull requests.
 - **Commit shards from pull-request jobs.** Those runs check out a merge ref or a fork, and their commits would race the merge itself. Persisting from one serialised production job is simpler to reason about.
 - **Copy the run's shard directory over the tip on conflict.** It reverts bindings other runs recorded and resurrects shards that were deleted. Replay per platform and tenant keeps both runs' work.
-- **Make `external_id_missing` an error.** A rule retired before it was ever deployed would then fail every later deploy, and there is nothing OpenTide can do about it. The warning carries the manual-cleanup instruction.
+- **Make `external_id_missing` an error.** A rule retired before it was ever deployed would then fail every later deploy, and there is nothing opentide can do about it. The warning carries the manual-cleanup instruction.
 - **Decide "ignored" by searching `.gitignore` text.** It misses wildcards, nested files, negations, `info/exclude`, and a global excludes file. A false negative is a duplicate rule.
-- **Move inflight in this RFC.** [#31](https://github.com/OpenTideHQ/specifications/issues/31) does that later. Mixing the path move with the id migration puts two unrelated catalogue changes in one upgrade.
+- **Move inflight in this RFC.** [#31](https://github.com/opentidehq/specifications/issues/31) does that later. Mixing the path move with the id migration puts two unrelated catalogue changes in one upgrade.
 
 ## Unresolved questions
 
@@ -479,14 +479,14 @@ None. The questions the draft left open are decided:
 
 ## References
 
-- Spec-change issue: [specifications#30](https://github.com/OpenTideHQ/specifications/issues/30)
-- Inflight path, deferred: [specifications#31](https://github.com/OpenTideHQ/specifications/issues/31)
-- opentide implementation: [opentide#396](https://github.com/OpenTideHQ/opentide/issues/396), [opentide#555](https://github.com/OpenTideHQ/opentide/pull/555)
-- Staging creates refused: [opentide#554](https://github.com/OpenTideHQ/opentide/issues/554); production write-back: [opentide#548](https://github.com/OpenTideHQ/opentide/issues/548)
+- Spec-change issue: [specifications#30](https://github.com/opentidehq/specifications/issues/30)
+- Inflight path, deferred: [specifications#31](https://github.com/opentidehq/specifications/issues/31)
+- opentide implementation: [opentide#396](https://github.com/opentidehq/opentide/issues/396), [opentide#555](https://github.com/opentidehq/opentide/pull/555)
+- Staging creates refused: [opentide#554](https://github.com/opentidehq/opentide/issues/554); production write-back: [opentide#548](https://github.com/opentidehq/opentide/issues/548)
 - Normative text: [specs/deployment-state.md](../specs/deployment-state.md)
 - Normative text this replaced on acceptance: [specs/platforms/index.md](../specs/platforms/index.md#external-rule-ids), [defender-for-endpoint-1.0.md](../specs/platforms/defender-for-endpoint-1.0.md), [sentinel-one-1.0.md](../specs/platforms/sentinel-one-1.0.md), [crowdstrike-1.0.md](../specs/platforms/crowdstrike-1.0.md), [harfanglab-1.0.md](../specs/platforms/harfanglab-1.0.md), [carbon-black-cloud-1.0.md](../specs/platforms/carbon-black-cloud-1.0.md)
 - State directory this extends: [specs/sharing.md](../specs/sharing.md), [specs/workspace.md](../specs/workspace.md), [RFC 0005](0005-sharing-system.md)
 - Elastic identity, unchanged: [RFC 0007](0007-elastic-security-platform.md)
-- Sysdig draft that must not grow another `rule_id_bundle`: [specifications#8](https://github.com/OpenTideHQ/specifications/issues/8)
+- Sysdig draft that must not grow another `rule_id_bundle`: [specifications#8](https://github.com/opentidehq/specifications/issues/8)
 - opentide writers and loader: `src/opentide/deployment/utils.py` (`ExternalIdHelper`), `src/opentide/platforms/defender_for_endpoint/deployer.py`, `src/opentide/platforms/sentinel_one/deployer.py`, `src/opentide/platforms/crowdstrike/deployer.py`, `src/opentide/loading/platform_loader.py`, `src/opentide/cli/services/setup/repo.py`
 - Governance: [GOVERNANCE.md](../GOVERNANCE.md), [RFC 0001](0001-authority-model.md)
