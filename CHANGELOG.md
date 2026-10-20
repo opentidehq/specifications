@@ -61,6 +61,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage comes from `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - Initial normative spec bootstrapped from opentide `models/rule.py` (exemplar template).
 
+## workspace 1.5
+
+- The production deploy job runs `opentide deploy --strategy RELEASE`. opentide 0.17.0 removed deployment plans (`--plan`); the job and its requirements are unchanged.
+
 ## workspace 1.4
 
 - `objective.1.1.schema.json` and `objective.1.1.template.yaml` beside the 1.0 artifacts ([RFC 0011](rfcs/0011-signal-reuse.md)).
@@ -107,6 +111,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## deployment 1.3
 
 - `UNIVERSAL` is listed as a status `strategy`: the rule is deployed to both staging/preview and production targets. opentide already accepted it; the strategy table did not list it. Additive, no bundled status uses it.
+- The `deployment_state_unpersisted` row names a CI run by its strategies (any run but a `RELEASE` run on a push) instead of a deployment plan.
 
 ## deployment 1.2
 
@@ -119,6 +124,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## deployment 1.0
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
+
+## deployment-state 1.2
+
+- A run that cannot persist state is any CI run but a release run on a push: a deploy whose run strategies include `RELEASE`, outside a pull or merge request pipeline. It was defined by the deployment plan (`PRODUCTION`), which opentide 0.17.0 removed. The generated jobs behave as before; the shard schema `deployment.state::1.0` is unchanged.
 
 ## deployment-state 1.1
 
@@ -139,6 +148,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## metaschema-keywords 1.0
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
+
+## platforms 1.3
+
+- A block's omitted `tenants` means every tenant the run reaches, not the deployment plan's selection; opentide 0.17.0 removed deployment plans. Field tables unchanged.
 
 ## platforms 1.2
 
@@ -216,6 +229,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - `kill-process` and `suspend-process` without `field` compile to `config: {field: process.entity_id, overwrite: true}`, because Kibana rejects them without `config` ([opentide#562](https://github.com/opentidehq/opentide/pull/562)).
 - Live query validation through Kibana rule preview, and the Elasticsearch checks (ES|QL pre-flight, aggregation, timestamp, and indicator match fields) before every deploy. No offline check.
 - Fixtures `fixtures/valid/rule-elastic-1.0.yaml`, `fixtures/invalid/rule-elastic-esql-index.yaml`, and `fixtures/platforms/elastic.yaml`.
+
+## sharing 1.3
+
+- `--changed` and the production release name the production deploy by its run strategy (`opentide deploy --strategy RELEASE` on a push) instead of `--plan PRODUCTION`, which opentide 0.17.0 removed. The commit range is unchanged.
 
 ## sharing 1.2
 

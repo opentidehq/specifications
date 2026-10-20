@@ -1,6 +1,6 @@
 ---
 spec: workspace
-version: "1.4"
+version: "1.5"
 schema_id: null
 status: normative
 supersedes: null
@@ -162,13 +162,13 @@ Consumers overlay shards onto the committed registry when the shard object `meta
 | `inflight_shards` | pull request / merge request | `opentide generate inflight` |
 | `inflight_prune` | push to default branch | `opentide generate inflight prune` |
 | `share` | push to the default branch only, and only when setup selected the sharing stage | `opentide share push --changed` |
-| `deploy_production` | push to the default branch | `opentide deploy --plan PRODUCTION`, then the deployment-state write-back whenever the deploy started ([below](#production-deployment-state)) |
+| `deploy_production` | push to the default branch | `opentide deploy --strategy RELEASE`, then the deployment-state write-back whenever the deploy started ([below](#production-deployment-state)) |
 
 `share` is the production release. Setup defaults the stage off (`--no-sharing`; the wizard checkbox is unchecked). `opentide setup` MUST NOT emit it, or any other `opentide share` command, on a pull request or merge request. The trigger, the setup choice, and the diff are specified in [sharing.md](sharing.md#setup).
 
 ### Production deployment state
 
-The production deploy job (`opentide deploy --plan PRODUCTION` on the default branch) is the only generated job that commits deployment state. `opentide setup` and `opentide setup ci` MUST generate it to meet [deployment-state.md CI requirements 1–7](deployment-state.md#continuous-integration):
+The production deploy job (`opentide deploy --strategy RELEASE` on a push to the default branch) is the only generated job that commits deployment state. `opentide setup` and `opentide setup ci` MUST generate it to meet [deployment-state.md CI requirements 1–7](deployment-state.md#continuous-integration):
 
 1. Queue production jobs without dropping runs (no GitHub `concurrency` group, GitLab `resource_group`, Azure the strongest available lock, documented).
 2. Before the dry run and the deploy, overlay `.opentide/states/deployment/` from the default-branch tip.
@@ -199,6 +199,7 @@ Object fixtures assume the default layout: rules under `objects/rules/`, etc.
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.5 | 2026-10-20 | The production deploy job runs `opentide deploy --strategy RELEASE`; opentide 0.17.0 removed `--plan`. |
 | 1.4 | 2026-10-19 | `objective::1.1` schema and template artifacts beside `objective::1.0` ([RFC 0011](../rfcs/0011-signal-reuse.md)). |
 | 1.3 | 2026-10-19 | Object instances are the YAML files placed directly in each family directory. A file in a subfolder is not an instance and is neither deployed nor shared ([specifications#16](https://github.com/opentidehq/specifications/pull/16), [opentide#312](https://github.com/opentidehq/opentide/issues/312)). |
 | 1.2 | 2026-10-16 | The production deploy job has no GitHub Actions `concurrency` group ([specifications#43](https://github.com/opentidehq/specifications/issues/43)). |

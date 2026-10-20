@@ -1,6 +1,6 @@
 ---
 spec: deployment-state
-version: "1.1"
+version: "1.2"
 schema_id: deployment.state::1.0
 status: normative
 supersedes: null
@@ -111,7 +111,7 @@ A writer MUST read the file, change one binding, and write the rest back unchang
 
 ### Deploy decisions
 
-For `defender_for_endpoint`, `sentinel_one`, and `crowdstrike`, per rule and per tenant the deployment plan selected, deploy MUST decide in this order. "Create" means a strategy other than `DELETION` or `DISABLEMENT` with no binding. `DISABLEMENT` with a binding is an update that sets the vendor's disabled state. It keeps the binding.
+For `defender_for_endpoint`, `sentinel_one`, and `crowdstrike`, per rule and per tenant the run selected, deploy MUST decide in this order. "Create" means a strategy other than `DELETION` or `DISABLEMENT` with no binding. `DISABLEMENT` with a binding is an update that sets the vendor's disabled state. It keeps the binding.
 
 | # | Situation | Code | Level | Result |
 |---|-----------|------|-------|--------|
@@ -125,7 +125,7 @@ For `defender_for_endpoint`, `sentinel_one`, and `crowdstrike`, per rule and per
 | 7 | No binding, create, otherwise | — | — | Create, then write the binding. |
 | 7a | The binding write fails after the vendor created the rule, or the binding removal fails after a successful delete | `deployment_state_write_failed` | error | The error MUST include the platform, tenant, and id. The remote rule MUST NOT be rolled back. |
 
-Row 1 applies whatever platform is being deployed, including Sentinel, Splunk, HarfangLab, Carbon Black Cloud, and Elastic blocks, and on every path that can reach a vendor: `opentide deploy`, `deploy --dry-run`, a plan narrowed by `--platform`, `--skip-unconfigured`, `opentide validate query --live`, and direct deployer or MCP calls. Deploy MUST NOT read a legacy key as a binding. There is no dual read.
+Row 1 applies whatever platform is being deployed, including Sentinel, Splunk, HarfangLab, Carbon Black Cloud, and Elastic blocks, and on every path that can reach a vendor: `opentide deploy`, `deploy --dry-run`, a deploy narrowed by `--platform`, `--skip-unconfigured`, `opentide validate query --live`, and direct deployer or MCP calls. Deploy MUST NOT read a legacy key as a binding. There is no dual read.
 
 A dry run MUST NOT call the vendor and MUST NOT write a shard.
 
@@ -134,9 +134,9 @@ A dry run MUST NOT call the vendor and MUST NOT write a shard.
 A run **cannot persist state** when both hold:
 
 - it runs in CI: Azure Pipelines (`TF_BUILD`), GitHub Actions (`GITHUB_ACTIONS`), or GitLab CI (`CI`), detected in that order; and
-- its deployment plan (`opentide deploy --plan`, or `DEPLOYMENT_PLAN`) is anything other than `PRODUCTION` (`STAGING`, `FULL`, `ALWAYS`, `MANUAL`, `DEBUG`, …).
+- it is not a release run on a push: a deploy whose run strategies include `RELEASE`, in a pipeline that is not a pull or merge request pipeline. A pull or merge request run, and a push run without `RELEASE`, cannot persist state.
 
-Only the generated production job commits shards ([CI](#continuous-integration)). A staging or pull-request run that created a remote rule would leave its id on the runner, and every rerun, and the production run after merge on an `ALWAYS` tenant, would create another copy.
+Only the generated production job commits shards ([CI](#continuous-integration)). A pull or merge request run that created a remote rule would leave its id on the runner, and every rerun, and the production run after merge on a tenant both runs reach, would create another copy.
 
 A local run (no CI detected) may create; the operator commits the shard. `opentide deploy --persist-state-externally` lifts the `deployment_state_unpersisted` refusal for an operator who persists `.opentide/states/deployment/` by other means. Generated CI MUST NOT pass it. It does not lift `deployment_state_ignored`.
 
@@ -181,9 +181,9 @@ A migration is complete when the default branch contains, in one commit, every r
 
 ### Continuous integration
 
-These requirements apply to the production deploy job that `opentide setup` and `opentide setup ci` generate for GitHub Actions, GitLab CI, and Azure Pipelines. That job runs `opentide deploy --plan PRODUCTION` on the default branch and is the only generated job that commits deployment state.
+These requirements apply to the production deploy job that `opentide setup` and `opentide setup ci` generate for GitHub Actions, GitLab CI, and Azure Pipelines. That job runs `opentide deploy --strategy RELEASE` on a push to the default branch and is the only generated job that commits deployment state.
 
-1. **Queue production jobs where the provider queues without dropping runs.** GitHub Actions MUST NOT place the production job in a `concurrency` group: GitHub keeps one pending run per group and cancels an older pending run even with `cancel-in-progress: false`, and a production plan deploys only its own commit's diff, so the cancelled commit's rules would never deploy and nothing would report it. Overlapping GitHub runs are bounded by requirements 2 and 5, which turn a double create into a reported `deployment_state_conflict`. GitLab CI MUST set `resource_group: opentide-production`. Azure Pipelines MUST use the strongest serialisation available from YAML (`lockBehavior: sequential` on the production stage) and the generated file MUST state that Azure serialises the job only when an Exclusive Lock check is configured on the protected resource the stage uses. Without that check Azure cannot serialise from YAML; requirements 2 and 5 then bound the damage.
+1. **Queue production jobs where the provider queues without dropping runs.** GitHub Actions MUST NOT place the production job in a `concurrency` group: GitHub keeps one pending run per group and cancels an older pending run even with `cancel-in-progress: false`, and a production run deploys only its own commit's diff, so the cancelled commit's rules would never deploy and nothing would report it. Overlapping GitHub runs are bounded by requirements 2 and 5, which turn a double create into a reported `deployment_state_conflict`. GitLab CI MUST set `resource_group: opentide-production`. Azure Pipelines MUST use the strongest serialisation available from YAML (`lockBehavior: sequential` on the production stage) and the generated file MUST state that Azure serialises the job only when an Exclusive Lock check is configured on the protected resource the stage uses. Without that check Azure cannot serialise from YAML; requirements 2 and 5 then bound the damage.
 2. **Overlay the default-branch state before deploying.** Before the dry run and the deploy, the job MUST fetch the default branch and replace `.opentide/states/deployment/` in the working tree with the tip's copy. It MUST remove the directory first, so deletions on the tip hold, and MUST leave it absent when the tip has none. The tip descends from the triggering commit, so it already holds that commit's state plus every later production write-back.
 3. **Write back whenever the deploy started**, including after a partial failure, a cancellation, or a timeout:
    - GitHub Actions: `if: ${{ always() && steps.deploy.outcome != 'skipped' }}`.
@@ -249,7 +249,7 @@ The complete catalogue. `yaml_parse` and `invalid_uuid` are the existing generic
 | Setting | Default | Override |
 |---------|---------|----------|
 | Shard directory | `.opentide/states/deployment/` | None |
-| Create in CI under a plan other than `PRODUCTION` | Refused (`deployment_state_unpersisted`) | `opentide deploy --persist-state-externally` |
+| Create in CI outside a release run on a push | Refused (`deployment_state_unpersisted`) | `opentide deploy --persist-state-externally` |
 | Setup ignore line | `.opentide/states/sharing.jsonl` | Client `.gitignore`, which MUST NOT ignore `.opentide/states/deployment/` |
 | Orphan shards | Retained | Removed by hand |
 
@@ -296,5 +296,6 @@ Fixtures: [fixtures/deployment/valid/](../fixtures/deployment/valid/) and [fixtu
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.2 | 2026-10-20 | A run that cannot persist state is defined by its run strategies, not a deployment plan: any CI run but a `RELEASE` run on a push. opentide 0.17.0 removed deployment plans; the generated jobs keep the same behaviour. |
 | 1.1 | 2026-10-16 | CI requirement 1: no GitHub Actions `concurrency` group on the production job, which would cancel a pending diff-scoped deploy ([specifications#43](https://github.com/opentidehq/specifications/issues/43)). |
 | 1.0 | 2026-10-16 | Initial normative deployment-state contract from accepted [RFC 0010](../rfcs/0010-deployment-external-ids.md). |

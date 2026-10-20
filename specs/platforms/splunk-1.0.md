@@ -177,7 +177,7 @@ The saved-search description is the Tide rule `description`. `response.responder
 | Block status strategy | Splunk result |
 |-----------------------|---------------|
 | `DISABLEMENT` | `disabled = true` |
-| `DELETION` | Handled by the deployment plan's removal path for the saved search |
+| `DELETION` | Handled by deploy's removal path for the saved search |
 | any other | Saved search enabled |
 
 Tenant modifiers in `splunk.toml` overlay `savedsearches.conf` keys after the block is compiled. Default modifiers fill gaps. Status, tenant, and flag modifiers overwrite.
