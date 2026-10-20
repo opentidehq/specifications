@@ -1,9 +1,9 @@
 ---
-title: OpenTide spec index
+title: opentide spec index
 description: One-page index of active normative spec versions — each spec is independently versioned.
 ---
 
-# OpenTide spec index
+# opentide spec index
 
 One-page index of active normative spec versions. There is no framework-wide version — each row is independently versioned.
 
@@ -43,4 +43,4 @@ New to the object model? Start with the [overview](index.md), then [Conformance]
 
 ## Fixtures
 
-Conformance examples live under [`fixtures/`](https://github.com/OpenTideHQ/specifications/tree/main/fixtures) and are referenced from object specs.
+Conformance examples live under [`fixtures/`](https://github.com/opentidehq/specifications/tree/main/fixtures) and are referenced from object specs.

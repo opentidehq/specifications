@@ -2,13 +2,13 @@
 
 - **RFC:** 0012
 - **Title:** Rules should read like the other objects
-- **Author:** OpenTide maintainers
+- **Author:** opentide maintainers
 - **Status:** draft
 - **Created:** 2026-09-30
 - **Revised:** 2026-10-19 (renumbered from 0008; aligned with `rule::1.1`, retired `responders` vocabulary, Elastic, and RFC 0010)
-- **Issue:** [OpenTideHQ/specifications#24](https://github.com/OpenTideHQ/specifications/issues/24)
-- **PR:** [#25](https://github.com/OpenTideHQ/specifications/pull/25)
-- **Implementation:** [OpenTideHQ/opentide#394](https://github.com/OpenTideHQ/opentide/issues/394)
+- **Issue:** [opentidehq/specifications#24](https://github.com/opentidehq/specifications/issues/24)
+- **PR:** [#25](https://github.com/opentidehq/specifications/pull/25)
+- **Implementation:** [opentidehq/opentide#394](https://github.com/opentidehq/opentide/issues/394)
 
 ## Summary
 
@@ -16,7 +16,7 @@ A threat file has a `threat:` block. An objective file has an `objective:` block
 
 `rule::2.0` puts the detection in a `rule:` block and places each platform directly on that block. Platform payloads stay as they are. Deployment status stays on the platform, which is where deploy already reads it. The link to an objective is named `objective`.
 
-Files that still say `rule::1.0` or `rule::1.1` keep today's layout. Both shapes have to validate, deploy, and survive every other feature; that requirement is [versioning 1.1](../specs/versioning.md) ([#27](https://github.com/OpenTideHQ/specifications/pull/27)), not this proposal. This RFC does not redesign Sentinel, Splunk, or any other platform.
+Files that still say `rule::1.0` or `rule::1.1` keep today's layout. Both shapes have to validate, deploy, and survive every other feature; that requirement is [versioning 1.1](../specs/versioning.md) ([#27](https://github.com/opentidehq/specifications/pull/27)), not this proposal. This RFC does not redesign Sentinel, Splunk, or any other platform.
 
 ## Motivation
 
@@ -128,7 +128,7 @@ On `rule::2.0` a rule matches a sharing block's `rule_statuses` when at least on
 ### Other specs that name rule fields
 
 - [sharing/misp-1.0.md](../specs/sharing/misp-1.0.md): the `rule` relation source is `rule.objective` on 2.0 (top-level `detection_model` on 1.x), and `threat_level_id` comes from `rule.severity`. The technique source `rule.techniques[]` already names the 2.0 path.
-- [RFC 0011](https://github.com/OpenTideHQ/specifications/pull/23) (signal reuse, draft): the direct objective of a `rule::2.0` file is `rule.objective`, or the owner of the signal it names.
+- [RFC 0011](https://github.com/opentidehq/specifications/pull/23) (signal reuse, draft): the direct objective of a `rule::2.0` file is `rule.objective`, or the owner of the signal it names.
 
 ### What lands after this RFC is accepted
 
@@ -161,10 +161,10 @@ Leaving the fields on the root and only renaming `configurations` keeps rules as
 
 ## References
 
-- [OpenTideHQ/specifications#24](https://github.com/OpenTideHQ/specifications/issues/24)
-- [OpenTideHQ/opentide#394](https://github.com/OpenTideHQ/opentide/issues/394)
+- [opentidehq/specifications#24](https://github.com/opentidehq/specifications/issues/24)
+- [opentidehq/opentide#394](https://github.com/opentidehq/opentide/issues/394)
 - [specs/objects/rule-1.0.md](../specs/objects/rule-1.0.md), [specs/objects/rule-1.1.md](../specs/objects/rule-1.1.md), [specs/objects/threat-1.0.md](../specs/objects/threat-1.0.md), [specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md)
-- [specs/versioning.md](../specs/versioning.md) 1.1 — every registered revision has to work for validation, deployment, and every other feature; migration is explicit and never changes `metadata.version` ([#27](https://github.com/OpenTideHQ/specifications/pull/27))
+- [specs/versioning.md](../specs/versioning.md) 1.1 — every registered revision has to work for validation, deployment, and every other feature; migration is explicit and never changes `metadata.version` ([#27](https://github.com/opentidehq/specifications/pull/27))
 - [RFC 0007](0007-elastic-security-platform.md) — Elastic block, unchanged, new location only
 - [RFC 0008](0008-rule-reviewed-date.md) — `metadata.reviewed`, carried onto `rule::2.0`
 - [RFC 0010](0010-deployment-external-ids.md) — no external ids in platform blocks; deployment state keyed by `metadata.uuid`

@@ -1,11 +1,11 @@
 ---
 title: Conformance
-description: How to read the normative keywords (MUST, SHOULD, MAY) used throughout the OpenTide specifications.
+description: How to read the normative keywords (MUST, SHOULD, MAY) used throughout the opentide specifications.
 ---
 
 # Conformance
 
-OpenTide specifications are **normative**: they define requirements an implementation, detection object, or tool must meet to conform. This page defines the keywords those requirements use and what conformance means.
+opentide specifications are **normative**: they define requirements an implementation, detection object, or tool must meet to conform. This page defines the keywords those requirements use and what conformance means.
 
 ## Requirement keywords
 

@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-Microsoft Defender for Endpoint, SentinelOne, and CrowdStrike give every rule OpenTide creates an id of their own. The next deploy has to update, disable, or delete the remote rule by that id, and the id is per tenant. OpenTide keeps it in one committed JSON file per rule, `.opentide/states/deployment/<uuid>.json` (`deployment.state::1.0`). It never stores it on the rule.
+Microsoft Defender for Endpoint, SentinelOne, and CrowdStrike give every rule opentide creates an id of their own. The next deploy has to update, disable, or delete the remote rule by that id, and the id is per tenant. opentide keeps it in one committed JSON file per rule, `.opentide/states/deployment/<uuid>.json` (`deployment.state::1.0`). It never stores it on the rule.
 
 A platform block that still carries `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>` is invalid, and deploy refuses the rule. `opentide deploy migrate-state` moves the ids of an existing catalogue into shards once. Losing a shard, or never committing it, loses the only handle on the remote rule: the next deploy creates a second live rule beside the first. Every requirement below exists to prevent that.
 
@@ -29,7 +29,7 @@ This spec is the normative text of accepted [RFC 0010](../rfcs/0010-deployment-e
 - Deploy MUST refuse a rule that carries a legacy external-id key on any platform block, on every deploy path, before any platform client is built and before any HTTP call (`external_id_in_rule`).
 - Deploy MUST NOT create a remote rule for a state-backed platform unless the returned binding can be retained: not when deployment state is ignored (`deployment_state_ignored`), and not when the run cannot persist state (`deployment_state_unpersisted`).
 - `DELETION` and `DISABLEMENT` without a binding MUST NOT call the vendor and MUST report `external_id_missing` at warning level.
-- Deploy MUST NOT rediscover an id by listing remote rules or matching titles. The shard is the only record of what OpenTide created.
+- Deploy MUST NOT rediscover an id by listing remote rules or matching titles. The shard is the only record of what opentide created.
 - A generated CI job MUST NOT create a state-backed remote rule unless that job publishes the returned binding to the default branch. The generated production job does so under [CI requirements 1–7](#continuous-integration); every other generated job MUST refuse the create before the vendor call (`deployment_state_unpersisted`).
 - Generated production CI MUST meet [CI requirements 1–7](#continuous-integration).
 - Status and reporting interfaces MUST read vendor identifiers from deployment state only. They MUST NOT reconstruct them from rule YAML. An unreadable shard MUST be surfaced with its `deployment_state_*` code.
@@ -175,7 +175,7 @@ A migration is complete when the default branch contains, in one commit, every r
 | `.opentide/states/deployment/` | MUST be committed. MUST NOT be gitignored. |
 | `.opentide/states/sharing.jsonl` | SHOULD be gitignored. Regenerable cache. |
 | `.opentide/states/` | MUST NOT be gitignored as a whole. |
-| `.opentide/inflight/` | Unchanged until [specifications#31](https://github.com/OpenTideHQ/specifications/issues/31). |
+| `.opentide/inflight/` | Unchanged until [specifications#31](https://github.com/opentidehq/specifications/issues/31). |
 
 `opentide setup` MUST write `.opentide/states/sharing.jsonl`, not `.opentide/states/`, as the ignore line for a new repository. Setup does not rewrite an existing `.gitignore`; `migrate-state` and the create guard are what stop an old ignore from hiding shards.
 
@@ -296,5 +296,5 @@ Fixtures: [fixtures/deployment/valid/](../fixtures/deployment/valid/) and [fixtu
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.1 | 2026-10-16 | CI requirement 1: no GitHub Actions `concurrency` group on the production job, which would cancel a pending diff-scoped deploy ([specifications#43](https://github.com/OpenTideHQ/specifications/issues/43)). |
+| 1.1 | 2026-10-16 | CI requirement 1: no GitHub Actions `concurrency` group on the production job, which would cancel a pending diff-scoped deploy ([specifications#43](https://github.com/opentidehq/specifications/issues/43)). |
 | 1.0 | 2026-10-16 | Initial normative deployment-state contract from accepted [RFC 0010](../rfcs/0010-deployment-external-ids.md). |

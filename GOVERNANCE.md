@@ -1,15 +1,15 @@
 ---
 title: Governance
-description: How OpenTide specifications are proposed, reviewed, versioned, and published — and why the model is shaped this way.
+description: How opentide specifications are proposed, reviewed, versioned, and published — and why the model is shaped this way.
 ---
 
 # Governance
 
-The specifications are the **normative source** for OpenTide. This page explains who controls them, how they change, and why the model is built this way. It is written for anyone reading the specs; the repository mechanics contributors need live in the [specifications repository](https://github.com/OpenTideHQ/specifications).
+The specifications are the **normative source** for opentide. This page explains who controls them, how they change, and why the model is built this way. It is written for anyone reading the specs; the repository mechanics contributors need live in the [specifications repository](https://github.com/opentidehq/specifications).
 
 ## Why specifications exist
 
-OpenTide previously mixed architecture notes, Python models, and generated JSON Schema with no single normative source, so authors, agents, and implementers had no clear precedence order. The specifications repository fixes that: it is a language-neutral, agent-friendly contract that evolves through a lightweight, transparent process.
+opentide previously mixed architecture notes, Python models, and generated JSON Schema with no single normative source, so authors, agents, and implementers had no clear precedence order. The specifications repository fixes that: it is a language-neutral, agent-friendly contract that evolves through a lightweight, transparent process.
 
 ## Authority model
 
@@ -36,12 +36,12 @@ flowchart LR
   Spec --> Impl["opentide implementation PR"]
 ```
 
-1. **Raise a GitHub issue** in [OpenTideHQ/specifications](https://github.com/OpenTideHQ/specifications) describing the problem, the affected specs, and acceptance criteria. OpenTide tracking is **public GitHub only** — never Linear or other private trackers. Implementation follow-up belongs in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide).
+1. **Raise a GitHub issue** in [opentidehq/specifications](https://github.com/opentidehq/specifications) describing the problem, the affected specs, and acceptance criteria. opentide tracking is **public GitHub only** — never Linear or other private trackers. Implementation follow-up belongs in [opentidehq/opentide](https://github.com/opentidehq/opentide).
 2. **Write a proposal** for non-trivial or breaking changes (an RFC). Maintainers accept or reject it; breaking changes must reference an accepted proposal.
 3. **Update the specs** — the affected spec files, conformance fixtures, and the [spec index](SPECS.md). Bump each spec's `version` in frontmatter; a breaking object change gets a new spec file (e.g. `rule-1.1.md`) and the old file is marked `deprecated`, never deleted.
 4. **Implement** in a separate opentide PR that aligns the validation models, generation, and tests.
 
-Contributors: issue and PR templates, the RFC template, and CI live in the [specifications repository](https://github.com/OpenTideHQ/specifications) under `.github/` and `rfcs/`.
+Contributors: issue and PR templates, the RFC template, and CI live in the [specifications repository](https://github.com/opentidehq/specifications) under `.github/` and `rfcs/`.
 
 ## Versioning rules
 

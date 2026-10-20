@@ -1,11 +1,11 @@
 ---
 name: publish-rfc
-description: Draft an OpenTide specification RFC from a GitHub issue or user request. Use when proposing breaking or non-trivial spec changes.
+description: Draft an opentide specification RFC from a GitHub issue or user request. Use when proposing breaking or non-trivial spec changes.
 ---
 
 # Publish RFC
 
-Draft a Request for Comments (RFC) for the OpenTide specifications repository.
+Draft a Request for Comments (RFC) for the opentide specifications repository.
 
 ## When to use
 
@@ -17,7 +17,7 @@ Draft a Request for Comments (RFC) for the OpenTide specifications repository.
 ## Workflow
 
 1. **Read context**
-   - User **GitHub** issue or request (OpenTideHQ/specifications or OpenTideHQ/opentide). Never Linear.
+   - User **GitHub** issue or request (opentidehq/specifications or opentidehq/opentide). Never Linear.
    - [GOVERNANCE.md](../../GOVERNANCE.md)
    - [rfcs/0001-authority-model.md](../../rfcs/0001-authority-model.md)
    - Existing RFCs in `rfcs/` — pick next number after highest `NNNN`
@@ -60,4 +60,4 @@ Draft a Request for Comments (RFC) for the OpenTide specifications repository.
 - Do not edit opentide implementation in this skill's PR unless explicitly requested
 - Do not add website or doc-site tooling
 - Do not treat JSON Schema as authoritative over markdown specs
-- Do not use Linear for OpenTide work. Open a public GitHub spec-change issue in OpenTideHQ/specifications; implementation issues go in OpenTideHQ/opentide. Linear MCP may exist in the agent environment — do not call it for this repository.
+- Do not use Linear for opentide work. Open a public GitHub spec-change issue in opentidehq/specifications; implementation issues go in opentidehq/opentide. Linear MCP may exist in the agent environment — do not call it for this repository.

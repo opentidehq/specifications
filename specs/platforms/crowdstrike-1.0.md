@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-`configurations.crowdstrike` is a CrowdStrike Falcon correlation rule. The detection text is the correlation filter. There is no query validator: `opentide validate query --platform crowdstrike` reports unsupported. CrowdStrike assigns the remote rule id; OpenTide stores it per tenant in [deployment state](../deployment-state.md).
+`configurations.crowdstrike` is a CrowdStrike Falcon correlation rule. The detection text is the correlation filter. There is no query validator: `opentide validate query --platform crowdstrike` reports unsupported. CrowdStrike assigns the remote rule id; opentide stores it per tenant in [deployment state](../deployment-state.md).
 
 Shared fields are defined in [platforms](index.md#shared-platform-block). `contributors` on this block are joined into the update comment. When the list is empty, deploy uses `metadata.author`.
 
@@ -78,7 +78,7 @@ The customer id is the tenant `customer_id` with the segment after the first hyp
 
 The binding is the tenant's entry under `crowdstrike` in `.opentide/states/deployment/<uuid>.json`, the create-response id verbatim. A create is refused when the shard directory is gitignored or the run cannot persist state. The decision order and codes are in [deployment-state.md](../deployment-state.md#deploy-decisions).
 
-The rule comment records the contributors and that OpenTide performed the update.
+The rule comment records the contributors and that opentide performed the update.
 
 ## Relationships
 

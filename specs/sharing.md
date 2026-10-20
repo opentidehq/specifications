@@ -269,7 +269,7 @@ Bundled `sharing.toml` ships with no enabled block. A block MUST set `max_tlp`. 
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.2 | 2026-10-19 | `rule_statuses` matches the statuses of a rule's enabled platform blocks, which deploy uses and promotion rewrites, and falls back to the root `status` only when no enabled block has one ([opentide#583](https://github.com/OpenTideHQ/opentide/issues/583)). |
+| 1.2 | 2026-10-19 | `rule_statuses` matches the statuses of a rule's enabled platform blocks, which deploy uses and promotion rewrites, and falls back to the root `status` only when no enabled block has one ([opentide#583](https://github.com/opentidehq/opentide/issues/583)). |
 | 1.1 | 2026-10-16 | `.opentide/states/` holds sharing's cache and deployment's committed shards ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). A future subsystem states whether its state is a cache or a record and whether it is committed. The directory is never ignored whole. Ledger fields are unchanged. |
 | 1.0 | 2026-09-28 | [RFC 0006](../rfcs/0006-sharing-ci.md). Optional sharing stage, default off, runs `opentide share push --changed` only on a push to the default branch. |
 | 1.0 | 2026-09-28 | Initial spec from accepted [RFC 0005](../rfcs/0005-sharing-system.md). Integration blocks are top-level arrays (`[[misp]]`) with per-block selection and a required `max_tlp`, merged by `name`. Share state is `.opentide/states/sharing.jsonl`. `preview` writes no files. |

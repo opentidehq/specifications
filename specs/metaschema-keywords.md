@@ -10,10 +10,10 @@ supersedes: null
 
 ## Summary
 
-OpenTide extends JSON Schema generation with `tide.*` keywords in its metaschema. At generation time the implementation walks the metaschema depth-first and resolves each keyword into standard JSON Schema constructs; the `tide.*` keywords are then stripped from the emitted client-facing schemas.
+opentide extends JSON Schema generation with `tide.*` keywords in its metaschema. At generation time the implementation walks the metaschema depth-first and resolves each keyword into standard JSON Schema constructs; the `tide.*` keywords are then stripped from the emitted client-facing schemas.
 
 <Callout type="info">
-This spec is an **implementer contract** — it defines how JSON Schema is generated from the metaschema. Detection authors do not write `tide.*` keywords; they benefit from the generated schemas transparently. Read this only if you build tooling that generates or consumes OpenTide schemas.
+This spec is an **implementer contract** — it defines how JSON Schema is generated from the metaschema. Detection authors do not write `tide.*` keywords; they benefit from the generated schemas transparently. Read this only if you build tooling that generates or consumes opentide schemas.
 </Callout>
 
 ## Requirements

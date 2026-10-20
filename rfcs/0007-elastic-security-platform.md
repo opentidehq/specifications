@@ -2,22 +2,22 @@
 
 - **RFC:** 0007
 - **Title:** Elastic Security detection platform
-- **Author:** OpenTide maintainers
+- **Author:** opentide maintainers
 - **Status:** accepted
 - **Created:** 2026-09-25
 - **Revised:** 2026-09-29 — author blocks follow the Security create-rule screens
-- **Revised:** 2026-10-15 — aligned with the first implementation ([OpenTideHQ/opentide#481](https://github.com/OpenTideHQ/opentide/pull/481)); see [§8](#8-revisions-after-the-first-implementation)
-- **Revised:** 2026-10-19 — tactic table follows ATT&CK v19 and later (Stealth, Defense Impairment) for `att&ck::1.2` ([OpenTideHQ/opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)); see [§8](#8-revisions-after-the-first-implementation)
+- **Revised:** 2026-10-15 — aligned with the first implementation ([opentidehq/opentide#481](https://github.com/opentidehq/opentide/pull/481)); see [§8](#8-revisions-after-the-first-implementation)
+- **Revised:** 2026-10-19 — tactic table follows ATT&CK v19 and later (Stealth, Defense Impairment) for `att&ck::1.2` ([opentidehq/opentide#568](https://github.com/opentidehq/opentide/issues/568)); see [§8](#8-revisions-after-the-first-implementation)
 - **Accepted:** 2026-09-29 — design accepted for the first implementation. Normative spec text and fixtures follow ([§7](#7-spec-changes-after-acceptance)).
-- **Landed:** 2026-10-19 — normative text in [specs/platforms/elastic-1.0.md](../specs/platforms/elastic-1.0.md). The spec also accepts compound shorthand durations (`1h10m`) and sends a default `config` for `kill-process` and `suspend-process` without `field`, as opentide does ([opentide#564](https://github.com/OpenTideHQ/opentide/pull/564), [opentide#562](https://github.com/OpenTideHQ/opentide/pull/562)).
-- **Issue:** [OpenTideHQ/specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)
-- **PR:** [OpenTideHQ/specifications#18](https://github.com/OpenTideHQ/specifications/pull/18)
+- **Landed:** 2026-10-19 — normative text in [specs/platforms/elastic-1.0.md](../specs/platforms/elastic-1.0.md). The spec also accepts compound shorthand durations (`1h10m`) and sends a default `config` for `kill-process` and `suspend-process` without `field`, as opentide does ([opentide#564](https://github.com/opentidehq/opentide/pull/564), [opentide#562](https://github.com/opentidehq/opentide/pull/562)).
+- **Issue:** [opentidehq/specifications#17](https://github.com/opentidehq/specifications/issues/17)
+- **PR:** [opentidehq/specifications#18](https://github.com/opentidehq/specifications/pull/18)
 
 > Numbering note: **RFC 0006** is [Sharing on the production merge](0006-sharing-ci.md). This proposal is **0007**.
 
 ## Summary
 
-Add a detection platform, `elastic` (display name **Elastic Security**, schema `platform::elastic::1.0`), that deploys OpenTide rules as Elastic SIEM detection rules. The only API is the Security detection engine: `POST /api/detection_engine/rules` in the default space, and `POST /s/{space_id}/api/detection_engine/rules` in any other space, with `elastic-api-version: 2023-10-31`. The deployer does not call Stack alerting (`/api/alerting/rule`), Watcher, Cases, Fleet, Elastic Defend policy or artifact APIs, the prebuilt-rules installer, or data-view create and update.
+Add a detection platform, `elastic` (display name **Elastic Security**, schema `platform::elastic::1.0`), that deploys opentide rules as Elastic SIEM detection rules. The only API is the Security detection engine: `POST /api/detection_engine/rules` in the default space, and `POST /s/{space_id}/api/detection_engine/rules` in any other space, with `elastic-api-version: 2023-10-31`. The deployer does not call Stack alerting (`/api/alerting/rule`), Watcher, Cases, Fleet, Elastic Defend policy or artifact APIs, the prebuilt-rules installer, or data-view create and update.
 
 Decisions:
 
@@ -32,7 +32,7 @@ The change is additive: it adds a `configurations.elastic` key and a new platfor
 
 ## Motivation
 
-Elastic Security is a common SIEM, and its detection engine is in the free Basic tier on self-managed clusters, so many OpenTide users already run it. Those users cannot deploy OpenTide rules to it today. They either rebuild rules by hand in Kibana or keep a second catalogue in Elastic's own [`detection-rules`](https://github.com/elastic/detection-rules) TOML format, which drops OpenTide's objectives, threats, and lifecycle.
+Elastic Security is a common SIEM, and its detection engine is in the free Basic tier on self-managed clusters, so many opentide users already run it. Those users cannot deploy opentide rules to it today. They either rebuild rules by hand in Kibana or keep a second catalogue in Elastic's own [`detection-rules`](https://github.com/elastic/detection-rules) TOML format, which drops opentide's objectives, threats, and lifecycle.
 
 Elastic also exposes several rule surfaces (Security detection rules, Kibana Stack alerting rules, Watcher, Elastic Defend) and three deployment types. Without a spec, each implementer would pick a different surface and a different identity model.
 
@@ -109,7 +109,7 @@ Not authored, because a detection engineer does not set them on those screens: s
 - ES\|QL rules are GA from 8.14. The supported floor is **Kibana 8.19** (final 8.x minor) and **9.x**. Older versions MAY work for `query`, `eql`, `threshold`, and `new_terms`, but they are not supported. [Appendix A](#appendix-a-reference-test) lists the versions tested.
 - The detection engine and all five v1 types work on the free Basic licence. Alert suppression needs Platinum or higher on self-managed and Hosted, and a project tier that includes it on Serverless.
 - **Suppression fails silently.** On a Basic licence, Kibana accepts and stores `alert_suppression`, previews it, and runs the rule with status `succeeded`, but it writes one alert per match and reports no error or warning. A least-privilege key cannot read the licence on 9.x: Kibana's `/api/licensing/info` is internal-only there (8.19 still serves it), and Elasticsearch `GET _license` needs the `monitor` cluster privilege. The tenant therefore declares it (`setup.suppression`, [§1](#1-platform-configuration-platformselastictoml)).
-- Kibana's `version` field on custom rules stays `1`. `revision` increments only when an update changes rule content, so an identical `PUT` leaves it unchanged. OpenTide does not send `version`.
+- Kibana's `version` field on custom rules stays `1`. `revision` increments only when an update changes rule content, so an identical `PUT` leaves it unchanged. opentide does not send `version`.
 
 ## Detailed design
 
@@ -1572,7 +1572,7 @@ configurations:
 
 ### Templates
 
-OpenTide generates one rule template, `rule.1.0.template.yaml` ([workspace layout](../specs/workspace.md)). The Elastic block in it is a custom query, the create-rule UI's starting point. Each other rule type keeps this MDR and replaces the Elastic keys shown under it. The template leaves out the rule's own `status`: deployment reads `configurations.elastic.status`.
+opentide generates one rule template, `rule.1.0.template.yaml` ([workspace layout](../specs/workspace.md)). The Elastic block in it is a custom query, the create-rule UI's starting point. Each other rule type keeps this MDR and replaces the Elastic keys shown under it. The template leaves out the rule's own `status`: deployment reads `configurations.elastic.status`.
 
 <!-- rfc0007:rule-template -->
 ```yaml
@@ -1798,7 +1798,7 @@ For `threat_match`, the deployer checks the `threat.mapping` fields with `_field
 
 | File | Change |
 |------|--------|
-| `specs/platforms/index.md` → 1.1 | Add the `elastic` capability row (query languages KQL, Lucene, EQL, and ES\|QL), the required fields (`type`, `query`, plus the type block), and an Elastic block section. Add it to the query-validation allowlist. Raise the platform count by one (seven to eight, or eight to nine if [RFC 0004](https://github.com/OpenTideHQ/specifications/issues/8) lands first). |
+| `specs/platforms/index.md` → 1.1 | Add the `elastic` capability row (query languages KQL, Lucene, EQL, and ES\|QL), the required fields (`type`, `query`, plus the type block), and an Elastic block section. Add it to the query-validation allowlist. Raise the platform count by one (seven to eight, or eight to nine if [RFC 0004](https://github.com/opentidehq/specifications/issues/8) lands first). |
 | `specs/objects/rule-1.0.md` | Add `elastic` / `ElasticConfig` / `platform::elastic::1.0` to the `configurations` table (additive; `rule::1.0` unchanged) |
 | `specs/validation.md` | Add `elastic` to the query-validation table, live mode only, as in §6 |
 | `fixtures/valid/rule-elastic-1.0.yaml`, `fixtures/invalid/rule-elastic-esql-index.yaml` | New conformance fixtures from Examples A and "Invalid block" |
@@ -1810,19 +1810,19 @@ opentide adds an `opentide/platforms/elastic/` package with `client`, `deployer`
 
 ### 8. Revisions after the first implementation
 
-The first implementation ([OpenTideHQ/opentide#481](https://github.com/OpenTideHQ/opentide/pull/481)) was reviewed against this RFC. These changes keep the RFC matching the engine; the text above already reflects them.
+The first implementation ([opentidehq/opentide#481](https://github.com/opentidehq/opentide/pull/481)) was reviewed against this RFC. These changes keep the RFC matching the engine; the text above already reflects them.
 
 | Change | Sections | Why |
 |--------|----------|-----|
 | No per-tenant `proxy` | §1 | opentide 0.10.0 retired the `proxy` setup key on every platform in favour of the global `opentide --proxy` option, and refuses a tenant that still sets it. The §1 example no longer sets it. |
-| No offline query check | Summary, §6, §7, Drawbacks | opentide 0.11.0 removed in-process query scanning on every platform ([opentide#456](https://github.com/OpenTideHQ/opentide/issues/456)); `validate query` is tenant-only. The preview API and the ES\|QL pre-flight catch the syntax errors the offline checks targeted, with the Kibana parser instead of an approximation. |
-| Block `status` is required | §3 `enabled`, Invalid block | [opentide#493](https://github.com/OpenTideHQ/opentide/pull/493) made `status` required on every platform block, so a rule cannot validate and then be undeployable. The `STAGING` default is removed. The invalid example sets `status` so it reports the three constraint codes. |
+| No offline query check | Summary, §6, §7, Drawbacks | opentide 0.11.0 removed in-process query scanning on every platform ([opentide#456](https://github.com/opentidehq/opentide/issues/456)); `validate query` is tenant-only. The preview API and the ES\|QL pre-flight catch the syntax errors the offline checks targeted, with the Kibana parser instead of an approximation. |
+| Block `status` is required | §3 `enabled`, Invalid block | [opentide#493](https://github.com/opentidehq/opentide/pull/493) made `status` required on every platform block, so a rule cannot validate and then be undeployable. The `STAGING` default is removed. The invalid example sets `status` so it reports the three constraint codes. |
 | `severity` constraint code | §2 | §2 already limits `severity` to the `alert_severity` vocabulary. Without a code, an unknown value compiled to `Informational` (`low`, risk score 1) and silently demoted the rule. |
 | Timestamp and indicator match field checks | §6 | Both are run-time failures Kibana accepts on create, the same class as the aggregation field check. They follow its not-onboarded leniency. |
 | Failed checks fail the rule | §6 | A data view lookup or `_field_caps` call that cannot complete is not a pass. |
 | Extra validation warnings | §2 | Look-back over `1h`, threshold look-back over `interval`, and EQL `maxspan` against the window. All are warnings; none rejects a rule. |
 | Bulk path precondition | Unresolved questions | Kibana's `_import` requires `version`, which §3 forbids, so a bulk path needs its own revision. |
-| Stealth and Defense Impairment tactics | §3 Threat | `att&ck::1.2` (ATT&CK 20.0) uses the v19 tactics: TA0005 is Stealth and Defense Impairment is TA0112. Without them, techniques staged only in those tactics would emit no `threat` entry ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)). Removed keys still staged `Defense Evasion` map through the alias table. |
+| Stealth and Defense Impairment tactics | §3 Threat | `att&ck::1.2` (ATT&CK 20.0) uses the v19 tactics: TA0005 is Stealth and Defense Impairment is TA0112. Without them, techniques staged only in those tactics would emit no `threat` entry ([opentide#568](https://github.com/opentidehq/opentide/issues/568)). Removed keys still staged `Defense Evasion` map through the alias table. |
 
 ## Drawbacks
 
@@ -1918,7 +1918,7 @@ This is the `POST /_security/api_key` body for 9.5.4. On 8.19.22 the application
 
 ## References
 
-- Issue: [OpenTideHQ/specifications#17](https://github.com/OpenTideHQ/specifications/issues/17)
+- Issue: [opentidehq/specifications#17](https://github.com/opentidehq/specifications/issues/17)
 - Kibana detection engine OpenAPI (`2023-10-31`): [elastic/kibana `security_solution/docs/openapi`](https://github.com/elastic/kibana/tree/main/x-pack/solutions/security/plugins/security_solution/docs/openapi)
 - [Kibana API: Security detections](https://www.elastic.co/docs/api/doc/kibana/group/endpoint-security-detections-api) · [Serverless](https://www.elastic.co/docs/api/doc/serverless/group/endpoint-security-detections-api)
 - [Spaces and Elastic Security](https://www.elastic.co/docs/solutions/security/get-started/spaces-elastic-security)

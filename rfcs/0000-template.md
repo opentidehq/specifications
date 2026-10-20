@@ -40,5 +40,5 @@ Open items for reviewer discussion.
 
 ## References
 
-- Links to **GitHub** issues (OpenTideHQ/specifications, OpenTideHQ/opentide), prior art, opentide implementation notes
-- Never Linear — OpenTide tracking is public GitHub only
+- Links to **GitHub** issues (opentidehq/specifications, opentidehq/opentide), prior art, opentide implementation notes
+- Never Linear — opentide tracking is public GitHub only

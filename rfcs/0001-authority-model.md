@@ -7,11 +7,11 @@
 
 ## Summary
 
-This RFC establishes the normative authority chain for OpenTide: markdown specs in the `specifications` repository are canonical; opentide Pydantic models implement them; JSON Schema is a generated artifact for IDE validation. It also defines the Issue → RFC → spec → implementation change process.
+This RFC establishes the normative authority chain for opentide: markdown specs in the `specifications` repository are canonical; opentide Pydantic models implement them; JSON Schema is a generated artifact for IDE validation. It also defines the Issue → RFC → spec → implementation change process.
 
 ## Motivation
 
-OpenTide previously mixed architecture docs, Pydantic models, and generated JSON Schema without a single normative source. Authors, agents, and implementers need a clear precedence order and a lightweight governance path for evolving object schemas, vocabularies, and workspace conventions.
+opentide previously mixed architecture docs, Pydantic models, and generated JSON Schema without a single normative source. Authors, agents, and implementers need a clear precedence order and a lightweight governance path for evolving object schemas, vocabularies, and workspace conventions.
 
 ## Detailed design
 

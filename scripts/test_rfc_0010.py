@@ -82,10 +82,10 @@ class Rfc0010HeaderTests(unittest.TestCase):
             "- **Status:** accepted",
             "- **Revised:** 2026-10-16",
             "- **Accepted:** 2026-10-16",
-            "- **Issue:** [#30](https://github.com/OpenTideHQ/specifications/issues/30)",
-            "- **PR:** [#32](https://github.com/OpenTideHQ/specifications/pull/32)",
-            "- **Implementation issue:** [opentide#396](https://github.com/OpenTideHQ/opentide/issues/396)",
-            "- **Implementation PR:** [opentide#555](https://github.com/OpenTideHQ/opentide/pull/555)",
+            "- **Issue:** [#30](https://github.com/opentidehq/specifications/issues/30)",
+            "- **PR:** [#32](https://github.com/opentidehq/specifications/pull/32)",
+            "- **Implementation issue:** [opentide#396](https://github.com/opentidehq/opentide/issues/396)",
+            "- **Implementation PR:** [opentide#555](https://github.com/opentidehq/opentide/pull/555)",
         ):
             self.assertIn(line, text)
         self.assertNotIn("Numbering note", text)

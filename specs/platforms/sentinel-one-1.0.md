@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-`configurations.sentinel_one` is a SentinelOne STAR rule. The detection text is S1QL, either one query (`Single Event`) or an ordered set of queries (`Correlation`). Query validation is supported. SentinelOne assigns the remote rule id; OpenTide stores it per tenant in [deployment state](../deployment-state.md).
+`configurations.sentinel_one` is a SentinelOne STAR rule. The detection text is S1QL, either one query (`Single Event`) or an ordered set of queries (`Correlation`). Query validation is supported. SentinelOne assigns the remote rule id; opentide stores it per tenant in [deployment state](../deployment-state.md).
 
 Shared fields are defined in [platforms](index.md#shared-platform-block).
 

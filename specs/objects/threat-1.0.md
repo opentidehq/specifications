@@ -164,7 +164,7 @@ threat:
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-10-19 | `mitre_attack` is pinned to `att&ck::1.2` (ATT&CK 20.0). Additive: every `att&ck::1.1` technique still validates ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)). `schema_id` stays `threat::1.0`. |
+| 1.0 | 2026-10-19 | `mitre_attack` is pinned to `att&ck::1.2` (ATT&CK 20.0). Additive: every `att&ck::1.1` technique still validates ([opentide#568](https://github.com/opentidehq/opentide/issues/568)). `schema_id` stays `threat::1.0`. |
 | 1.0 | 2026-10-06 | Technique list key is `mitre_attack`, pinned to `att&ck::1.1`. Vocabulary id stays `att&ck`. `schema_id` stays `threat::1.0`. |
-| 1.0 | 2026-09-16 | Correct `impact` and `leverage` to non-empty `list[string]`; forbid semicolon packing and first-token collapse ([#12](https://github.com/OpenTideHQ/specifications/issues/12)). Correct `actors` to `list[ThreatActor]` with scoped `name`; pin path is `threat.actors.name` ([#11](https://github.com/OpenTideHQ/specifications/issues/11)). Write-up correction of 1.0 — `schema_id` stays `threat::1.0`. |
+| 1.0 | 2026-09-16 | Correct `impact` and `leverage` to non-empty `list[string]`; forbid semicolon packing and first-token collapse ([#12](https://github.com/opentidehq/specifications/issues/12)). Correct `actors` to `list[ThreatActor]` with scoped `name`; pin path is `threat.actors.name` ([#11](https://github.com/opentidehq/specifications/issues/11)). Write-up correction of 1.0 — `schema_id` stays `threat::1.0`. |
 | 1.0 | 2026-06-25 | Initial spec from opentide `models/threat.py` |

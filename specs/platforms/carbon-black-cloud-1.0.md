@@ -34,7 +34,7 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 | `organizations` | list[string] | optional | null | Accepted, including the loader alias `organization`. The current deployer targets the tenant from the deployment plan and does not filter on this list. |
 | `watchlist` | string | optional | null | Watchlist name. Deploy uses the tenant watchlist when omitted. The watchlist must already exist. |
 | `report` | string | optional | null | Report title. Deploy uses the Tide rule `name` when omitted. |
-| `tags` | list[string] | optional | null | Extra report tags, appended after the tags OpenTide always writes. |
+| `tags` | list[string] | optional | null | Extra report tags, appended after the tags opentide always writes. |
 
 ### Report tags and severity
 
@@ -93,7 +93,7 @@ configurations:
     schema: platform::carbon_black_cloud::1.0
     status: STAGING
     query: process_name:cmd.exe
-    watchlist: OpenTide
+    watchlist: opentide
     report: Suspicious command processor
     tags:
       - windows

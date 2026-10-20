@@ -2,12 +2,12 @@
 
 - **RFC:** 0006
 - **Title:** Sharing on the production merge
-- **Author:** OpenTide
+- **Author:** opentide
 - **Status:** accepted
 - **Created:** 2026-09-28
 - **Accepted:** 2026-09-28 — normative text in [specs/sharing.md](../specs/sharing.md)
-- **Issue:** [#20](https://github.com/OpenTideHQ/specifications/issues/20)
-- **PR:** [#21](https://github.com/OpenTideHQ/specifications/pull/21)
+- **Issue:** [#20](https://github.com/opentidehq/specifications/issues/20)
+- **PR:** [#21](https://github.com/opentidehq/specifications/pull/21)
 - **Supersedes:** the disposition of [RFC 0005](0005-sharing-system.md) question 8 (CI left as usage-guide material)
 
 ## Summary
@@ -103,9 +103,9 @@ None. The trigger, the command, the diff, and the empty-run exits are decided ab
 
 ## References
 
-- Spec-change issue: [specifications#20](https://github.com/OpenTideHQ/specifications/issues/20)
-- Spec PR: [specifications#21](https://github.com/OpenTideHQ/specifications/pull/21)
+- Spec-change issue: [specifications#20](https://github.com/opentidehq/specifications/issues/20)
+- Spec PR: [specifications#21](https://github.com/opentidehq/specifications/pull/21)
 - Sharing spec this attaches to: [specs/sharing.md](../specs/sharing.md), [RFC 0005](0005-sharing-system.md)
-- Acceptance of sharing 1.0: [specifications#19](https://github.com/OpenTideHQ/specifications/pull/19)
-- opentide implementation: [opentide#184](https://github.com/OpenTideHQ/opentide/issues/184)
+- Acceptance of sharing 1.0: [specifications#19](https://github.com/opentidehq/specifications/pull/19)
+- opentide implementation: [opentide#184](https://github.com/opentidehq/opentide/issues/184)
 - Production deploy the job sits beside: `src/opentide/ci/github.py`, `src/opentide/ci/gitlab.py`, `src/opentide/ci/azure.py`, and the `PRODUCTION` range in `src/opentide/deployment/git_repo.py`

@@ -15,7 +15,7 @@ created: 2026-10-14
 
 ## Summary
 
-This repository is the normative source for OpenTide's taxonomy, but it publishes that taxonomy
+This repository is the normative source for opentide's taxonomy, but it publishes that taxonomy
 as documents for people rather than as a contract for machines. The gap is not cosmetic: a
 consumer reading only this repository **cannot determine whether a field's authored values are
 stage-prefixed**, because `tide.vocab.scoped` is specified here and declared nowhere here. This
@@ -62,12 +62,12 @@ Nothing there distinguishes `objective.signals.entities`, which takes `Host::Acc
 
 ### What it costs downstream
 
-`OpenTideHQ/website` rendered wrong values for three of the five staged vocabularies — `Account`
+`opentidehq/website` rendered wrong values for three of the five staged vocabularies — `Account`
 for `signal.entities`, `Accept` for `malapi`, and a bare actor name for `actors`, where the
 specification requires `Host::Account`, `Internet::Accept` and `att&ck::G1028`. Having no flag to
 read, a human transcribed the values and they drifted unnoticed.
 
-[website#43](https://github.com/OpenTideHQ/website/pull/43) fixed it by **inferring** scoping
+[website#43](https://github.com/opentidehq/website/pull/43) fixed it by **inferring** scoping
 from the shape of the `stages` declaration: a `[[stages]]` table array implies scoped values,
 while a plain string array — `att&ck`'s and `killchain`'s tactic lists — does not. That heuristic
 is correct today and is documented nowhere. It exists only because the authoritative flag is
@@ -76,7 +76,7 @@ unreachable, and it is exactly the kind of private reimplementation the authorit
 
 ### Retirement has no path
 
-Retiring `responders` ([#38](https://github.com/OpenTideHQ/specifications/pull/38)) deleted
+Retiring `responders` ([#38](https://github.com/opentidehq/specifications/pull/38)) deleted
 `responders.vocab.toml` outright. Downstream, that froze the website's deploys for roughly twenty
 hours.
 
@@ -316,7 +316,7 @@ No vocabulary's keys change. Five files are confirmed staged in the index (`acto
 ## Alternatives
 
 **Leave scoping to be inferred from the `[[stages]]` shape.** Rejected: it is what
-[website#43](https://github.com/OpenTideHQ/website/pull/43) does today, and it is undocumented,
+[website#43](https://github.com/opentidehq/website/pull/43) does today, and it is undocumented,
 unversioned, and duplicated per consumer. It also cannot express a field that narrows to a
 subset of stages, which `tide.vocab.stages` already allows.
 
@@ -341,7 +341,7 @@ JSON Schema is for editor and router validation, never for authoring normative c
   file per contract revision under `schemas/enums/`, built on release rather than committed, is
   the obvious shape, but the churn and size tradeoff needs a decision.
 - **Tags and releases.** `git tag` in this repository returns nothing, so no consumer can pin a
-  specification version — `OpenTideHQ/website` pins a raw commit SHA in a submodule. This has no
+  specification version — `opentidehq/website` pins a raw commit SHA in a submodule. This has no
   spec-text impact and is separable from this RFC, but it is the cheapest fix on the list.
   Should it be folded in, or tracked separately?
 - **Sunset enforcement.** Should CI fail once a deprecated vocabulary is past its `sunset` and
@@ -356,9 +356,9 @@ JSON Schema is for editor and router validation, never for authoring normative c
 
 ## References
 
-- [#39](https://github.com/OpenTideHQ/specifications/issues/39) — the spec-change issue this RFC answers
-- [#38](https://github.com/OpenTideHQ/specifications/pull/38) — retired `responders`; the deletion this RFC gives a path for
-- [website#43](https://github.com/OpenTideHQ/website/pull/43) — downstream fix, and the `[[stages]]`-shape heuristic it had to invent
+- [#39](https://github.com/opentidehq/specifications/issues/39) — the spec-change issue this RFC answers
+- [#38](https://github.com/opentidehq/specifications/pull/38) — retired `responders`; the deletion this RFC gives a path for
+- [website#43](https://github.com/opentidehq/website/pull/43) — downstream fix, and the `[[stages]]`-shape heuristic it had to invent
 - [RFC 0001](0001-authority-model.md) — authority model and change process
 - [RFC 0003](0003-per-key-vocabulary-versioning.md) — per-key vocabulary versioning and schema pins
 - [RFC 0005](0005-scoped-signal-entities.md) — stage-scoped `signal.entities`, and one prefixing rule for every staged vocabulary

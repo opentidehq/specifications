@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-OpenTide merges bundled package configuration with optional client overrides from `.opentide/configurations/`. Deep merge applies at the TOML key level; later layers override earlier ones for scalar and replaced subtrees.
+opentide merges bundled package configuration with optional client overrides from `.opentide/configurations/`. Deep merge applies at the TOML key level; later layers override earlier ones for scalar and replaced subtrees.
 
 ## Requirements
 

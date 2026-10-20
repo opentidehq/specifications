@@ -2,11 +2,11 @@
 
 - **RFC:** 0011
 - **Title:** Signal reuse across detection objectives
-- **Author:** OpenTide
+- **Author:** opentide
 - **Status:** draft
 - **Created:** 2026-09-29
-- **Issue:** [#22](https://github.com/OpenTideHQ/specifications/issues/22)
-- **PR:** [#23](https://github.com/OpenTideHQ/specifications/pull/23)
+- **Issue:** [#22](https://github.com/opentidehq/specifications/issues/22)
+- **PR:** [#23](https://github.com/opentidehq/specifications/pull/23)
 
 ## Summary
 
@@ -382,7 +382,7 @@ No change to `vocabularies/`. `objective::1.0` is not deleted and not deprecated
 
 ### opentide follow-up
 
-File in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide) after this RFC is accepted. Expected touch points, for that issue:
+File in [opentidehq/opentide](https://github.com/opentidehq/opentide) after this RFC is accepted. Expected touch points, for that issue:
 
 - `models/objective.py` — `objective::1.1` model beside `objective::1.0`; migration rewrites only `metadata.schema`
 - `registry/builder.py` and `indexing/inflight.py` — `owner` vs authored `parent`; reject duplicate definition UUIDs
@@ -436,7 +436,7 @@ File in [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide) after this
 
 ## References
 
-- Issue [#22](https://github.com/OpenTideHQ/specifications/issues/22)
+- Issue [#22](https://github.com/opentidehq/specifications/issues/22)
 - [specs/objects/objective-1.1.md](../specs/objects/objective-1.1.md), [specs/objects/objective-1.0.md](../specs/objects/objective-1.0.md), [specs/objects/rule-1.0.md](../specs/objects/rule-1.0.md)
 - [specs/validation.md](../specs/validation.md), [specs/metaschema-keywords.md](../specs/metaschema-keywords.md)
 - [specs/sharing/misp-1.0.md](../specs/sharing/misp-1.0.md) relation table

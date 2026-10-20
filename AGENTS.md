@@ -1,26 +1,26 @@
 ---
 title: Agent guide
-description: How AI agents should read, propose, and apply OpenTide normative specifications.
+description: How AI agents should read, propose, and apply opentide normative specifications.
 ---
 
 <Callout type="info">
-This guide targets contributors to the [specifications](https://github.com/OpenTideHQ/specifications) repository. Detection engineers reading [opentide.org](https://opentide.org) should start with [Specifications](/docs/specifications/) and [Usage](/docs/usage/).
+This guide targets contributors to the [specifications](https://github.com/opentidehq/specifications) repository. Detection engineers reading [opentide.org](https://opentide.org) should start with [Specifications](/docs/specifications/) and [Usage](/docs/usage/).
 </Callout>
 
-# Agent guide — OpenTide specifications
+# Agent guide — opentide specifications
 
 Instructions for AI agents working in this repository.
 
 ## Tracking (mandatory)
 
-OpenTide work is **public GitHub only**. Never create, update, comment on, or otherwise use Linear issues, projects, or documents for OpenTideHQ work — even if a Linear MCP server is available in the agent environment.
+opentide work is **public GitHub only**. Never create, update, comment on, or otherwise use Linear issues, projects, or documents for opentidehq work — even if a Linear MCP server is available in the agent environment.
 
 Canonical trackers:
 
-- Specs, RFCs, and governance: [OpenTideHQ/specifications](https://github.com/OpenTideHQ/specifications)
-- Implementation: [OpenTideHQ/opentide](https://github.com/OpenTideHQ/opentide)
+- Specs, RFCs, and governance: [opentidehq/specifications](https://github.com/opentidehq/specifications)
+- Implementation: [opentidehq/opentide](https://github.com/opentidehq/opentide)
 
-Open a GitHub spec-change issue (see `.github/ISSUE_TEMPLATE/spec-change.yml`) before an RFC. Implementation follow-up belongs in `OpenTideHQ/opentide` issues. Do not mirror OpenTide tickets into Linear.
+Open a GitHub spec-change issue (see `.github/ISSUE_TEMPLATE/spec-change.yml`) before an RFC. Implementation follow-up belongs in `opentidehq/opentide` issues. Do not mirror opentide tickets into Linear.
 
 ## Authority model
 
@@ -81,7 +81,7 @@ Sections (fixed order): Summary, Requirements, Definition, Relationships, Defaul
 - **Do not** invent a framework version — version each spec independently
 - **Do not** merge breaking spec changes without an RFC reference
 - **Do not** delete deprecated spec files — mark `status: deprecated` instead
-- **Do not** use Linear (issues, comments, projects, documents) for OpenTide work. Tracking is public GitHub only.
+- **Do not** use Linear (issues, comments, projects, documents) for opentide work. Tracking is public GitHub only.
 
 ## Vocabulary sync
 

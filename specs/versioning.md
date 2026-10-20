@@ -88,5 +88,5 @@ A workspace that holds both valid rules validates each against its own identifie
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.1 | 2026-10-19 | Every feature follows `metadata.schema`, not only validation. Missing schema is an error. Migration is explicit and does not change `metadata.version` ([specifications#27](https://github.com/OpenTideHQ/specifications/pull/27)). |
+| 1.1 | 2026-10-19 | Every feature follows `metadata.schema`, not only validation. Missing schema is an error. Migration is explicit and does not change `metadata.version` ([specifications#27](https://github.com/opentidehq/specifications/pull/27)). |
 | 1.0 | 2026-06-25 | Initial spec bootstrapped from opentide `SCHEMA_REVISION.md` |

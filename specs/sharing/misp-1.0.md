@@ -172,7 +172,7 @@ Emission order: TLP, PAP, `threat-actor` clusters, then `mitre-attack-pattern` c
 
 A missing or unmapped `metadata.tlp` fails the object with `unmapped_tlp`. An unmapped `metadata.pap` fails it with `unmapped_pap`. An absent `metadata.pap` emits no PAP tag.
 
-Cluster values MUST be the `value` string the instance returns. The connector MUST NOT derive a cluster value from an OpenTide vocabulary field.
+Cluster values MUST be the `value` string the instance returns. The connector MUST NOT derive a cluster value from an opentide vocabulary field.
 
 | Identifier source | Galaxy | First key that yields exactly one match |
 |-------------------|--------|------------------------------------------|
@@ -213,7 +213,7 @@ An object whose top-level `name` is absent or empty after trimming, or whose `me
 
 `threat_level_id` (`1` High, `2` Medium, `3` Low, `4` Undefined) is derived, never configured. Threat uses top-level `criticality`. Rule uses top-level `severity`. Objective has no source and is `4`.
 
-| OpenTide scale | Source values | `threat_level_id` |
+| opentide scale | Source values | `threat_level_id` |
 |----------------|---------------|-------------------|
 | `criticality::1.0` | `Emergency`, `Severe`, `High` | `1` |
 | `criticality::1.0` | `Medium` | `2` |
@@ -241,7 +241,7 @@ Pinned template identity:
 | Required relations | `name`, `opentide-object`, `opentide-type`, `uuid`, `version`, `schema` |
 | Optional repeatable relations | `opentide-relation`, `misp-event-relation` |
 
-`opentide-type` MUST be one of the template `values_list` entries: `threat`, `objective`, `rule`. Those strings are the OpenTide family names.
+`opentide-type` MUST be one of the template `values_list` entries: `threat`, `objective`, `rule`. Those strings are the opentide family names.
 
 | Relation | Cardinality | Source | `disable_correlation` |
 |----------|-------------|--------|------------------------|
@@ -252,7 +252,7 @@ Pinned template identity:
 | `schema` | exactly 1 | `metadata.schema`, verbatim (`rule::1.0` and siblings) | `true` |
 | `opentide-object` | exactly 1 | Verbatim source document | `false` |
 | `opentide-relation` | 0..n | Parent object UUIDs below | `false` |
-| `misp-event-relation` | 0 | Not emitted. MISP Event UUIDs are server-assigned and are not OpenTide identity | — |
+| `misp-event-relation` | 0 | Not emitted. MISP Event UUIDs are server-assigned and are not opentide identity | — |
 
 Every emitted attribute MUST set `type` to `text`, `category` to `Other`, `to_ids` to `false`, and `distribution` to `5` (inherit the Event). The object itself MUST set `distribution` to `5`, so a stored object cannot outreach its Event.
 

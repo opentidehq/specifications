@@ -198,5 +198,5 @@ A rule with `detection_model` pointing at this objective covers it directly, and
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.1 | 2026-10-19 | Draft. `mitre_attack` is pinned to `att&ck::1.2` (ATT&CK 20.0), as in `objective::1.0` ([opentide#568](https://github.com/OpenTideHQ/opentide/issues/568)). |
+| 1.1 | 2026-10-19 | Draft. `mitre_attack` is pinned to `att&ck::1.2` (ATT&CK 20.0), as in `objective::1.0` ([opentide#568](https://github.com/opentidehq/opentide/issues/568)). |
 | 1.1 | 2026-10-19 | Draft. Signal binding `reuse` ([RFC 0011](../../rfcs/0011-signal-reuse.md)). Field tables copy `objective::1.0` as of 2026-10-19 (`mitre_attack`, `alert_severity::1.0`, stage-scoped `entities`, `visibility.toml` log sources, integer `effort` with no pin). `objective::1.0` remains normative for definitions only. |

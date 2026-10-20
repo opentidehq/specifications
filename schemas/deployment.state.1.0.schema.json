@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://opentide.dev/schemas/deployment.state.1.0.schema.json",
-  "title": "OpenTide deployment state shard",
+  "title": "opentide deployment state shard",
   "description": "Vendor-assigned rule ids for one rule, per state-backed platform and tenant, stored at .opentide/states/deployment/<uuid>.json (specs/deployment-state.md). The filename stem must equal object_uuid; JSON Schema cannot see the filename, so readers check that separately. Readers may accept empty platform maps; writers never emit them.",
   "type": "object",
   "required": ["schema", "object_uuid", "platforms"],
