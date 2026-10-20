@@ -1,6 +1,6 @@
 ---
 spec: platforms
-version: "1.2"
+version: "1.3"
 schema_id: null
 status: normative
 supersedes: null
@@ -101,7 +101,7 @@ Every block includes these fields. Platform specs do not repeat them except wher
 | `platform_schema` | `schema` | string | optional | null | Schema identifier. Canonical value: `platform::<identifier>::1.0`. Templates emit it. Validation does not require it. |
 | `status` | `status` | string | optional | null | Deployment status for this block. When set, it MUST be a status name from [deployment.md](../deployment.md). `DISABLEMENT` disables an existing rule; `DELETION` removes it. Other strategies deploy it enabled. Required on `elastic` ([elastic-1.0](elastic-1.0.md)). |
 | `flags` | `flags` | list[string] | optional | null | Free-form flags. Splunk modifiers may match on them. |
-| `tenants` | `tenants` | list[string] | optional | null | Tenant names this block targets. Empty or omitted means the deployment plan's tenant selection. |
+| `tenants` | `tenants` | list[string] | optional | null | Tenant names this block targets. Empty or omitted means every tenant the run reaches. |
 | `contributors` | `contributors` | list[string] | optional | null | People credited on the platform rule. CrowdStrike joins them into the rule comment. |
 
 `schema` is the YAML key. The model field is `platform_schema` because `schema` would collide with the base model's schema method.
@@ -208,6 +208,7 @@ Vocabulary files are not platform configuration. See [configuration.md](../confi
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.3 | 2026-10-20 | Block `tenants`: omitted means every tenant the run reaches; opentide 0.17.0 removed deployment plans. |
 | 1.0 | 2026-06-25 | Initial matrix for seven bundled platforms |
 | 1.0 | 2026-09-30 | Field contracts moved to per-platform specs. Static validation, registry load, and deploy are specified separately. Generated JSON Schema is no longer described as the field contract. |
 | 1.1 | 2026-10-16 | Platform blocks carry no external ids. `rule_id`, `rule_id_bundle`, and the `rule_id::<tenant>` loader alias are removed from every block and fail `external_id_in_rule`; Defender, SentinelOne, and CrowdStrike ids live in [deployment state](../deployment-state.md) ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Elastic is recorded as addressed by `metadata.uuid` with no stored id. Platform `schema_id`s stay `::1.0`. |

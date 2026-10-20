@@ -1,6 +1,6 @@
 ---
 spec: sharing
-version: "1.2"
+version: "1.3"
 schema_id: null
 status: normative
 supersedes: null
@@ -48,7 +48,7 @@ Four surfaces share `sharing.toml` and `.opentide/states/sharing.jsonl`.
 | CI stage | `share` in the pipeline written by setup | `push --changed` on a production release, and only when the stage was selected |
 | Setup | `opentide setup`, `opentide setup ci` | None. Setup writes the pipeline. It does not write `sharing.toml` and it does not ask for API keys. |
 
-**Production release.** A push to the repository default branch. This is the event `opentide deploy --plan PRODUCTION` already uses.
+**Production release.** A push to the repository default branch. This is the event the generated production deploy (`opentide deploy --strategy RELEASE`) already uses.
 
 **Sharing stage.** The optional pipeline unit named `share`. It is absent unless setup selects it. Block `enabled` and the sharing stage are separate switches: an enabled block does not add the stage, and a selected stage with no enabled block exits 0.
 
@@ -185,7 +185,7 @@ The command MUST be `opentide share push --changed`. The generated files MUST NO
 
 The stage starts after generate has succeeded. It depends only on generate. Deploy jobs MUST keep their current dependencies. Adding the stage MUST NOT make deploy wait for share, and MUST NOT make share wait for deploy. The checkout MUST include the history the production diff needs. API keys come from the CI secret store. The generated file MUST NOT embed them.
 
-`--changed` uses the commit range `opentide deploy --plan PRODUCTION` uses:
+`--changed` uses the commit range the production deploy uses on a push:
 
 | Platform | Range |
 |----------|-------|
@@ -269,6 +269,7 @@ Bundled `sharing.toml` ships with no enabled block. A block MUST set `max_tlp`. 
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.3 | 2026-10-20 | Names the production deploy by its run strategy; opentide 0.17.0 removed `--plan`. |
 | 1.2 | 2026-10-19 | `rule_statuses` matches the statuses of a rule's enabled platform blocks, which deploy uses and promotion rewrites, and falls back to the root `status` only when no enabled block has one ([opentide#583](https://github.com/opentidehq/opentide/issues/583)). |
 | 1.1 | 2026-10-16 | `.opentide/states/` holds sharing's cache and deployment's committed shards ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). A future subsystem states whether its state is a cache or a record and whether it is committed. The directory is never ignored whole. Ledger fields are unchanged. |
 | 1.0 | 2026-09-28 | [RFC 0006](../rfcs/0006-sharing-ci.md). Optional sharing stage, default off, runs `opentide share push --changed` only on a push to the default branch. |
