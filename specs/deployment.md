@@ -1,6 +1,6 @@
 ---
 spec: deployment
-version: "1.2"
+version: "1.3"
 schema_id: null
 status: normative
 supersedes: null
@@ -57,6 +57,9 @@ The `strategy` on a status determines what `opentide deploy` does with a rule in
 | `RELEASE` | Rule is deployed to production targets |
 | `DISABLEMENT` | Any active deployment of the rule is disabled (kept but inactive) |
 | `DELETION` | The rule is removed from platforms |
+| `UNIVERSAL` | Rule is deployed to both staging/preview and production targets |
+
+No bundled status uses `UNIVERSAL`; a client status MAY.
 
 ### Status changes and promotion
 
@@ -148,3 +151,4 @@ Default rule status in fixtures: `STAGING` — see [fixtures/valid/rule-1.0.yaml
 | 1.0 | 2026-06-25 | Initial spec from opentide `deployment.toml` |
 | 1.1 | 2026-10-16 | Vendor-assigned rule ids: update, disablement, and deletion on Defender for Endpoint, SentinelOne, and CrowdStrike use the binding in [deployment state](deployment-state.md); creates require a destination that is not ignored and a run that can persist state; `external_id_missing` is a warning ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |
 | 1.2 | 2026-10-19 | `opentide deploy` selects only rule files placed directly in the configured rules directory; a rule file in a subfolder is not deployed ([specifications#16](https://github.com/opentidehq/specifications/pull/16)). |
+| 1.3 | 2026-10-20 | `UNIVERSAL` joins the strategy table. opentide already accepts it for a status `strategy`; the spec did not list it. Additive. |

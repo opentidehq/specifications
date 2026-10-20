@@ -21,7 +21,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Configuration | 1.0 | — | normative | [specs/configuration.md](specs/configuration.md) |
 | Vocabulary format | 1.0 | — | normative | [specs/vocabularies/format.md](specs/vocabularies/format.md) |
 | Vocabulary catalog | 1.0 | — | normative | [specs/vocabularies/catalog.md](specs/vocabularies/catalog.md) |
-| Deployment lifecycle | 1.2 | — | normative | [specs/deployment.md](specs/deployment.md) |
+| Deployment lifecycle | 1.3 | — | normative | [specs/deployment.md](specs/deployment.md) |
 | Deployment state | 1.1 | `deployment.state::1.0` | normative | [specs/deployment-state.md](specs/deployment-state.md) |
 | Metaschema keywords | 1.2 | — | normative | [specs/metaschema-keywords.md](specs/metaschema-keywords.md) |
 | Platforms | 1.2 | — | normative | [specs/platforms/index.md](specs/platforms/index.md) |
