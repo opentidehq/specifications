@@ -159,14 +159,14 @@ Consumers overlay shards onto the committed registry when the shard object `meta
 
 | Job id | Trigger | Command |
 |--------|---------|---------|
-| `validate_query_<platform>` (GitHub: a step of `validate`) | every pipeline | `opentide validate query --platform <platform> --live --changed`, on a full-history checkout, after replacing `.opentide/configurations` with the default branch's copy |
+| `validate_query_<platform>` (GitHub: a step of `validate`) | every pipeline | `opentide validate query --platform <platform> --live --changed --plan FULL`, on a full-history checkout, after replacing `.opentide/configurations` with the default branch's copy |
 | `deploy_staging` | pull request / merge request into the default branch | `opentide deploy --plan STAGING` |
 | `inflight_shards` | pull request / merge request | `opentide generate inflight` |
 | `inflight_prune` | push to default branch | `opentide generate inflight prune` |
 | `share` | push to the default branch only, and only when setup selected the sharing stage | `opentide share push --changed` |
 | `deploy_production` | push to the default branch | `opentide deploy --plan PRODUCTION`, then the deployment-state write-back whenever the deploy started ([below](#production-deployment-state)) |
 
-The live query check MUST pass `--changed` and no `--plan`: it checks the rule files the run changed, on every tenant they can reach, whatever their status ([validation.md](validation.md#query-validation-scope)). Checking every rule on every run made the gate take as long as the catalogue was large.
+The live query check MUST pass `--changed --plan FULL`. It checks the rule files the run changed whose strategy is `PREVIEW`, `RELEASE`, or `UNIVERSAL`, on every tenant they can reach; a changed `INERT`, `DISABLEMENT`, or `DELETION` rule sends no query ([validation.md](validation.md#query-validation-scope)). `--plan FULL` is explicit because an omitted `--plan` reads `DEPLOYMENT_PLAN`, and a project-wide `DEPLOYMENT_PLAN` would otherwise narrow the gate. Checking every rule on every run made the gate take as long as the catalogue was large.
 
 Generated GitLab pipelines MUST set `workflow:rules` that create merge request pipelines and default-branch pipelines. A GitLab job with no `rules` defaults to `except: merge_requests`; without `workflow:rules`, a merge request pipeline holds only the jobs gated on the merge request, and GitLab refuses to start it when one of them `needs` a job it left out (`deploy_staging` and `inflight_shards` need `generate`). The same rules keep a push to a branch with an open merge request from starting a branch pipeline beside the merge request pipeline.
 
@@ -205,7 +205,7 @@ Object fixtures assume the default layout: rules under `objects/rules/`, etc.
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.5 | 2026-10-20 | Generated CI: the live query check runs `opentide validate query --live --changed` with no `--plan` on a full-history checkout, and the staging deploy is listed. Generated GitLab pipelines set `workflow:rules` for merge request and default-branch pipelines, without which GitLab refused every merge request pipeline. |
+| 1.5 | 2026-10-20 | Generated CI: the live query check runs `opentide validate query --live --changed --plan FULL` on a full-history checkout, and the staging deploy is listed ([RFC 0013](../rfcs/0013-deployment-plans-and-query-scope.md)). Generated GitLab pipelines set `workflow:rules` for merge request and default-branch pipelines, without which GitLab refused every merge request pipeline. |
 | 1.4 | 2026-10-19 | `objective::1.1` schema and template artifacts beside `objective::1.0` ([RFC 0011](../rfcs/0011-signal-reuse.md)). |
 | 1.3 | 2026-10-19 | Object instances are the YAML files placed directly in each family directory. A file in a subfolder is not an instance and is neither deployed nor shared ([specifications#16](https://github.com/opentidehq/specifications/pull/16), [opentide#312](https://github.com/opentidehq/opentide/issues/312)). |
 | 1.2 | 2026-10-16 | The production deploy job has no GitHub Actions `concurrency` group ([specifications#43](https://github.com/opentidehq/specifications/issues/43)). |

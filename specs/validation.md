@@ -104,7 +104,7 @@ Three flags narrow the rule files and nothing else:
 
 `--changed` MUST NOT be combined with `--file` or `--uuid` (exit `2`). A `--file` or `--uuid` target that selects no rule file MUST fail the run (exit `1`) before any query is sent, naming the target. When the narrowed files hold no rule for the platform, the result is `skipped` with exit `0`. The result names the narrowing in `scope` (`changed` or `selected`).
 
-`--changed` keeps the plan's strategies and tenants: with no `--plan`, a pull request that edits a rule in a `RELEASE` status still has that rule's queries checked, on every tenant it can reach. Narrowing with `--plan STAGING` instead would drop it. Generated pipelines MUST run the live check with `--changed` and no `--plan` ([workspace.md](workspace.md#ci-jobs)).
+`--changed` keeps the plan's strategies and tenants: under `FULL`, a pull request that edits a rule in a `RELEASE` status still has that rule's queries checked, on every tenant it can reach. Narrowing with `--plan STAGING` instead would drop it. Omitting `--plan` gives `FULL` only when `DEPLOYMENT_PLAN` is unset, so generated pipelines MUST run the live check with `--changed --plan FULL` ([workspace.md](workspace.md#ci-jobs)). Under `FULL` a changed rule whose strategy is `INERT`, `DISABLEMENT`, or `DELETION` sends no query ([RFC 0013](../rfcs/0013-deployment-plans-and-query-scope.md)).
 
 ### Specifications-repo fixture checker
 
@@ -212,7 +212,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.4 | 2026-10-20 | Query validation scope: a live check reads a deployment plan's rules (`FULL` by default, every reachable tenant); `--changed`, `--file`, and `--uuid` narrow the rule files without changing the plan's strategies or tenants. `--changed` takes the pull or merge request's diff, or the push's, and refuses outside CI. Generated pipelines run the check with `--changed`. |
+| 1.4 | 2026-10-20 | Query validation scope: a live check reads a deployment plan's rules (`FULL` by default, every reachable tenant); `--changed`, `--file`, and `--uuid` narrow the rule files without changing the plan's strategies or tenants. `--changed` takes the pull or merge request's diff, or the push's, and refuses outside CI. Generated pipelines run the check with `--changed --plan FULL` ([RFC 0013](../rfcs/0013-deployment-plans-and-query-scope.md)). |
 | 1.3 | 2026-10-19 | `elastic` joins query validation, live only through Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md)). The command is `validate query --live` on every platform in the query-validation allowlist; without `--live` it refuses. The fixture checker applies three Elastic constraint codes (`language`, `esql_source`, `suppression_shape`) to `configurations.elastic` blocks. |
 | 1.2 | 2026-10-19 | `objective::1.1` signal binding codes ([RFC 0011](../rfcs/0011-signal-reuse.md)). The fixture checker proves `signal_entry_mixed`, `invalid_uuid` on `reuse`, and `binding_requires_1_1`. `unresolved_signal`, `self_signal`, `duplicate_signal`, `duplicate_signal_uuid`, and `signal_tlp` are `opentide validate` against the workspace library. |
 | 1.1 | 2026-10-16 | `external_id_in_rule` replaces the generic unknown-key error for legacy external-id keys; full-workspace validation checks every deployment-state shard, orphans included; every `--file` target must match an object; deployment fixture checker codes ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |

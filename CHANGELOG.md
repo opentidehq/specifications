@@ -63,7 +63,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## workspace 1.5
 
-- Generated CI: the live query check runs `opentide validate query --platform <platform> --live --changed` with no `--plan`, on a full-history checkout, so it checks the rule files the run changed on every tenant they can reach. Checking every rule on every run made the gate take as long as the catalogue was large. The staging deploy job is listed.
+- Generated CI: the live query check runs `opentide validate query --platform <platform> --live --changed --plan FULL`, on a full-history checkout, so it checks the rule files the run changed on every tenant they can reach; an inherited `DEPLOYMENT_PLAN` cannot narrow it ([RFC 0013](rfcs/0013-deployment-plans-and-query-scope.md)). Checking every rule on every run made the gate take as long as the catalogue was large. The staging deploy job is listed.
 - Generated GitLab pipelines set `workflow:rules` for merge request and default-branch pipelines. A GitLab job with no `rules` defaults to `except: merge_requests`, so without them the merge request pipeline left out `generate`, which `deploy_staging` and `inflight_shards` need, and GitLab refused to start it.
 
 ## workspace 1.4
@@ -111,7 +111,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## deployment 1.3
 
-- Deployment plans are specified. `STAGING` (pull or merge request), `PRODUCTION` (push to the default branch), and `FULL` (every rule file, the default) name a pipeline; each reads its rule files and deploys the rules whose status strategy it lists, to the tenants of its class. A plan never selects by status name, so the bundled `STAGING` and `PRODUCTION` statuses share their names with plans by convention only, and a strategy given as a plan (`PREVIEW`, `RELEASE`) is refused.
+- Deployment plans are specified ([RFC 0013](rfcs/0013-deployment-plans-and-query-scope.md)). `STAGING` (pull or merge request), `PRODUCTION` (push to the default branch), and `FULL` (every rule file, the default) name a pipeline; each reads its rule files and deploys the rules whose status strategy it lists, to the tenants of its class. A plan never selects by status name, so the bundled `STAGING` and `PRODUCTION` statuses share their names with plans by convention only, and a strategy given as a plan (`PREVIEW`, `RELEASE`) is refused.
 - The strategy table gains the plans that deploy each strategy, and `UNIVERSAL` (deployed by both the pull-request and the default-branch plan), which opentide implements.
 - `[proxy]` is replaced by the network proxy contract: the global `opentide --proxy` option or `OPENTIDE_PROXY`, with `NO_PROXY` honoured. The `[proxy]` table, a tenant `proxy` key, and `[cve].proxy` are refused. opentide 0.10.0 retired the table; the spec still described it.
 
@@ -248,7 +248,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## validation 1.4
 
-- Query validation scope. A live check reads a deployment plan's rules, `FULL` by default, which reaches every tenant a rule can reach. `--changed` (the pull or merge request's diff, or the push's; refused outside CI), `--file`, and `--uuid` narrow the rule files without changing the plan's strategies or tenants; a target that selects no rule file fails before any query. Generated pipelines run the check with `--changed`.
+- Query validation scope ([RFC 0013](rfcs/0013-deployment-plans-and-query-scope.md)). A live check reads a deployment plan's rules, `FULL` by default, which reaches every tenant a rule can reach. `--changed` (the pull or merge request's diff, or the push's; refused outside CI), `--file`, and `--uuid` narrow the rule files without changing the plan's strategies or tenants; a target that selects no rule file fails before any query. Generated pipelines run the check with `--changed --plan FULL`.
 
 ## validation 1.3
 
