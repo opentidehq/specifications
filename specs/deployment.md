@@ -1,6 +1,6 @@
 ---
 spec: deployment
-version: "1.2"
+version: "1.3"
 schema_id: null
 status: normative
 supersedes: null
@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-Defines rule deployment statuses, promotion strategy, proxy settings, and debug configuration. Shipped in bundled `deployment.toml`; clients MAY override via `.opentide/configurations/deployment.toml`.
+Defines rule deployment statuses and the strategy each maps to, the deployment plans that select rules by strategy, promotion, and debug configuration. Shipped in bundled `deployment.toml`; clients MAY override via `.opentide/configurations/deployment.toml`.
 
 ## Requirements
 
@@ -22,6 +22,8 @@ Defines rule deployment statuses, promotion strategy, proxy settings, and debug 
 - Platform-specific `status` on configuration blocks MUST also be valid deployment statuses when set.
 - For Defender for Endpoint, SentinelOne, and CrowdStrike, update, disablement, and deletion MUST use the tenant binding in [deployment state](deployment-state.md). A `RELEASE` or `PREVIEW` action with no binding MUST NOT create a remote rule unless the deployment-state destination is not ignored and the binding can be durably retained.
 - `opentide deploy` MUST select only the rule files placed directly in the configured rules directory (`paths.objects.rule`, see [workspace layout](workspace.md)). A rule file in a subdirectory of that folder MUST NOT be deployed.
+- A deployment plan MUST select rules by the strategy of their status, never by the status name ([Deployment plans](#deployment-plans)). Plan names are fixed by this specification; they MUST NOT be read as status names, and status names MUST NOT be read as plans.
+- `deployment.toml` carries no proxy settings. A `[proxy]` table MUST fail the command and name the global proxy option ([Network proxy](#network-proxy)).
 
 ## Definition
 
@@ -50,13 +52,34 @@ Defines rule deployment statuses, promotion strategy, proxy settings, and debug 
 
 The `strategy` on a status determines what `opentide deploy` does with a rule in that status:
 
-| Strategy | Deploy behaviour |
-|----------|------------------|
-| `INERT` | Rule is not deployed to any platform |
-| `PREVIEW` | Rule is deployed to staging/preview targets only |
-| `RELEASE` | Rule is deployed to production targets |
-| `DISABLEMENT` | Any active deployment of the rule is disabled (kept but inactive) |
-| `DELETION` | The rule is removed from platforms |
+| Strategy | Deploy behaviour | Deployed by plan |
+|----------|------------------|------------------|
+| `INERT` | Rule is not deployed to any platform | none |
+| `PREVIEW` | Rule is deployed to staging/preview targets only | `STAGING`, `FULL` |
+| `RELEASE` | Rule is deployed to production targets | `PRODUCTION`, `FULL` |
+| `DISABLEMENT` | Any active deployment of the rule is disabled (kept but inactive) | `PRODUCTION`; `FULL` when the run keeps deprecated rules |
+| `DELETION` | The rule is removed from platforms | `PRODUCTION`; `FULL` when the run keeps deprecated rules |
+| `UNIVERSAL` | Rule is deployed by both the pull-request and the default-branch plan | `STAGING`, `PRODUCTION`, `FULL` |
+
+No bundled status uses `UNIVERSAL`; a client status MAY.
+
+### Deployment plans
+
+A deployment plan names the pipeline a run belongs to. It is chosen per run with `opentide deploy --plan` or `DEPLOYMENT_PLAN`, and defaults to `FULL`. A plan is not a status: it selects the rules whose status **strategy** it deploys, whatever the status is called, so the plan names never have to match a configured status. The bundled `STAGING` and `PRODUCTION` statuses share a name with two plans by convention only.
+
+| Plan | Pipeline | Rule files read | Strategies deployed | Tenants targeted |
+|------|----------|-----------------|---------------------|------------------|
+| `STAGING` | Pull or merge request | Those the request changed, from its merge base | `PREVIEW`, `UNIVERSAL` | `deployment = "STAGING"` or `"ALWAYS"`; `"MANUAL"` when the block lists it |
+| `PRODUCTION` | Push to the default branch | Those the push changed | `RELEASE`, `UNIVERSAL`, `DISABLEMENT`, `DELETION` | `deployment = "PRODUCTION"` or `"ALWAYS"`; `"MANUAL"` when the block lists it |
+| `FULL` | Any; the default outside CI | Every rule file | `PREVIEW`, `RELEASE`, `UNIVERSAL`; `DISABLEMENT` and `DELETION` when the run keeps deprecated rules | `deployment = "ALWAYS"`; `"MANUAL"` when the block lists it |
+
+`PRODUCTION` keeps deprecated rules (`DISABLEMENT`, `DELETION`) unless the run drops them (`opentide deploy --drop-deprecated`); `FULL` drops them unless the run keeps them (`--keep-deprecated`), so a full redeploy does not retire the archived catalogue by accident. The rule files read follow the rules-directory requirement above. A block's `tenants` list (see [platforms/index.md](platforms/index.md)) limits a rule to the tenants it names. With the bundled statuses, `STAGING` therefore deploys a rule in `DEVELOPMENT`, `IMPROVING`, `STAGING`, or `ACCEPTANCE`, and `PRODUCTION` a rule in `PRODUCTION`, `DISABLED`, or `REMOVED`. A client status `CANARY` with strategy `PREVIEW` is deployed by `STAGING`, and a client that maps a status named `STAGING` to `RELEASE` has it deployed by `PRODUCTION`.
+
+A status strategy is not a plan name. An implementation MUST refuse a plan named after a strategy (`PREVIEW`, `RELEASE`, …), and SHOULD name the plan that deploys that strategy. `ALWAYS`, `MANUAL`, and `DEBUG` are tenant classes or implementation plans, not CI diff plans; a CI diff under them MUST fail rather than read every rule.
+
+The tenant `deployment` key in a platform's workspace configuration uses the plan names as tenant classes: `STAGING` and `PRODUCTION` tenants receive their plan's deploys, `ALWAYS` tenants every plan's, and `MANUAL` tenants only the rules whose block lists them.
+
+Live query validation (`opentide validate query --live`) reads the same plans but only reads from tenants, so under `FULL` it checks every tenant a rule can reach ([validation.md](validation.md#query-validation)).
 
 ### Status changes and promotion
 
@@ -100,16 +123,11 @@ A rule that carries `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>` on any p
 | `enabled` | boolean | `true` | Whether status promotion is allowed |
 | `promotion_target` | string | `PRODUCTION` | Default target status for promotion |
 
-### `[proxy]`
+### Network proxy
 
-| Field | Description |
-|-------|-------------|
-| `proxy_user` | Optional; use with `proxy_password` for auth |
-| `proxy_password` | Optional proxy password (env var substitution supported) |
-| `proxy_host` | Proxy hostname |
-| `proxy_port` | Proxy port |
+`deployment.toml` has no proxy settings. The proxy for platform and lookup calls is the global `opentide --proxy http://[user:pass@]host:port` option, or `OPENTIDE_PROXY` when the option is omitted. It applies to the `opentide` process only, overriding `HTTP_PROXY` and `HTTPS_PROXY`; without it the process environment's proxy variables apply. Hosts listed in `NO_PROXY` MUST be reached directly in either case, so one run can reach a cloud tenant through the proxy and an internal tenant without it.
 
-When both `proxy_user` and `proxy_password` are present, authenticated proxy is used; otherwise host:port only.
+A `[proxy]` table in `deployment.toml`, a `proxy` key under a tenant's `[tenants.setup]`, and `[cve].proxy` in `documentation.toml` are retired: each MUST fail the command and name `opentide --proxy`. opentide 0.10.0 retired them; until version 1.3 this specification still described `[proxy]` (`proxy_user`, `proxy_password`, `proxy_host`, `proxy_port`).
 
 ### `[debug]`
 
@@ -132,6 +150,8 @@ When both `proxy_user` and `proxy_password` are present, authenticated proxy is 
 - [platforms/index.md](platforms/index.md) — per-platform deployment
 - [deployment-state.md](deployment-state.md) — vendor-assigned rule ids, deploy decisions, and the production write-back
 - [metaschema-keywords.md](metaschema-keywords.md) — `tide.config.statuses` keyword
+- [validation.md](validation.md#query-validation) — live query validation under a plan
+- [workspace.md](workspace.md#ci-jobs) — the generated jobs that run each plan
 
 ## Defaults & overrides
 
@@ -148,3 +168,4 @@ Default rule status in fixtures: `STAGING` — see [fixtures/valid/rule-1.0.yaml
 | 1.0 | 2026-06-25 | Initial spec from opentide `deployment.toml` |
 | 1.1 | 2026-10-16 | Vendor-assigned rule ids: update, disablement, and deletion on Defender for Endpoint, SentinelOne, and CrowdStrike use the binding in [deployment state](deployment-state.md); creates require a destination that is not ignored and a run that can persist state; `external_id_missing` is a warning ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |
 | 1.2 | 2026-10-19 | `opentide deploy` selects only rule files placed directly in the configured rules directory; a rule file in a subfolder is not deployed ([specifications#16](https://github.com/opentidehq/specifications/pull/16)). |
+| 1.3 | 2026-10-20 | Deployment plans are specified: `STAGING`, `PRODUCTION`, and `FULL` name a pipeline and select rules by status strategy, never by status name; a strategy given as a plan is refused. The tenant `deployment` classes are listed, and `UNIVERSAL` joins the strategy table as implemented. `[proxy]` is replaced by the global `opentide --proxy` / `OPENTIDE_PROXY` with `NO_PROXY` honoured; the table, retired by opentide 0.10.0, is refused. |

@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.3"
+version: "1.4"
 schema_id: null
 status: normative
 supersedes: null
@@ -23,6 +23,7 @@ opentide validates detection content through a structured pipeline: ID uniquenes
 - Threat `chaining` relationships MUST reference valid targets when checked.
 - Query validation MUST only be offered for platforms in the query-validation allowlist (see [platforms/index.md](platforms/index.md)).
 - Platforms without query validators MUST return `supported: false` — not fake success.
+- Live query validation MUST narrow rule files only through `--changed`, `--file`, and `--uuid`; those flags MUST NOT change the strategies or tenants the plan selects ([Query validation scope](#query-validation-scope)).
 - The schema check MUST report `external_id_in_rule` for `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>` at the root of any platform block and MUST suppress the redundant generic unknown-key diagnostic for that same field.
 - Full-workspace validation MUST validate every deployment-state shard under `.opentide/states/deployment/`, including orphan shards whose `object_uuid` is not in the registry. A missing shard is not an error.
 
@@ -88,6 +89,22 @@ Command: `opentide validate query --platform <id> --live`
 | `harfanglab` | no |
 
 Requires platform credentials and enabled configuration. Validates deployed or planned rule queries against the live platform API. Query validation is a tenant check on every platform in the query-validation allowlist above: without `--live` the command MUST refuse and name `--live`, and MUST NOT report a pass. `crowdstrike` and `harfanglab` report `supported: false` instead ([platforms](platforms/index.md#query-validation-platforms)). No platform has an offline syntax check; Elastic's query language (KQL, Lucene, EQL, or ES|QL) comes from each rule's block: its `type`, and `language` for the types that take one.
+
+#### Query validation scope
+
+A live check reads the rules of a [deployment plan](deployment.md#deployment-plans): `--plan` or `DEPLOYMENT_PLAN`, `FULL` by default. It checks the rules whose status strategy the plan deploys, except `DISABLEMENT` and `DELETION`. It only reads, so under `FULL` it MUST check every tenant a rule can reach (`STAGING`, `PRODUCTION`, and `ALWAYS` tenants, and a `MANUAL` tenant the block lists); an explicit `STAGING` or `PRODUCTION` plan narrows the check to the tenants that plan deploys to. A run that sends no query MUST NOT report a pass.
+
+Three flags narrow the rule files and nothing else:
+
+| Flag | Rule files checked |
+|------|--------------------|
+| `--changed` | In a pull or merge request run, the files the `STAGING` plan reads (the request's diff from its merge base). In any other GitHub Actions, GitLab CI, or Azure Pipelines run, the files the `PRODUCTION` plan reads (the pushed commit's diff). Outside CI the command MUST refuse with exit `2`. |
+| `--file` | Each target selects rule files directly in the rules directory, matched as `opentide validate --file` matches ([Validation scope](#validation-scope)). Repeatable. |
+| `--uuid` | Each target selects the rule file whose `metadata.uuid` it names. Repeatable. |
+
+`--changed` MUST NOT be combined with `--file` or `--uuid` (exit `2`). A `--file` or `--uuid` target that selects no rule file MUST fail the run (exit `1`) before any query is sent, naming the target. When the narrowed files hold no rule for the platform, the result is `skipped` with exit `0`. The result names the narrowing in `scope` (`changed` or `selected`).
+
+`--changed` keeps the plan's strategies and tenants: with no `--plan`, a pull request that edits a rule in a `RELEASE` status still has that rule's queries checked, on every tenant it can reach. Narrowing with `--plan STAGING` instead would drop it. Generated pipelines MUST run the live check with `--changed` and no `--plan` ([workspace.md](workspace.md#ci-jobs)).
 
 ### Specifications-repo fixture checker
 
@@ -195,6 +212,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.4 | 2026-10-20 | Query validation scope: a live check reads a deployment plan's rules (`FULL` by default, every reachable tenant); `--changed`, `--file`, and `--uuid` narrow the rule files without changing the plan's strategies or tenants. `--changed` takes the pull or merge request's diff, or the push's, and refuses outside CI. Generated pipelines run the check with `--changed`. |
 | 1.3 | 2026-10-19 | `elastic` joins query validation, live only through Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md)). The command is `validate query --live` on every platform in the query-validation allowlist; without `--live` it refuses. The fixture checker applies three Elastic constraint codes (`language`, `esql_source`, `suppression_shape`) to `configurations.elastic` blocks. |
 | 1.2 | 2026-10-19 | `objective::1.1` signal binding codes ([RFC 0011](../rfcs/0011-signal-reuse.md)). The fixture checker proves `signal_entry_mixed`, `invalid_uuid` on `reuse`, and `binding_requires_1_1`. `unresolved_signal`, `self_signal`, `duplicate_signal`, `duplicate_signal_uuid`, and `signal_tlp` are `opentide validate` against the workspace library. |
 | 1.1 | 2026-10-16 | `external_id_in_rule` replaces the generic unknown-key error for legacy external-id keys; full-workspace validation checks every deployment-state shard, orphans included; every `--file` target must match an object; deployment fixture checker codes ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |

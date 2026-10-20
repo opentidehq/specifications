@@ -61,6 +61,11 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage comes from `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - Initial normative spec bootstrapped from opentide `models/rule.py` (exemplar template).
 
+## workspace 1.5
+
+- Generated CI: the live query check runs `opentide validate query --platform <platform> --live --changed` with no `--plan`, on a full-history checkout, so it checks the rule files the run changed on every tenant they can reach. Checking every rule on every run made the gate take as long as the catalogue was large. The staging deploy job is listed.
+- Generated GitLab pipelines set `workflow:rules` for merge request and default-branch pipelines. A GitLab job with no `rules` defaults to `except: merge_requests`, so without them the merge request pipeline left out `generate`, which `deploy_staging` and `inflight_shards` need, and GitLab refused to start it.
+
 ## workspace 1.4
 
 - `objective.1.1.schema.json` and `objective.1.1.template.yaml` beside the 1.0 artifacts ([RFC 0011](rfcs/0011-signal-reuse.md)).
@@ -103,6 +108,12 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - `scripts/validate.py` rejects a pin `field::M.m` that no key of `field` is introduced or removed at, so a pin can no longer name an empty minor. A removal-only major (`att&ck::2.0`) stays pinnable.
 - `responders.vocab.toml` is retired. It shipped with `keys = []` while `response.responders` was pinned to it, so every authored value failed validation and no instance could fix it (vocabularies are not locally extensible). The alert handling team is per-organisation configuration: the field is free text defaulted from `[deployment] default_responders` (opentide#507).
 - Initial catalog of 36 bundled vocabularies copied from opentide.
+
+## deployment 1.3
+
+- Deployment plans are specified. `STAGING` (pull or merge request), `PRODUCTION` (push to the default branch), and `FULL` (every rule file, the default) name a pipeline; each reads its rule files and deploys the rules whose status strategy it lists, to the tenants of its class. A plan never selects by status name, so the bundled `STAGING` and `PRODUCTION` statuses share their names with plans by convention only, and a strategy given as a plan (`PREVIEW`, `RELEASE`) is refused.
+- The strategy table gains the plans that deploy each strategy, and `UNIVERSAL` (deployed by both the pull-request and the default-branch plan), which opentide implements.
+- `[proxy]` is replaced by the network proxy contract: the global `opentide --proxy` option or `OPENTIDE_PROXY`, with `NO_PROXY` honoured. The `[proxy]` table, a tenant `proxy` key, and `[cve].proxy` are refused. opentide 0.10.0 retired the table; the spec still described it.
 
 ## deployment 1.2
 
@@ -234,6 +245,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.4
+
+- Query validation scope. A live check reads a deployment plan's rules, `FULL` by default, which reaches every tenant a rule can reach. `--changed` (the pull or merge request's diff, or the push's; refused outside CI), `--file`, and `--uuid` narrow the rule files without changing the plan's strategies or tenants; a target that selects no rule file fails before any query. Generated pipelines run the check with `--changed`.
 
 ## validation 1.3
 

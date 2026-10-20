@@ -16,12 +16,12 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Objective object | 1.1 | `objective::1.1` | draft | [specs/objects/objective-1.1.md](specs/objects/objective-1.1.md) |
 | Rule object | 1.0 | `rule::1.0` | normative | [specs/objects/rule-1.0.md](specs/objects/rule-1.0.md) |
 | Rule object | 1.1 | `rule::1.1` | normative | [specs/objects/rule-1.1.md](specs/objects/rule-1.1.md) |
-| Workspace layout | 1.4 | — | normative | [specs/workspace.md](specs/workspace.md) |
+| Workspace layout | 1.5 | — | normative | [specs/workspace.md](specs/workspace.md) |
 | Inflight preview shard | 1.0 | `inflight.shard::1.0` | normative | [specs/workspace.md](specs/workspace.md#inflight-preview-shards) |
 | Configuration | 1.0 | — | normative | [specs/configuration.md](specs/configuration.md) |
 | Vocabulary format | 1.0 | — | normative | [specs/vocabularies/format.md](specs/vocabularies/format.md) |
 | Vocabulary catalog | 1.0 | — | normative | [specs/vocabularies/catalog.md](specs/vocabularies/catalog.md) |
-| Deployment lifecycle | 1.2 | — | normative | [specs/deployment.md](specs/deployment.md) |
+| Deployment lifecycle | 1.3 | — | normative | [specs/deployment.md](specs/deployment.md) |
 | Deployment state | 1.1 | `deployment.state::1.0` | normative | [specs/deployment-state.md](specs/deployment-state.md) |
 | Metaschema keywords | 1.2 | — | normative | [specs/metaschema-keywords.md](specs/metaschema-keywords.md) |
 | Platforms | 1.2 | — | normative | [specs/platforms/index.md](specs/platforms/index.md) |
@@ -33,7 +33,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | CrowdStrike platform | 1.1 | `platform::crowdstrike::1.0` | normative | [specs/platforms/crowdstrike-1.0.md](specs/platforms/crowdstrike-1.0.md) |
 | HarfangLab platform | 1.1 | `platform::harfanglab::1.0` | normative | [specs/platforms/harfanglab-1.0.md](specs/platforms/harfanglab-1.0.md) |
 | Elastic Security platform | 1.0 | `platform::elastic::1.0` | normative | [specs/platforms/elastic-1.0.md](specs/platforms/elastic-1.0.md) |
-| Validation | 1.3 | — | normative | [specs/validation.md](specs/validation.md) |
+| Validation | 1.4 | — | normative | [specs/validation.md](specs/validation.md) |
 | Sharing | 1.2 | — | normative | [specs/sharing.md](specs/sharing.md) |
 | MISP connector | 1.0 | `sharing::misp::1.0` | normative | [specs/sharing/misp-1.0.md](specs/sharing/misp-1.0.md) |
 
