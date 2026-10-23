@@ -19,7 +19,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 - The document MUST declare `metadata.schema: rule::1.0`.
 - `name`, `metadata`, and `description` MUST be present.
 - `status` MUST be a valid deployment status from [deployment.md](../deployment.md) (default: `STAGING`).
-- `severity` MUST be a valid rule severity vocabulary value (default: `Informational`).
+- `severity` MUST be a value of the `alert_severity` vocabulary (pin `alert_severity::1.0`: `Informational`, `Low`, `Medium`, `High`, `Critical`; default: `Informational`). It is the rule's own severity, distinct from a threat's `severity`, which uses the `severity` (Threat Severity) incident scale.
 - `techniques` MUST be a list of ATT&CK technique ids from vocabulary `att&ck` (pin `att&ck::1.2`). The list MAY be empty.
 - `platforms` or `configurations` MUST contain at least one enabled platform block for deployable rules.
 - `detection_model` when present MUST reference either a valid objective UUID or the UUID of a signal defined under an objective (`objective::1.0` or `objective::1.1`). A rule implements a whole objective or one of its signals; both are referenceable by design. A signal reference implements that signal, and the rule's objective is the signal's owning objective. Indirect coverage of other objectives is derived from signal bindings on `objective::1.1` ([objective-1.1.md](objective-1.1.md), draft). A rule has a single `detection_model`.
@@ -45,7 +45,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 | `metadata` | ObjectMetadata | yes | — | See [metadata.md](../metadata.md) |
 | `description` | string | yes | — | Rule narrative (multiline YAML encouraged) |
 | `status` | string | no | `STAGING` | Deployment lifecycle status |
-| `severity` | string | no | `Informational` | Rule severity vocabulary |
+| `severity` | string | no | `Informational` | `alert_severity::1.0` |
 | `techniques` | list[string] | no | `[]` | MITRE ATT&CK technique ids (`att&ck::1.2`) |
 | `platforms` | map[string, object] | no | `{}` | Legacy flat platform dict (prefer `configurations`) |
 | `configurations` | RuleConfigurations | no | null | Typed per-platform configuration blocks |
