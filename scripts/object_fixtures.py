@@ -599,6 +599,42 @@ def validate_elastic_block(block: dict[str, Any]) -> list[CheckError]:
     return errors
 
 
+# response.procedure.searches[].language: the query languages a system with more
+# than one language takes (specs/objects/rule-1.1.md, specifications#58).
+SEARCH_LANGUAGES: dict[str, frozenset[str]] = {
+    "elastic": frozenset({"kuery", "lucene", "eql", "esql"}),
+}
+
+
+def validate_searches(doc: dict[str, Any]) -> list[CheckError]:
+    """`language` on a hunt search is set only for a system that lists it, with a listed value."""
+    response = doc.get("response")
+    procedure = response.get("procedure") if isinstance(response, dict) else None
+    searches = procedure.get("searches") if isinstance(procedure, dict) else None
+    if not isinstance(searches, list):
+        return []
+    errors: list[CheckError] = []
+    for index, search in enumerate(searches):
+        if not isinstance(search, dict) or "language" not in search:
+            continue
+        path = f"response.procedure.searches[{index}].language"
+        system = search.get("system")
+        allowed = SEARCH_LANGUAGES.get(system) if isinstance(system, str) else None
+        if allowed is None:
+            errors.append(
+                CheckError("search_language", f"language MUST NOT be set for system {system!r}", path)
+            )
+        elif search["language"] not in allowed:
+            errors.append(
+                CheckError(
+                    "search_language",
+                    f"{search['language']!r} is not one of {', '.join(sorted(allowed))} for system {system!r}",
+                    path,
+                )
+            )
+    return errors
+
+
 def validate_rule(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[CheckError]:
     errors: list[CheckError] = []
     _require_non_empty_string(doc.get("name"), code="missing_field", path="name", errors=errors)
@@ -617,6 +653,7 @@ def validate_rule(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[CheckEr
     configurations = doc.get("configurations")
     if isinstance(configurations, dict) and isinstance(configurations.get("elastic"), dict):
         errors.extend(validate_elastic_block(configurations["elastic"]))
+    errors.extend(validate_searches(doc))
     return errors
 
 
@@ -672,4 +709,5 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "objective-1.0-signal-binding.yaml": "binding_requires_1_1",
     "objective-effort-string.yaml": "invalid_effort",
     "rule-elastic-esql-index.yaml": "esql_source",
+    "rule-search-language.yaml": "search_language",
 }

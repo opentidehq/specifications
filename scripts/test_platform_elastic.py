@@ -119,7 +119,7 @@ class ElasticSpecShapeTests(unittest.TestCase):
         text = _read(SPEC)
         meta = _frontmatter(text)
         self.assertEqual(meta["spec"], "platform-elastic")
-        self.assertEqual(meta["version"], "1.0")
+        self.assertEqual(meta["version"], "1.1")
         self.assertEqual(meta["schema_id"], "platform::elastic::1.0")
         self.assertEqual(meta["status"], "normative")
         self.assertEqual(re.findall(r"^## (.+)$", text, flags=re.MULTILINE), SECTIONS)
@@ -155,12 +155,12 @@ class ElasticSpecMatchesRfcTests(unittest.TestCase):
     """Tables the spec carries over from RFC 0007 stay identical to it."""
 
     def test_constraint_codes(self) -> None:
-        spec_codes = {row["Code"].strip("`") for row in _table(_read(SPEC), "Code")}
+        spec_codes = {row["Code"].strip("`") for row in _table(_section(_read(SPEC), "### Constraints"), "Code")}
         rfc_codes = {row["Code"].strip("`") for row in rfc._table("constraints-table")}
         self.assertEqual(spec_codes, rfc_codes)
 
     def test_retired_flat_keys(self) -> None:
-        row = next(r for r in _table(_read(SPEC), "Code") if r["Code"] == "`type_block`")
+        row = next(r for r in _table(_section(_read(SPEC), "### Constraints"), "Code") if r["Code"] == "`type_block`")
         listed = set(re.findall(r"`([a-z_]+)`", row["Constraint"].split("invalid at the block root:", 1)[1]))
         self.assertEqual(listed, set(rfc._REMOVED_FLAT))
 
@@ -195,7 +195,8 @@ class ElasticSpecMatchesRfcTests(unittest.TestCase):
         spec = {(row["tenants.setup field"], row["Required"]) for row in _table(_read(SPEC), "tenants.setup field")}
         ours = {(name.strip("`"), "yes" if req == "yes" else "no") for name, req in spec}
         theirs = {(row["tenants.setup field"].strip("`"), row["Required"]) for row in rfc._table("setup-table")}
-        self.assertEqual(ours, theirs)
+        # specifications#59 amends the RFC with the optional `version` key, tested in StackVersionTests.
+        self.assertEqual(ours, theirs | {("version", "no")})
 
     def test_field_types(self) -> None:
         row = next(r for r in _rows(_read(SPEC), "Field") if r["Field"] == "`type`" and "mapping type" in r["Description"])
@@ -247,6 +248,64 @@ class ElasticSpecExampleTests(unittest.TestCase):
         self.assertEqual(invalid["configurations"]["elastic"], rfc_invalid)
         platform = yaml.safe_load(_read(ROOT / "fixtures" / "platforms" / "elastic.yaml"))
         self.assertEqual(platform["configurations"], yaml.safe_load(_fences(self._examples(), "yaml")[0])["configurations"])
+
+
+ADVISORY_CODES = [
+    "lookback_zero",
+    "lookback_long",
+    "threshold_lookback",
+    "esql_metadata_id",
+    "eql_maxspan_window",
+    "eql_maxspan_lookback",
+    "risk_band",
+    "technique_not_enterprise",
+]
+
+
+class AdvisoryTests(unittest.TestCase):
+    """specifications#57: one stable code per advisory condition, listed as warnings."""
+
+    def _advisories(self) -> list[dict[str, str]]:
+        return _table(_section(_read(SPEC), "### Advisories"), "Code")
+
+    def test_one_code_per_condition(self) -> None:
+        rows = self._advisories()
+        self.assertEqual([row["Code"].strip("`") for row in rows], ADVISORY_CODES)
+        self.assertEqual(len({row["Condition"] for row in rows}), len(rows))
+
+    def test_codes_do_not_reuse_constraint_codes(self) -> None:
+        constraints = {row["Code"].strip("`") for row in _table(_section(_read(SPEC), "### Constraints"), "Code")}
+        self.assertEqual(constraints & set(ADVISORY_CODES), set())
+
+    def test_non_aggregating_is_defined(self) -> None:
+        section = _section(_read(SPEC), "### Advisories")
+        self.assertIn("no pipeline step is `STATS`", section)
+        self.assertIn("`INLINE STATS` keeps every row", section)
+        self.assertIn("Kibana 9.4 and later add `METADATA _id`", section)
+
+    def test_validation_lists_them_as_warnings(self) -> None:
+        text = _read(VALIDATION)
+        self.assertGreaterEqual(_version(text), (1, 4))
+        rows = _table(_section(text, "### Platform advisories"), "Code")
+        self.assertEqual([row["Code"].strip("`") for row in rows], ADVISORY_CODES)
+        self.assertEqual({row["Severity"] for row in rows}, {"warning"})
+
+
+class StackVersionTests(unittest.TestCase):
+    """specifications#59: tenants declare their lowest stack version."""
+
+    def test_setup_row(self) -> None:
+        row = next(r for r in _table(_read(SPEC), "tenants.setup field") if r["tenants.setup field"] == "`version`")
+        self.assertEqual((row["Type"], row["Required"], row["Default"]), ("string", "no", "null"))
+        self.assertIn('"serverless"', row["Meaning"])
+
+    def test_semantics(self) -> None:
+        section = _section(_read(SPEC), "#### Stack version")
+        self.assertIn("Deploy MUST NOT read the version from the cluster", section)
+        self.assertIn("Absent means unknown: report against the spec floor, Kibana 8.19.", section)
+        self.assertIn("MAY use the lowest version declared across a rule's target tenants", section)
+        defaults = {row["Field"]: row["Default"] for row in _table(_section(_read(SPEC), "## Defaults & overrides"), "Field")}
+        self.assertIn("Kibana 8.19", defaults["Tenant `version`"])
 
 
 class DurationTests(unittest.TestCase):
