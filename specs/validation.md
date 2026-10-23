@@ -83,7 +83,7 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `threshold_lookback` | warning | Elastic: a `threshold` rule's `lookback` exceeds its `interval` |
 | `esql_metadata_id` | warning | Elastic: a non-aggregating ES\|QL query (no `STATS` step) lacks `METADATA _id` |
 | `eql_maxspan_window` | warning | Elastic: an EQL `maxspan` exceeds `interval` + `lookback` |
-| `eql_maxspan_lookback` | warning | Elastic: an EQL `maxspan` exceeds `lookback` |
+| `eql_maxspan_lookback` | warning | Elastic: an EQL `maxspan` exceeds `lookback` but not `interval` + `lookback` |
 | `risk_band` | warning | Elastic: an explicit risk score is outside its severity's band |
 | `technique_not_enterprise` | warning | Elastic: a technique is skipped because it is not Enterprise ATT&CK |
 

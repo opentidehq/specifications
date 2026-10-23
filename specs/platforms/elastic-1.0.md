@@ -564,11 +564,11 @@ Validation SHOULD warn, without rejecting the rule, when a condition below holds
 | `threshold_lookback` | a `threshold` rule's `lookback` exceeds its `interval`: threshold counts are not de-duplicated across overlapping runs. |
 | `esql_metadata_id` | a non-aggregating ES\|QL query lacks `METADATA _id`: alerts are not de-duplicated. |
 | `eql_maxspan_window` | an EQL `sequence` `maxspan` exceeds `interval` + `lookback`: the sequence cannot fit one run. |
-| `eql_maxspan_lookback` | an EQL `sequence` `maxspan` exceeds `lookback`: a sequence that straddles two runs is missed. |
+| `eql_maxspan_lookback` | an EQL `sequence` `maxspan` exceeds `lookback` but not `interval` + `lookback`: a sequence that straddles two runs is missed. |
 | `risk_band` | an explicit risk score is outside its severity's [band](#severity-and-risk). |
 | `technique_not_enterprise` | a technique is skipped because it is not Enterprise ATT&CK ([ATT&CK](#attck)). |
 
-Each condition has one code. A rule that meets two conditions gets both warnings: an EQL `maxspan` above `interval` + `lookback` also exceeds `lookback`, and reports `eql_maxspan_window` and `eql_maxspan_lookback`.
+Each condition has one code, and a rule that meets two conditions gets both warnings. The two EQL conditions do not overlap: a `maxspan` above `interval` + `lookback` reports only `eql_maxspan_window`.
 
 An ES|QL query is **non-aggregating** as Kibana decides it: no pipeline step is `STATS`. `INLINE STATS` keeps every row, so it does not make a query aggregating. Kibana 9.4 and later add `METADATA _id` to a non-aggregating query themselves; `esql_metadata_id` matters for Kibana 8.19 through 9.3.
 
