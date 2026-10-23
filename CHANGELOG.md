@@ -221,6 +221,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - `platform::harfanglab::1.0`. Sigma or YARA rule. Identity is `metadata.uuid`. No query validator. Deploy requires one of `sigma` or `yara`; validation does not.
 
+## platform-elastic 1.1
+
+- Advisories carry stable codes, one per condition: `lookback_zero`, `lookback_long`, `threshold_lookback`, `esql_metadata_id`, `eql_maxspan_window`, `eql_maxspan_lookback`, `risk_band`, and `technique_not_enterprise`. The EQL `maxspan` advisory is split into `eql_maxspan_window` and `eql_maxspan_lookback`, and `threshold_lookback` is separate from `lookback_long`; opentide's log events merged each pair. A non-aggregating ES|QL query has no `STATS` step; `INLINE STATS` keeps rows and does not count. Kibana 9.4 and later add `METADATA _id` themselves, so `esql_metadata_id` matters for 8.19 through 9.3 ([specifications#57](https://github.com/opentidehq/specifications/issues/57)). Schema id unchanged.
+
 ## platform-elastic 1.0
 
 - The ATT&CK tactic table follows `att&ck::1.2` (ATT&CK 20.0): TA0005 is `Stealth` and `Defense Impairment` is TA0112, as in RFC 0007. Removed keys still staged `Defense Evasion` map to `Stealth` through a legacy-stage table. With the old `Defense Evasion` row, techniques staged only in the v19 tactics emitted no `threat` entry ([opentide#568](https://github.com/opentidehq/opentide/issues/568)).
@@ -255,6 +259,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.4
+
+- Platform advisories: the eight Elastic advisory codes are warnings, reported under the same code by the CLI and editors ([specifications#57](https://github.com/opentidehq/specifications/issues/57)).
 
 ## validation 1.3
 

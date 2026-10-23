@@ -1,6 +1,6 @@
 ---
 spec: platform-elastic
-version: "1.0"
+version: "1.1"
 schema_id: platform::elastic::1.0
 status: normative
 supersedes: null
@@ -29,6 +29,7 @@ Static validation (`opentide validate`) and registry load:
 - Legacy external-id keys (`rule_id`, `rule_id_bundle`, `rule_id::<tenant>`) at the block root MUST fail with `external_id_in_rule` ([External rule ids](index.md#external-rule-ids)). Registry load drops those keys and passes every other key to the model, so registry load accepts exactly the blocks static validation accepts, apart from the legacy keys.
 - Field names (`suppression.group_by`, `threshold.field`, `threshold.cardinality.field`, `new_terms.fields`, `highlighted_fields`, `required_fields[].name`, `threat.mapping[].entries[].field` and `value`) name fields in the tenant's data. They MUST NOT be checked against a closed list. Deploy checks the aggregation, timestamp, and indicator fields against the tenant instead ([Elasticsearch checks](#elasticsearch-checks)).
 - Durations MUST follow [Durations](#durations).
+- An [advisory](#advisories) SHOULD be reported as a warning with its advisory code. An advisory never rejects a rule.
 
 Deploy:
 
@@ -442,13 +443,13 @@ The alert severity is `severity` (a string), else `severity.default`, else `resp
 | High | high | 73 |
 | Critical | critical | 99 |
 
-`risk` (an integer) or `risk.score` replaces the table score. The table follows Elastic's prebuilt-rule convention and sits inside Kibana's risk bands (0–21 low, 22–47 medium, 48–73 high, 74–100 critical). An explicit score SHOULD stay inside its severity's band.
+`risk` (an integer) or `risk.score` replaces the table score. The table follows Elastic's prebuilt-rule convention and sits inside Kibana's risk bands (0–21 low, 22–47 medium, 48–73 high, 74–100 critical). An explicit score SHOULD stay inside its severity's band (`risk_band`).
 
 ### ATT&CK
 
 The body key `threat` is the ATT&CK array. It is derived from the rule's `techniques` plus the techniques inherited through `detection_model` (objective, then its threats), de-duplicated. Sentinel uses only the inherited set; Elastic takes the union, so a rule's own `techniques` are never dropped.
 
-1. Keep Enterprise techniques only. Mobile and ICS entries in `att&ck.vocab.toml` carry a `Mobile : ` or `Industrial : ` name prefix. Deploy MUST skip them with a warning.
+1. Keep Enterprise techniques only. Mobile and ICS entries in `att&ck.vocab.toml` carry a `Mobile : ` or `Industrial : ` name prefix. Deploy MUST skip them with a warning (`technique_not_enterprise`).
 2. Map each technique's `tide.vocab.stages` to tactics with the table below. A sub-technique uses its own stages. A legacy stage is first renamed through the legacy-stage table; any other stage outside the table emits no tactic.
 3. Emit one entry per tactic, in table order, with `framework: "MITRE ATT&CK"`. Techniques are sorted by id. A sub-technique appears under its parent technique, named without the `<parent name>: ` prefix. An empty `subtechnique` list is omitted.
 4. `reference` is the vocabulary `link` for a technique and `https://attack.mitre.org/tactics/<id>/` for a tactic.
@@ -542,15 +543,22 @@ Kibana accepts some rules that then fail silently. Before every create or update
 
 ### Advisories
 
-Validation SHOULD warn, without rejecting the rule, when:
+Validation SHOULD warn, without rejecting the rule, when a condition below holds. A warning MUST carry its code, so the CLI and an editor name the same finding the same way.
 
-- `scheduling.lookback` is zero: the next run starts as the window ends, and Elastic recommends at least one minute.
-- `scheduling.lookback` exceeds `1h`: `lookback` is overlap added to `interval`, not the whole window as in Sentinel.
-- a `threshold` rule's `lookback` exceeds its `interval`: threshold counts are not de-duplicated across overlapping runs.
-- a non-aggregating ES|QL query (no `STATS`) lacks `METADATA _id`: alerts are not de-duplicated.
-- an EQL `sequence` `maxspan` exceeds `interval` + `lookback` (the sequence cannot fit one run) or `lookback` (a sequence that straddles two runs is missed).
-- an explicit risk score is outside its severity's band.
-- a technique is skipped because it is not Enterprise ATT&CK.
+| Code | Condition |
+|------|-----------|
+| `lookback_zero` | `scheduling.lookback` is zero: the next run starts as the window ends, and Elastic recommends at least one minute. |
+| `lookback_long` | `scheduling.lookback` exceeds `1h`: `lookback` is overlap added to `interval`, not the whole window as in Sentinel. |
+| `threshold_lookback` | a `threshold` rule's `lookback` exceeds its `interval`: threshold counts are not de-duplicated across overlapping runs. |
+| `esql_metadata_id` | a non-aggregating ES\|QL query lacks `METADATA _id`: alerts are not de-duplicated. |
+| `eql_maxspan_window` | an EQL `sequence` `maxspan` exceeds `interval` + `lookback`: the sequence cannot fit one run. |
+| `eql_maxspan_lookback` | an EQL `sequence` `maxspan` exceeds `lookback`: a sequence that straddles two runs is missed. |
+| `risk_band` | an explicit risk score is outside its severity's [band](#severity-and-risk). |
+| `technique_not_enterprise` | a technique is skipped because it is not Enterprise ATT&CK ([ATT&CK](#attck)). |
+
+Each condition has one code. A rule that meets two conditions gets both warnings: an EQL `maxspan` above `interval` + `lookback` also exceeds `lookback`, and reports `eql_maxspan_window` and `eql_maxspan_lookback`.
+
+An ES|QL query is **non-aggregating** as Kibana decides it: no pipeline step is `STATS`. `INLINE STATS` keeps every row, so it does not make a query aggregating. Kibana 9.4 and later add `METADATA _id` to a non-aggregating query themselves; `esql_metadata_id` matters for Kibana 8.19 through 9.3.
 
 ## Relationships
 
@@ -707,5 +715,6 @@ RFC 0007 has a complete rule for every rule type, and the compiled body of its E
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-10-23 | [Advisories](#advisories) carry stable codes, one per condition: `lookback_zero`, `lookback_long`, `threshold_lookback`, `esql_metadata_id`, `eql_maxspan_window`, `eql_maxspan_lookback`, `risk_band`, and `technique_not_enterprise`. The EQL `maxspan` advisory is split in two. A non-aggregating ES\|QL query is one with no `STATS` step; `INLINE STATS` does not count. Kibana 9.4 and later add `METADATA _id` themselves ([specifications#57](https://github.com/opentidehq/specifications/issues/57)). Schema id unchanged. |
 | 1.0 | 2026-10-19 | The tactic table follows ATT&CK v19 as `att&ck::1.2` (ATT&CK 20.0) publishes it: TA0005 is `Stealth`, and `Defense Impairment` is TA0112. Removed keys still staged `Defense Evasion` map to `Stealth` through the legacy-stage table. Without this, techniques staged only in those tactics emitted no `threat` entry ([opentide#568](https://github.com/opentidehq/opentide/issues/568)). |
 | 1.0 | 2026-10-19 | Initial field contract from [RFC 0007](../../rfcs/0007-elastic-security-platform.md) and the opentide implementation ([specifications#17](https://github.com/opentidehq/specifications/issues/17)). Amends the RFC in two places. Durations accept compound shorthand (`1h10m`, `1d2h`, `2m30s`) as well as single-unit shorthand and ISO 8601 ([opentide#564](https://github.com/opentidehq/opentide/pull/564)). `kill-process` and `suspend-process` without `field` send Kibana's default process field, `process.entity_id` with `overwrite: true` ([opentide#562](https://github.com/opentidehq/opentide/pull/562)). |

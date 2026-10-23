@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.3"
+version: "1.4"
 schema_id: null
 status: normative
 supersedes: null
@@ -71,6 +71,23 @@ In `full` scope, validation MUST read every `*.json` file under `.opentide/state
 | `deployment_state_shape` | error | A shard is unreadable or violates `deployment.state::1.0` |
 | `deployment_state_platform` | error | A shard names a platform that is not state-backed |
 | `deployment_state_uuid_mismatch` | error | A shard's filename and `object_uuid` disagree or are not lowercase canonical |
+
+### Platform advisories
+
+A platform spec MAY list advisories: conditions that validation SHOULD report as a warning without rejecting the rule. Each has a stable code, and the CLI and editors MUST report a finding under that code. An advisory never sets `VALIDATION_ERROR_RAISED`.
+
+| Code | Severity | When |
+|------|----------|------|
+| `lookback_zero` | warning | Elastic: `scheduling.lookback` is zero |
+| `lookback_long` | warning | Elastic: `scheduling.lookback` exceeds `1h` |
+| `threshold_lookback` | warning | Elastic: a `threshold` rule's `lookback` exceeds its `interval` |
+| `esql_metadata_id` | warning | Elastic: a non-aggregating ES\|QL query (no `STATS` step) lacks `METADATA _id` |
+| `eql_maxspan_window` | warning | Elastic: an EQL `maxspan` exceeds `interval` + `lookback` |
+| `eql_maxspan_lookback` | warning | Elastic: an EQL `maxspan` exceeds `lookback` |
+| `risk_band` | warning | Elastic: an explicit risk score is outside its severity's band |
+| `technique_not_enterprise` | warning | Elastic: a technique is skipped because it is not Enterprise ATT&CK |
+
+The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories).
 
 ### Query validation
 
@@ -152,7 +169,7 @@ A packed semicolon string that happens to start with a valid token MUST still fa
 | Severity | Examples |
 |----------|----------|
 | `error` | Schema failure, duplicate UUID, invalid UUID, broken cross-ref, `external_id_in_rule`, invalid deployment-state shard |
-| `warning` | Deprecated field usage |
+| `warning` | Deprecated field usage, a [platform advisory](#platform-advisories) |
 
 ### Environment signals
 
@@ -195,6 +212,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.4 | 2026-10-23 | [Platform advisories](#platform-advisories): the eight Elastic advisory codes are warnings ([elastic-1.0](platforms/elastic-1.0.md#advisories), [specifications#57](https://github.com/opentidehq/specifications/issues/57)). |
 | 1.3 | 2026-10-19 | `elastic` joins query validation, live only through Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md)). The command is `validate query --live` on every platform in the query-validation allowlist; without `--live` it refuses. The fixture checker applies three Elastic constraint codes (`language`, `esql_source`, `suppression_shape`) to `configurations.elastic` blocks. |
 | 1.2 | 2026-10-19 | `objective::1.1` signal binding codes ([RFC 0011](../rfcs/0011-signal-reuse.md)). The fixture checker proves `signal_entry_mixed`, `invalid_uuid` on `reuse`, and `binding_requires_1_1`. `unresolved_signal`, `self_signal`, `duplicate_signal`, `duplicate_signal_uuid`, and `signal_tlp` are `opentide validate` against the workspace library. |
 | 1.1 | 2026-10-16 | `external_id_in_rule` replaces the generic unknown-key error for legacy external-id keys; full-workspace validation checks every deployment-state shard, orphans included; every `--file` target must match an object; deployment fixture checker codes ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |

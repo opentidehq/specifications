@@ -32,8 +32,8 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Carbon Black Cloud platform | 1.1 | `platform::carbon_black_cloud::1.0` | normative | [specs/platforms/carbon-black-cloud-1.0.md](specs/platforms/carbon-black-cloud-1.0.md) |
 | CrowdStrike platform | 1.1 | `platform::crowdstrike::1.0` | normative | [specs/platforms/crowdstrike-1.0.md](specs/platforms/crowdstrike-1.0.md) |
 | HarfangLab platform | 1.1 | `platform::harfanglab::1.0` | normative | [specs/platforms/harfanglab-1.0.md](specs/platforms/harfanglab-1.0.md) |
-| Elastic Security platform | 1.0 | `platform::elastic::1.0` | normative | [specs/platforms/elastic-1.0.md](specs/platforms/elastic-1.0.md) |
-| Validation | 1.3 | — | normative | [specs/validation.md](specs/validation.md) |
+| Elastic Security platform | 1.1 | `platform::elastic::1.0` | normative | [specs/platforms/elastic-1.0.md](specs/platforms/elastic-1.0.md) |
+| Validation | 1.4 | — | normative | [specs/validation.md](specs/validation.md) |
 | Sharing | 1.3 | — | normative | [specs/sharing.md](specs/sharing.md) |
 | MISP connector | 1.0 | `sharing::misp::1.0` | normative | [specs/sharing/misp-1.0.md](specs/sharing/misp-1.0.md) |
 
