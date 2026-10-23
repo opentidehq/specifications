@@ -195,7 +195,8 @@ class ElasticSpecMatchesRfcTests(unittest.TestCase):
         spec = {(row["tenants.setup field"], row["Required"]) for row in _table(_read(SPEC), "tenants.setup field")}
         ours = {(name.strip("`"), "yes" if req == "yes" else "no") for name, req in spec}
         theirs = {(row["tenants.setup field"].strip("`"), row["Required"]) for row in rfc._table("setup-table")}
-        self.assertEqual(ours, theirs)
+        # specifications#59 amends the RFC with the optional `version` key, tested in StackVersionTests.
+        self.assertEqual(ours, theirs | {("version", "no")})
 
     def test_field_types(self) -> None:
         row = next(r for r in _rows(_read(SPEC), "Field") if r["Field"] == "`type`" and "mapping type" in r["Description"])
@@ -288,6 +289,23 @@ class AdvisoryTests(unittest.TestCase):
         rows = _table(_section(text, "### Platform advisories"), "Code")
         self.assertEqual([row["Code"].strip("`") for row in rows], ADVISORY_CODES)
         self.assertEqual({row["Severity"] for row in rows}, {"warning"})
+
+
+class StackVersionTests(unittest.TestCase):
+    """specifications#59: tenants declare their lowest stack version."""
+
+    def test_setup_row(self) -> None:
+        row = next(r for r in _table(_read(SPEC), "tenants.setup field") if r["tenants.setup field"] == "`version`")
+        self.assertEqual((row["Type"], row["Required"], row["Default"]), ("string", "no", "null"))
+        self.assertIn('"serverless"', row["Meaning"])
+
+    def test_semantics(self) -> None:
+        section = _section(_read(SPEC), "#### Stack version")
+        self.assertIn("Deploy MUST NOT read the version from the cluster", section)
+        self.assertIn("Absent means unknown: report against the spec floor, Kibana 8.19.", section)
+        self.assertIn("MAY use the lowest version declared across a rule's target tenants", section)
+        defaults = {row["Field"]: row["Default"] for row in _table(_section(_read(SPEC), "## Defaults & overrides"), "Field")}
+        self.assertIn("Kibana 8.19", defaults["Tenant `version`"])
 
 
 class DurationTests(unittest.TestCase):

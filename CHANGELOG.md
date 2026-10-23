@@ -225,6 +225,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-elastic 1.1
 
+- Optional tenant setup key `version`: the lowest stack version among the deployments a tenant reaches, a string `MAJOR.MINOR` (`"8.19"`, `"9.5"`) or `"serverless"`. Static validation and editors MAY use the lowest declared version across a rule's target tenants to report syntax that version lacks; a tenant without it counts as the Kibana 8.19 floor. Deploy MUST NOT read the version from the cluster, which a least-privilege key may not see. Validation MAY skip `esql_metadata_id` when the lowest version is 9.4 or later. The compiled body is unchanged ([specifications#59](https://github.com/opentidehq/specifications/issues/59)).
 - Advisories carry stable codes, one per condition: `lookback_zero`, `lookback_long`, `threshold_lookback`, `esql_metadata_id`, `eql_maxspan_window`, `eql_maxspan_lookback`, `risk_band`, and `technique_not_enterprise`. The EQL `maxspan` advisory is split into `eql_maxspan_window` and `eql_maxspan_lookback`, and `threshold_lookback` is separate from `lookback_long`; opentide's log events merged each pair. A non-aggregating ES|QL query has no `STATS` step; `INLINE STATS` keeps rows and does not count. Kibana 9.4 and later add `METADATA _id` themselves, so `esql_metadata_id` matters for 8.19 through 9.3 ([specifications#57](https://github.com/opentidehq/specifications/issues/57)). Schema id unchanged.
 
 ## platform-elastic 1.0

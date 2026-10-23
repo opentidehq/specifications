@@ -372,11 +372,23 @@ Tenants are workspace configuration in `.opentide/configurations/platforms/elast
 | `index` | list[string] | no | null | Index patterns for blocks that set neither `index` nor `data_view_id`. |
 | `tags` | list[string] | no | `[]` | Tags added to every rule deployed to this tenant. |
 | `suppression` | boolean | no | `true` | Whether the licence or project tier applies alert suppression. `false` omits `alert_suppression` with a warning. |
+| `version` | string | no | null | Lowest stack version among the deployments the tenant reaches: `MAJOR.MINOR` (`"8.19"`, `"9.5"`) or `"serverless"`. Absent means unknown ([Stack version](#stack-version)). |
 | `ssl` | boolean | yes | — | Shared tenant setup: TLS verification. |
 
 A tenant that sets `proxy` is refused; the proxy is the global `opentide --proxy` option. One API key serves Kibana and Elasticsearch. Rules run with the privileges of the key that last created or updated them, so each tenant SHOULD use a dedicated, non-personal key with Security rules management `All` in its space, `read` and `view_index_metadata` on every source index the rules query, and, for live validation, `read` on `.preview.alerts-security.alerts-<space>` and `.internal.preview.alerts-security.alerts-<space>-*`. Kibana renames the feature privileges between versions, so this spec does not pin their names.
 
 The supported floor is Kibana 8.19 and 9.x. ES|QL rules need 8.14 or later. The detection engine and the `query`, `eql`, `esql`, `threshold`, and `new_terms` types work on the Basic licence; alert suppression does not ([suppression](#suppression-elasticsuppression)).
+
+#### Stack version
+
+Query syntax differs across the supported range: ES|QL commands that shipped in 9.2 or later, such as `INLINE STATS`, are missing on 8.19, and so is `FORK`. `setup.version` lets a tenant declare the lowest stack version among the deployments it reaches, as a string `MAJOR.MINOR` (`"8.19"`, `"9.5"`) or `"serverless"` for Elastic Cloud Serverless. Any other value, a TOML number included (`9.10` would read as `9.1`), is a configuration error. Versions compare by major, then minor, as integers; `serverless` is later than every `MAJOR.MINOR`.
+
+- Static validation and editors MAY use the lowest version declared across a rule's target tenants (the block's `tenants`, or every tenant when it is omitted) to report syntax that version lacks. A target tenant without `version` counts as the floor.
+- Absent means unknown: report against the spec floor, Kibana 8.19.
+- Deploy MUST NOT read the version from the cluster on the author's behalf. A least-privilege key may not see it, as with `suppression`.
+- When the lowest version is 9.4 or later, or `serverless`, validation MAY skip `esql_metadata_id` ([Advisories](#advisories)).
+
+`version` does not change the compiled body.
 
 ### Compiled body
 
@@ -593,6 +605,7 @@ An ES|QL query is **non-aggregating** as Kibana decides it: no pipeline step is 
 | kill-process and suspend-process `config` | `{field: process.entity_id, overwrite: true}` when `field` is omitted |
 | Tenant `space` | `default` |
 | Tenant `suppression` | `true` |
+| Tenant `version` | unknown: syntax is reported against Kibana 8.19 |
 
 ## Examples
 
@@ -715,6 +728,7 @@ RFC 0007 has a complete rule for every rule type, and the compiled body of its E
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-10-23 | Optional tenant `setup.version`: the lowest stack version a tenant reaches, `MAJOR.MINOR` or `serverless` ([Stack version](#stack-version)). Static validation and editors MAY report syntax the lowest declared version across a rule's target tenants lacks; absent means the 8.19 floor. Deploy MUST NOT read the version from the cluster ([specifications#59](https://github.com/opentidehq/specifications/issues/59)). Schema id unchanged. |
 | 1.1 | 2026-10-23 | [Advisories](#advisories) carry stable codes, one per condition: `lookback_zero`, `lookback_long`, `threshold_lookback`, `esql_metadata_id`, `eql_maxspan_window`, `eql_maxspan_lookback`, `risk_band`, and `technique_not_enterprise`. The EQL `maxspan` advisory is split in two. A non-aggregating ES\|QL query is one with no `STATS` step; `INLINE STATS` does not count. Kibana 9.4 and later add `METADATA _id` themselves ([specifications#57](https://github.com/opentidehq/specifications/issues/57)). Schema id unchanged. |
 | 1.0 | 2026-10-19 | The tactic table follows ATT&CK v19 as `att&ck::1.2` (ATT&CK 20.0) publishes it: TA0005 is `Stealth`, and `Defense Impairment` is TA0112. Removed keys still staged `Defense Evasion` map to `Stealth` through the legacy-stage table. Without this, techniques staged only in those tactics emitted no `threat` entry ([opentide#568](https://github.com/opentidehq/opentide/issues/568)). |
 | 1.0 | 2026-10-19 | Initial field contract from [RFC 0007](../../rfcs/0007-elastic-security-platform.md) and the opentide implementation ([specifications#17](https://github.com/opentidehq/specifications/issues/17)). Amends the RFC in two places. Durations accept compound shorthand (`1h10m`, `1d2h`, `2m30s`) as well as single-unit shorthand and ISO 8601 ([opentide#564](https://github.com/opentidehq/opentide/pull/564)). `kill-process` and `suspend-process` without `field` send Kibana's default process field, `process.entity_id` with `overwrite: true` ([opentide#562](https://github.com/opentidehq/opentide/pull/562)). |
