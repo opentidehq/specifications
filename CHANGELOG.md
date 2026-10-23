@@ -47,6 +47,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
+- Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.1`. New fixtures `fixtures/valid/rule-1.1-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
 - Bump `techniques` pin to `att&ck::1.2` (ATT&CK 20.0). Additive minor; `att&ck::1.1` keys are unaffected ([opentide#568](https://github.com/opentidehq/opentide/issues/568)).
 - `configurations.elastic` (`ElasticConfig`, `platform::elastic::1.0`) is added ([RFC 0007](rfcs/0007-elastic-security-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - Correct `detection_model`: it references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design; a signal reference implements that signal, and its owning objective is the rule's objective. The objective-only wording was wrong. New fixture `fixtures/cross-object/rule-references-signal.yaml`.
@@ -55,6 +56,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.0
 
+- Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.0`. New fixtures `fixtures/valid/rule-1.1-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
 - Bump `techniques` pin to `att&ck::1.2` (ATT&CK 20.0). Additive minor; `att&ck::1.1` keys are unaffected ([opentide#568](https://github.com/opentidehq/opentide/issues/568)).
 - `configurations.elastic` (`ElasticConfig`, `platform::elastic::1.0`) is added ([RFC 0007](rfcs/0007-elastic-security-platform.md)). Additive; every existing rule stays valid and `schema_id` stays `rule::1.0`.
 - Correct `detection_model`: it references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design; a signal reference implements that signal, and its owning objective is the rule's objective. The objective-only wording was wrong. New fixture `fixtures/cross-object/rule-references-signal.yaml`.
@@ -262,6 +264,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## validation 1.4
 
+- Fixture checker code `search_language`: `response.procedure.searches[].language` set with a system other than `elastic`, or with a value other than `kuery`, `lucene`, `eql`, or `esql` ([specifications#58](https://github.com/opentidehq/specifications/issues/58)).
 - Platform advisories: the eight Elastic advisory codes are warnings, reported under the same code by the CLI and editors ([specifications#57](https://github.com/opentidehq/specifications/issues/57)).
 
 ## validation 1.3

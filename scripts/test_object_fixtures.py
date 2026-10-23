@@ -17,6 +17,7 @@ from object_fixtures import (
     validate_objective,
     validate_elastic_block,
     validate_rule,
+    validate_searches,
     validate_threat,
 )
 
@@ -283,6 +284,54 @@ class RuleReviewedTests(unittest.TestCase):
         doc = copy.deepcopy(self.reviewed)
         doc["metadata"]["schema"] = "rule::1.0"
         self.assertIn("reviewed_not_in_schema", _codes(validate_rule(doc, self.vocabs)))
+
+
+class SearchLanguageTests(unittest.TestCase):
+    """response.procedure.searches[].language (specifications#58)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.vocabs = load_vocabularies(VOCAB_DIR)
+        cls.valid = load_yaml(FIXTURES / "valid" / "rule-1.1-search-language.yaml")
+        cls.invalid = load_yaml(FIXTURES / "invalid" / "rule-search-language.yaml")
+
+    def _search(self, **search: str) -> dict:
+        doc = copy.deepcopy(self.valid)
+        doc["response"]["procedure"]["searches"] = [{"purpose": "p", "query": "q", **search}]
+        return doc
+
+    def test_valid_fixture_has_an_esql_hunt_and_passes(self) -> None:
+        searches = self.valid["response"]["procedure"]["searches"]
+        self.assertIn(("elastic", "esql"), {(s["system"], s.get("language")) for s in searches})
+        self.assertEqual(validate_rule(self.valid, self.vocabs), [])
+
+    def test_every_elastic_language_passes(self) -> None:
+        for language in ("kuery", "lucene", "eql", "esql"):
+            with self.subTest(language=language):
+                self.assertEqual(validate_searches(self._search(system="elastic", language=language)), [])
+
+    def test_omitted_language_passes_on_any_system(self) -> None:
+        for system in ("elastic", "sentinel", "splunk", "velociraptor"):
+            with self.subTest(system=system):
+                self.assertEqual(validate_searches(self._search(system=system)), [])
+
+    def test_unknown_elastic_language_is_rejected(self) -> None:
+        for language in ("kql", "KUERY", "esql ", "sql", ""):
+            with self.subTest(language=language):
+                self.assertEqual(_codes(validate_searches(self._search(system="elastic", language=language))), {"search_language"})
+
+    def test_language_on_another_system_is_rejected(self) -> None:
+        for system in ("sentinel", "splunk", "Elastic"):
+            with self.subTest(system=system):
+                self.assertEqual(_codes(validate_searches(self._search(system=system, language="kuery"))), {"search_language"})
+
+    def test_invalid_fixture_reports_both_searches(self) -> None:
+        errors = validate_rule(self.invalid, self.vocabs)
+        self.assertEqual([e.path for e in errors if e.code == "search_language"], [
+            "response.procedure.searches[0].language",
+            "response.procedure.searches[1].language",
+        ])
+        self.assertEqual(self.invalid["metadata"]["schema"], "rule::1.0")
 
 
 class ObjectiveSignalBindingTests(unittest.TestCase):

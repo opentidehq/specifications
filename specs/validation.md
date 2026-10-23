@@ -135,6 +135,7 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/invalid/objective-signal-bad-uuid.yaml](../fixtures/invalid/objective-signal-bad-uuid.yaml) | `invalid_uuid` |
 | [fixtures/invalid/objective-1.0-signal-binding.yaml](../fixtures/invalid/objective-1.0-signal-binding.yaml) | `binding_requires_1_1` |
 | [fixtures/invalid/rule-elastic-esql-index.yaml](../fixtures/invalid/rule-elastic-esql-index.yaml) | `esql_source` (also `language` and `suppression_shape`) |
+| [fixtures/invalid/rule-search-language.yaml](../fixtures/invalid/rule-search-language.yaml) | `search_language` |
 | [fixtures/sharing/invalid/unknown-distribution.toml](../fixtures/sharing/invalid/unknown-distribution.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/legacy-targets-table.toml](../fixtures/sharing/invalid/legacy-targets-table.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/duplicate-name.toml](../fixtures/sharing/invalid/duplicate-name.toml) | `duplicate_name` |
@@ -161,6 +162,8 @@ Deployment fixtures (`scripts/deployment_state_fixtures.py`) are checked against
 Sharing fixtures (`scripts/sharing_fixtures.py`) also prove the merge rule: [override.toml](../fixtures/sharing/valid/override.toml) merged by `name` onto [sharing.toml](../fixtures/sharing/valid/sharing.toml) MUST equal [merged.toml](../fixtures/sharing/valid/merged.toml).
 
 On a rule's `configurations.elastic` block the checker applies three of the [Elastic constraint codes](platforms/elastic-1.0.md#constraints), the ones the invalid Elastic fixture exercises: `language`, `esql_source`, and `suppression_shape`. They are the platform's own codes, so the checker and `opentide validate` report the same name. The other Elastic codes, and every other platform block, are left to opentide.
+
+On a rule's `response.procedure.searches[]` the checker reports `search_language` when `language` is set with a `system` other than `elastic`, or with a value other than `kuery`, `lucene`, `eql`, or `esql` ([rule-1.1](objects/rule-1.1.md#searches-responsesearch)).
 
 A packed semicolon string that happens to start with a valid token MUST still fail `packed_vocab_string`. Accepting only the first token is lossy and non-compliant.
 
@@ -212,6 +215,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.4 | 2026-10-23 | Fixture checker code `search_language` for `response.procedure.searches[].language` ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). |
 | 1.4 | 2026-10-23 | [Platform advisories](#platform-advisories): the eight Elastic advisory codes are warnings ([elastic-1.0](platforms/elastic-1.0.md#advisories), [specifications#57](https://github.com/opentidehq/specifications/issues/57)). |
 | 1.3 | 2026-10-19 | `elastic` joins query validation, live only through Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md)). The command is `validate query --live` on every platform in the query-validation allowlist; without `--live` it refuses. The fixture checker applies three Elastic constraint codes (`language`, `esql_source`, `suppression_shape`) to `configurations.elastic` blocks. |
 | 1.2 | 2026-10-19 | `objective::1.1` signal binding codes ([RFC 0011](../rfcs/0011-signal-reuse.md)). The fixture checker proves `signal_entry_mixed`, `invalid_uuid` on `reuse`, and `binding_requires_1_1`. `unresolved_signal`, `self_signal`, `duplicate_signal`, `duplicate_signal_uuid`, and `signal_tlp` are `opentide validate` against the workspace library. |
