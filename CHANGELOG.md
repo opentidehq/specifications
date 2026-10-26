@@ -47,6 +47,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
+- Correct the `severity` pin to `alert_severity::1.0`. The normative text, the default (`Informational`) and every rule fixture already used alert labels, but the pin named `severity::1.0`, the Threat Severity incident scale, so a conforming rule failed validation. Corrected in place, as the pin disagreed with this spec rather than the spec changing; threats keep `severity::1.0`.
 - Bump `techniques` pin to `att&ck::1.2` (ATT&CK 20.0). Additive minor; `att&ck::1.1` keys are unaffected ([opentide#568](https://github.com/opentidehq/opentide/issues/568)).
 - `configurations.elastic` (`ElasticConfig`, `platform::elastic::1.0`) is added ([RFC 0007](rfcs/0007-elastic-security-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - Correct `detection_model`: it references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design; a signal reference implements that signal, and its owning objective is the rule's objective. The objective-only wording was wrong. New fixture `fixtures/cross-object/rule-references-signal.yaml`.
@@ -55,6 +56,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.0
 
+- Correct the `severity` pin to `alert_severity::1.0`. The normative text, the default (`Informational`) and every rule fixture already used alert labels, but the pin named `severity::1.0`, the Threat Severity incident scale, so a conforming rule failed validation. Corrected in place, as the pin disagreed with this spec rather than the spec changing; threats keep `severity::1.0`.
 - Bump `techniques` pin to `att&ck::1.2` (ATT&CK 20.0). Additive minor; `att&ck::1.1` keys are unaffected ([opentide#568](https://github.com/opentidehq/opentide/issues/568)).
 - `configurations.elastic` (`ElasticConfig`, `platform::elastic::1.0`) is added ([RFC 0007](rfcs/0007-elastic-security-platform.md)). Additive; every existing rule stays valid and `schema_id` stays `rule::1.0`.
 - Correct `detection_model`: it references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design; a signal reference implements that signal, and its owning objective is the rule's objective. The objective-only wording was wrong. New fixture `fixtures/cross-object/rule-references-signal.yaml`.
