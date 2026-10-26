@@ -77,6 +77,9 @@ This document is the **exemplar spec** — all object specs follow the same sect
 | `purpose` | string | yes | Why this search is run |
 | `system` | string | yes | Target platform or system |
 | `query` | string | yes | Query text |
+| `language` | string | no | Query language, for a `system` with more than one. Omitted with `system: elastic`: unknown. |
+
+`language` names the query language when `system` alone does not. With `system: elastic` it MUST be one of the names [elastic-1.0](../platforms/elastic-1.0.md) uses: `kuery` (KQL), `lucene`, `eql`, or `esql` (ES\|QL). `language` MUST NOT be set with any other `system`, because the system alone names the language: `sentinel` and `defender_for_endpoint` are KQL, `splunk` is SPL, and no other system has a language in this revision. With `system: elastic`, an omitted `language` (or an empty one, YAML `null`) means the language is unknown and the query is not analysed, as before the field existed.
 
 ### Platform block (PlatformConfigBase)
 
@@ -172,6 +175,7 @@ configurations:
 | [fixtures/cross-object/rule-references-objective.yaml](../../fixtures/cross-object/rule-references-objective.yaml) | `detection_model` → objective UUID |
 | [fixtures/cross-object/rule-references-signal.yaml](../../fixtures/cross-object/rule-references-signal.yaml) | `detection_model` → signal UUID |
 | [fixtures/valid/rule-elastic-1.0.yaml](../../fixtures/valid/rule-elastic-1.0.yaml) | Elastic Security custom query block with every shared key set |
+| [fixtures/valid/rule-1.0-search-language.yaml](../../fixtures/valid/rule-1.0-search-language.yaml) | Elastic ES\|QL and KQL hunts with `searches[].language`, and a Splunk hunt without it |
 
 ### Invalid fixtures
 
@@ -180,6 +184,7 @@ configurations:
 | [fixtures/invalid/rule-missing-metadata.yaml](../../fixtures/invalid/rule-missing-metadata.yaml) | Missing required `metadata` |
 | [fixtures/invalid/rule-unknown-schema.yaml](../../fixtures/invalid/rule-unknown-schema.yaml) | Unregistered `metadata.schema` |
 | [fixtures/invalid/rule-bad-uuid.yaml](../../fixtures/invalid/rule-bad-uuid.yaml) | Non-UUIDv4 `metadata.uuid` |
+| [fixtures/invalid/rule-search-language.yaml](../../fixtures/invalid/rule-search-language.yaml) | `searches[].language` outside the Elastic names, and set on a `sentinel` search (`rule::1.0`) |
 | [fixtures/invalid/rule-1.0-reviewed.yaml](../../fixtures/invalid/rule-1.0-reviewed.yaml) | `metadata.reviewed` on `rule::1.0` |
 | [fixtures/invalid/rule-elastic-esql-index.yaml](../../fixtures/invalid/rule-elastic-esql-index.yaml) | Elastic `esql` block with `index`, `language`, and threshold-style suppression (`esql_source`, `language`, `suppression_shape`) |
 
@@ -187,6 +192,7 @@ configurations:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-10-23 | Optional `response.procedure.searches[].language`: `kuery`, `lucene`, `eql`, or `esql` with `system: elastic`, and not set with any other system. Omitted means unknown, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-10-19 | `techniques` is pinned to `att&ck::1.2` (ATT&CK 20.0). Additive: every `att&ck::1.1` technique still validates ([opentide#568](https://github.com/opentidehq/opentide/issues/568)). `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-10-19 | `configurations.elastic` (`ElasticConfig`, `platform::elastic::1.0`, [elastic-1.0.md](../platforms/elastic-1.0.md)) is added ([RFC 0007](../../rfcs/0007-elastic-security-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-10-19 | `detection_model` references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design and implementations always accepted signal UUIDs; the earlier objective-only wording was wrong. |

@@ -1,0 +1,52 @@
+name: Encoded PowerShell Command
+
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000107
+  schema: rule::1.0
+  version: 1
+  created: "2026-10-23"
+  modified: "2026-10-23"
+  tlp: clear
+
+description: |
+  rule::1.0 whose response hunts name their query language. An Elastic hunt
+  sets language; a Splunk hunt omits it, because SPL is the only language.
+status: STAGING
+severity: Medium
+techniques:
+  - T1059.001
+
+response:
+  alert_severity: Medium
+  procedure:
+    analysis: |
+      Decode the command and check what the host ran before and after it.
+    searches:
+      - purpose: Other hosts that ran an encoded PowerShell command this week
+        system: elastic
+        language: esql
+        query: |
+          FROM logs-endpoint.events.process-*
+          | WHERE @timestamp > NOW() - 7 days
+            AND process.name == "powershell.exe"
+            AND process.command_line LIKE "*-enc*"
+          | STATS runs = COUNT(*) BY host.name, user.name
+          | SORT runs DESC
+      - purpose: Network connections from the same process
+        system: elastic
+        language: kuery
+        query: 'event.category : "network" and process.name : "powershell.exe"'
+      - purpose: The same command line in proxy logs
+        system: splunk
+        query: |
+          index=proxy user_agent="*PowerShell*" | stats count by src, dest
+
+configurations:
+  elastic:
+    enabled: true
+    schema: platform::elastic::1.0
+    status: STAGING
+    type: esql
+    query: |
+      FROM logs-endpoint.events.process-* METADATA _id, _index, _version
+      | WHERE process.name == "powershell.exe" AND process.command_line LIKE "*-enc*"

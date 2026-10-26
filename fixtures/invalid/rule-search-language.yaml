@@ -1,0 +1,29 @@
+name: Search Language Outside The Vocabulary
+
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000106
+  schema: rule::1.0
+  version: 1
+  created: "2026-10-23"
+  modified: "2026-10-23"
+  tlp: clear
+
+description: |
+  An Elastic hunt names KQL as kql instead of kuery, and a Sentinel hunt sets
+  a language its system already implies. Both fail search_language.
+
+response:
+  alert_severity: Low
+  procedure:
+    analysis: Check the parent process.
+    searches:
+      - purpose: Parent processes of the alerting process
+        system: elastic
+        language: kql
+        query: 'event.category : "process" and process.name : "cmd.exe"'
+      - purpose: The same process in Sentinel
+        system: sentinel
+        language: kuery
+        query: |
+          DeviceProcessEvents
+          | where FileName == "cmd.exe"
