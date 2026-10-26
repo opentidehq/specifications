@@ -74,7 +74,7 @@ In `full` scope, validation MUST read every `*.json` file under `.opentide/state
 
 ### Platform advisories
 
-A platform spec MAY list advisories: conditions that validation SHOULD report as a warning without rejecting the rule. Each has a stable code, and the CLI and editors MUST report a finding under that code. An advisory never sets `VALIDATION_ERROR_RAISED`.
+A platform spec MAY list advisories: conditions that validation SHOULD report as a warning without rejecting the rule. Each has a stable code, and the CLI and editors MUST report a finding under that code. Codes are unique across platform specs: a later spec MUST NOT reuse a code for a different condition, and picks a new one instead. An advisory never sets `VALIDATION_ERROR_RAISED`.
 
 | Code | Severity | When |
 |------|----------|------|
@@ -85,7 +85,7 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `eql_maxspan_window` | warning | Elastic: an EQL `maxspan` exceeds `interval` + `lookback` |
 | `eql_maxspan_lookback` | warning | Elastic: an EQL `maxspan` exceeds `lookback` but not `interval` + `lookback` |
 | `risk_band` | warning | Elastic: an explicit risk score is outside its severity's band |
-| `technique_not_enterprise` | warning | Elastic: a technique is skipped because it is not Enterprise ATT&CK |
+| `technique_not_enterprise` | warning | Elastic: the rule names a technique that is not Enterprise ATT&CK, which deploy skips |
 
 The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories).
 

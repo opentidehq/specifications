@@ -295,7 +295,7 @@ class SearchLanguageTests(unittest.TestCase):
         cls.valid = load_yaml(FIXTURES / "valid" / "rule-1.1-search-language.yaml")
         cls.invalid = load_yaml(FIXTURES / "invalid" / "rule-search-language.yaml")
 
-    def _search(self, **search: str) -> dict:
+    def _search(self, **search: object) -> dict:
         doc = copy.deepcopy(self.valid)
         doc["response"]["procedure"]["searches"] = [{"purpose": "p", "query": "q", **search}]
         return doc
@@ -314,6 +314,21 @@ class SearchLanguageTests(unittest.TestCase):
         for system in ("elastic", "sentinel", "splunk", "velociraptor"):
             with self.subTest(system=system):
                 self.assertEqual(validate_searches(self._search(system=system)), [])
+
+    def test_valid_rule_1_0_fixture_passes(self) -> None:
+        doc = load_yaml(FIXTURES / "valid" / "rule-1.0-search-language.yaml")
+        self.assertEqual(doc["metadata"]["schema"], "rule::1.0")
+        self.assertEqual(validate_rule(doc, self.vocabs), [])
+
+    def test_null_language_is_omitted(self) -> None:
+        for system in ("elastic", "sentinel"):
+            with self.subTest(system=system):
+                self.assertEqual(validate_searches(self._search(system=system, language=None)), [])
+
+    def test_non_string_language_is_rejected_not_a_crash(self) -> None:
+        for language in (["kuery"], {"a": 1}, 1):
+            with self.subTest(language=language):
+                self.assertEqual(_codes(validate_searches(self._search(system="elastic", language=language))), {"search_language"})
 
     def test_unknown_elastic_language_is_rejected(self) -> None:
         for language in ("kql", "KUERY", "esql ", "sql", ""):

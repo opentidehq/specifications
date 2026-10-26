@@ -91,9 +91,9 @@ A `reviewed` instant equal to `T − W` or later is not unreviewed. `W` is not a
 | `purpose` | string | yes | Why this search is run |
 | `system` | string | yes | Target platform or system |
 | `query` | string | yes | Query text |
-| `language` | string | no | Query language, for a `system` with more than one. Omitted: unknown. |
+| `language` | string | no | Query language, for a `system` with more than one. Omitted with `system: elastic`: unknown. |
 
-`language` names the query language when `system` alone does not. With `system: elastic` it MUST be one of the names [elastic-1.0](../platforms/elastic-1.0.md) uses: `kuery` (KQL), `lucene`, `eql`, or `esql` (ES\|QL). `language` MUST NOT be set with any other `system`: `sentinel` and `defender_for_endpoint` are KQL, `splunk` is SPL, and no other system has values in this revision. Omitted, the language is unknown and the query is not analysed, as before the field existed.
+`language` names the query language when `system` alone does not. With `system: elastic` it MUST be one of the names [elastic-1.0](../platforms/elastic-1.0.md) uses: `kuery` (KQL), `lucene`, `eql`, or `esql` (ES\|QL). `language` MUST NOT be set with any other `system`, because the system alone names the language: `sentinel` and `defender_for_endpoint` are KQL, `splunk` is SPL, and no other system has a language in this revision. With `system: elastic`, an omitted `language` (or an empty one, YAML `null`) means the language is unknown and the query is not analysed, as before the field existed.
 
 ### Platform block (PlatformConfigBase)
 

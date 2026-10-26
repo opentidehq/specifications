@@ -212,6 +212,7 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "valid" / "rule-elastic-1.0.yaml",
         FIXTURES / "invalid" / "rule-elastic-esql-index.yaml",
         FIXTURES / "valid" / "rule-1.1-search-language.yaml",
+        FIXTURES / "valid" / "rule-1.0-search-language.yaml",
         FIXTURES / "invalid" / "rule-search-language.yaml",
         FIXTURES / "valid" / "threat-1.0.yaml",
         FIXTURES / "valid" / "objective-1.0.yaml",

@@ -615,7 +615,8 @@ def validate_searches(doc: dict[str, Any]) -> list[CheckError]:
         return []
     errors: list[CheckError] = []
     for index, search in enumerate(searches):
-        if not isinstance(search, dict) or "language" not in search:
+        # An empty `language:` key (YAML null) is the same as omitting it.
+        if not isinstance(search, dict) or search.get("language") is None:
             continue
         path = f"response.procedure.searches[{index}].language"
         system = search.get("system")
@@ -624,7 +625,7 @@ def validate_searches(doc: dict[str, Any]) -> list[CheckError]:
             errors.append(
                 CheckError("search_language", f"language MUST NOT be set for system {system!r}", path)
             )
-        elif search["language"] not in allowed:
+        elif not isinstance(search["language"], str) or search["language"] not in allowed:
             errors.append(
                 CheckError(
                     "search_language",

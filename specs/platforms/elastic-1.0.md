@@ -29,7 +29,7 @@ Static validation (`opentide validate`) and registry load:
 - Legacy external-id keys (`rule_id`, `rule_id_bundle`, `rule_id::<tenant>`) at the block root MUST fail with `external_id_in_rule` ([External rule ids](index.md#external-rule-ids)). Registry load drops those keys and passes every other key to the model, so registry load accepts exactly the blocks static validation accepts, apart from the legacy keys.
 - Field names (`suppression.group_by`, `threshold.field`, `threshold.cardinality.field`, `new_terms.fields`, `highlighted_fields`, `required_fields[].name`, `threat.mapping[].entries[].field` and `value`) name fields in the tenant's data. They MUST NOT be checked against a closed list. Deploy checks the aggregation, timestamp, and indicator fields against the tenant instead ([Elasticsearch checks](#elasticsearch-checks)).
 - Durations MUST follow [Durations](#durations).
-- An [advisory](#advisories) SHOULD be reported as a warning with its advisory code. An advisory never rejects a rule.
+- An [advisory](#advisories) SHOULD be reported as a warning. A reported advisory MUST carry its advisory code. An advisory never rejects a rule.
 
 Deploy:
 
@@ -383,7 +383,8 @@ The supported floor is Kibana 8.19 and 9.x. ES|QL rules need 8.14 or later. The 
 
 Query syntax differs across the supported range: ES|QL commands that shipped in 9.2 or later, such as `INLINE STATS`, are missing on 8.19, and so is `FORK`. `setup.version` lets a tenant declare the lowest stack version among the deployments it reaches, as a string `MAJOR.MINOR` (`"8.19"`, `"9.5"`) or `"serverless"` for Elastic Cloud Serverless. Any other value, a TOML number included (`9.10` would read as `9.1`), is a configuration error. Versions compare by major, then minor, as integers; `serverless` is later than every `MAJOR.MINOR`.
 
-- Static validation and editors MAY use the lowest version declared across a rule's target tenants (the block's `tenants`, or every tenant when it is omitted) to report syntax that version lacks. A target tenant without `version` counts as the floor.
+- Static validation and editors MAY use the lowest version declared across a rule's target tenants (the block's `tenants`, or every tenant when it is empty or omitted) to report syntax that version lacks. A target tenant without `version` counts as the floor.
+- A version older than 8.19 is outside the supported range and is checked as 8.19.
 - Absent means unknown: report against the spec floor, Kibana 8.19.
 - Deploy MUST NOT read the version from the cluster on the author's behalf. A least-privilege key may not see it, as with `suppression`.
 - When the lowest version is 9.4 or later, or `serverless`, validation MAY skip `esql_metadata_id` ([Advisories](#advisories)).
@@ -566,7 +567,7 @@ Validation SHOULD warn, without rejecting the rule, when a condition below holds
 | `eql_maxspan_window` | an EQL `sequence` `maxspan` exceeds `interval` + `lookback`: the sequence cannot fit one run. |
 | `eql_maxspan_lookback` | an EQL `sequence` `maxspan` exceeds `lookback` but not `interval` + `lookback`: a sequence that straddles two runs is missed. |
 | `risk_band` | an explicit risk score is outside its severity's [band](#severity-and-risk). |
-| `technique_not_enterprise` | a technique is skipped because it is not Enterprise ATT&CK ([ATT&CK](#attck)). |
+| `technique_not_enterprise` | the rule names a technique that is not Enterprise ATT&CK, which deploy skips ([ATT&CK](#attck)). Static validation reports it from the technique list, before deploy. |
 
 Each condition has one code, and a rule that meets two conditions gets both warnings. The two EQL conditions do not overlap: a `maxspan` above `interval` + `lookback` reports only `eql_maxspan_window`.
 
