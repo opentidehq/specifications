@@ -25,7 +25,7 @@ A log source's `name` **is its dataset**: the KQL table for Sentinel and Defende
 
 - A log source MUST set `name`, `description` and `system`, and MAY set `tenants`, `assets`, `references` and `columns`. Any other key MUST fail validation.
 - `name` MUST NOT be empty or whitespace-only. Names MUST be unique per `system`; the same name MAY appear under two systems (`DeviceEvents` under `sentinel` and `defender_for_endpoint`).
-- The opentide 0.20.0 keys `tables`, `indexes`, `sourcetypes`, `macros`, `indices`, `data_views` and `ecs` MUST fail validation with a message that names `opentide migrate visibility` ([Migration](#migration-from-opentide-0200)).
+- The opentide 0.20.0 keys `tables`, `indexes`, `sourcetypes`, `macros`, `indices`, `data_views` and `ecs` MUST fail validation, with a message that says what replaces the key: one log source per table, sourcetype or index pattern, named after it.
 
 ### Columns
 
@@ -110,14 +110,6 @@ These requirements apply to every query check an implementation runs offline (`v
 
 A log source or detector that names an asset `[[assets]]` does not declare MUST be reported.
 
-### Migration from opentide 0.20.0
-
-opentide 0.20.0 let a log source list datasets under plural keys (`tables = ["A", "B"]`). An implementation SHOULD offer `opentide migrate visibility` (a dry run by default, `--apply` to write):
-
-- Each name in `tables`, `sourcetypes` or `indices` becomes its own log source with that `name`, copying `description`, `system`, `tenants`, `assets` and `references`. `indexes`, `macros`, `data_views` and `ecs` are dropped, and the migration lists what it dropped.
-- A log source with none of the plural keys is left unchanged.
-- In objective files, a signal `data.logsources` reference to a migrated log source's old name becomes the names it was split into, all of them, in order. A log source that held only dropped keys is split into none, and references to it are removed.
-
 ## Relationships
 
 - [configuration.md](configuration.md): `visibility.toml` is a configuration file; package defaults and workspace overrides merge as described there. Arrays replace.
@@ -181,4 +173,4 @@ data:
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-11-03 | First normative spec ([RFC 0013](../rfcs/0013-visibility-logsource-is-a-dataset.md), [#63](https://github.com/opentidehq/specifications/issues/63)). A log source's `name` is its dataset; optional `columns` keyed by column name; query-check semantics. The opentide 0.20.0 plural keys and `ecs` fail validation, with a migration. `schema_id` stays `visibility::1.0`. Corrected before any implementation released the 2026-11-02 draft of this spec (singular dataset keys, `[[logsources.columns]]`). |
+| 1.0 | 2026-11-03 | First normative spec ([RFC 0013](../rfcs/0013-visibility-logsource-is-a-dataset.md), [#63](https://github.com/opentidehq/specifications/issues/63)). A log source's `name` is its dataset; optional `columns` keyed by column name; query-check semantics. The opentide 0.20.0 plural keys and `ecs` fail validation. `schema_id` stays `visibility::1.0`. Corrected before any implementation released the 2026-11-02 draft of this spec (singular dataset keys, `[[logsources.columns]]`). |
