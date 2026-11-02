@@ -32,14 +32,6 @@ class VisibilityFixtures(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertEqual(vf.errors({"logsources": [source(**{key: "x"})]}), ["unknown_key"])
 
-    def test_migration_drops_and_lists(self) -> None:
-        doc = {"logsources": [source(name="Macros", system="splunk", macros=["sysmon"])]}
-        migrated, renamed, dropped = vf.migrate(doc)
-        self.assertEqual(migrated["logsources"], [])
-        self.assertEqual(renamed, {"Macros": []})
-        self.assertEqual(dropped, [{"logsource": "Macros", "key": "macros", "value": "sysmon"}])
-        self.assertEqual(vf.migrate_references(["Macros", "Other"], renamed), ["Other"])
-
 
 if __name__ == "__main__":
     unittest.main()

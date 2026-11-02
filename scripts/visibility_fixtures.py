@@ -12,7 +12,7 @@ VISIBILITY = ROOT / "fixtures" / "visibility"
 TOP_LEVEL = {"assets", "logsources", "detectors"}
 REQUIRED = ("name", "description", "system")
 KEYS = {*REQUIRED, "tenants", "assets", "references", "columns"}
-# opentide 0.20.0 keys; each fails validation and names `opentide migrate visibility`.
+# opentide 0.20.0 keys; each fails validation.
 PLURAL_KEYS = {"tables", "indexes", "sourcetypes", "macros", "indices", "data_views", "ecs"}
 KQL_TYPES = {"bool", "datetime", "decimal", "dynamic", "guid", "int", "long", "real", "string", "timespan"}
 COLUMN_TYPES = {
@@ -104,43 +104,6 @@ def errors(doc: dict) -> list[str]:
     return found
 
 
-SPLIT_KEYS = {"tables", "sourcetypes", "indices"}
-CARRIED = ("description", "system", "tenants", "assets", "references")
-
-
-def migrate(doc: dict) -> tuple[dict, dict[str, list[str]], list[dict]]:
-    """Split 0.20.0 plural keys into one log source per name (visibility.md, Migration).
-
-    Returns the migrated document, the old name -> new names map for signal
-    references, and what was dropped.
-    """
-    sources: list[dict] = []
-    renamed: dict[str, list[str]] = {}
-    dropped: list[dict] = []
-    for source in doc.get("logsources", []):
-        if not any(key in source for key in PLURAL_KEYS):
-            sources.append(source)
-            continue
-        carried = {key: source[key] for key in CARRIED if key in source}
-        split: list[str] = []
-        for key, value in source.items():
-            if key in SPLIT_KEYS:
-                split.extend(value)
-            elif key in PLURAL_KEYS:
-                values = value if isinstance(value, list) else [value]
-                dropped.extend({"logsource": source["name"], "key": key, "value": v} for v in values)
-        sources.extend({"name": name, **carried} for name in split)
-        renamed[source["name"]] = split
-    return {**{k: v for k, v in doc.items() if k != "logsources"}, "logsources": sources}, renamed, dropped
-
-
-def migrate_references(references: list[str], renamed: dict[str, list[str]]) -> list[str]:
-    out: list[str] = []
-    for reference in references:
-        out.extend(renamed.get(reference, [reference]))
-    return out
-
-
 def check_visibility_fixtures() -> list[str]:
     problems: list[str] = []
     valid = VISIBILITY / "valid" / "visibility.toml"
@@ -162,20 +125,6 @@ def check_visibility_fixtures() -> list[str]:
     for name in sorted(set(EXPECTED_INVALID) - seen):
         problems.append(f"missing invalid visibility fixture {name}")
 
-    migration = VISIBILITY / "migration"
-    before, expected = _load(migration / "v0.20.0.toml"), _load(migration / "expected.toml")
-    if "plural_dataset_key" not in errors(before):
-        problems.append("migration/v0.20.0.toml must use the 0.20.0 keys")
-    migrated, renamed, dropped = migrate(before)
-    if migrated != expected:
-        problems.append("migrating migration/v0.20.0.toml does not yield migration/expected.toml")
-    if errors(expected):
-        problems.append(f"migration/expected.toml: unexpected {sorted(set(errors(expected)))}")
-    references = _load(migration / "references.toml")
-    if migrate_references(references["before"], renamed) != references["after"]:
-        problems.append("migration/references.toml: signal references do not migrate as listed")
-    if dropped != references["dropped"]:
-        problems.append("migration/references.toml: dropped keys do not match the migration")
     return problems
 
 

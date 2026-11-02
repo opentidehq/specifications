@@ -31,11 +31,11 @@ See [visibility.md](../specs/visibility.md). In short:
 - Keys: `name` (the dataset), `description`, `system`, `tenants`, `assets`, `references`, `columns`. Nothing else. `name` is unique per `system`.
 - `columns` is a table keyed by column name as-is; each value has `type` from the system's type set (KQL scalar types, Elasticsearch field types, Splunk `string`/`number`/`boolean`) and optional `description`. Other systems take no columns.
 - Query checks are opt-in per system. Splunk declares sourcetypes only and Elastic index patterns only; Splunk indexes and macros and Elastic data views are not declarable. An undeclared name the implementation does not know keeps `kql_unknown_table` at its profile's severity (0.20.0 downgraded it to the `kql_table_not_declared` warning once any table was declared, so a Defender typo stopped failing validation), and under opt-in a KQL name is checked whatever its case.
-- The 0.20.0 keys (`tables`, `indexes`, `sourcetypes`, `macros`, `indices`, `data_views`, `ecs`) fail validation, and `opentide migrate visibility` splits `tables`, `sourcetypes` and `indices` into one log source per name, dropping and listing the rest.
+- The 0.20.0 keys (`tables`, `indexes`, `sourcetypes`, `macros`, `indices`, `data_views`, `ecs`) fail validation. No migration command is provided: opentide is pre-1.0, and a workspace rewrites the file (one log source per table, sourcetype or index pattern) by hand or with an agent.
 
 ## Why in place, not `visibility::1.1`
 
-The plural lists shipped in opentide 0.20.0 on 2026-11-02 and are corrected in 0.20.1. They were a defect of an unspecified format, not a reviewed revision that users adopted. Keeping both shapes would carry the arbitrary grouping forward indefinitely. The cost is that a 0.20.0 file with plural lists fails validation in 0.20.1; the failure names `opentide migrate visibility`, which converts the file and the signals that reference it.
+The plural lists shipped in opentide 0.20.0 on 2026-11-02 and are corrected in 0.20.1. They were a defect of an unspecified format, not a reviewed revision that users adopted. Keeping both shapes would carry the arbitrary grouping forward indefinitely. The cost is that a 0.20.0 file with plural lists fails validation in 0.20.1; the failure says what replaces the key. opentide is pre-1.0, so there is no migration command: the file and the signals that reference it are rewritten by hand or by an agent.
 
 ## Alternatives considered
 
