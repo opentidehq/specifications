@@ -1,2 +1,3 @@
 [[logsources]]
-table = "Contoso_Audit_CL"
+name = "Contoso_Audit_CL"
+description = "Administrative audit events"

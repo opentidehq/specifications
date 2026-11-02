@@ -1,7 +1,0 @@
-[[logsources]]
-name = "Badge readers"
-system = "sentinel"
-
-[[logsources.columns]]
-name = "TimeGenerated"
-type = "datetime"

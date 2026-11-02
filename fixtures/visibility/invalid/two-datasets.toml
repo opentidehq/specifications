@@ -1,5 +1,0 @@
-[[logsources]]
-name = "Endpoint"
-system = "elastic"
-index = "logs-endpoint.*"
-data_view = "security-solution-default"

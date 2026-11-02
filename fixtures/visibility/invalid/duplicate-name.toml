@@ -1,9 +1,9 @@
 [[logsources]]
-name = "Audit"
+name = "Contoso_Audit_CL"
+description = "Administrative audit events"
 system = "sentinel"
-table = "Contoso_Audit_CL"
 
 [[logsources]]
-name = "Audit"
+name = "Contoso_Audit_CL"
+description = "The same table again"
 system = "sentinel"
-table = "Fabrikam_Audit_CL"

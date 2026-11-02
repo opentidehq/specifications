@@ -43,7 +43,7 @@ If bundled config lacks `global`, `paths` is aliased to `global`. If `platforms`
 | `paths.toml` | Yes | Workspace directory paths |
 | `deployment.toml` | Yes | Rule lifecycle statuses and promotion |
 | `schema.toml` | Yes | Template defaults, vocabulary extensions |
-| `visibility.toml` | Yes | Assets, log sources (one dataset each, with columns) and external detectors ([visibility.md](visibility.md)) |
+| `visibility.toml` | Yes | Assets, log sources (each named by its dataset, with optional columns) and external detectors ([visibility.md](visibility.md)) |
 | `documentation.toml` | Yes | Documentation generation settings |
 | `platforms/*.toml` | Yes | Per-platform connection and behavior |
 | `sharing.toml` | Yes | Every sharing integration block (`[[misp]]`), in one file |
