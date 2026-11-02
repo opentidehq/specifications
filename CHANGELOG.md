@@ -24,7 +24,6 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## threat 1.0
 
-- Bump `threat.actors.name` pin to `actors::1.2` (ATT&CK 20.0 groups and the current MISP threat-actor galaxy). The 60 keys added at `actors::1.2` were unreachable behind the `actors::1.1` pin. Additive minor; `actors::1.1` keys are unaffected.
 - Bump `threat.mitre_attack` pin to `att&ck::1.2` (ATT&CK 20.0). Additive minor; `att&ck::1.1` keys are unaffected ([opentide#568](https://github.com/opentidehq/opentide/issues/568)).
 - Correct `threat.surface` to stage-scoped values (`<stage>::<key>`, e.g. `OS::Windows::Desktop`). The vocabulary groups keys under stages and the same key name is defined under two of them — `VPN`, `VPN::OpenVPN`, `VPN::WireGuard`, `Wireless` and `Industrial` are each both `Infrastructure` and `Protocol` — so a bare key name was ambiguous and those five values were unreachable. The prior description asserting values "are not prefixed with the stage id" was wrong and is corrected in place; no vocabulary version bump, as `surface::1.0` key names are unchanged and only the authored encoding is corrected.
 - Bump `threat.actors.name` pin to `actors::1.1`. The 220 galaxy clusters added at `actors::1.1` were present in the vocabulary but unreachable behind the `actors::1.0` pin, so a correctly-authored MISP cluster UUID was reported as an unknown vocabulary value. Additive minor; `actors::1.0` keys are unaffected.
