@@ -1,4 +1,4 @@
-# visibility::1.0 — one dataset per log source, optional columns.
+# visibility::1.0 — a log source's name is its dataset; columns keyed by name.
 
 [[assets]]
 name = "Contoso identity provider"
@@ -6,95 +6,69 @@ description = "Production identity provider"
 criticality = "High"
 
 [[logsources]]
-name = "Contoso audit log"
+name = "Contoso_Audit_CL"
 description = "Administrative audit events from the Contoso connector"
 system = "sentinel"
-table = "Contoso_Audit_CL"
 tenants = ["Production"]
 assets = ["Contoso identity provider"]
+references = ["https://contoso.example/docs/audit"]
 
-[[logsources.columns]]
-name = "TimeGenerated"
-type = "datetime"
+[logsources.columns]
+TimeGenerated = { type = "datetime" }
+Actor_s = { type = "string", description = "UPN of the account that made the change" }
+ResultCode_d = { type = "real" }
 
-[[logsources.columns]]
-name = "Actor_s"
-type = "string"
-description = "UPN of the account that made the change"
-
-[[logsources.columns]]
-name = "ResultCode_d"
-type = "real"
-
-# Built-in table by name only; `name` defaults to "SigninLogs".
+# A built-in table, declared by name only.
 [[logsources]]
+name = "DeviceEvents"
+description = "Defender device events in the Sentinel workspace"
 system = "sentinel"
-table = "SigninLogs"
 
-# The same default name under another system is allowed.
+# The same name under another system is allowed.
 [[logsources]]
+name = "DeviceEvents"
+description = "Defender device events in advanced hunting"
 system = "defender_for_endpoint"
-table = "DeviceEvents"
 
+# A lowercase custom table.
 [[logsources]]
+name = "vendor_alerts_CL"
+description = "Alerts forwarded by the vendor connector"
 system = "sentinel"
-table = "DeviceEvents"
 
-# A lowercase custom table and a workspace function are tables too.
+# A wildcard name.
 [[logsources]]
+name = "Fabrikam_*_CL"
+description = "Every Fabrikam connector table"
 system = "sentinel"
-table = "vendor_alerts_CL"
 
-# Wildcard, name only.
+# splunk: name is the sourcetype.
 [[logsources]]
-name = "Any custom table"
-system = "sentinel"
-table = "*_CL"
-
-[[logsources]]
-name = "Windows security events"
+name = "WinEventLog:Security"
+description = "Domain controller security log"
 system = "splunk"
-index = "wineventlog"
-sourcetype = "WinEventLog:Security"
 
-[[logsources.columns]]
-name = "EventCode"
-type = "number"
+[logsources.columns]
+EventCode = { type = "number" }
+Account_Name = { type = "string", description = "Account the event is about" }
 
+# elastic: name is the index pattern; dotted column names are quoted.
 [[logsources]]
-system = "splunk"
-macro = "wineventlog_security"
-
-[[logsources]]
-name = "Endpoint telemetry"
+name = "logs-endpoint.events.*"
+description = "Endpoint telemetry"
 system = "elastic"
-index = "logs-endpoint.events.*"
-ecs = true
 
-[[logsources]]
-name = "Custom app logs"
-system = "elastic"
-index = "custom-app-*"
+[logsources.columns]
+"process.name" = { type = "keyword" }
+"process.pid" = { type = "long", description = "Process id" }
+"@timestamp" = { type = "date" }
 
-[[logsources]]
-name = "Custom app logs (single index)"
-system = "elastic"
-index = "custom-app-2026"
-
-[[logsources.columns]]
-name = "app.user"
-type = "keyword"
-description = "Application user id"
-
-[[logsources]]
-system = "elastic"
-data_view = "security-solution-default"
-
-# A log source with no dataset: known to signals, declares nothing to query checks.
+# A system without query checks: known to signals, declares nothing to query checks.
 [[logsources]]
 name = "Badge readers"
 description = "Physical access logs held by the facilities team"
 system = "sentinel_one"
+assets = ["Contoso identity provider"]
 
 [[detectors]]
 name = "Contoso native alerts"

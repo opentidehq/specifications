@@ -1,4 +1,0 @@
-[[logsources]]
-name = "Proxy"
-system = "splunk"
-table = "Fabrikam_Proxy_CL"

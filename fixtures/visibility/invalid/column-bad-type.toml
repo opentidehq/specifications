@@ -1,7 +1,7 @@
 [[logsources]]
+name = "Contoso_Audit_CL"
+description = "Administrative audit events"
 system = "sentinel"
-table = "Contoso_Audit_CL"
 
-[[logsources.columns]]
-name = "Actor_s"
-type = "keyword"
+[logsources.columns]
+Actor_s = { type = "keyword" }

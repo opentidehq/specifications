@@ -1,7 +1,0 @@
-[[logsources]]
-system = "sentinel"
-table = "*_CL"
-
-[[logsources.columns]]
-name = "TimeGenerated"
-type = "datetime"

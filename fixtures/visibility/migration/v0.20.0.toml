@@ -9,16 +9,17 @@ tables = ["Contoso_Audit_CL", "Fabrikam_Proxy_CL"]
 
 [[logsources]]
 name = "Sign-ins"
-system = "sentinel"
 description = "Entra ID sign-ins"
+system = "sentinel"
 tables = ["SigninLogs"]
 
 [[logsources]]
 name = "Windows security"
 description = "Domain controller security log"
 system = "splunk"
+references = ["https://example.org/wineventlog"]
 indexes = ["wineventlog"]
-sourcetypes = ["WinEventLog:Security"]
+sourcetypes = ["WinEventLog:Security", "XmlWinEventLog:Security"]
 macros = ["wineventlog_security"]
 
 [[logsources]]
@@ -28,3 +29,15 @@ system = "elastic"
 indices = ["logs-endpoint.events.*"]
 data_views = ["security-solution-default"]
 ecs = true
+
+[[logsources]]
+name = "Splunk macros"
+description = "Searches through macros"
+system = "splunk"
+macros = ["sysmon"]
+
+# No plural key: left unchanged.
+[[logsources]]
+name = "Badge readers"
+description = "Physical access logs held by the facilities team"
+system = "sentinel_one"

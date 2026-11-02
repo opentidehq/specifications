@@ -1,3 +1,12 @@
-# Signal `data.logsources` before and after migrating v0.20.0.toml.
-before = ["Custom tables", "Sign-ins", "Windows security", "Endpoint"]
-after = ["Contoso_Audit_CL", "Fabrikam_Proxy_CL", "Sign-ins", "wineventlog", "WinEventLog:Security", "wineventlog_security", "logs-endpoint.events.*", "security-solution-default"]
+# Signal `data.logsources` before and after migrating v0.20.0.toml,
+# and what the migration reports as dropped.
+before = ["Custom tables", "Sign-ins", "Windows security", "Endpoint", "Splunk macros", "Badge readers"]
+after = ["Contoso_Audit_CL", "Fabrikam_Proxy_CL", "SigninLogs", "WinEventLog:Security", "XmlWinEventLog:Security", "logs-endpoint.events.*", "Badge readers"]
+
+dropped = [
+  { logsource = "Windows security", key = "indexes", value = "wineventlog" },
+  { logsource = "Windows security", key = "macros", value = "wineventlog_security" },
+  { logsource = "Endpoint", key = "data_views", value = "security-solution-default" },
+  { logsource = "Endpoint", key = "ecs", value = true },
+  { logsource = "Splunk macros", key = "macros", value = "sysmon" },
+]
