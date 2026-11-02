@@ -1,0 +1,50 @@
+[[logsources]]
+name = "Contoso_Audit_CL"
+description = "Custom connector tables"
+system = "sentinel"
+tenants = ["Production"]
+table = "Contoso_Audit_CL"
+
+[[logsources]]
+name = "Fabrikam_Proxy_CL"
+description = "Custom connector tables"
+system = "sentinel"
+tenants = ["Production"]
+table = "Fabrikam_Proxy_CL"
+
+[[logsources]]
+name = "Sign-ins"
+description = "Entra ID sign-ins"
+system = "sentinel"
+table = "SigninLogs"
+
+[[logsources]]
+name = "wineventlog"
+description = "Domain controller security log"
+system = "splunk"
+index = "wineventlog"
+
+[[logsources]]
+name = "WinEventLog:Security"
+description = "Domain controller security log"
+system = "splunk"
+sourcetype = "WinEventLog:Security"
+
+[[logsources]]
+name = "wineventlog_security"
+description = "Domain controller security log"
+system = "splunk"
+macro = "wineventlog_security"
+
+[[logsources]]
+name = "logs-endpoint.events.*"
+description = "Endpoint telemetry"
+system = "elastic"
+index = "logs-endpoint.events.*"
+ecs = true
+
+[[logsources]]
+name = "security-solution-default"
+description = "Endpoint telemetry"
+system = "elastic"
+data_view = "security-solution-default"

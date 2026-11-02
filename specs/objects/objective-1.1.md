@@ -112,7 +112,7 @@ Completion of `reuse` uses the `signal` model vocabulary ([metaschema-keywords.m
 |-------|------|----------|-------------|
 | `availability` | string | yes | Data availability level |
 | `requirements` | string | yes | Data source requirements |
-| `logsources` | list[string] | no | Log source names from the workspace `visibility.toml` (`tide.config.visibility.logsources`) |
+| `logsources` | list[string] | no | Log sources from the workspace `visibility.toml` ([visibility.md](../visibility.md#signal-references)): `<name>`, `<system>::<name>` or `<system>::<tenant>::<name>`. A log source is one dataset. |
 
 ### `detectors[]` (ExternalDetector)
 
@@ -198,5 +198,6 @@ A rule with `detection_model` pointing at this objective covers it directly, and
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-11-02 | `signals[].data.logsources` names log sources as [visibility.md](../visibility.md#signal-references) defines them, one dataset each. No field change. |
 | 1.1 | 2026-10-19 | Draft. `mitre_attack` is pinned to `att&ck::1.2` (ATT&CK 20.0), as in `objective::1.0` ([opentide#568](https://github.com/opentidehq/opentide/issues/568)). |
 | 1.1 | 2026-10-19 | Draft. Signal binding `reuse` ([RFC 0011](../../rfcs/0011-signal-reuse.md)). Field tables copy `objective::1.0` as of 2026-10-19 (`mitre_attack`, `alert_severity::1.0`, stage-scoped `entities`, `visibility.toml` log sources, integer `effort` with no pin). `objective::1.0` remains normative for definitions only. |

@@ -16,6 +16,7 @@ from object_fixtures import (
 )
 from deployment_state_fixtures import check_deployment_fixtures
 from sharing_fixtures import check_sharing_fixtures
+from visibility_fixtures import check_visibility_fixtures
 
 ROOT = Path(__file__).resolve().parents[1]
 VOCAB_DIR = ROOT / "vocabularies"
@@ -397,6 +398,7 @@ def main() -> int:
     errors.extend(_validate_object_fixtures())
     errors.extend(_validate_inflight_fixture())
     errors.extend(check_sharing_fixtures())
+    errors.extend(check_visibility_fixtures())
     errors.extend(check_deployment_fixtures())
 
     if errors:

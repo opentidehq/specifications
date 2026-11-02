@@ -1,0 +1,6 @@
+[[logsources]]
+system = "sentinel"
+table = "Contoso_Audit_CL"
+
+[[datasets]]
+name = "Contoso_Audit_CL"

@@ -1,0 +1,9 @@
+[[logsources]]
+name = "Audit"
+system = "sentinel"
+table = "Contoso_Audit_CL"
+
+[[logsources]]
+name = "Audit again"
+system = "sentinel"
+table = "Contoso_Audit_CL"
