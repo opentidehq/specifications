@@ -27,6 +27,7 @@ Shared fields are defined in [platforms](index.md#shared-platform-block). The de
 
 Static validation (`opentide validate`) and registry load:
 
+- `status` MUST be present, as on `elastic`: it picks the deploy strategy, and Falco has no default for it. A block that omits it fails as a missing required field; implementations MAY report the constraint codes only for blocks that set `status`.
 - A block MUST set exactly one of a **new rule** or a **tuning**: without `append_to_rule`, `condition` is required and MUST be a non-blank string; with `append_to_rule`, at least one of `condition` and `exceptions` MUST be present.
 - A block MUST satisfy every [constraint](#constraints). A violation MUST be reported with its constraint code.
 - Unknown keys MUST fail, at the block root and inside every object in the field tables.
@@ -64,7 +65,7 @@ Query validation:
 | `macros` | list[SysdigMacro] | optional | null | Macros only this rule uses, expanded at deploy ([`macros[]`](#macros-sysdigmacro)). |
 | `lists` | list[SysdigList] | optional | null | Lists only this rule uses, expanded at deploy ([`lists[]`](#lists-sysdiglist)). |
 | `policies` | list[string] | optional | tenant `policies` | Names of Sysdig runtime policies the rule joins. `api` delivery only; a `file` tenant ignores it. |
-| `required_engine_version` | string | optional | null | Falco engine version the rule needs (`0.39.0`). `file` delivery writes it as a `- required_engine_version:` item. |
+| `required_engine_version` | string or number | optional | null | Falco engine version the rule needs (`0.39.0`). A YAML number (`0.37`, or a legacy integer engine version such as `17`) is read as its text. `file` delivery writes it as a `- required_engine_version:` item. |
 | `required_plugin_versions` | list[SysdigPluginVersion] | optional | null | Plugins the rule needs. `file` delivery writes them as a `- required_plugin_versions:` item. A block with a `source` other than `syscall` SHOULD set it for `file` tenants. |
 
 The shared `name` is the Falco rule name. Empty means the opentide rule `name`. It is ignored with `append_to_rule`, which names the rule instead.
@@ -173,7 +174,7 @@ Deploy writes the union of, in this order and without duplicates:
 
 1. The block `tags`.
 2. Each ATT&CK technique id of the rule (`T1059.004`): the rule's `techniques` plus the techniques inherited through `detection_model`, the same union Elastic uses ([elastic-1.0](elastic-1.0.md#attck)). Then a `mitre_<tactic>` tag for each tactic of those techniques, from the tactic table of [elastic-1.0](elastic-1.0.md#attck), lower-cased with spaces and hyphens as underscores (`mitre_execution`, `mitre_privilege_escalation`). This is the Falco default rules' convention. A technique that is not Enterprise ATT&CK adds its id and no tactic.
-3. A maturity tag from the block's status strategy: `maturity_stable` for `RELEASE`, `maturity_incubating` for `PREVIEW`, otherwise `maturity_sandbox`.
+3. A maturity tag from the block's status strategy: `maturity_stable` for `RELEASE` and `UNIVERSAL`, `maturity_incubating` for `PREVIEW`, otherwise `maturity_sandbox`.
 4. The tenant `tags`.
 
 A tuning gets no derived tags: Falco does not append tags to an existing rule.
@@ -192,7 +193,7 @@ flags = []
 [[tenants]]
 name = "sysdig-prod"
 description = "Sysdig Secure SaaS, EU region"
-deployment = "PRODUCTION"
+strategies = ["RELEASE"]
 [tenants.setup]
 ssl = true
 delivery = "api"
@@ -203,7 +204,7 @@ policies = ["opentide managed detections"]
 [[tenants]]
 name = "falco-gitops"
 description = "Falco rules files picked up by the Helm chart"
-deployment = "STAGING"
+strategies = ["PREVIEW"]
 [tenants.setup]
 ssl = true
 delivery = "file"
@@ -255,7 +256,9 @@ A tuning is sent with `"name": "<append_to_rule>"`, `"append": true`, an empty `
 
 A tuning never joins a policy: the tuned rule's policies apply.
 
-A policy is found by name in `GET /api/v2/policies`. It is updated with `PUT /api/v2/policies/{id}`, sending the policy as read with the changed `ruleNames`. When the bound rule no longer exists (`404` on `GET`), deploy creates it again under the same rules as a create and replaces the binding, with a `sysdig_rule_recreated` warning.
+A policy is found by name in `GET /api/v2/policies`. It is updated with `PUT /api/v2/policies/{id}`, sending the policy as read with the changed `ruleNames`. When the bound rule no longer exists (`404` on `GET`), deploy creates it again under the same rules as a create and replaces the binding, with a `sysdig_rule_recreated` warning. For `DISABLEMENT` and `DELETION` it creates nothing: it removes the binding, with a `sysdig_rule_missing` warning.
+
+A rule is created before its policies are updated. When a named policy is missing (`sysdig_policy_missing`), the rule fails but its binding is kept, so the next deploy updates that rule instead of creating a second one.
 
 ### Deploy: `file`
 

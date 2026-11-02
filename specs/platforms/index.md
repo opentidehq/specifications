@@ -92,7 +92,7 @@ This is the static-validation bar. Deploy adds the constraints in each platform 
 | `carbon_black_cloud` | `query` |
 | `crowdstrike` | `details` (with `trigger` and `outcome`), `schedule` (with `frequency` and `lookback`), `query` |
 | `harfanglab` | no platform field is required; `maturity`, `confidence`, and `action` have defaults. Deploy requires `sigma` or `yara` |
-| `sysdig` | `condition`, or `append_to_rule` with `condition` or `exceptions`. Every block also meets the [Sysdig constraints](sysdig-1.0.md#constraints) |
+| `sysdig` | `status`, and `condition`, or `append_to_rule` with `condition` or `exceptions`. Every block also meets the [Sysdig constraints](sysdig-1.0.md#constraints) |
 | `elastic` | `type`, `status`, and `query` (except for `machine_learning`), plus the type object: `threshold`, `new_terms`, `threat`, or `machine_learning` for those types. Every block also meets the [Elastic constraints](elastic-1.0.md#constraints) |
 
 ### Shared platform block
@@ -104,7 +104,7 @@ Every block includes these fields. Platform specs do not repeat them except wher
 | `enabled` | `enabled` | boolean | optional | `false` | When `true`, the block is active for deploy. A rule with no enabled block is still valid. |
 | `name` | `name` | string | optional | `""` | Platform-specific rule name. Empty means the deployer uses the rule `name`, where that platform has a name field. |
 | `platform_schema` | `schema` | string | optional | null | Schema identifier. Canonical value: `platform::<identifier>::1.0`. Templates emit it. Validation does not require it. |
-| `status` | `status` | string | optional | null | Deployment status for this block. When set, it MUST be a status name from [deployment.md](../deployment.md). `DISABLEMENT` disables an existing rule; `DELETION` removes it. Other strategies deploy it enabled. Required on `elastic` ([elastic-1.0](elastic-1.0.md)). |
+| `status` | `status` | string | optional | null | Deployment status for this block. When set, it MUST be a status name from [deployment.md](../deployment.md). `DISABLEMENT` disables an existing rule; `DELETION` removes it. Other strategies deploy it enabled. Required on `elastic` ([elastic-1.0](elastic-1.0.md)) and `sysdig` ([sysdig-1.0](sysdig-1.0.md)). |
 | `flags` | `flags` | list[string] | optional | null | Free-form flags. Splunk modifiers may match on them. |
 | `tenants` | `tenants` | list[string] | optional | null | Tenant names this block targets. Empty or omitted means every tenant the run reaches. |
 | `contributors` | `contributors` | list[string] | optional | null | People credited on the platform rule. CrowdStrike joins them into the rule comment. |
@@ -201,7 +201,7 @@ Deployers register via `opentide.platforms` entry points. Validators load from `
 |---------|---------|----------|
 | Platform enabled | `false` in bundled TOML | `.opentide/configurations/platforms/<id>.toml` |
 | Block `enabled` | `false` | Per-block YAML |
-| Block `status` | null (rule-level status still applies to the rule). Required on `elastic`, with no default. | Per-block YAML |
+| Block `status` | null (rule-level status still applies to the rule). Required on `elastic` and `sysdig`, with no default. | Per-block YAML |
 | Block `schema` | omitted | Templates write `platform::<identifier>::1.0` |
 
 Vocabulary files are not platform configuration. See [configuration.md](../configuration.md).
