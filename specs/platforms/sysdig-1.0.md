@@ -256,7 +256,7 @@ A tuning is sent with `"name": "<append_to_rule>"`, `"append": true`, an empty `
 
 A tuning never joins a policy: the tuned rule's policies apply.
 
-A policy is found by name in `GET /api/v2/policies`. It is updated with `PUT /api/v2/policies/{id}`, sending the policy as read with the changed `ruleNames`. When the bound rule no longer exists (`404` on `GET`), deploy creates it again under the same rules as a create and replaces the binding, with a `sysdig_rule_recreated` warning. For `DISABLEMENT` and `DELETION` it creates nothing: it removes the binding, with a `sysdig_rule_missing` warning.
+A policy is found by name in `GET /api/v2/policies`. It is updated with `PUT /api/v2/policies/{id}`, sending the policy as read with the changed `ruleNames`. When the bound rule no longer exists (`404` on `GET`), deploy creates it again under the same rules as a create and replaces the binding, with a `sysdig_rule_recreated` warning. For `DISABLEMENT` it creates nothing: it removes the binding, with a `sysdig_rule_missing` warning. A `DELETION` whose rule is already gone (`404` on `DELETE`) succeeds and removes the binding.
 
 A rule is created before its policies are updated. When a named policy is missing (`sysdig_policy_missing`), the rule fails but its binding is kept, so the next deploy updates that rule instead of creating a second one.
 
