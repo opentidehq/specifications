@@ -1,0 +1,4 @@
+[[logsources]]
+system = "sentinel"
+table = "Contoso_Audit_CL"
+retention = "90d"

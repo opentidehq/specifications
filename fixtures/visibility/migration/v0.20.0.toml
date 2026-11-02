@@ -1,0 +1,30 @@
+# A 0.20.0 file with plural dataset lists.
+
+[[logsources]]
+name = "Custom tables"
+description = "Custom connector tables"
+system = "sentinel"
+tenants = ["Production"]
+tables = ["Contoso_Audit_CL", "Fabrikam_Proxy_CL"]
+
+[[logsources]]
+name = "Sign-ins"
+system = "sentinel"
+description = "Entra ID sign-ins"
+tables = ["SigninLogs"]
+
+[[logsources]]
+name = "Windows security"
+description = "Domain controller security log"
+system = "splunk"
+indexes = ["wineventlog"]
+sourcetypes = ["WinEventLog:Security"]
+macros = ["wineventlog_security"]
+
+[[logsources]]
+name = "Endpoint"
+description = "Endpoint telemetry"
+system = "elastic"
+indices = ["logs-endpoint.events.*"]
+data_views = ["security-solution-default"]
+ecs = true

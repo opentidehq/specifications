@@ -1,0 +1,3 @@
+# Signal `data.logsources` before and after migrating v0.20.0.toml.
+before = ["Custom tables", "Sign-ins", "Windows security", "Endpoint"]
+after = ["Contoso_Audit_CL", "Fabrikam_Proxy_CL", "Sign-ins", "wineventlog", "WinEventLog:Security", "wineventlog_security", "logs-endpoint.events.*", "security-solution-default"]

@@ -1,0 +1,102 @@
+# visibility::1.0 — one dataset per log source, optional columns.
+
+[[assets]]
+name = "Contoso identity provider"
+description = "Production identity provider"
+criticality = "High"
+
+[[logsources]]
+name = "Contoso audit log"
+description = "Administrative audit events from the Contoso connector"
+system = "sentinel"
+table = "Contoso_Audit_CL"
+tenants = ["Production"]
+assets = ["Contoso identity provider"]
+
+[[logsources.columns]]
+name = "TimeGenerated"
+type = "datetime"
+
+[[logsources.columns]]
+name = "Actor_s"
+type = "string"
+description = "UPN of the account that made the change"
+
+[[logsources.columns]]
+name = "ResultCode_d"
+type = "real"
+
+# Built-in table by name only; `name` defaults to "SigninLogs".
+[[logsources]]
+system = "sentinel"
+table = "SigninLogs"
+
+# The same default name under another system is allowed.
+[[logsources]]
+system = "defender_for_endpoint"
+table = "DeviceEvents"
+
+[[logsources]]
+system = "sentinel"
+table = "DeviceEvents"
+
+# A lowercase custom table and a workspace function are tables too.
+[[logsources]]
+system = "sentinel"
+table = "vendor_alerts_CL"
+
+# Wildcard, name only.
+[[logsources]]
+name = "Any custom table"
+system = "sentinel"
+table = "*_CL"
+
+[[logsources]]
+name = "Windows security events"
+system = "splunk"
+index = "wineventlog"
+sourcetype = "WinEventLog:Security"
+
+[[logsources.columns]]
+name = "EventCode"
+type = "number"
+
+[[logsources]]
+system = "splunk"
+macro = "wineventlog_security"
+
+[[logsources]]
+name = "Endpoint telemetry"
+system = "elastic"
+index = "logs-endpoint.events.*"
+ecs = true
+
+[[logsources]]
+name = "Custom app logs"
+system = "elastic"
+index = "custom-app-*"
+
+[[logsources]]
+name = "Custom app logs (single index)"
+system = "elastic"
+index = "custom-app-2026"
+
+[[logsources.columns]]
+name = "app.user"
+type = "keyword"
+description = "Application user id"
+
+[[logsources]]
+system = "elastic"
+data_view = "security-solution-default"
+
+# A log source with no dataset: known to signals, declares nothing to query checks.
+[[logsources]]
+name = "Badge readers"
+description = "Physical access logs held by the facilities team"
+system = "sentinel_one"
+
+[[detectors]]
+name = "Contoso native alerts"
+description = "Alerts raised by the Contoso console"
+assets = ["Contoso identity provider"]

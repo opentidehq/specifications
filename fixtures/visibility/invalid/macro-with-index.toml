@@ -1,0 +1,5 @@
+[[logsources]]
+name = "Security"
+system = "splunk"
+index = "wineventlog"
+macro = "wineventlog_security"

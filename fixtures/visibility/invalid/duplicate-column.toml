@@ -1,0 +1,11 @@
+[[logsources]]
+system = "sentinel"
+table = "Contoso_Audit_CL"
+
+[[logsources.columns]]
+name = "Actor_s"
+type = "string"
+
+[[logsources.columns]]
+name = "Actor_s"
+type = "string"

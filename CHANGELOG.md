@@ -31,6 +31,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Correct `threat.actors` to `list[ThreatActor]` with scoped `name`; pin path is `threat.actors.name` ([#11](https://github.com/opentidehq/specifications/issues/11)).
 - Initial normative spec bootstrapped from opentide `models/threat.py`.
 
+## visibility 1.0
+
+- First normative spec, [specs/visibility.md](specs/visibility.md) ([RFC 0013](rfcs/0013-visibility-one-dataset-per-logsource.md), [#63](https://github.com/opentidehq/specifications/issues/63)). A `[[logsources]]` entry declares one dataset (`table`; `index`, `sourcetype` or `macro`; `index` or `data_view`) and may list its `columns` (`name`, `type`, `description`), which the query checks use like the columns of a table they ship. Corrects the plural dataset lists opentide 0.20.0 shipped (`tables`, `indexes`, `sourcetypes`, `macros`, `indices`, `data_views`), which now fail validation; `schema_id` stays `visibility::1.0`. Also normative: an undeclared name the implementation does not know keeps `kql_unknown_table` at its profile's severity, and a KQL table name is checked whatever its case. New fixtures under `fixtures/visibility/`.
+
 ## objective 1.1
 
 - `objective.mitre_attack` is pinned to `att&ck::1.2` (ATT&CK 20.0), as in `objective::1.0` ([opentide#568](https://github.com/opentidehq/opentide/issues/568)).

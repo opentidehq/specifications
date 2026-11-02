@@ -19,6 +19,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Workspace layout | 1.5 | — | normative | [specs/workspace.md](specs/workspace.md) |
 | Inflight preview shard | 1.0 | `inflight.shard::1.0` | normative | [specs/workspace.md](specs/workspace.md#inflight-preview-shards) |
 | Configuration | 1.0 | — | normative | [specs/configuration.md](specs/configuration.md) |
+| Visibility | 1.0 | `visibility::1.0` | normative | [specs/visibility.md](specs/visibility.md) |
 | Vocabulary format | 1.0 | — | normative | [specs/vocabularies/format.md](specs/vocabularies/format.md) |
 | Vocabulary catalog | 1.0 | — | normative | [specs/vocabularies/catalog.md](specs/vocabularies/catalog.md) |
 | Deployment lifecycle | 1.3 | — | normative | [specs/deployment.md](specs/deployment.md) |
