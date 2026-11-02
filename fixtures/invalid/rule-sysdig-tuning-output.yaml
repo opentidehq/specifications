@@ -1,0 +1,28 @@
+# A tuning that sets output and priority, and an exception whose comps do
+# not align with its fields.
+# Expected constraint codes: sysdig_tuning_keys, sysdig_exception_shape.
+name: Tuning that rewrites the tuned rule
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000031
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+description: |
+  A tuning inherits output and priority from the rule it tunes.
+configurations:
+  sysdig:
+    enabled: true
+    schema: platform::sysdig::1.0
+    status: STAGING
+    append_to_rule: Terminal shell in container
+    condition: and not proc.pname = sshd
+    output: Shell spawned
+    priority: ERROR
+    exceptions:
+    - name: misaligned
+      fields: [proc.name, proc.pname]
+      comps: ['=']
+      values:
+      - [bash, sshd]

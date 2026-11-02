@@ -51,6 +51,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
+- `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.1`. New fixtures `fixtures/valid/rule-1.1-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
 - Correct the `severity` pin to `alert_severity::1.0`. The normative text, the default (`Informational`) and every rule fixture already used alert labels, but the pin named `severity::1.0`, the Threat Severity incident scale, so a conforming rule failed validation. Corrected in place, as the pin disagreed with this spec rather than the spec changing; threats keep `severity::1.0`.
 - Bump `techniques` pin to `att&ck::1.2` (ATT&CK 20.0). Additive minor; `att&ck::1.1` keys are unaffected ([opentide#568](https://github.com/opentidehq/opentide/issues/568)).
@@ -61,6 +62,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.0
 
+- `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.0`. New fixtures `fixtures/valid/rule-1.0-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
 - Correct the `severity` pin to `alert_severity::1.0`. The normative text, the default (`Informational`) and every rule fixture already used alert labels, but the pin named `severity::1.0`, the Threat Severity incident scale, so a conforming rule failed validation. Corrected in place, as the pin disagreed with this spec rather than the spec changing; threats keep `severity::1.0`.
 - Bump `techniques` pin to `att&ck::1.2` (ATT&CK 20.0). Additive minor; `att&ck::1.1` keys are unaffected ([opentide#568](https://github.com/opentidehq/opentide/issues/568)).
@@ -133,6 +135,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
 
+## deployment-state 1.3
+
+- `sysdig` is a state-backed platform for its `api` tenants: the Sysdig rule id is a canonical decimal string under `platforms.sysdig.<tenant>`. `file` tenants have no binding. `schemas/deployment.state.1.0.schema.json` accepts the `sysdig` key; `schema_id` stays `deployment.state::1.0` ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)).
+
 ## deployment-state 1.2
 
 - A run that cannot persist state is any CI run but a release run on a push: a deploy whose run strategies include `RELEASE`, outside a pull or merge request pipeline. It was defined by the deployment plan (`PRODUCTION`), which opentide 0.17.0 removed. The generated jobs behave as before; the shard schema `deployment.state::1.0` is unchanged.
@@ -156,6 +162,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## metaschema-keywords 1.0
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
+
+## platforms 1.4
+
+- Sysdig Secure joins the matrix as the ninth platform ([specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md), [RFC 0014](rfcs/0014-sysdig-falco-platform.md)): Falco rules delivered to the Sysdig Secure API or written as Falco rules files. It is excluded from query validation (`supported: false`); `opentide validate` checks the Falco condition offline.
 
 ## platforms 1.3
 
@@ -243,6 +253,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Live query validation through Kibana rule preview, and the Elasticsearch checks (ES|QL pre-flight, aggregation, timestamp, and indicator match fields) before every deploy. No offline check.
 - Fixtures `fixtures/valid/rule-elastic-1.0.yaml`, `fixtures/invalid/rule-elastic-esql-index.yaml`, and `fixtures/platforms/elastic.yaml`.
 
+## platform-sysdig 1.0
+
+- Initial field contract for `platform::sysdig::1.0` ([RFC 0014](rfcs/0014-sysdig-falco-platform.md), [specifications#8](https://github.com/opentidehq/specifications/issues/8)): a Falco condition with exceptions and private macros and lists, expanded at deploy; or a tuning of an existing rule (`append_to_rule`). Derived name, `desc`, `priority`, tags, and output. `api` and `file` delivery. Eight constraint codes. Fixtures under `fixtures/platforms/sysdig/` and `fixtures/valid/rule-sysdig-*.yaml`.
+
 ## sharing 1.3
 
 - `--changed` and the production release name the production deploy by its run strategy (`opentide deploy --strategy RELEASE` on a push) instead of `--plan PRODUCTION`, which opentide 0.17.0 removed. The commit range is unchanged.
@@ -268,6 +282,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.5
+
+- `sysdig` is excluded from query validation (`supported: false`); its Falco condition is checked offline by `opentide validate` ([specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md#query-validation)). `validate query` has no offline mode on any platform. The fixture checker applies seven Sysdig constraint codes to `configurations.sysdig` blocks.
 
 ## validation 1.4
 

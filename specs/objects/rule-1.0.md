@@ -109,6 +109,7 @@ Typed optional blocks keyed by platform identifier:
 | `harfanglab` | HarfangLabConfig | `platform::harfanglab::1.0` | [harfanglab-1.0.md](../platforms/harfanglab-1.0.md) |
 | `carbon_black_cloud` | CarbonBlackConfig | `platform::carbon_black_cloud::1.0` | [carbon-black-cloud-1.0.md](../platforms/carbon-black-cloud-1.0.md) |
 | `elastic` | ElasticConfig | `platform::elastic::1.0` | [elastic-1.0.md](../platforms/elastic-1.0.md) |
+| `sysdig` | SysdigConfig | `platform::sysdig::1.0` | [sysdig-1.0.md](../platforms/sysdig-1.0.md) |
 
 Shared block fields and the capability matrix are in [platforms/index.md](../platforms/index.md). Each link above is the field contract for that block.
 
@@ -192,6 +193,7 @@ configurations:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-11-02 | `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [sysdig-1.0.md](../platforms/sysdig-1.0.md)) is added ([RFC 0014](../../rfcs/0014-sysdig-falco-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-10-23 | Optional `response.procedure.searches[].language`: `kuery`, `lucene`, `eql`, or `esql` with `system: elastic`, and not set with any other system. Omitted means unknown, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-10-19 | `techniques` is pinned to `att&ck::1.2` (ATT&CK 20.0). Additive: every `att&ck::1.1` technique still validates ([opentide#568](https://github.com/opentidehq/opentide/issues/568)). `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-10-19 | `configurations.elastic` (`ElasticConfig`, `platform::elastic::1.0`, [elastic-1.0.md](../platforms/elastic-1.0.md)) is added ([RFC 0007](../../rfcs/0007-elastic-security-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |

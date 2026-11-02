@@ -1,6 +1,6 @@
 ---
 spec: platforms
-version: "1.3"
+version: "1.4"
 schema_id: null
 status: normative
 supersedes: null
@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-opentide ships eight detection platform integrations. Each platform has bundled TOML configuration, a deployer, an optional query validator, and a typed rule block under `configurations.<platform>`.
+opentide ships nine detection platform integrations. Each platform has bundled TOML configuration, a deployer, an optional query validator, and a typed rule block under `configurations.<platform>`.
 
 The block's schema identifier is `platform::<identifier>::1.0`. This page is the capability matrix and the shared block. The field contract for each block is its own spec:
 
@@ -24,6 +24,7 @@ The block's schema identifier is `platform::<identifier>::1.0`. This page is the
 | `crowdstrike` | `platform::crowdstrike::1.0` | [crowdstrike-1.0.md](crowdstrike-1.0.md) |
 | `harfanglab` | `platform::harfanglab::1.0` | [harfanglab-1.0.md](harfanglab-1.0.md) |
 | `elastic` | `platform::elastic::1.0` | [elastic-1.0.md](elastic-1.0.md) |
+| `sysdig` | `platform::sysdig::1.0` | [sysdig-1.0.md](sysdig-1.0.md) |
 
 These specs describe the blocks as the engine accepts them today, including every optional key. Generated JSON Schema is a build artifact. Where it disagrees with this page or a platform spec, the spec wins. opentide's usage and SDK pages link here. They do not restate the keys. Change a field here first; the implementation follows.
 
@@ -32,11 +33,11 @@ These specs describe the blocks as the engine accepts them today, including ever
 - Platform identifiers MUST use the keys in the capability matrix (snake_case).
 - A platform MUST be marked `enabled: true` in merged configuration to appear in `enabled_systems()`.
 - Deploy and validate capabilities MUST be reported honestly. A platform without a query validator MUST NOT claim query validation support.
-- CrowdStrike and HarfangLab MUST NOT advertise query validation (`can_validate: false`).
+- CrowdStrike, HarfangLab, and Sysdig MUST NOT advertise query validation (`can_validate: false`). Sysdig's Falco condition is checked offline by `opentide validate` ([sysdig-1.0](sysdig-1.0.md#query-validation)), which is not query validation.
 - A typed block SHOULD set `schema` to `platform::<identifier>::1.0`. Implementations MUST accept a missing `schema` and MUST accept a legacy identifier (`sentinel::2.4`, `splunk::2.0`, `splunk::3.0`, `carbon_black_cloud::3.0`, and the same shape for the other platforms). The identifier is not a closed enum.
 - Unknown keys on a block MUST fail static validation. The model forbids them.
 - A block MUST NOT carry a vendor-assigned external id. `rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` at the root of any block, on every platform, MUST fail with `external_id_in_rule` ([External rule ids](#external-rule-ids)).
-- Registry load is stricter or looser depending on the platform. Defender, Splunk, Carbon Black, and Elastic pass leftover keys on the block into the model, so an unknown key at the block root fails load as well. The Splunk loader still drops unknown keys inside `scheduling` other than `type`, `expires`, `schedule`, and `timerange`. Sentinel, SentinelOne, CrowdStrike, and HarfangLab drop keys the loader does not map, so those keys pass load and fail `opentide validate`. The [Splunk](splunk-1.0.md) aliases and Defender's `quarantine_files` alias are mapped before that check.
+- Registry load is stricter or looser depending on the platform. Defender, Splunk, Carbon Black, Elastic, and Sysdig pass leftover keys on the block into the model, so an unknown key at the block root fails load as well. The Splunk loader still drops unknown keys inside `scheduling` other than `type`, `expires`, `schedule`, and `timerange`. Sentinel, SentinelOne, CrowdStrike, and HarfangLab drop keys the loader does not map, so those keys pass load and fail `opentide validate`. The [Splunk](splunk-1.0.md) aliases and Defender's `quarantine_files` alias are mapped before that check.
 - In every field table, **optional** means the key may be omitted at static validation. A later sentence in that platform spec names the keys deploy or registry load still require.
 - `query`, where the platform spec marks it required, MUST be a string and MUST NOT be empty or whitespace.
 - Static validation (`opentide validate`) MUST enforce the **Required** column of each platform spec. It MUST NOT require a field only because generated JSON Schema lists it.
@@ -60,10 +61,13 @@ These specs describe the blocks as the engine accepts them today, including ever
 | `crowdstrike` | CrowdStrike Falcon | yes* | **no** | correlation filter | [crowdstrike-1.0](crowdstrike-1.0.md) |
 | `harfanglab` | HarfangLab | yes* | **no** | Sigma or YARA | [harfanglab-1.0](harfanglab-1.0.md) |
 | `elastic` | Elastic Security | yes* | yes† | KQL, Lucene, EQL, or ES\|QL, chosen by the block's `type` and `language` | [elastic-1.0](elastic-1.0.md) |
+| `sysdig` | Sysdig Secure | yes* | **no**‡ | Falco condition | [sysdig-1.0](sysdig-1.0.md) |
 
 \* Deploy requires a loaded deployer entry point and `enabled: true` in workspace configuration.
 
 † Live only, through Kibana rule preview (`/api/detection_engine/rules/preview`) plus the Elasticsearch checks, against a tenant, for every language the block can carry. Elastic has no offline syntax check ([elastic-1.0](elastic-1.0.md#query-validation)).
+
+‡ Sysdig Secure has no rule preview. The analysis engine checks the Falco condition offline in `opentide validate` and in editors ([sysdig-1.0](sysdig-1.0.md#query-validation)).
 
 ### Query validation platforms
 
@@ -73,7 +77,7 @@ These specs describe the blocks as the engine accepts them today, including ever
 
 Query validation is a tenant check on every platform in this allowlist: `opentide validate query --live`. Without `--live` the command refuses and names `--live`.
 
-Excluded: `crowdstrike`, `harfanglab`. Implementations MUST report `supported: false` for those two and MUST NOT invent a passing result.
+Excluded: `crowdstrike`, `harfanglab`, `sysdig`. Implementations MUST report `supported: false` for those three and MUST NOT invent a passing result.
 
 ### What a block must contain to validate
 
@@ -88,6 +92,7 @@ This is the static-validation bar. Deploy adds the constraints in each platform 
 | `carbon_black_cloud` | `query` |
 | `crowdstrike` | `details` (with `trigger` and `outcome`), `schedule` (with `frequency` and `lookback`), `query` |
 | `harfanglab` | no platform field is required; `maturity`, `confidence`, and `action` have defaults. Deploy requires `sigma` or `yara` |
+| `sysdig` | `condition`, or `append_to_rule` with `condition` or `exceptions`. Every block also meets the [Sysdig constraints](sysdig-1.0.md#constraints) |
 | `elastic` | `type`, `status`, and `query` (except for `machine_learning`), plus the type object: `threshold`, `new_terms`, `threat`, or `machine_learning` for those types. Every block also meets the [Elastic constraints](elastic-1.0.md#constraints) |
 
 ### Shared platform block
@@ -128,7 +133,7 @@ All bundled platforms default to `enabled = false`. Enable one by setting `enabl
 
 ### External rule ids
 
-Platform blocks MUST NOT contain vendor-assigned external identifiers. Defender for Endpoint, SentinelOne, and CrowdStrike use the committed deployment-state shard defined in [deployment-state.md](../deployment-state.md). Sentinel, HarfangLab, and Elastic use `metadata.uuid`; Carbon Black Cloud uses `metadata.uuid` for the IOC and the title for the report; Splunk uses its saved-search identity.
+Platform blocks MUST NOT contain vendor-assigned external identifiers. Defender for Endpoint, SentinelOne, CrowdStrike, and Sysdig (`api` tenants) use the committed deployment-state shard defined in [deployment-state.md](../deployment-state.md). Sentinel, HarfangLab, and Elastic use `metadata.uuid`; Carbon Black Cloud uses `metadata.uuid` for the IOC and the title for the report; Splunk uses its saved-search identity.
 
 | Platform | How deploy addresses the remote rule | Where a vendor id lives |
 |----------|--------------------------------------|-------------------------|
@@ -140,10 +145,11 @@ Platform blocks MUST NOT contain vendor-assigned external identifiers. Defender 
 | `crowdstrike` | CrowdStrike-assigned correlation rule id | `.opentide/states/deployment/<uuid>.json` |
 | `harfanglab` | `metadata.uuid` on the Sigma rule and the YARA meta `id` | Nowhere |
 | `elastic` | `metadata.uuid` is the Kibana `rule_id`, in every tenant and space | Nowhere |
+| `sysdig` | `api`: Sysdig-assigned rule id. `file`: the file `<rules_dir>/<metadata.uuid>.yaml` | `api`: `.opentide/states/deployment/<uuid>.json`. `file`: nowhere |
 
 Elastic Security ([elastic-1.0](elastic-1.0.md), [RFC 0007](../../rfcs/0007-elastic-security-platform.md)) addresses every rule by `metadata.uuid`. Elastic never stores an external id: Kibana's internal `id` is not recorded in a block or in deployment state.
 
-`rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` are legacy keys from before [RFC 0010](../../rfcs/0010-deployment-external-ids.md). Static validation and every deploy path MUST reject them with `external_id_in_rule`, on every platform block, whether or not a shard also holds the id. No loader folds them into a field. `opentide deploy migrate-state` moves Defender, SentinelOne, and CrowdStrike values into shards and removes the keys from every other platform with an `external_id_unused` warning.
+`rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` are legacy keys from before [RFC 0010](../../rfcs/0010-deployment-external-ids.md). Static validation and every deploy path MUST reject them with `external_id_in_rule`, on every platform block, whether or not a shard also holds the id. No loader folds them into a field. `opentide deploy migrate-state` moves Defender, SentinelOne, and CrowdStrike values into shards (Sysdig never had a legacy key) and removes the keys from every other platform with an `external_id_unused` warning.
 
 Defender also accepts the alias `quarantine_files` for `actions.files.quarantine_file` on the loader path only.
 
@@ -173,6 +179,7 @@ Splunk extras also name `threshold`, `throttling`, and `security_domain` on the 
 | `harfanglab` | `harfanglab::2.0` |
 | `carbon_black_cloud` | `carbon_black_cloud::3.0` |
 | `elastic` | `elastic::1.0` |
+| `sysdig` | `platform::sysdig::1.0` |
 
 ### Entry points
 
@@ -208,6 +215,7 @@ Vocabulary files are not platform configuration. See [configuration.md](../confi
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.4 | 2026-11-02 | Sysdig Secure joins the matrix as the ninth platform ([sysdig-1.0](sysdig-1.0.md), [RFC 0014](../../rfcs/0014-sysdig-falco-platform.md)): Falco rules delivered to the Sysdig Secure API or written as Falco rules files; no live query validation, an offline Falco check in `opentide validate`; the Sysdig rule id of an `api` tenant lives in deployment state. |
 | 1.3 | 2026-10-20 | Block `tenants`: omitted means every tenant the run reaches; opentide 0.17.0 removed deployment plans. |
 | 1.0 | 2026-06-25 | Initial matrix for seven bundled platforms |
 | 1.0 | 2026-09-30 | Field contracts moved to per-platform specs. Static validation, registry load, and deploy are specified separately. Generated JSON Schema is no longer described as the field contract. |
