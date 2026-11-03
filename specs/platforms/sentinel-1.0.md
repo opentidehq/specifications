@@ -30,6 +30,7 @@ Shared fields (`enabled`, `name`, `schema`, `status`, `flags`, `tenants`, `contr
 - `scheduling.nrt: true` MUST deploy an NRT rule and MUST NOT require `frequency`, `lookback`, or `trigger`.
 - Each `alert.techniques` entry MUST be an [ATT&CK v18](#attck-techniques) technique or sub-technique id. Static validation MUST reject any other value, including an id that a later ATT&CK release added. The `att&ck` vocabulary does not constrain this field.
 - Deploy MUST send parent technique ids in the Sentinel `techniques` property and sub-technique ids in `subTechniques`. It MUST NOT send a sub-technique id in `techniques`.
+- Deploy MUST NOT send a sub-technique outside [ATT&CK v18](#attck-techniques) in `subTechniques`. A rule's resolved techniques follow the `att&ck` vocabulary, so one can be newer; its parent is still sent in `techniques`, and an implementation SHOULD warn that the sub-technique was left out.
 
 ## Definition
 
@@ -148,7 +149,7 @@ Sent only for scheduled rules. Omitted on NRT rules.
 
 Microsoft Sentinel is aligned to the MITRE ATT&CK framework, version 18 (Microsoft, "Understand security coverage by the MITRE ATT&CK framework"). The ids `alert.techniques` accepts are therefore Sentinel's own, not the `att&ck` vocabulary's, which follows the current ATT&CK release: every technique and sub-technique of the ATT&CK 18.1 Enterprise, Mobile, and ICS matrices that is neither revoked nor deprecated, as MITRE publishes them in its STIX data ([mitre-attack/attack-stix-data](https://github.com/mitre-attack/attack-stix-data), `{enterprise,mobile,ics}-attack-18.1.json`). ATT&CK 18.0 has the same ids. An implementation MAY bundle the list; it MUST NOT read it from the `att&ck` vocabulary.
 
-An id that a later ATT&CK release added is not accepted, even when it replaced a v18 id: `T1685` (ATT&CK v19) replaced `T1562`, `T1562.001`, and `T1562.006`, which are the ids to write here. An implementation SHOULD name the replaced v18 ids when it rejects such an id.
+An id that a later ATT&CK release added is not accepted, even when it replaced a v18 id: `T1685` (ATT&CK v19) replaced `T1562`, `T1562.001`, and `T1562.006`, which are the ids to write here. An implementation SHOULD name the replaced v18 ids when it rejects such an id, following revocations through every hop. An id ATT&CK retired before v18 (`T1086`, PowerShell) is not accepted either; an implementation SHOULD name the v18 id that replaced it (`T1059.001`), when there is one.
 
 Deploy splits the ids it sends. The Sentinel `techniques` property takes `T####` ids only, so a sub-technique is sent in `subTechniques` and its parent in `techniques`:
 
@@ -158,7 +159,7 @@ Deploy splits the ids it sends. The Sentinel `techniques` property takes `T####`
 | `T1556`, `T1556.009`, `T1078.004` | `T1556`, `T1078` | `T1556.009`, `T1078.004` |
 | `T1059` | `T1059` | omitted |
 
-The ids deploy sends are the rule's resolved techniques (its objective's, from the `att&ck` vocabulary) when any resolve, and `alert.techniques` otherwise. Resolved techniques also replace `alert.tactics`.
+The ids deploy sends are the rule's resolved techniques (its objective's, from the `att&ck` vocabulary) when any resolve, and `alert.techniques` otherwise. Resolved techniques also replace `alert.tactics`. A resolved sub-technique newer than v18 (`T1027.018`) is left out of `subTechniques`; its parent (`T1027`) is still sent in `techniques`.
 
 ### Durations
 
