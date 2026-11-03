@@ -287,6 +287,8 @@ class AdvisoryTests(unittest.TestCase):
         text = _read(VALIDATION)
         self.assertGreaterEqual(_version(text), (1, 4))
         rows = _table(_section(text, "### Platform advisories"), "Code")
+        # The table is shared across platforms; Elastic's rows say "Elastic:".
+        rows = [row for row in rows if row["When"].startswith("Elastic:")]
         self.assertEqual([row["Code"].strip("`") for row in rows], ADVISORY_CODES)
         self.assertEqual({row["Severity"] for row in rows}, {"warning"})
 
