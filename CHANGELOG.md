@@ -137,7 +137,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## deployment-state 1.3
 
-- `sysdig` is a state-backed platform for its `api` tenants: the Sysdig rule id is a canonical decimal string under `platforms.sysdig.<tenant>`. `file` tenants have no binding. `schemas/deployment.state.1.0.schema.json` accepts the `sysdig` key; `schema_id` stays `deployment.state::1.0` ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)).
+- `sysdig` is a state-backed platform: the Sysdig rule id is a canonical decimal string under `platforms.sysdig.<tenant>`. `schemas/deployment.state.1.0.schema.json` accepts the `sysdig` key; `schema_id` stays `deployment.state::1.0` ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)).
 
 ## deployment-state 1.2
 
@@ -165,7 +165,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platforms 1.4
 
-- Sysdig Secure joins the matrix as the ninth platform ([specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md), [RFC 0014](rfcs/0014-sysdig-falco-platform.md)): Falco rules delivered to the Sysdig Secure API or written as Falco rules files. It is excluded from query validation (`supported: false`); `opentide validate` checks the Falco condition offline.
+- Sysdig Secure joins the matrix as the ninth platform ([specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md), [RFC 0014](rfcs/0014-sysdig-falco-platform.md)): Falco rules deployed through the Sysdig Secure API. It is excluded from query validation (`supported: false`); `opentide validate` checks the Falco condition offline.
 
 ## platforms 1.3
 
@@ -255,7 +255,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-sysdig 1.0
 
-- Initial field contract for `platform::sysdig::1.0` ([RFC 0014](rfcs/0014-sysdig-falco-platform.md), [specifications#8](https://github.com/opentidehq/specifications/issues/8)): a Falco condition with exceptions and private macros and lists, expanded at deploy; or a tuning of an existing rule (`append_to_rule`). Derived name, `desc`, `priority`, tags, and output. `api` and `file` delivery. Eight constraint codes. Fixtures under `fixtures/platforms/sysdig/` and `fixtures/valid/rule-sysdig-*.yaml`.
+- Initial field contract for `platform::sysdig::1.0` ([RFC 0014](rfcs/0014-sysdig-falco-platform.md), [specifications#8](https://github.com/opentidehq/specifications/issues/8)): a Falco condition with exceptions and private macros and lists, expanded at deploy; or a tuning of an existing rule (`append_to_rule`). Derived name, `desc`, `priority`, tags, and output. Deployed through the Sysdig Secure API only. Eight constraint codes. Fixtures under `fixtures/platforms/sysdig/` (the API bodies) and `fixtures/valid/rule-sysdig-*.yaml`.
 
 ## sharing 1.3
 

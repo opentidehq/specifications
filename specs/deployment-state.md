@@ -45,7 +45,7 @@ A **state-backed platform** is one whose deployer addresses the remote rule by a
 | `defender_for_endpoint` | Graph detection-rule `id` returned on create | **Shard** |
 | `sentinel_one` | STAR rule id returned on create | **Shard** |
 | `crowdstrike` | Correlation rule id returned on create (`resources[0].id`) | **Shard** |
-| `sysdig` ([sysdig-1.0](platforms/sysdig-1.0.md)) | `api` tenants: Falco rule `id` returned by `POST /api/secure/rules`. `file` tenants: the file `<rules_dir>/<uuid>.yaml` | **Shard** for `api` tenants. None for `file` tenants |
+| `sysdig` ([sysdig-1.0](platforms/sysdig-1.0.md)) | Falco rule `id` returned by `POST /api/secure/rules` | **Shard** |
 | `sentinel` | Analytics rule id is `metadata.uuid` | None |
 | `splunk` | The saved search; no vendor-assigned id | None |
 | `harfanglab` | Sigma id and YARA meta `id` are `metadata.uuid` | None |
@@ -83,7 +83,7 @@ Inside `platforms`:
 | `defender_for_endpoint` | Canonical decimal integer as a string: no sign, no leading zero (`"12345"`, `"0"`). |
 | `sentinel_one` | Canonical decimal integer as a string. |
 | `crowdstrike` | The create-response id, verbatim, as a string. MUST contain a non-whitespace character. It is not parsed as an integer. |
-| `sysdig` | Canonical decimal integer as a string. Only `api` tenants have a binding. |
+| `sysdig` | Canonical decimal integer as a string. |
 
 A platform key outside this table fails `deployment_state_platform`. A tenant key that is empty, or that has leading or trailing whitespace, fails `deployment_state_shape`. A non-string id, or an id that breaks its platform's pattern, fails `deployment_state_shape`. There is one binding per platform-and-tenant pair.
 
@@ -113,7 +113,7 @@ A writer MUST read the file, change one binding, and write the rest back unchang
 
 ### Deploy decisions
 
-For `defender_for_endpoint`, `sentinel_one`, `crowdstrike`, and the `api` tenants of `sysdig`, per rule and per tenant the run selected, deploy MUST decide in this order. "Create" means a strategy other than `DELETION` or `DISABLEMENT` with no binding. `DISABLEMENT` with a binding is an update that sets the vendor's disabled state. It keeps the binding.
+For `defender_for_endpoint`, `sentinel_one`, `crowdstrike`, and `sysdig`, per rule and per tenant the run selected, deploy MUST decide in this order. "Create" means a strategy other than `DELETION` or `DISABLEMENT` with no binding. `DISABLEMENT` with a binding is an update that sets the vendor's disabled state. It keeps the binding.
 
 | # | Situation | Code | Level | Result |
 |---|-----------|------|-------|--------|
@@ -301,7 +301,7 @@ Fixtures: [fixtures/deployment/valid/](../fixtures/deployment/valid/) and [fixtu
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.3 | 2026-11-02 | `sysdig` is state-backed for its `api` tenants: the Sysdig rule id is a canonical decimal string under `platforms.sysdig.<tenant>` ([sysdig-1.0](platforms/sysdig-1.0.md), [RFC 0014](../rfcs/0014-sysdig-falco-platform.md)). `file` tenants have no binding. `schema_id` stays `deployment.state::1.0`. |
+| 1.3 | 2026-11-02 | `sysdig` is state-backed: the Sysdig rule id is a canonical decimal string under `platforms.sysdig.<tenant>` ([sysdig-1.0](platforms/sysdig-1.0.md), [RFC 0014](../rfcs/0014-sysdig-falco-platform.md)). `schema_id` stays `deployment.state::1.0`. |
 | 1.2 | 2026-10-20 | A run that cannot persist state is defined by its run strategies, not a deployment plan: any CI run but a `RELEASE` run on a push. opentide 0.17.0 removed deployment plans; the generated jobs keep the same behaviour. |
 | 1.1 | 2026-10-16 | CI requirement 1: no GitHub Actions `concurrency` group on the production job, which would cancel a pending diff-scoped deploy ([specifications#43](https://github.com/opentidehq/specifications/issues/43)). |
 | 1.0 | 2026-10-16 | Initial normative deployment-state contract from accepted [RFC 0010](../rfcs/0010-deployment-external-ids.md). |

@@ -133,7 +133,7 @@ All bundled platforms default to `enabled = false`. Enable one by setting `enabl
 
 ### External rule ids
 
-Platform blocks MUST NOT contain vendor-assigned external identifiers. Defender for Endpoint, SentinelOne, CrowdStrike, and Sysdig (`api` tenants) use the committed deployment-state shard defined in [deployment-state.md](../deployment-state.md). Sentinel, HarfangLab, and Elastic use `metadata.uuid`; Carbon Black Cloud uses `metadata.uuid` for the IOC and the title for the report; Splunk uses its saved-search identity.
+Platform blocks MUST NOT contain vendor-assigned external identifiers. Defender for Endpoint, SentinelOne, CrowdStrike, and Sysdig use the committed deployment-state shard defined in [deployment-state.md](../deployment-state.md). Sentinel, HarfangLab, and Elastic use `metadata.uuid`; Carbon Black Cloud uses `metadata.uuid` for the IOC and the title for the report; Splunk uses its saved-search identity.
 
 | Platform | How deploy addresses the remote rule | Where a vendor id lives |
 |----------|--------------------------------------|-------------------------|
@@ -145,7 +145,7 @@ Platform blocks MUST NOT contain vendor-assigned external identifiers. Defender 
 | `crowdstrike` | CrowdStrike-assigned correlation rule id | `.opentide/states/deployment/<uuid>.json` |
 | `harfanglab` | `metadata.uuid` on the Sigma rule and the YARA meta `id` | Nowhere |
 | `elastic` | `metadata.uuid` is the Kibana `rule_id`, in every tenant and space | Nowhere |
-| `sysdig` | `api`: Sysdig-assigned rule id. `file`: the file `<rules_dir>/<metadata.uuid>.yaml` | `api`: `.opentide/states/deployment/<uuid>.json`. `file`: nowhere |
+| `sysdig` | Sysdig-assigned Falco rule id | `.opentide/states/deployment/<uuid>.json` |
 
 Elastic Security ([elastic-1.0](elastic-1.0.md), [RFC 0007](../../rfcs/0007-elastic-security-platform.md)) addresses every rule by `metadata.uuid`. Elastic never stores an external id: Kibana's internal `id` is not recorded in a block or in deployment state.
 
@@ -215,7 +215,7 @@ Vocabulary files are not platform configuration. See [configuration.md](../confi
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.4 | 2026-11-02 | Sysdig Secure joins the matrix as the ninth platform ([sysdig-1.0](sysdig-1.0.md), [RFC 0014](../../rfcs/0014-sysdig-falco-platform.md)): Falco rules delivered to the Sysdig Secure API or written as Falco rules files; no live query validation, an offline Falco check in `opentide validate`; the Sysdig rule id of an `api` tenant lives in deployment state. |
+| 1.4 | 2026-11-02 | Sysdig Secure joins the matrix as the ninth platform ([sysdig-1.0](sysdig-1.0.md), [RFC 0014](../../rfcs/0014-sysdig-falco-platform.md)): Falco rules deployed through the Sysdig Secure API; no live query validation, an offline Falco check in `opentide validate`; the Sysdig rule id lives in deployment state. |
 | 1.3 | 2026-10-20 | Block `tenants`: omitted means every tenant the run reaches; opentide 0.17.0 removed deployment plans. |
 | 1.0 | 2026-06-25 | Initial matrix for seven bundled platforms |
 | 1.0 | 2026-09-30 | Field contracts moved to per-platform specs. Static validation, registry load, and deploy are specified separately. Generated JSON Schema is no longer described as the field contract. |

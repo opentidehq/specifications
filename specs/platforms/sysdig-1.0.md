@@ -10,16 +10,13 @@ supersedes: null
 
 ## Summary
 
-`configurations.sysdig` is a Falco rule. Sysdig Secure's runtime threat detection runs Falco, so one block serves two deliveries, chosen per tenant:
-
-- **`api`**: the rule is created in Sysdig Secure as a custom Falco rule (`/api/secure/rules`) and added to Sysdig runtime policies by name (`/api/v2/policies`).
-- **`file`**: the rule is written as a Falco rules file, one file per rule, into a directory that Falco (open source) or a GitOps pipeline loads.
+`configurations.sysdig` is a Falco rule for Sysdig Secure, whose runtime threat detection runs Falco. Deploy creates it through the Sysdig Secure API as a custom Falco rule (`/api/secure/rules`) and adds it to Sysdig runtime policies by name (`/api/v2/policies`), as every opentide platform deploys through its vendor's API.
 
 The detection text is a Falco **condition** ([Falco language](#falco-language)). The author writes the condition, its exceptions, and the macros and lists only this rule uses. Deploy derives the Falco `rule` name, `desc`, `priority`, MITRE `tags`, and a default `output` from the opentide rule, so those are not retyped.
 
 A block either defines a new Falco rule (`condition`) or tunes an existing one (`append_to_rule`): a Falco default rule, or a rule Sysdig manages.
 
-Sysdig assigns every rule an integer id at create time. For `api` tenants that id is kept in deployment state ([deployment-state.md](../deployment-state.md)); a `file` tenant needs no id, because the file is named by `metadata.uuid`.
+Sysdig assigns every rule an integer id at create time. That id is kept in deployment state ([deployment-state.md](../deployment-state.md)).
 
 Shared fields are defined in [platforms](index.md#shared-platform-block). The design and its alternatives are in [RFC 0014](../../rfcs/0014-sysdig-falco-platform.md).
 
@@ -37,17 +34,16 @@ Static validation (`opentide validate`) and registry load:
 
 Deploy:
 
-- Deploy MUST expand the block's own `macros` and `lists` into the condition before it sends or writes the rule ([Expansion](#expansion)). It MUST NOT create, update, or delete a Falco macro or list on a tenant, and MUST NOT write a `- macro:` or `- list:` item to a rules file.
-- `api` requests MUST carry `Authorization: Bearer <api_token>`. Deploy MUST NOT call the Sysdig Public (Next-Gen) API for rules: it has no custom Falco rule or policy write.
-- An `api` tenant is state-backed. Deploy MUST follow the [deploy decisions](../deployment-state.md#deploy-decisions) of deployment state, storing the Sysdig rule id under `platforms.sysdig.<tenant>`. Deploy MUST NOT find a rule by listing remote rules or matching names.
-- A `file` tenant MUST NOT create a deployment-state shard.
+- Deploy MUST expand the block's own `macros` and `lists` into the condition before it sends the rule ([Expansion](#expansion)). It MUST NOT create, update, or delete a Falco macro or list on a tenant.
+- Requests MUST carry `Authorization: Bearer <api_token>`. Deploy MUST NOT call the Sysdig Public (Next-Gen) API for rules: it has no custom Falco rule or policy write.
+- Sysdig is state-backed. Deploy MUST follow the [deploy decisions](../deployment-state.md#deploy-decisions) of deployment state, storing the Sysdig rule id under `platforms.sysdig.<tenant>`. Deploy MUST NOT find a rule by listing remote rules or matching names.
 - Deploy MUST NOT create or delete a Sysdig policy. A named policy that does not exist fails the rule with `sysdig_policy_missing`.
 - Deploy MUST NOT remove a rule from a policy the block or the tenant does not name.
 - Deploy MUST NOT write to the rule file.
 
 Query validation:
 
-- `opentide validate query --platform sysdig` MUST report `supported: false`. Sysdig Secure has no dry-run or preview for a rule, and Falco OSS has no API. The offline engine check is part of `opentide validate` ([Query validation](#query-validation)).
+- `opentide validate query --platform sysdig` MUST report `supported: false`. Sysdig Secure has no dry-run or preview for a rule. The offline engine check is part of `opentide validate` ([Query validation](#query-validation)).
 
 ## Definition
 
@@ -64,9 +60,8 @@ Query validation:
 | `exceptions` | list[SysdigException] | optional | null | Falco exceptions ([`exceptions[]`](#exceptions-sysdigexception)). |
 | `macros` | list[SysdigMacro] | optional | null | Macros only this rule uses, expanded at deploy ([`macros[]`](#macros-sysdigmacro)). |
 | `lists` | list[SysdigList] | optional | null | Lists only this rule uses, expanded at deploy ([`lists[]`](#lists-sysdiglist)). |
-| `policies` | list[string] | optional | tenant `policies` | Names of Sysdig runtime policies the rule joins. `api` delivery only; a `file` tenant ignores it. |
-| `required_engine_version` | string or number | optional | null | Falco engine version the rule needs (`0.39.0`). A YAML number (`0.37`, or a legacy integer engine version such as `17`) is read as its text. `file` delivery writes it as a `- required_engine_version:` item. |
-| `required_plugin_versions` | list[SysdigPluginVersion] | optional | null | Plugins the rule needs. `file` delivery writes them as a `- required_plugin_versions:` item. A block with a `source` other than `syscall` SHOULD set it for `file` tenants. |
+| `policies` | list[string] | optional | tenant `policies` | Names of Sysdig runtime policies the rule joins. |
+| `minimum_engine_version` | integer | optional | null | Minimum Falco engine version the rule needs, as Sysdig counts it (a non-negative integer). Sent as `details.minimumEngineVersion`; omitted when unset. |
 
 The shared `name` is the Falco rule name. Empty means the opentide rule `name`. It is ignored with `append_to_rule`, which names the rule instead.
 
@@ -81,7 +76,7 @@ The shared `name` is the Falco rule name. Empty means the opentide rule `name`. 
 
 Allowed comparison operators: `=`, `!=`, `<`, `<=`, `>`, `>=`, `contains`, `icontains`, `bcontains`, `startswith`, `bstartswith`, `endswith`, `glob`, `iglob`, `in`, `intersects`, `pmatch`, and `regex`.
 
-Values are sent and written as the block gives them. Deploy does not expand lists inside `values`.
+Values are sent as the block gives them. Deploy does not expand lists inside `values`.
 
 ### `macros[]` (SysdigMacro)
 
@@ -96,13 +91,6 @@ Values are sent and written as the block gives them. Deploy does not expand list
 |-------|------|----------|---------|-------------|
 | `name` | string | yes | — | List name, matching `^[A-Za-z_][A-Za-z0-9_]*$`. |
 | `items` | list[string or number] | yes | — | List items. An item may name another list of this block. |
-
-### `required_plugin_versions[]` (SysdigPluginVersion)
-
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `name` | string | yes | — | Plugin name (`k8saudit`, `cloudtrail`). |
-| `version` | string | yes | — | Minimum plugin version, semver. |
 
 ### Constraints
 
@@ -132,7 +120,7 @@ Editors get the same diagnostics, plus highlighting, hover, and completion, thro
 
 ### Expansion
 
-Before a rule is sent or written, deploy replaces every reference to the block's own macros and lists with its definition:
+Before a rule is sent, deploy replaces every reference to the block's own macros and lists with its definition:
 
 1. A bare name in the condition that is a block **macro** becomes the macro's condition, expanded, in parentheses: `(…)`.
 2. A bare name inside a value list (the parenthesised list after `in`, `intersects`, or `pmatch`) that is a block **list** becomes the list's items, expanded, joined by `, `. An item is written as Falco reads it: an item containing a space, comma, parenthesis, or quote is double-quoted.
@@ -187,7 +175,7 @@ enabled = true
 identifier = "sysdig"
 name = "Sysdig Secure"
 subschema = "Sysdig Secure"
-description = "Falco rules for Sysdig Secure runtime detection, or as Falco rules files."
+description = "Falco rules for Sysdig Secure runtime threat detection."
 flags = []
 
 [[tenants]]
@@ -196,34 +184,23 @@ description = "Sysdig Secure SaaS, EU region"
 strategies = ["RELEASE"]
 [tenants.setup]
 ssl = true
-delivery = "api"
 url = "https://eu1.app.sysdig.com"
 api_token = "$SYSDIG_SECURE_API_TOKEN"
 policies = ["opentide managed detections"]
 
-[[tenants]]
-name = "falco-gitops"
-description = "Falco rules files picked up by the Helm chart"
-strategies = ["PREVIEW"]
-[tenants.setup]
-ssl = true
-delivery = "file"
-rules_dir = "deploy/falco/rules.d"
 ```
 
 | `tenants.setup` field | Type | Required | Default | Meaning |
 |-----------------------|------|----------|---------|---------|
-| `delivery` | string | no | `api` | `api` or `file`. |
-| `url` | string | for `api` | — | Sysdig Secure base URL for the account's region: `https://secure.sysdig.com` (US East), `https://us2.app.sysdig.com`, `https://us4.app.sysdig.com`, `https://eu1.app.sysdig.com`, `https://app.au1.sysdig.com`, `https://app.me2.sysdig.com`, or an on-premises URL. |
-| `api_token` | string | for `api` | — | Sysdig Secure API token. MUST be a `$ENV` reference. |
+| `url` | string | yes | — | Sysdig Secure base URL for the account's region: `https://secure.sysdig.com` (US East), `https://us2.app.sysdig.com`, `https://us4.app.sysdig.com`, `https://eu1.app.sysdig.com`, `https://app.au1.sysdig.com`, `https://app.me2.sysdig.com`, or an on-premises URL. |
+| `api_token` | string | yes | — | Sysdig Secure API token. MUST be a `$ENV` reference. |
 | `policies` | list[string] | no | `[]` | Policies every new rule joins when its block sets no `policies`. |
-| `rules_dir` | string | for `file` | — | Directory that receives the rules files. A relative path resolves against the workspace root. |
 | `tags` | list[string] | no | `[]` | Tags added to every rule deployed to this tenant. |
 | `ssl` | bool | yes | — | Shared tenant setup (TLS verification). |
 
-A tenant whose `delivery` is `api` without `url` or `api_token`, or `file` without `rules_dir`, fails configuration load.
+A tenant without `url` or `api_token` fails configuration load, and so does an unknown setup key.
 
-### Deploy: `api`
+### Deploy
 
 A new rule is sent as:
 
@@ -239,12 +216,13 @@ A new rule is sent as:
     "condition": {"condition": "<expanded condition>", "components": []},
     "output": "<output>",
     "priority": "warning",
+    "minimumEngineVersion": 17,
     "exceptions": [{"name": "…", "fields": ["…"], "comps": ["…"], "values": [["…"]]}]
   }
 }
 ```
 
-A tuning is sent with `"name": "<append_to_rule>"`, `"append": true`, an empty `description` and `tags`, and only `condition` and `exceptions` in `details`. `exceptions` is omitted when the block has none.
+`minimumEngineVersion` and `exceptions` are omitted when the block does not set them. A tuning is sent with `"name": "<append_to_rule>"`, `"append": true`, an empty `description` and `tags`, and only `ruleType`, `append`, `condition`, `exceptions`, and `minimumEngineVersion` in `details`; Sysdig appends the condition and exceptions to the tuned rule's, as Falco's `override: {condition: append, exceptions: append}` does.
 
 | Block status strategy | Binding in deployment state | Sysdig result |
 |-----------------------|-----------------------------|---------------|
@@ -260,48 +238,6 @@ A policy is found by name in `GET /api/v2/policies`. It is updated with `PUT /ap
 
 A rule is created before its policies are updated. When a named policy is missing (`sysdig_policy_missing`), the rule fails but its binding is kept, so the next deploy updates that rule instead of creating a second one.
 
-### Deploy: `file`
-
-Each rule is written to `<rules_dir>/<metadata.uuid>.yaml`, UTF-8, with LF line endings, replacing the file when it exists:
-
-```yaml
-# Generated by opentide from rule <metadata.uuid>. Do not edit: changes are overwritten.
-- required_engine_version: 0.39.0
-- required_plugin_versions:
-    - name: k8saudit
-      version: 0.7.0
-- rule: <Falco rule name>
-  desc: <description>
-  condition: <expanded condition>
-  output: <output>
-  priority: <PRIORITY>
-  source: <source>
-  enabled: true
-  tags: [<derived tags>]
-  exceptions: [...]
-```
-
-The `required_*` items are written only when set. A tuning is written as:
-
-```yaml
-- rule: <append_to_rule>
-  condition: <condition>
-  exceptions: [...]
-  override:
-    condition: append
-    exceptions: append
-```
-
-with `override` naming exactly the keys present. The `override` syntax needs Falco 0.36 or later.
-
-| Block status strategy | File result |
-|-----------------------|-------------|
-| `PREVIEW`, `RELEASE`, `UNIVERSAL` | Written with `enabled: true`. |
-| `DISABLEMENT` | Written with `enabled: false`. A tuning's file is deleted. |
-| `DELETION` | The file is deleted. A missing file is not an error. |
-
-Falco loads a rules directory in file-name order. Because every rule carries its own definitions ([Expansion](#expansion)), the order does not change any rule. A tuning's file still has to load after the file that defines the tuned rule: the Falco default rules load first when they are listed first in `rules_files`.
-
 ### Query validation
 
 | Check | Sysdig |
@@ -313,7 +249,7 @@ Falco loads a rules directory in file-name order. Because every rule carries its
 ## Relationships
 
 - [platforms](index.md) — shared fields, capability matrix, external ids
-- [deployment-state.md](../deployment-state.md) — the Sysdig rule id of an `api` tenant
+- [deployment-state.md](../deployment-state.md) — the Sysdig rule id
 - [deployment.md](../deployment.md) — status strategies
 - [rule-1.0.md](../objects/rule-1.0.md) — `response.alert_severity`, `detection_model`, `description`
 - [validation.md](../validation.md) — static validation and query validation
@@ -329,7 +265,6 @@ Falco loads a rules directory in file-name order. Because every rule carries its
 | `output` | [Output](#output) |
 | `priority` | [Priority](#priority), else `WARNING` |
 | `policies` | tenant `policies` |
-| Tenant `delivery` | `api` |
 
 ## Examples
 
@@ -375,7 +310,7 @@ configurations:
         items: [gitlab-runner, buildkite-agent]
 ```
 
-Fixtures: [fixtures/platforms/sysdig.yaml](../../fixtures/platforms/sysdig.yaml), [fixtures/valid/rule-sysdig-1.0.yaml](../../fixtures/valid/rule-sysdig-1.0.yaml), [fixtures/valid/rule-sysdig-tuning-1.0.yaml](../../fixtures/valid/rule-sysdig-tuning-1.0.yaml), and the generated file [fixtures/platforms/sysdig/rule-sysdig-1.0.falco.yaml](../../fixtures/platforms/sysdig/rule-sysdig-1.0.falco.yaml).
+Fixtures: [fixtures/platforms/sysdig.yaml](../../fixtures/platforms/sysdig.yaml), [fixtures/valid/rule-sysdig-1.0.yaml](../../fixtures/valid/rule-sysdig-1.0.yaml), [fixtures/valid/rule-sysdig-tuning-1.0.yaml](../../fixtures/valid/rule-sysdig-tuning-1.0.yaml), and the API bodies deploy sends for them: [fixtures/platforms/sysdig/rule-sysdig-1.0.api.json](../../fixtures/platforms/sysdig/rule-sysdig-1.0.api.json) and [fixtures/platforms/sysdig/rule-sysdig-tuning-1.0.api.json](../../fixtures/platforms/sysdig/rule-sysdig-tuning-1.0.api.json).
 
 ## History
 

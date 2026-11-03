@@ -255,9 +255,8 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "platforms" / "carbon-black-cloud.yaml",
         FIXTURES / "platforms" / "elastic.yaml",
         FIXTURES / "platforms" / "sysdig.yaml",
-        FIXTURES / "platforms" / "sysdig" / "rule-sysdig-1.0.falco.yaml",
-        FIXTURES / "platforms" / "sysdig" / "rule-sysdig-tuning-1.0.falco.yaml",
         FIXTURES / "platforms" / "sysdig" / "rule-sysdig-1.0.api.json",
+        FIXTURES / "platforms" / "sysdig" / "rule-sysdig-tuning-1.0.api.json",
     ]
     for path in required:
         if not path.is_file():

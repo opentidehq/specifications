@@ -16,7 +16,7 @@
 
 Add a ninth detection platform, `sysdig` (display name **Sysdig Secure**, schema `platform::sysdig::1.0`). Its block is a Falco rule: a Falco `condition`, its `exceptions`, and the macros and lists only this rule uses. Deploy derives the Falco rule name, `desc`, `priority`, MITRE `tags`, and a default `output` from the opentide rule.
 
-One block serves two deliveries, chosen per tenant: the Sysdig Secure API (`api`) and Falco rules files (`file`), for open-source Falco and for GitOps. The analysis engine gains a Falco language: grammar, field catalog per event source, macro and list resolution, highlighting, hover, and completion, so `opentide validate` and editors check the condition offline.
+Deploy goes through the Sysdig Secure API only, as every opentide platform deploys through its vendor's API. The analysis engine gains a Falco language: grammar, field catalog per event source, macro and list resolution, highlighting, hover, and completion, so `opentide validate` and editors check the condition offline.
 
 The change is additive. It adds `configurations.sysdig`, a deployment-state platform key, and no change to existing blocks.
 
@@ -43,7 +43,7 @@ Regions are separate base URLs (`secure.sysdig.com`, `us2.app.sysdig.com`, `us4.
 
 ### Rule identity
 
-Sysdig assigns an integer `id` on create and requires it for update and delete. Rule names are unique among custom rules, but [deployment-state](../specs/deployment-state.md) forbids rediscovering a rule by name. The id therefore lives in a deployment-state shard, as Defender's, SentinelOne's, and CrowdStrike's do. A `file` tenant writes `<rules_dir>/<metadata.uuid>.yaml` and needs no id.
+Sysdig assigns an integer `id` on create and requires it for update and delete. Rule names are unique among custom rules, but [deployment-state](../specs/deployment-state.md) forbids rediscovering a rule by name. The id therefore lives in a deployment-state shard, as Defender's, SentinelOne's, and CrowdStrike's do.
 
 ### Policies
 
@@ -57,25 +57,24 @@ Falco conditions are boolean filter expressions over fields (`proc.name`, `fd.na
 
 The normative text is [specs/platforms/sysdig-1.0.md](../specs/platforms/sysdig-1.0.md). The decisions:
 
-### 1. One platform, two deliveries
+### 1. Configured over the API only
 
-`sysdig` covers Sysdig Secure and open-source Falco. A tenant's `delivery` is `api` (Sysdig Secure) or `file` (one Falco rules file per rule in `rules_dir`). The block is the same for both: only the tenant decides where the rule goes. A separate `falco` platform would duplicate the block and its checks for the same rule language.
+`sysdig` deploys to Sysdig Secure through its runtime API, as every other platform deploys through its vendor's API: a tenant is a Sysdig account and region, with an API token. Writing Falco rules files for open-source Falco or a GitOps pipeline was drafted as a second delivery and dropped during review: a file is not a platform configuration that opentide can update, disable, or delete with an identity, and it would split the platform's behaviour per tenant.
 
 ### 2. Expansion instead of remote macros and lists
 
-The block's `macros` and `lists` are private to the rule. Deploy expands them into the condition before it sends or writes the rule. Names the block does not define are left as written and resolve on the tenant: the Falco default macros (`spawned_process`, `container`, `open_read`) and the ones Sysdig manages.
+The block's `macros` and `lists` are private to the rule. Deploy expands them into the condition before it sends the rule. Names the block does not define are left as written and resolve on the tenant: the Falco default macros (`spawned_process`, `container`, `open_read`) and the ones Sysdig manages.
 
 Every rule owns exactly one remote object, so:
 
 - two rules cannot overwrite each other's definitions on a tenant;
-- the deployment-state shard keeps its one-id-per-tenant shape;
-- a rules directory loads the same whatever the file order.
+- the deployment-state shard keeps its one-id-per-tenant shape.
 
 The cost is that a shared definition is repeated in each rule that uses it. A shared macro belongs on the tenant (Sysdig managed, or the Falco default rules), where every rule can reference it.
 
 ### 3. New rule or tuning
 
-A block either defines a rule (`condition`) or tunes an existing one (`append_to_rule` plus a `condition` fragment and/or `exceptions`). A tuning is Falco's `override: {condition: append, exceptions: append}` in a file and `details.append: true` on the API. It cannot set `output`, `priority`, `source`, or policies: those stay the tuned rule's. RFC 0004's `override` key with per-key `replace` is dropped. Replacing a managed rule's condition from a detection catalogue hides the change from the rule's owner; a replacement is a new rule.
+A block either defines a rule (`condition`) or tunes an existing one (`append_to_rule` plus a `condition` fragment and/or `exceptions`). A tuning is `details.append: true` on the API, the semantics of Falco's `override: {condition: append, exceptions: append}`. It cannot set `output`, `priority`, `source`, or policies: those stay the tuned rule's. RFC 0004's `override` key with per-key `replace` is dropped. Replacing a managed rule's condition from a detection catalogue hides the change from the rule's owner; a replacement is a new rule.
 
 ### 4. Derived fields
 
@@ -84,11 +83,11 @@ A block either defines a rule (`condition`) or tunes an existing one (`append_to
 - **priority:** from `response.alert_severity`: Critical → `CRITICAL`, High → `ERROR`, Medium → `WARNING`, Low → `NOTICE`, Informational → `INFORMATIONAL`. Falco's own rules reserve `EMERGENCY` and `ALERT` for host compromise, and so does this map.
 - **tags:** the block's tags, technique ids, `mitre_<tactic>` tags, a `maturity_*` tag from the status strategy, and tenant tags. These are the Falco default rules' tag conventions, so opentide rules filter beside them in Falco Sidekick and Sysdig.
 - **output:** a default per event source when omitted.
-- **enabled:** `false` for `DISABLEMENT` in a file. On the API, Sysdig has no rule-level enable flag, so disablement removes the rule from its policies.
+- **Disablement:** Sysdig has no rule-level enable flag, so disablement removes the rule from its policies.
 
 ### 5. Validation
 
-`opentide validate query --live` reports `supported: false`: Sysdig has no rule preview, and Falco OSS has no API. The analysis engine checks the condition offline instead: syntax is an error, an unknown field or reference is a warning (plugins add fields, Sysdig manages macros). The engine's macro and list catalogue is the public Falco default rules; its field catalogue is the Falco and plugin field references.
+`opentide validate query --live` reports `supported: false`: Sysdig has no rule preview. The analysis engine checks the condition offline instead: syntax is an error, an unknown field or reference is a warning (plugins add fields, Sysdig manages macros). The engine's macro and list catalogue is the public Falco default rules; its field catalogue is the Falco and plugin field references.
 
 ### 6. Engine (language-server)
 
@@ -98,14 +97,14 @@ A tree-sitter grammar for Falco conditions, a field catalogue per source, highli
 
 - Expansion repeats a definition in every rule that uses it and makes the deployed condition longer than the authored one.
 - Sysdig's runtime API is not the documented public API. The Terraform provider uses it, which makes it stable in practice, but Sysdig could change it.
-- A tuning depends on a rule opentide does not manage. If the tuned rule is renamed or removed, the append fails at deploy (API) or at Falco load (file).
+- A tuning depends on a rule opentide does not manage. If the tuned rule is renamed or removed, the append fails at deploy.
 
 ## Alternatives
 
 - **Raw Falco YAML in the block.** Simple, but every rule would retype `desc`, `priority`, and tags, the ATT&CK mapping would drift from opentide's, and nothing could check the rule before deploy.
 - **Remote macros and lists, upserted by name.** RFC 0004's design. Rejected for the global-name collisions above, and because deployment state would need several ids per rule.
-- **A `falco` platform separate from `sysdig`.** Rejected: same block, same language, and the delivery is a tenant property.
-- **`terraform` delivery.** Deferred, as in RFC 0004. The `api` delivery uses the same endpoints.
+- **Falco rules files as a second delivery** (`file`, one file per rule for open-source Falco or GitOps). Drafted and dropped in review: every platform is configured over its API, and a file has no remote identity to update, disable, or delete.
+- **`terraform` delivery.** Deferred, as in RFC 0004. The API delivery uses the same endpoints.
 - **Live validation by create-and-delete.** Rejected: it creates remote state to check syntax, and the offline engine already checks it.
 
 ## Unresolved questions
