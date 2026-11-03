@@ -81,6 +81,17 @@ class SpecShapeTests(unittest.TestCase):
             ],
         )
 
+    def test_list_order_follows_falco(self) -> None:
+        """Real Falco 0.45.2: a macro naming a later macro is refused; a list naming a later list resolves."""
+        text = _read(SPEC)
+        row = next(line for line in text.splitlines() if line.startswith("| `sysdig_definition_order` |"))
+        self.assertIn("for macros", row)
+        self.assertIn("Lists have no ordering constraint", row)
+        self.assertIn("a list may name a later list", text)
+        advisories = text.split("### Advisories", 1)[1].split("###", 1)[0]
+        self.assertIn("| `sysdig_list_self_reference` |", advisories)
+        self.assertIn("| `sysdig_list_self_reference` | warning |", _read(ROOT / "specs" / "validation.md"))
+
     def test_priority_table_matches(self) -> None:
         section = _read(SPEC).split("### Priority", 1)[1].split("###", 1)[0]
         for severity, (falco, api) in PRIORITY.items():

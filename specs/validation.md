@@ -86,8 +86,9 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `eql_maxspan_lookback` | warning | Elastic: an EQL `maxspan` exceeds `lookback` but not `interval` + `lookback` |
 | `risk_band` | warning | Elastic: an explicit risk score is outside its severity's band |
 | `technique_not_enterprise` | warning | Elastic: the rule names a technique that is not Enterprise ATT&CK, which deploy skips |
+| `sysdig_list_self_reference` | warning | Sysdig: a block list names itself, which Falco keeps as a literal value |
 
-The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories).
+The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories) and [sysdig-1.0](platforms/sysdig-1.0.md#advisories).
 
 ### Query validation
 
@@ -219,6 +220,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.5 | 2026-11-03 | [Platform advisories](#platform-advisories): `sysdig_list_self_reference` ([sysdig-1.0](platforms/sysdig-1.0.md#advisories)). |
 | 1.5 | 2026-11-02 | `sysdig` is excluded from query validation (`supported: false`); its Falco condition is checked offline by `opentide validate` ([sysdig-1.0](platforms/sysdig-1.0.md#query-validation)). `validate query` has no offline mode on any platform. The fixture checker applies seven Sysdig constraint codes to `configurations.sysdig` blocks. |
 | 1.4 | 2026-10-23 | Fixture checker code `search_language` for `response.procedure.searches[].language` ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). |
 | 1.4 | 2026-10-23 | [Platform advisories](#platform-advisories): the eight Elastic advisory codes are warnings ([elastic-1.0](platforms/elastic-1.0.md#advisories), [specifications#57](https://github.com/opentidehq/specifications/issues/57)). |

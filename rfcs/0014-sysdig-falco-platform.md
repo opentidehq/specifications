@@ -63,7 +63,7 @@ The normative text is [specs/platforms/sysdig-1.0.md](../specs/platforms/sysdig-
 
 ### 2. Expansion instead of remote macros and lists
 
-The block's `macros` and `lists` are private to the rule. Deploy expands them into the condition, the macro conditions, and the exception values before it sends the rule, with Falco's own rule-loader algorithm (`resolve_list` for lists, identifier substitution for macros, definition-before-use), so the result parses to what Falco would compile. Names the block does not define are left as written and resolve on the tenant: the Falco default macros (`spawned_process`, `container`, `open_read`) and the ones Sysdig manages.
+The block's `macros` and `lists` are private to the rule. Deploy expands them into the condition, the macro conditions, and the exception values before it sends the rule, with Falco's own rule-loader algorithm (`resolve_list` for lists, identifier substitution for macros, definition-before-use for macros; a list may name a later list, as Falco resolves it), so the result parses to what Falco would compile. Real Falco confirms both: it refuses a macro naming a later macro, and resolves a list naming a later list. Names the block does not define are left as written and resolve on the tenant: the Falco default macros (`spawned_process`, `container`, `open_read`) and the ones Sysdig manages.
 
 Every rule owns exactly one remote object, so:
 

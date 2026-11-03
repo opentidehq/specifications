@@ -103,7 +103,7 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `sysdig_exception_shape` | The checks Falco's rule loader makes (`validate_exception_info`, `build_rule_exception_infos`). An exception has a non-empty `name`. Tuple form: `fields` is a non-empty list of strings, `comps` (when set) is a list of the same length, each comparison a [Falco operator](#operators) or a modified operator, and every row of `values` is a list of the same length as `fields`. Single-field form: `comps` (when set) is a string, `in`, `pmatch`, `intersects`, or a modified operator, and `values` is a flat list of scalars. |
 | `sysdig_definition_name` | Every macro and list `name` matches `^[A-Za-z_][A-Za-z0-9_]*$` and is not a Falco operator or keyword (`and`, `or`, `not`, `in`, `exists`, `val`, and the operators). |
 | `sysdig_definition_duplicate` | A name is defined at most once across the block's `macros` and `lists`. |
-| `sysdig_definition_order` | Falco's definition-before-use: a list item names only block lists defined before it, and a macro condition names only block macros defined before it, never itself or a later one. A macro may use any block list: Falco resolves every list before it compiles the macros. (Falco gives a definition no view of later ones, so a forward reference would silently fall through to the tenant.) |
+| `sysdig_definition_order` | Falco's definition-before-use for macros: a macro condition names only block macros defined before it, never itself or a later one. Falco refuses such a macro (`Undefined macro`), and on Sysdig the name would fall through to a tenant macro. A macro may use any block list: Falco resolves every list before it compiles the macros. Lists have no ordering constraint ([Expansion](#expansion)). |
 | `sysdig_list_in_value` | A block list name appears in an exception value where Falco's expansion would not produce a value list: inside a longer value, or as a single value under a comparison that is not a list comparison. |
 
 ### Falco language
@@ -153,9 +153,9 @@ Editors get the same diagnostics, plus highlighting, hover, and completion, thro
 
 Before a rule is sent, deploy replaces the block's own macros and lists with their definitions, by Falco's rule-loader algorithm (`rule_loader_compiler.cpp`), so the condition Sysdig receives parses to the expression Falco would compile had the definitions been loaded on the tenant:
 
-1. **Lists, flattened.** In block order, an item that names an earlier block list is replaced by that list's items.
-2. **Lists in the condition and in each macro condition** (Falco's `resolve_list`). For each block list in block order, every occurrence of its name with a delimiter on each side (the start or end of the text, a blank, `(`, `)`, `,`, or `=`) is replaced: the name and the blanks around it become `" " + items + " "`, where items are joined by `, ` and an item that contains a space and does not start with a quote is wrapped in double quotes. When the list is empty, one comma next to it is removed. This applies inside quoted strings as well, as Falco does.
-3. **Lists in exception values.** A value, or a member of a value list, equal to a block list name is replaced by that list's items: spliced into a value list, or, as a single value under a list comparison, made the value list. Any other occurrence is `sysdig_list_in_value`.
+1. **Lists, flattened.** In block order, an item that names an earlier block list is replaced by that list's items. An item that names a later block list, or its own list, stays as written for now.
+2. **Lists in the condition and in each macro condition** (Falco's `resolve_list`). For each block list in block order, every occurrence of its name with a delimiter on each side (the start or end of the text, a blank, `(`, `)`, `,`, or `=`) is replaced: the name and the blanks around it become `" " + items + " "`, where items are joined by `, ` and an item that contains a space and does not start with a quote is wrapped in double quotes. When the list is empty, one comma next to it is removed. This applies inside quoted strings as well, as Falco does. Because every list is applied in turn, a name left by step 1 for a later list is expanded when that list's turn comes, so a list may name a later list. A name a list's own items brought back is not expanded again: a list naming itself leaves its own name as a literal value (`sysdig_list_self_reference`).
+3. **Lists in exception values.** Falco compiles exceptions into the condition before step 2, so the same pass applies: for each block list in block order, a value, or a member of a value list, equal to its name is replaced by its items (spliced into a value list, or, as a single value under a list comparison, made the value list), and the items just inserted are not scanned again for that list. Any other occurrence of a block list name in a value is `sysdig_list_in_value`.
 4. **Macros.** A bare identifier in a condition position (a check, not a value) that names a block macro becomes `(` + the macro's expanded condition + `)`. A macro condition sees every block list and the block macros defined before it.
 5. Names the block does not define are left as written and resolve on the tenant: Falco's default macros and lists, or the ones Sysdig manages.
 
@@ -270,6 +270,14 @@ A policy is found by name in `GET /api/v2/policies`. It is updated with `PUT /ap
 
 A rule is created before its policies are updated. When a named policy is missing (`sysdig_policy_missing`), the rule fails but its binding is kept, so the next deploy updates that rule instead of creating a second one.
 
+### Advisories
+
+Advisories are [warnings](../validation.md#platform-advisories): validation reports them under their code and never rejects the rule.
+
+| Code | When | Why |
+|------|------|-----|
+| `sysdig_list_self_reference` | A block list names itself among its items. | Falco loads it and keeps the name as a literal value, which the rule almost never means. On Sysdig, the literal then resolves against a tenant list of the same name, if one exists. Deploy sends what Falco would compile: the literal. |
+
 ### Query validation
 
 | Check | Sysdig |
@@ -348,5 +356,5 @@ Fixtures: [fixtures/platforms/sysdig.yaml](../../fixtures/platforms/sysdig.yaml)
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-11-03 | Before merge: configured over the API only (no rules-file delivery; `minimum_engine_version`); the Falco language, exception rules, and list expansion follow libsinsp and Falco's rule loader exactly; `sysdig_definition_order` and `sysdig_list_in_value` replace `sysdig_definition_cycle`. |
+| 1.0 | 2026-11-03 | Before merge: configured over the API only (no rules-file delivery; `minimum_engine_version`); the Falco language, exception rules, and list expansion follow libsinsp and Falco's rule loader exactly; `sysdig_definition_order` (macros) and `sysdig_list_in_value` replace `sysdig_definition_cycle`; a list may name a later list, as in Falco, and a list naming itself is the `sysdig_list_self_reference` advisory. |
 | 1.0 | 2026-11-02 | Initial field contract ([RFC 0014](../../rfcs/0014-sysdig-falco-platform.md), [specifications#8](https://github.com/opentidehq/specifications/issues/8)). |
