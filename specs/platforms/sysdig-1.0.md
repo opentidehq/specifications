@@ -69,14 +69,12 @@ The shared `name` is the Falco rule name. Empty means the opentide rule `name`. 
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `name` | string | yes | — | Exception name, unique in the block. |
+| `name` | string | yes | — | Exception name. Names SHOULD be unique in the block: Falco warns on a repeated name (`LOAD_EXCEPTION_NAME_NOT_UNIQUE`) and the engine reports it as a warning. |
 | `fields` | string or list[string] | yes | — | One Falco field (the single-field form) or a list of fields (the tuple form). |
-| `comps` | string or list[string] | optional | see below | Comparison operators. Tuple form: a list aligned with `fields`; default `=` for each field. Single-field form: one of `in`, `pmatch`, or `intersects`; default `in`. |
-| `values` | list | optional | `[]` | Tuple form: a list of rows, each a list aligned with `fields`. Where the aligned comparison is `in`, `pmatch`, or `intersects`, the item is a list. Single-field form: a flat list of values. |
+| `comps` | string or list[string] | optional | see below | Comparison operators, leading and trailing blanks ignored. Tuple form: a list aligned with `fields`, each a [Falco operator](#operators) or a [modified operator](#operators); default `=` for each field. Single-field form: `in`, `pmatch`, `intersects`, or a modified operator (`startswith oneof`); default `in`. |
+| `values` | list | optional | `[]` | Tuple form: a list of rows, each a list aligned with `fields`. An item is a value or a list of values; a single value under a list comparison (`in`, `pmatch`, `intersects`, or a modified operator) is one value list, or the name of a list. Single-field form: a flat list of values. |
 
-Allowed comparison operators: `=`, `!=`, `<`, `<=`, `>`, `>=`, `contains`, `icontains`, `bcontains`, `startswith`, `bstartswith`, `endswith`, `glob`, `iglob`, `in`, `intersects`, `pmatch`, and `regex`.
-
-Values are sent as the block gives them. Deploy does not expand lists inside `values`.
+Falco compiles each exception into the condition, `(<condition>) and not (<exception>) …`, before it expands lists, so the [Expansion](#expansion) of the block's lists applies to exception values too.
 
 ### `macros[]` (SysdigMacro)
 
@@ -102,30 +100,62 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `sysdig_tuning_keys` | With `append_to_rule`, `output`, `priority`, `policies`, `source`, and `name` MUST NOT be set. A tuning inherits them from the tuned rule. |
 | `sysdig_priority` | `priority` is one of the eight Falco priorities or `INFO`, compared case-insensitively. |
 | `sysdig_source` | `source` matches `^[a-z][a-z0-9_]*$`. |
-| `sysdig_exception_shape` | An exception has a non-empty `name`, unique in the block. Tuple form: `fields` is a non-empty list of distinct strings, `comps` (when set) is a list of the same length, every row of `values` is a list of the same length, and an item whose comparison is `in`, `pmatch`, or `intersects` is a list. Single-field form: `comps` (when set) is `in`, `pmatch`, or `intersects`, and `values` is a flat list. Every comparison is one of the [allowed operators](#exceptions-sysdigexception). |
+| `sysdig_exception_shape` | The checks Falco's rule loader makes (`validate_exception_info`, `build_rule_exception_infos`). An exception has a non-empty `name`. Tuple form: `fields` is a non-empty list of strings, `comps` (when set) is a list of the same length, each comparison a [Falco operator](#operators) or a modified operator, and every row of `values` is a list of the same length as `fields`. Single-field form: `comps` (when set) is a string, `in`, `pmatch`, `intersects`, or a modified operator, and `values` is a flat list of scalars. |
 | `sysdig_definition_name` | Every macro and list `name` matches `^[A-Za-z_][A-Za-z0-9_]*$` and is not a Falco operator or keyword (`and`, `or`, `not`, `in`, `exists`, `val`, and the operators). |
 | `sysdig_definition_duplicate` | A name is defined at most once across the block's `macros` and `lists`. |
-| `sysdig_definition_cycle` | Expanding the block's macros and lists terminates: no macro or list reaches itself through other block definitions. |
+| `sysdig_definition_order` | Falco's definition-before-use: a list item or a macro condition references only block lists and macros defined before it in the block, never itself or a later one. (Falco gives a definition no view of later ones, so a forward reference would silently fall through to the tenant.) |
+| `sysdig_list_in_value` | A block list name appears in an exception value where Falco's expansion would not produce a value list: inside a longer value, or as a single value under a comparison that is not a list comparison. |
 
 ### Falco language
 
-The condition is a Falco filter expression. The analysis engine ([language-server](https://github.com/opentidehq/language-server)) parses it with its Falco grammar and checks it offline:
+The condition is a Falco filter expression, as libsinsp parses and compiles it (`falcosecurity/libs`, `userspace/libsinsp/filter/parser.h` and the filter compiler), inside Falco's rule loader (`falcosecurity/falco`, `userspace/engine`). This section is the contract; [docs/FALCO.md](https://github.com/opentidehq/language-server/blob/main/docs/FALCO.md) in the language server maps each element to the libsinsp source and the test that proves it.
 
-- syntax: boolean operators `and`, `or`, `not`; comparisons with the [allowed operators](#exceptions-sysdigexception) plus `exists`; value lists `( … )`; quoted strings; field arguments (`proc.aname[2]`, `evt.arg.flags`, `fd.name`); and the transformers `tolower`, `toupper`, `b64`, `basename`, `len`, and `val()`. A syntax error is an error;
-- fields: each field is known for the block's `source`. An unknown field is a warning, because plugins add fields;
-- references: a bare name is a macro of the block, a list of the block inside a value list, or a macro or list of the Falco default rules (`falcosecurity/rules`, `falco_rules.yaml`). Any other name is a warning: on a Sysdig tenant it may be a macro Sysdig manages;
-- the output template's `%field` references follow the same field check.
+#### Grammar
+
+| Element | Syntax |
+|---------|--------|
+| Boolean | `or` binds weaker than `and`; `not` is a prefix, repeatable, and `not(…)` needs no blank. `and(`/`or(` need no blank before a parenthesis. Parentheses group. |
+| Check | `<field> <condition>`, `<transformer>(…) <condition>`, a bare identifier (a macro), or `( <expr> )` |
+| Field | `<class>.<name>` (`[a-zA-Z][a-zA-Z0-9_]*` parts joined by `.`), with an optional argument `[<arg>]`: a quoted string or bare text without blanks, brackets, or quotes (`proc.aname[2]`, `proc.env[HOME]`, `json.value[/spec/x]`). Dotted arguments are part of the name for fields that take them (`evt.arg.flags`). |
+| Values | A bare string (no blanks, `(`, `)`, `,`, `=`, quotes), a single- or double-quoted string with backslash escapes, a decimal number with optional sign, fraction, and exponent, or a hex number (`0x1f`) |
+| Value list | `( v1, v2, … )`, possibly empty, or the name of a list |
+| Right-hand field | `val(<field>)`, or a transformer, compared against the left-hand field |
+
+#### Operators
+
+| Kind | Operators |
+|------|-----------|
+| Unary | `exists` |
+| Numeric | `<`, `<=`, `>`, `>=` |
+| String | `=`, `==`, `!=`, `contains`, `icontains`, `bcontains`, `startswith`, `bstartswith`, `endswith`, `glob`, `iglob`, `regex` |
+| List | `in`, `intersects`, `pmatch` |
+| Modifier | `oneof`, `anyof`, `allof`, after `=`, `==`, `!=`, `contains`, `icontains`, `bcontains`, `startswith`, `bstartswith`, `endswith`, `glob`, `iglob`, or `regex`, before a value list: `proc.name startswith anyof (ba, zs)` |
+
+Word operators need a blank after them; symbols do not.
+
+#### Transformers
+
+`tolower`, `toupper`, `b64`, `basename`, `len`, `join`, `concat`, and `getopt`, nestable, with the argument kinds and counts libsinsp accepts (`join` and `concat` take several arguments, including value lists), and an optional `[<arg>]` after the closing parenthesis. `val(<field>)` names a field on the right-hand side.
+
+#### Compile checks
+
+The engine reports as an **error** what libsinsp or Falco refuse to load: a syntax error; an unknown field of a known source; a field argument that is missing, not allowed, or of the wrong kind (index or key); an operator the field's type does not accept; a value its type cannot parse (numbers, booleans, IP addresses and CIDR networks, hex strings for `bcontains` and `bstartswith`, regular expressions for `regex`); a list operator on a field that is not a list where libsinsp requires one; a transformer applied to a type it does not take, or with the wrong arguments; an unknown event name in `evt.type`; a tuning condition that does not start with `and` or `or`; and an invalid output template.
+
+It reports as a **warning** what depends on the tenant or agent: a field of an unknown source or plugin; a bare name that is neither a block macro or list nor a Falco default macro or list (a Sysdig-managed macro may define it); a deprecated field; libsinsp's compile warnings; a condition that matches too many event types (`LOAD_NO_EVTTYPE`, which Sysdig also returns on create); syntax that needs a newer libsinsp than older agents ship; and a repeated exception name.
+
+The field catalogue per `source` is libsinsp's own field tables for `syscall`, and the plugins' field tables for `k8s_audit`, `aws_cloudtrail`, `gcp_auditlog`, `okta`, `github`, `k8smeta`, and the container plugin. Exception `fields` and `output` `%field` references are checked against the same catalogue.
 
 Editors get the same diagnostics, plus highlighting, hover, and completion, through the language server.
 
 ### Expansion
 
-Before a rule is sent, deploy replaces every reference to the block's own macros and lists with its definition:
+Before a rule is sent, deploy replaces the block's own macros and lists with their definitions, by Falco's rule-loader algorithm (`rule_loader_compiler.cpp`), so the condition Sysdig receives parses to the expression Falco would compile had the definitions been loaded on the tenant:
 
-1. A bare name in the condition that is a block **macro** becomes the macro's condition, expanded, in parentheses: `(…)`.
-2. A bare name inside a value list (the parenthesised list after `in`, `intersects`, or `pmatch`) that is a block **list** becomes the list's items, expanded, joined by `, `. An item is written as Falco reads it: an item containing a space, comma, parenthesis, or quote is double-quoted.
-3. Expansion recurses through block definitions, and stops at names the block does not define. Those are left as written and resolve on the tenant.
-4. Quoted strings, field names, and field arguments are never expanded.
+1. **Lists, flattened.** In block order, an item that names an earlier block list is replaced by that list's items.
+2. **Lists in the condition and in each macro condition** (Falco's `resolve_list`). For each block list in block order, every occurrence of its name with a delimiter on each side (the start or end of the text, a blank, `(`, `)`, `,`, or `=`) is replaced: the name and the blanks around it become `" " + items + " "`, where items are joined by `, ` and an item that contains a space and does not start with a quote is wrapped in double quotes. When the list is empty, one comma next to it is removed. This applies inside quoted strings as well, as Falco does.
+3. **Lists in exception values.** A value, or a member of a value list, equal to a block list name is replaced by that list's items: spliced into a value list, or, as a single value under a list comparison, made the value list. Any other occurrence is `sysdig_list_in_value`.
+4. **Macros.** A bare identifier in a condition position (a check, not a value) that names a block macro becomes `(` + the macro's expanded condition + `)`. A macro condition sees only the block macros and lists defined before it.
+5. Names the block does not define are left as written and resolve on the tenant: Falco's default macros and lists, or the ones Sysdig manages.
 
 Each rule therefore owns exactly one remote object. Falco macros and lists are global to a ruleset: two rules that defined the same name would overwrite each other on the tenant, so a block's definitions never leave it.
 
@@ -316,4 +346,5 @@ Fixtures: [fixtures/platforms/sysdig.yaml](../../fixtures/platforms/sysdig.yaml)
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-11-03 | Before merge: configured over the API only (no rules-file delivery; `minimum_engine_version`); the Falco language, exception rules, and list expansion follow libsinsp and Falco's rule loader exactly; `sysdig_definition_order` and `sysdig_list_in_value` replace `sysdig_definition_cycle`. |
 | 1.0 | 2026-11-02 | Initial field contract ([RFC 0014](../../rfcs/0014-sysdig-falco-platform.md), [specifications#8](https://github.com/opentidehq/specifications/issues/8)). |

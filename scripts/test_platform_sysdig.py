@@ -76,7 +76,8 @@ class SpecShapeTests(unittest.TestCase):
                 "sysdig_exception_shape",
                 "sysdig_definition_name",
                 "sysdig_definition_duplicate",
-                "sysdig_definition_cycle",
+                "sysdig_definition_order",
+                "sysdig_list_in_value",
             ],
         )
 
@@ -161,22 +162,29 @@ class CheckerTests(unittest.TestCase):
             self.assertEqual(_codes(validate_sysdig_block(_block(condition="a", source=value))), {"sysdig_source"})
 
     def test_exception_shapes(self) -> None:
+        """Falco's validate_exception_info and build_rule_exception_infos (falcosecurity/falco)."""
         ok = [
             {"name": "a", "fields": ["proc.name", "proc.pname"], "values": [["sh", "bash"]]},
             {"name": "b", "fields": ["proc.name", "proc.pname"], "comps": ["=", "in"], "values": [["sh", ["bash", "zsh"]]]},
-            {"name": "c", "fields": "proc.name", "values": ["sh", "bash"]},
-            {"name": "d", "fields": "proc.name", "comps": "pmatch", "values": ["/tmp"]},
-            {"name": "e", "fields": ["fd.name"]},
+            # A single value under a list comparison: Falco wraps it, so it can name a list.
+            {"name": "c", "fields": ["proc.name", "proc.pname"], "comps": ["=", "in"], "values": [["sh", "shell_binaries"]]},
+            {"name": "d", "fields": "proc.name", "values": ["sh", "bash"]},
+            {"name": "e", "fields": "proc.name", "comps": "pmatch", "values": ["/tmp"]},
+            {"name": "f", "fields": "proc.name", "comps": "startswith oneof", "values": ["ba", "zs"]},
+            {"name": "g", "fields": ["fd.name"]},
+            {"name": "h", "fields": ["proc.name", "fd.name"], "comps": ["==", " glob anyof "], "values": [["sh", ["/tmp/*"]]]},
+            {"name": "i", "fields": ["proc.name"], "comps": ["exists"], "values": []},
         ]
         self.assertEqual(_codes(validate_sysdig_block(_block(condition="a", exceptions=ok))), set())
         bad = [
             {"name": "", "fields": "proc.name"},
             {"name": "x", "fields": ["proc.name"], "comps": ["=", "="]},
-            {"name": "x", "fields": ["proc.name", "proc.name"]},
             {"name": "x", "fields": ["proc.name"], "comps": ["~"]},
+            {"name": "x", "fields": ["proc.name"], "comps": ["< oneof"]},
+            {"name": "x", "fields": ["proc.name"], "comps": ["startswith someof"]},
             {"name": "x", "fields": ["proc.name", "proc.pname"], "values": [["sh"]]},
-            {"name": "x", "fields": ["proc.name"], "comps": ["in"], "values": [["sh"]]},
             {"name": "x", "fields": "proc.name", "comps": "="},
+            {"name": "x", "fields": "proc.name", "comps": ["in"]},
             {"name": "x", "fields": "proc.name", "values": [["sh"]]},
             {"name": "x", "fields": []},
         ]
@@ -185,10 +193,11 @@ class CheckerTests(unittest.TestCase):
                 self.assertEqual(
                     _codes(validate_sysdig_block(_block(condition="a", exceptions=[exc]))), {"sysdig_exception_shape"}
                 )
-        duplicate = [{"name": "a", "fields": "proc.name"}, {"name": "a", "fields": "proc.pname"}]
-        self.assertEqual(
-            _codes(validate_sysdig_block(_block(condition="a", exceptions=duplicate))), {"sysdig_exception_shape"}
-        )
+
+    def test_repeated_exception_names_are_not_a_constraint(self) -> None:
+        """Falco only warns (LOAD_EXCEPTION_NAME_NOT_UNIQUE); the engine reports the warning."""
+        repeated = [{"name": "a", "fields": "proc.name"}, {"name": "a", "fields": "proc.pname"}]
+        self.assertEqual(_codes(validate_sysdig_block(_block(condition="a", exceptions=repeated))), set())
 
     def test_definitions(self) -> None:
         for name in ("in", "and", "1abc", "has-dash", "contains"):
@@ -240,7 +249,8 @@ class GoldenTests(unittest.TestCase):
         expected = " ".join(block["condition"].split())
         for definition in block["lists"]:
             self.assertNotRegex(condition["condition"], rf"\b{definition['name']}\b")
-            expected = expected.replace(definition["name"], ", ".join(definition["items"]))
+            # Falco's resolve_list: the name becomes " " + items + " " (no blank around it here).
+            expected = expected.replace(definition["name"], " " + ", ".join(definition["items"]) + " ")
         self.assertEqual(condition["condition"], expected)
 
     def test_tuning(self) -> None:
@@ -254,7 +264,7 @@ class GoldenTests(unittest.TestCase):
         self.assertIs(details["append"], True)
         self.assertEqual(
             details["condition"],
-            {"components": [], "condition": "and not proc.pname in (gitlab-runner, buildkite-agent)"},
+            {"components": [], "condition": "and not proc.pname in ( gitlab-runner, buildkite-agent )"},
         )
         self.assertEqual(details["exceptions"], block["exceptions"])
 

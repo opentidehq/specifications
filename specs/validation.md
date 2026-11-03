@@ -165,7 +165,7 @@ Sharing fixtures (`scripts/sharing_fixtures.py`) also prove the merge rule: [ove
 
 On a rule's `configurations.elastic` block the checker applies three of the [Elastic constraint codes](platforms/elastic-1.0.md#constraints), the ones the invalid Elastic fixture exercises: `language`, `esql_source`, and `suppression_shape`. They are the platform's own codes, so the checker and `opentide validate` report the same name. The other Elastic codes, and every other platform block, are left to opentide.
 
-On a rule's `configurations.sysdig` block the checker applies the [Sysdig constraint codes](platforms/sysdig-1.0.md#constraints) that need no Falco parser: `sysdig_rule_shape`, `sysdig_tuning_keys`, `sysdig_priority`, `sysdig_source`, `sysdig_exception_shape`, `sysdig_definition_name`, and `sysdig_definition_duplicate`. `sysdig_definition_cycle` needs the Falco tokenizer and is left to opentide.
+On a rule's `configurations.sysdig` block the checker applies the [Sysdig constraint codes](platforms/sysdig-1.0.md#constraints) that need no Falco parser: `sysdig_rule_shape`, `sysdig_tuning_keys`, `sysdig_priority`, `sysdig_source`, `sysdig_exception_shape`, `sysdig_definition_name`, and `sysdig_definition_duplicate`. `sysdig_definition_order` and `sysdig_list_in_value` need the Falco tokenizer and are left to opentide.
 
 On a rule's `response.procedure.searches[]` the checker reports `search_language` when `language` is set with a `system` other than `elastic`, or with a value other than `kuery`, `lucene`, `eql`, or `esql` ([rule-1.1](objects/rule-1.1.md#searches-responsesearch)).
 

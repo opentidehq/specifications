@@ -4,7 +4,7 @@
     "append": true,
     "condition": {
       "components": [],
-      "condition": "and not proc.pname in (gitlab-runner, buildkite-agent)"
+      "condition": "and not proc.pname in ( gitlab-runner, buildkite-agent )"
     },
     "exceptions": [
       {

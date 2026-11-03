@@ -63,7 +63,7 @@ The normative text is [specs/platforms/sysdig-1.0.md](../specs/platforms/sysdig-
 
 ### 2. Expansion instead of remote macros and lists
 
-The block's `macros` and `lists` are private to the rule. Deploy expands them into the condition before it sends the rule. Names the block does not define are left as written and resolve on the tenant: the Falco default macros (`spawned_process`, `container`, `open_read`) and the ones Sysdig manages.
+The block's `macros` and `lists` are private to the rule. Deploy expands them into the condition, the macro conditions, and the exception values before it sends the rule, with Falco's own rule-loader algorithm (`resolve_list` for lists, identifier substitution for macros, definition-before-use), so the result parses to what Falco would compile. Names the block does not define are left as written and resolve on the tenant: the Falco default macros (`spawned_process`, `container`, `open_read`) and the ones Sysdig manages.
 
 Every rule owns exactly one remote object, so:
 
@@ -87,7 +87,7 @@ A block either defines a rule (`condition`) or tunes an existing one (`append_to
 
 ### 5. Validation
 
-`opentide validate query --live` reports `supported: false`: Sysdig has no rule preview. The analysis engine checks the condition offline instead: syntax is an error, an unknown field or reference is a warning (plugins add fields, Sysdig manages macros). The engine's macro and list catalogue is the public Falco default rules; its field catalogue is the Falco and plugin field references.
+`opentide validate query --live` reports `supported: false`: Sysdig has no rule preview. The analysis engine checks the condition offline instead, as libsinsp and Falco's rule loader do: everything they refuse to load is an error (syntax, unknown fields of a known source, field arguments, operator and value types, transformers, event names, exceptions), and what depends on the agent is a warning (plugin fields, tenant macros, deprecated fields, newer syntax). It is proven against libsinsp's own parser and compiler unit tests (100% agreement) and the public Falco default rules. Its field catalogue is libsinsp's field tables and the plugins'; its macro and list catalogue is the public Falco default rules.
 
 ### 6. Engine (language-server)
 
