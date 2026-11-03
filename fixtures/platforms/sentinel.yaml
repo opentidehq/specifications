@@ -29,6 +29,7 @@ configurations:
       severity: High
       suppression: false
       create_incident: true
+      techniques: [T1059.001]
     grouping:
       event: SingleAlert
       alert:
