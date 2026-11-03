@@ -22,7 +22,8 @@
       "properties": {
         "defender_for_endpoint": { "$ref": "#/$defs/decimalTenants" },
         "sentinel_one": { "$ref": "#/$defs/decimalTenants" },
-        "crowdstrike": { "$ref": "#/$defs/verbatimTenants" }
+        "crowdstrike": { "$ref": "#/$defs/verbatimTenants" },
+        "sysdig": { "$ref": "#/$defs/decimalTenants" }
       }
     }
   },

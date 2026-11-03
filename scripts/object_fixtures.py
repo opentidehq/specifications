@@ -599,6 +599,130 @@ def validate_elastic_block(block: dict[str, Any]) -> list[CheckError]:
     return errors
 
 
+_SYSDIG_PRIORITIES = frozenset(
+    {"EMERGENCY", "ALERT", "CRITICAL", "ERROR", "WARNING", "NOTICE", "INFORMATIONAL", "INFO", "DEBUG"}
+)
+_SYSDIG_TUNING_FORBIDDEN = ("output", "priority", "policies", "source", "name")
+_SYSDIG_STR_OPS = (
+    "=", "==", "!=", "contains", "icontains", "bcontains", "startswith", "bstartswith",
+    "endswith", "glob", "iglob", "regex",
+)
+_SYSDIG_LIST_COMPS = frozenset({"in", "intersects", "pmatch"})
+# Falco's operators (libsinsp parser.cpp) and the modified string operators
+# (falco rule_loader_cmpop.h): "startswith oneof", "= anyof", ...
+_SYSDIG_COMPS = frozenset({"exists", "<", "<=", ">", ">="} | set(_SYSDIG_STR_OPS) | _SYSDIG_LIST_COMPS)
+_SYSDIG_MODIFIERS = ("oneof", "anyof", "allof")
+_SYSDIG_RESERVED = frozenset({"and", "or", "not", "in", "exists", "val"}) | _SYSDIG_COMPS
+_SYSDIG_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_SYSDIG_SOURCE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def _blank(value: Any) -> bool:
+    return not isinstance(value, str) or not value.strip()
+
+
+def _modified(comp: str) -> bool:
+    parts = comp.split()
+    return len(parts) == 2 and parts[0] in _SYSDIG_STR_OPS and parts[1] in _SYSDIG_MODIFIERS
+
+
+def _comp(value: Any) -> str | None:
+    return value.strip() if isinstance(value, str) else None
+
+
+def _sysdig_exception_ok(exc: Any) -> bool:
+    """Falco's validate_exception_info and build_rule_exception_infos shape checks."""
+    if not isinstance(exc, dict) or _blank(exc.get("name")):
+        return False
+    fields, comps, values = exc.get("fields"), exc.get("comps"), exc.get("values", [])
+    if values is None:
+        values = []
+    if not isinstance(values, list):
+        return False
+    if isinstance(fields, str):
+        if _blank(fields):
+            return False
+        if comps is not None:
+            comp = _comp(comps)
+            if comp is None or not (comp in _SYSDIG_LIST_COMPS or _modified(comp)):
+                return False
+        return all(not isinstance(value, (list, dict)) for value in values)
+    if not isinstance(fields, list) or not fields or not all(isinstance(f, str) and f for f in fields):
+        return False
+    if comps is None:
+        comps = ["="] * len(fields)
+    if not isinstance(comps, list) or len(comps) != len(fields):
+        return False
+    for raw in comps:
+        comp = _comp(raw)
+        if comp is None or not (comp in _SYSDIG_COMPS or _modified(comp)):
+            return False
+    return all(isinstance(row, list) and len(row) == len(fields) for row in values)
+
+
+def validate_sysdig_block(block: dict[str, Any]) -> list[CheckError]:
+    """The platform::sysdig::1.0 constraint codes that need no Falco parser.
+
+    specs/platforms/sysdig-1.0.md#constraints. `sysdig_definition_order` and
+    `sysdig_list_in_value` need the Falco tokenizer and are left to opentide.
+    """
+    errors: list[CheckError] = []
+    base = "configurations.sysdig"
+    tuning = block.get("append_to_rule")
+    if tuning is None:
+        if _blank(block.get("condition")):
+            errors.append(CheckError("sysdig_rule_shape", "a new rule needs a non-blank condition", f"{base}.condition"))
+    else:
+        has_condition = not _blank(block.get("condition"))
+        has_exceptions = isinstance(block.get("exceptions"), list) and bool(block["exceptions"])
+        if _blank(tuning) or not (has_condition or has_exceptions):
+            errors.append(
+                CheckError(
+                    "sysdig_rule_shape",
+                    "a tuning names a rule and appends a condition or exceptions",
+                    f"{base}.append_to_rule",
+                )
+            )
+        set_keys = [key for key in _SYSDIG_TUNING_FORBIDDEN if block.get(key) not in (None, "", [])]
+        if set_keys:
+            errors.append(
+                CheckError(
+                    "sysdig_tuning_keys",
+                    f"a tuning MUST NOT set {', '.join(set_keys)}",
+                    base,
+                )
+            )
+    priority = block.get("priority")
+    if priority is not None and (not isinstance(priority, str) or priority.upper() not in _SYSDIG_PRIORITIES):
+        errors.append(CheckError("sysdig_priority", f"{priority!r} is not a Falco priority", f"{base}.priority"))
+    source = block.get("source")
+    if source is not None and (not isinstance(source, str) or not _SYSDIG_SOURCE.match(source)):
+        errors.append(CheckError("sysdig_source", f"{source!r} is not a Falco source name", f"{base}.source"))
+    exceptions = block.get("exceptions") or []
+    for index, exc in enumerate(exceptions if isinstance(exceptions, list) else [exceptions]):
+        if not _sysdig_exception_ok(exc):
+            errors.append(
+                CheckError(
+                    "sysdig_exception_shape",
+                    "exception fields, comps, and values do not align",
+                    f"{base}.exceptions[{index}]",
+                )
+            )
+    defined: set[str] = set()
+    for kind in ("macros", "lists"):
+        entries = block.get(kind) or []
+        for index, entry in enumerate(entries if isinstance(entries, list) else []):
+            name = entry.get("name") if isinstance(entry, dict) else None
+            path = f"{base}.{kind}[{index}].name"
+            if not isinstance(name, str) or not _SYSDIG_NAME.match(name) or name in _SYSDIG_RESERVED:
+                errors.append(CheckError("sysdig_definition_name", f"{name!r} is not a macro or list name", path))
+                continue
+            if name in defined:
+                errors.append(CheckError("sysdig_definition_duplicate", f"{name!r} is defined twice", path))
+            defined.add(name)
+    return errors
+
+
 # response.procedure.searches[].language: the query languages a system with more
 # than one language takes (specs/objects/rule-1.1.md, specifications#58).
 SEARCH_LANGUAGES: dict[str, frozenset[str]] = {
@@ -654,6 +778,8 @@ def validate_rule(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[CheckEr
     configurations = doc.get("configurations")
     if isinstance(configurations, dict) and isinstance(configurations.get("elastic"), dict):
         errors.extend(validate_elastic_block(configurations["elastic"]))
+    if isinstance(configurations, dict) and isinstance(configurations.get("sysdig"), dict):
+        errors.extend(validate_sysdig_block(configurations["sysdig"]))
     errors.extend(validate_searches(doc))
     return errors
 
@@ -711,4 +837,5 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "objective-effort-string.yaml": "invalid_effort",
     "rule-elastic-esql-index.yaml": "esql_source",
     "rule-search-language.yaml": "search_language",
+    "rule-sysdig-tuning-output.yaml": "sysdig_tuning_keys",
 }

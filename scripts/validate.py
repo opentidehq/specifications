@@ -212,6 +212,9 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "invalid" / "rule-1.0-reviewed.yaml",
         FIXTURES / "valid" / "rule-elastic-1.0.yaml",
         FIXTURES / "invalid" / "rule-elastic-esql-index.yaml",
+        FIXTURES / "valid" / "rule-sysdig-1.0.yaml",
+        FIXTURES / "valid" / "rule-sysdig-tuning-1.0.yaml",
+        FIXTURES / "invalid" / "rule-sysdig-tuning-output.yaml",
         FIXTURES / "valid" / "rule-1.1-search-language.yaml",
         FIXTURES / "valid" / "rule-1.0-search-language.yaml",
         FIXTURES / "invalid" / "rule-search-language.yaml",
@@ -251,6 +254,9 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "platforms" / "harfanglab-yara.yaml",
         FIXTURES / "platforms" / "carbon-black-cloud.yaml",
         FIXTURES / "platforms" / "elastic.yaml",
+        FIXTURES / "platforms" / "sysdig.yaml",
+        FIXTURES / "platforms" / "sysdig" / "rule-sysdig-1.0.api.json",
+        FIXTURES / "platforms" / "sysdig" / "rule-sysdig-tuning-1.0.api.json",
     ]
     for path in required:
         if not path.is_file():

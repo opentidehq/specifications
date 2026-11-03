@@ -1,6 +1,6 @@
 ---
 spec: deployment-state
-version: "1.2"
+version: "1.3"
 schema_id: deployment.state::1.0
 status: normative
 supersedes: null
@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-Microsoft Defender for Endpoint, SentinelOne, and CrowdStrike give every rule opentide creates an id of their own. The next deploy has to update, disable, or delete the remote rule by that id, and the id is per tenant. opentide keeps it in one committed JSON file per rule, `.opentide/states/deployment/<uuid>.json` (`deployment.state::1.0`). It never stores it on the rule.
+Microsoft Defender for Endpoint, SentinelOne, CrowdStrike, and Sysdig Secure give every rule opentide creates an id of their own. The next deploy has to update, disable, or delete the remote rule by that id, and the id is per tenant. opentide keeps it in one committed JSON file per rule, `.opentide/states/deployment/<uuid>.json` (`deployment.state::1.0`). It never stores it on the rule.
 
 A platform block that still carries `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>` is invalid, and deploy refuses the rule. `opentide deploy migrate-state` moves the ids of an existing catalogue into shards once. Losing a shard, or never committing it, loses the only handle on the remote rule: the next deploy creates a second live rule beside the first. Every requirement below exists to prevent that.
 
@@ -18,10 +18,10 @@ This spec is the normative text of accepted [RFC 0010](../rfcs/0010-deployment-e
 
 ## Requirements
 
-- Defender for Endpoint, SentinelOne, and CrowdStrike vendor identifiers MUST be stored only in `.opentide/states/deployment/<uuid>.json`. A platform block MUST NOT contain `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>`.
+- Defender for Endpoint, SentinelOne, CrowdStrike, and Sysdig vendor identifiers MUST be stored only in `.opentide/states/deployment/<uuid>.json`. A platform block MUST NOT contain `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>`.
 - `<uuid>` MUST be the lowercase canonical form of the rule's `metadata.uuid`, and `object_uuid` MUST equal the filename stem exactly.
 - Tenant keys MUST be non-empty and MUST equal the configured tenant `name` with surrounding whitespace removed. A stored key with leading or trailing whitespace is invalid.
-- External identifiers MUST be JSON strings. Defender and SentinelOne identifiers MUST match `0|[1-9][0-9]*`. CrowdStrike identifiers MUST contain a non-whitespace character and are otherwise stored verbatim.
+- External identifiers MUST be JSON strings. Defender, SentinelOne, and Sysdig identifiers MUST match `0|[1-9][0-9]*`. CrowdStrike identifiers MUST contain a non-whitespace character and are otherwise stored verbatim.
 - Writers MUST preserve unknown root keys, change only the addressed platform-and-tenant binding, sort keys at every level, use two-space JSON indentation, and write one trailing newline.
 - Writers MUST remove an empty platform map and MUST delete a shard that holds no binding. A successful delete MUST remove the tenant binding, then an empty platform map, then the file when no binding remains. Readers MAY treat an empty `platforms` object and an empty platform map as no bindings.
 - `.opentide/states/deployment/` MUST be committed. Implementations MUST NOT gitignore it, and MUST NOT gitignore the whole `.opentide/states/` directory.
@@ -45,6 +45,7 @@ A **state-backed platform** is one whose deployer addresses the remote rule by a
 | `defender_for_endpoint` | Graph detection-rule `id` returned on create | **Shard** |
 | `sentinel_one` | STAR rule id returned on create | **Shard** |
 | `crowdstrike` | Correlation rule id returned on create (`resources[0].id`) | **Shard** |
+| `sysdig` ([sysdig-1.0](platforms/sysdig-1.0.md)) | Falco rule `id` returned by `POST /api/secure/rules` | **Shard** |
 | `sentinel` | Analytics rule id is `metadata.uuid` | None |
 | `splunk` | The saved search; no vendor-assigned id | None |
 | `harfanglab` | Sigma id and YARA meta `id` are `metadata.uuid` | None |
@@ -82,6 +83,7 @@ Inside `platforms`:
 | `defender_for_endpoint` | Canonical decimal integer as a string: no sign, no leading zero (`"12345"`, `"0"`). |
 | `sentinel_one` | Canonical decimal integer as a string. |
 | `crowdstrike` | The create-response id, verbatim, as a string. MUST contain a non-whitespace character. It is not parsed as an integer. |
+| `sysdig` | Canonical decimal integer as a string. |
 
 A platform key outside this table fails `deployment_state_platform`. A tenant key that is empty, or that has leading or trailing whitespace, fails `deployment_state_shape`. A non-string id, or an id that breaks its platform's pattern, fails `deployment_state_shape`. There is one binding per platform-and-tenant pair.
 
@@ -111,7 +113,7 @@ A writer MUST read the file, change one binding, and write the rest back unchang
 
 ### Deploy decisions
 
-For `defender_for_endpoint`, `sentinel_one`, and `crowdstrike`, per rule and per tenant the run selected, deploy MUST decide in this order. "Create" means a strategy other than `DELETION` or `DISABLEMENT` with no binding. `DISABLEMENT` with a binding is an update that sets the vendor's disabled state. It keeps the binding.
+For `defender_for_endpoint`, `sentinel_one`, `crowdstrike`, and `sysdig`, per rule and per tenant the run selected, deploy MUST decide in this order. "Create" means a strategy other than `DELETION` or `DISABLEMENT` with no binding. `DISABLEMENT` with a binding is an update that sets the vendor's disabled state. It keeps the binding.
 
 | # | Situation | Code | Level | Result |
 |---|-----------|------|-------|--------|
@@ -257,7 +259,7 @@ There is no configuration key for this spec.
 
 ## Examples
 
-A rule bound on all three state-backed platforms, `.opentide/states/deployment/00000000-0000-4000-8003-000000000010.json`:
+A rule bound on every state-backed platform, `.opentide/states/deployment/00000000-0000-4000-8003-000000000010.json`:
 
 ```json
 {
@@ -272,6 +274,9 @@ A rule bound on all three state-backed platforms, `.opentide/states/deployment/0
     },
     "sentinel_one": {
       "s1-prod": "4242"
+    },
+    "sysdig": {
+      "sysdig-prod": "20482"
     }
   },
   "schema": "deployment.state::1.0"
@@ -296,6 +301,7 @@ Fixtures: [fixtures/deployment/valid/](../fixtures/deployment/valid/) and [fixtu
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.3 | 2026-11-02 | `sysdig` is state-backed: the Sysdig rule id is a canonical decimal string under `platforms.sysdig.<tenant>` ([sysdig-1.0](platforms/sysdig-1.0.md), [RFC 0014](../rfcs/0014-sysdig-falco-platform.md)). `schema_id` stays `deployment.state::1.0`. |
 | 1.2 | 2026-10-20 | A run that cannot persist state is defined by its run strategies, not a deployment plan: any CI run but a `RELEASE` run on a push. opentide 0.17.0 removed deployment plans; the generated jobs keep the same behaviour. |
 | 1.1 | 2026-10-16 | CI requirement 1: no GitHub Actions `concurrency` group on the production job, which would cancel a pending diff-scoped deploy ([specifications#43](https://github.com/opentidehq/specifications/issues/43)). |
 | 1.0 | 2026-10-16 | Initial normative deployment-state contract from accepted [RFC 0010](../rfcs/0010-deployment-external-ids.md). |

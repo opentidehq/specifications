@@ -21,7 +21,7 @@ RULE_FIXTURE_DIRS = (
     ROOT / "fixtures" / "cross-object",
 )
 
-STATE_PLATFORMS = ("crowdstrike", "defender_for_endpoint", "sentinel_one")
+STATE_PLATFORMS = ("crowdstrike", "defender_for_endpoint", "sentinel_one", "sysdig")
 LEGACY_MAP_KEYS = ("rule_id", "rule_id_bundle")
 LEGACY_TENANT_PREFIX = "rule_id::"
 
@@ -167,7 +167,7 @@ def check_deployment_fixtures() -> list[str]:
             problems.append(f"{path.relative_to(ROOT)}: {problem}")
         platforms = json.loads(text)["platforms"]
         if sorted(platforms) != list(STATE_PLATFORMS):
-            problems.append(f"{path.relative_to(ROOT)}: must bind all three state-backed platforms")
+            problems.append(f"{path.relative_to(ROOT)}: must bind every state-backed platform")
     problems.extend(
         f"fixtures/deployment/valid: {code}" for code in directory_codes([p.name for p in valid])
     )

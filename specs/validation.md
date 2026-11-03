@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.4"
+version: "1.5"
 schema_id: null
 status: normative
 supersedes: null
@@ -86,8 +86,9 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `eql_maxspan_lookback` | warning | Elastic: an EQL `maxspan` exceeds `lookback` but not `interval` + `lookback` |
 | `risk_band` | warning | Elastic: an explicit risk score is outside its severity's band |
 | `technique_not_enterprise` | warning | Elastic: the rule names a technique that is not Enterprise ATT&CK, which deploy skips |
+| `sysdig_list_self_reference` | warning | Sysdig: a block list names itself, which Falco keeps as a literal value |
 
-The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories).
+The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories) and [sysdig-1.0](platforms/sysdig-1.0.md#advisories).
 
 ### Query validation
 
@@ -103,8 +104,9 @@ Command: `opentide validate query --platform <id> --live`
 | `elastic` | yes, live only: Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md#query-validation)) |
 | `crowdstrike` | no |
 | `harfanglab` | no |
+| `sysdig` | no. The Falco condition is checked offline by `opentide validate` ([sysdig-1.0](platforms/sysdig-1.0.md#query-validation)) |
 
-Requires platform credentials and enabled configuration. Validates deployed or planned rule queries against the live platform API. Query validation is a tenant check on every platform in the query-validation allowlist above: without `--live` the command MUST refuse and name `--live`, and MUST NOT report a pass. `crowdstrike` and `harfanglab` report `supported: false` instead ([platforms](platforms/index.md#query-validation-platforms)). No platform has an offline syntax check; Elastic's query language (KQL, Lucene, EQL, or ES|QL) comes from each rule's block: its `type`, and `language` for the types that take one.
+Requires platform credentials and enabled configuration. Validates deployed or planned rule queries against the live platform API. Query validation is a tenant check on every platform in the query-validation allowlist above: without `--live` the command MUST refuse and name `--live`, and MUST NOT report a pass. `crowdstrike`, `harfanglab`, and `sysdig` report `supported: false` instead ([platforms](platforms/index.md#query-validation-platforms)). `validate query` has no offline mode on any platform; Elastic's query language (KQL, Lucene, EQL, or ES|QL) comes from each rule's block: its `type`, and `language` for the types that take one.
 
 ### Specifications-repo fixture checker
 
@@ -136,6 +138,7 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/invalid/objective-1.0-signal-binding.yaml](../fixtures/invalid/objective-1.0-signal-binding.yaml) | `binding_requires_1_1` |
 | [fixtures/invalid/rule-elastic-esql-index.yaml](../fixtures/invalid/rule-elastic-esql-index.yaml) | `esql_source` (also `language` and `suppression_shape`) |
 | [fixtures/invalid/rule-search-language.yaml](../fixtures/invalid/rule-search-language.yaml) | `search_language` |
+| [fixtures/invalid/rule-sysdig-tuning-output.yaml](../fixtures/invalid/rule-sysdig-tuning-output.yaml) | `sysdig_tuning_keys` (also `sysdig_exception_shape`) |
 | [fixtures/sharing/invalid/unknown-distribution.toml](../fixtures/sharing/invalid/unknown-distribution.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/legacy-targets-table.toml](../fixtures/sharing/invalid/legacy-targets-table.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/duplicate-name.toml](../fixtures/sharing/invalid/duplicate-name.toml) | `duplicate_name` |
@@ -162,6 +165,8 @@ Deployment fixtures (`scripts/deployment_state_fixtures.py`) are checked against
 Sharing fixtures (`scripts/sharing_fixtures.py`) also prove the merge rule: [override.toml](../fixtures/sharing/valid/override.toml) merged by `name` onto [sharing.toml](../fixtures/sharing/valid/sharing.toml) MUST equal [merged.toml](../fixtures/sharing/valid/merged.toml).
 
 On a rule's `configurations.elastic` block the checker applies three of the [Elastic constraint codes](platforms/elastic-1.0.md#constraints), the ones the invalid Elastic fixture exercises: `language`, `esql_source`, and `suppression_shape`. They are the platform's own codes, so the checker and `opentide validate` report the same name. The other Elastic codes, and every other platform block, are left to opentide.
+
+On a rule's `configurations.sysdig` block the checker applies the [Sysdig constraint codes](platforms/sysdig-1.0.md#constraints) that need no Falco parser: `sysdig_rule_shape`, `sysdig_tuning_keys`, `sysdig_priority`, `sysdig_source`, `sysdig_exception_shape`, `sysdig_definition_name`, and `sysdig_definition_duplicate`. `sysdig_definition_order` and `sysdig_list_in_value` need the Falco tokenizer and are left to opentide.
 
 On a rule's `response.procedure.searches[]` the checker reports `search_language` when `language` is set with a `system` other than `elastic`, or with a value other than `kuery`, `lucene`, `eql`, or `esql` ([rule-1.1](objects/rule-1.1.md#searches-responsesearch)).
 
@@ -215,6 +220,8 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.5 | 2026-11-03 | [Platform advisories](#platform-advisories): `sysdig_list_self_reference` ([sysdig-1.0](platforms/sysdig-1.0.md#advisories)). |
+| 1.5 | 2026-11-02 | `sysdig` is excluded from query validation (`supported: false`); its Falco condition is checked offline by `opentide validate` ([sysdig-1.0](platforms/sysdig-1.0.md#query-validation)). `validate query` has no offline mode on any platform. The fixture checker applies seven Sysdig constraint codes to `configurations.sysdig` blocks. |
 | 1.4 | 2026-10-23 | Fixture checker code `search_language` for `response.procedure.searches[].language` ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). |
 | 1.4 | 2026-10-23 | [Platform advisories](#platform-advisories): the eight Elastic advisory codes are warnings ([elastic-1.0](platforms/elastic-1.0.md#advisories), [specifications#57](https://github.com/opentidehq/specifications/issues/57)). |
 | 1.3 | 2026-10-19 | `elastic` joins query validation, live only through Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md)). The command is `validate query --live` on every platform in the query-validation allowlist; without `--live` it refuses. The fixture checker applies three Elastic constraint codes (`language`, `esql_source`, `suppression_shape`) to `configurations.elastic` blocks. |

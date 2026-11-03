@@ -17,7 +17,7 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0001](0001-authority-model.md) | Authority model and change process | accepted |
 | [0002](0002-vocabulary-versioning.md) | Vocabulary identifier versioning and schema pins | proposed |
 | [0003](0003-per-key-vocabulary-versioning.md) | Per-key vocabulary versioning and schema pins | proposed |
-| [0004](https://github.com/opentidehq/specifications/issues/8) | Sysdig Falco deployer (reserved by issue #8; file not yet in tree) | reserved |
+| 0004 | Sysdig Falco deployer (reserved by issue #8; never landed, superseded by [0014](0014-sysdig-falco-platform.md)) | superseded |
 | [0005](0005-scoped-signal-entities.md) | Stage-scoped `signal.entities`, and one prefixing rule for every staged vocabulary | accepted |
 | [0005](0005-sharing-system.md) | Sharing system and MISP connector | accepted |
 | [0006](0006-sharing-ci.md) | Sharing on the production merge | accepted |
@@ -28,6 +28,7 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0011](0011-signal-reuse.md) | Signal reuse across detection objectives | draft |
 | [0012](0012-rule-document-shape.md) | Rules should read like the other objects | draft |
 | [0013](0013-visibility-logsource-is-a-dataset.md) | A log source is a dataset, with its columns | accepted |
+| [0014](0014-sysdig-falco-platform.md) | Sysdig Secure and Falco detection platform | accepted |
 
 ## Numbering
 

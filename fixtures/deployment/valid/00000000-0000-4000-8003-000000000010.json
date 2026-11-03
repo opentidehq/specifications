@@ -10,6 +10,9 @@
     },
     "sentinel_one": {
       "s1-prod": "4242"
+    },
+    "sysdig": {
+      "sysdig-prod": "20482"
     }
   },
   "schema": "deployment.state::1.0"

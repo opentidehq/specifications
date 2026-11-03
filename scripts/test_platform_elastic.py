@@ -287,6 +287,8 @@ class AdvisoryTests(unittest.TestCase):
         text = _read(VALIDATION)
         self.assertGreaterEqual(_version(text), (1, 4))
         rows = _table(_section(text, "### Platform advisories"), "Code")
+        # The table is shared across platforms; Elastic's rows say "Elastic:".
+        rows = [row for row in rows if row["When"].startswith("Elastic:")]
         self.assertEqual([row["Code"].strip("`") for row in rows], ADVISORY_CODES)
         self.assertEqual({row["Severity"] for row in rows}, {"warning"})
 
@@ -344,7 +346,7 @@ class ListingTests(unittest.TestCase):
     def test_platforms_index(self) -> None:
         text = _read(INDEX)
         self.assertGreaterEqual(_version(text), (1, 2))
-        self.assertIn("opentide ships eight detection platform integrations.", text)
+        self.assertIn("opentide ships nine detection platform integrations.", text)
         self.assertNotIn("not yet in this matrix", text)
         self.assertIn("| `elastic` | `platform::elastic::1.0` | [elastic-1.0.md](elastic-1.0.md) |", text)
         self.assertRegex(text, r"\| `elastic` \| Elastic Security \| yes\* \| yes† \| KQL, Lucene, EQL, or ES\\\|QL")

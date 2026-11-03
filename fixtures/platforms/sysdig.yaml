@@ -1,0 +1,21 @@
+name: Sysdig Secure platform block
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000030
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+  author: Detection Engineering
+description: |
+  Sysdig Secure Falco rule: the smallest useful block.
+status: STAGING
+severity: Medium
+response:
+  alert_severity: Medium
+configurations:
+  sysdig:
+    enabled: true
+    schema: platform::sysdig::1.0
+    status: STAGING
+    condition: evt.type in (execve, execveat) and evt.dir = < and proc.name = nc
