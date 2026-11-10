@@ -1,6 +1,6 @@
 ---
 spec: platform-bitdefender
-version: "1.0"
+version: "1.1"
 schema_id: platform::bitdefender::1.0
 status: normative
 supersedes: null
@@ -121,9 +121,9 @@ Static validation MUST reject a block that breaks any of these, and report the c
 |------|------------|
 | `bitdefender_rule_kind` | Exactly one of `detection` and `yara` is set. |
 | `bitdefender_target` | `target` is a detection target from the [`detection`](#detection-bitdefenderdetection) table. The exclusion-only targets `flow` and `bitbucket repository` are refused. |
-| `bitdefender_criterion_shape` | A criterion has `field` and exactly one of `is`, `contains`, and `any`. `any` is a non-empty list; `is` and `contains` are scalars. |
+| `bitdefender_criterion_shape` | A criterion has `field` and exactly one of `is`, `contains`, and `any`. `is` is a string or an integer, `contains` is a string, and `any` is a non-empty list of strings or integers. A boolean is none of these. |
 | `bitdefender_criterion_field` | `field` belongs to the `target` in the [criteria catalogue](#criteria-catalogue). |
-| `bitdefender_criterion_relation` | Enum fields take `is` or `any` only. `contains` is not allowed on `*.MD5` and `*.SHA2`. |
+| `bitdefender_criterion_relation` | Enum fields take `is` or `any`; `File.CertificateSignedStatus`, `Connection.Protocol`, and `Registry.DataType` take `is` only. `contains` is not allowed on `*.MD5` and `*.SHA2`. |
 | `bitdefender_criterion_value` | An enum field's value is one of its values. A port is an integer from 0 to 65535. |
 | `bitdefender_criteria_combination` | The catalogue's pairing rules hold. EDR-only and XDR-only fields or values are not mixed. `File.Certificate*` needs `File.Name` or `File.FullPathName`. `Connection.Protocol` needs `Connection.Domain`. An XDR detection uses `alert` or an operation criterion, not both. |
 | `bitdefender_action_scope` | Each action is allowed for the kind and target ([`actions`](#actions-bitdefenderactions)). |
@@ -133,6 +133,20 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `bitdefender_yara_size` | `yara.signature` is at most 30,000 characters. |
 | `bitdefender_name_duplicate` | Workspace check: no two enabled `bitdefender` blocks resolve to the same GravityZone [name](#name-and-description). GravityZone refuses a second rule with one name in a company. |
 
+Every implementation reports each code at the same `field_path`, so opentide and the editor name the same finding. Paths are under `configurations.bitdefender`:
+
+| Code | `field_path` |
+|------|--------------|
+| `bitdefender_rule_kind` | the block |
+| `bitdefender_target` | `detection.target` |
+| `bitdefender_criterion_shape`, `bitdefender_criterion_field`, `bitdefender_criterion_relation`, `bitdefender_criterion_value` | `detection.criteria.<N>`, the criterion; `detection.criteria` when the list itself is empty or not a list |
+| `bitdefender_criteria_combination` | `detection.criteria` |
+| `bitdefender_action_scope` | `actions.<key>` |
+| `bitdefender_targets_shape` | `targets` |
+| `bitdefender_severity` | `severity` |
+| `bitdefender_yara_ascii`, `bitdefender_yara_size` | `yara.signature` |
+| advisories | `detection.criteria.<N>` for `bitdefender_registry_full_hive` and `bitdefender_contains_no_wildcard`; the block for `bitdefender_severity_collapsed` |
+
 ### Criteria catalogue
 
 The fields per target, their kinds, their enum values, and the pairing rules are Bitdefender's [Detection and exclusion criteria for Basic rules](https://www.bitdefender.com/business/support/en/77209-1486297-detection-and-exclusion-criteria.html). The language server ships them as data in `catalogs/bitdefender/criteria.toml`, generated from that page. The EDR targets:
@@ -141,7 +155,7 @@ The fields per target, their kinds, their enum values, and the pairing rules are
 |--------|--------|
 | `process` | `Process.Name`, `Process.Path`, `Process.FullPathName`, `Process.CommandLine`, `Process.Parent.Name`, `Process.Parent.Path`, `Process.Parent.FullPathName`, `Process.Parent.CommandLine`, `Process.User`, `Process.MD5`, `Process.SHA2` |
 | `file` | `File.Name`, `File.Path`, `File.FullPathName`, `File.Operation`, `File.CreatedBy.Name`, `File.CreatedBy.Path`, `File.CreatedBy.FullPathName`, `File.CreatedBy.CommandLine`, `File.CreatedBy.User`, `File.CertificateSigner`, `File.CertificateIssuer`, `File.CertificateSignedStatus`, and the XDR fields `File.MD5`, `File.SHA2`, `File.Url`, `File.SourceIP`, `File.DestinationIP` |
-| `connection` | `Connection.SourceIP`, `Connection.DestinationIP`, `Connection.SourcePort`, `Connection.DestinationPort`, `Connection.Process.Name`, `Connection.Process.Path`, `Connection.Process.FullPathName`, `Connection.Process.CommandLine`, `Connection.Process.User`, `Connection.URL`, `Connection.Domain`, `Connection.Protocol`, `Connection.HTTPUser`, `Connection.HTTPDownloadedFile`, `Connection.HTTPUploadedFile`, `Connection.FTPUser`, `Connection.SSHUser`, `Connection.TelnetUser`, `Connection.SMBDomain`, `Connection.SMBSharePath`, `Connection.SMBUser`, `Connection.WMIExecQuery`, `Connection.FileRemotePath`, `Connection.FileRemoteOperation` |
+| `connection` | `Connection.SourceIP`, `Connection.DestinationIP`, `Connection.SourcePort`, `Connection.DestinationPort`, `Connection.Process.Name`, `Connection.Process.Path`, `Connection.Process.FullPathName`, `Connection.Process.CommandLine`, `Connection.Process.User`, `Connection.URL`, `Connection.Domain`, `Connection.Protocol`, `Connection.HTTPUser`, `Connection.HTTPDownloadedFile`, `Connection.HTTPUploadedFile`, `Connection.FTPUser`, `Connection.SSHUser`, `Connection.TelnetUser`, `Connection.SMBDomain`, `Connection.SMBSharePath`, `Connection.SMBUser`, `Connection.WMIExecQuery`, `Connection.FileRemotePath`, `Connection.FileRemoteOperation`, and the XDR fields `Connection.SourceUser`, `Connection.DestinationUser`, `Connection.Email.Subject`, `Connection.<Resource>.Name` for the resources `File`, `Application`, `KeyVault`, `Role`, `Policy`, `SharingLink`, `Url`, `SshKey`, `LaunchTemplate`, `ServicePrincipal`, `UserGroup`, `AutomationAccount`, `AutomationAccountHook`, `Api`, `CertificateAuthority`, `Bucket`, `ConfluencePage`, `JiraProject`, and `Connection.<Resource>.Operation` for those resources and `Email` |
 | `registry` | `Registry.Key`, `Registry.Value`, `Registry.Data`, `Registry.DataType`, `Registry.Operation`, `Registry.CreatedBy.Name`, `Registry.CreatedBy.Path`, `Registry.CreatedBy.FullPathName`, `Registry.CreatedBy.CommandLine` |
 
 | Enum field | Values |
@@ -152,8 +166,9 @@ The fields per target, their kinds, their enum values, and the pairing rules are
 | `Connection.FileRemoteOperation` | `create`, `rem_delete`, `read`, `write`, `move` |
 | `Registry.Operation` | `key_created`, `key_deleted`, `key_renamed`, `value_created`, `value_deleted`, `value_written` |
 | `Registry.DataType` | `string`, `expandablestring`, `dword`, `qword`, `binary`, `none`, `link`, `resource_list`, `full_resource_descriptor`, `resource_requirements_list` |
+| `Connection.<Resource>.Operation` (XDR) | the values the catalogue lists for each resource |
 
-For a target this table does not cover, the catalogue file is the reference. An unknown field there is a warning, not an error, until the catalogue covers it.
+For a target this table does not cover, the catalogue file is the reference. An unknown field there is a warning, not an error, until the catalogue covers it. For `process`, `file`, `connection`, and `registry`, the table above and the catalogue list the same detection fields, and an unknown field is an error.
 
 ### YARA profile
 
@@ -165,7 +180,7 @@ Advisories are [warnings](../validation.md#platform-advisories): validation repo
 
 | Code | When | Why |
 |------|------|-----|
-| `bitdefender_registry_full_hive` | A `Registry.Key` value starts with a full hive name (`HKEY_LOCAL_MACHINE\…`). | GravityZone accepts it, and the rule never triggers. Write `HKLM`, `HKCU`, `HKU`, `HKCR`, `HKCC`, or `HKLU`. |
+| `bitdefender_registry_full_hive` | A `Registry.Key` value starts with a full hive name (`HKEY_LOCAL_MACHINE\…`), compared case-insensitively. | GravityZone accepts it, and the rule never triggers. Write `HKLM`, `HKCU`, `HKCR`, `HKCC`, `HKU` for `HKEY_USERS\<SID>…`, or `HKLU` for any other `HKEY_USERS\…` key. |
 | `bitdefender_contains_no_wildcard` | A `contains` value has neither `*` nor `?`. | GravityZone matches it as written; the author most likely meant `*value*`. |
 | `bitdefender_severity_collapsed` | `response.alert_severity` is `Critical` or `Informational`, and `severity` is not set. | GravityZone has three levels, so the value is sent as `High` or `Low`. |
 
@@ -250,14 +265,16 @@ Each request is a JSON-RPC 2.0 `POST` to `<url>/v1.0/jsonrpc/incidents` with `Co
 
 | Kind | `type` / `subtype` | `settings` |
 |------|--------------------|------------|
-| `detection` | 1 / 0 | `status`, `severity`, `target`, `criteriaList` (`[{field, relation, value}]`, in block order), `filters` (only when `alert` is set), `automaticActions` |
+| `detection` | 1 / 0 | `status`, `severity`, `target`, `criteriaList` (`[{field, relation, value}]`, in block order), `filters` (`[{field: "detection", value: <alert>}]`, or `[]` without `alert`; omitted on create without `alert`), `automaticActions` |
 | `yara` | 1 / 1 | `status`, `severity`, `yaraQuery` (`signature` with `\n` line endings and one trailing newline), `automaticActions` |
 
 `settings.status` is `1`, or `0` under `DISABLEMENT`. On a `yara` rule it is `1` only when `on_access` is `true`, and `0` otherwise.
 
 **Automatic actions.** Every action type the kind allows is sent, in type order, each with `enabled: true` or `false`: types 1–7 for `detection`, and 1, 2, 3, 5, 6, 7 for `yara`. An enabled `kill_process` or `quarantine` carries `settings: {includeParent, includeChildren}`. An enabled `antimalware_scan` carries `settings: {type: 1}` for `quick` or `{type: 2}` for `full`. A disabled entry carries only `type` and `enabled`. With tenant `automatic_actions = false`, `automaticActions` is omitted.
 
-**Targets.** `targets.endpoint_tags` is sent as `targets.endpointTags: [{tagId, companyId}]`, and `targets.companies` as `targets.companiesIds`. Without block or tenant `targets`, `targets` is omitted, and the rule applies to the whole company. A partner tenant's `company_id` is sent as `companyId` on create.
+**Targets.** `targets.endpoint_tags` is sent as `targets.endpointTags: [{tagId, companyId}]`, and `targets.companies` as `targets.companiesIds`. Without block or tenant `targets`, the rule applies to the whole company: a create omits `targets`, and an update sends `"targets": {}`. A partner tenant's `company_id` is sent as `companyId` on create.
+
+**Nothing is left to the stored rule.** GravityZone keeps the stored value of any optional parameter an update does not send, so an update sends an explicit value for every parameter the block can change: `filters: []` when `alert` was removed, `targets: {}` when targets were removed. A tenant that refuses an empty value fails the rule with its `error`, rather than leaving the rule scoped or filtered as before.
 
 | Block status strategy | Binding in deployment state | GravityZone calls |
 |-----------------------|-----------------------------|-------------------|
@@ -372,3 +389,4 @@ Fixtures:
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-11-10 | Initial field contract ([RFC 0016](../../rfcs/0016-bitdefender-gravityzone-platform.md)): `detection` and `yara` kinds, criteria catalogue, derived name, description, severity, and tags; whole-payload updates; the GravityZone id in deployment state; no exclusion rules. |
+| 1.1 | 2026-11-10 | Clarifications from the first implementation review: an update sends `filters: []` and `targets: {}` when the block has none, so a removed alert filter or target scope does not survive on GravityZone (create still omits them); the `connection` row lists the XDR fields Bitdefender's criteria page gives (`Connection.SourceUser`, `Connection.DestinationUser`, `Connection.Email.Subject`, and a `.Name` and `.Operation` per XDR resource); three enum fields take `is` only; value types per relation; one `field_path` per code; the `HKLU` hint for `HKEY_USERS` keys without a SID. Schema id unchanged. |

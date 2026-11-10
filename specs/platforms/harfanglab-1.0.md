@@ -1,6 +1,6 @@
 ---
 spec: platform-harfanglab
-version: "1.2"
+version: "1.3"
 schema_id: platform::harfanglab::1.0
 status: normative
 supersedes: null
@@ -133,7 +133,7 @@ The author writes every meta line, `context` included. Deploy adds and rewrites 
 
 Author meta uses `metadata.author`, then `metadata.organisation.name`. `metadata.created` and `metadata.modified` are written when set. Public references are joined into meta `references`.
 
-The language server checks the decomposed form as the rule deploy assembles it: the `import` lines, the derived rule name, the generated meta, and the two bodies. Each diagnostic maps back to `strings`, `condition`, `imports`, or the rule `name`.
+The language server checks the decomposed form as the rule deploy assembles it, byte for byte: the `import` lines, the derived rule name, every generated meta line with deploy's escaping (including the fields deploy writes unescaped), and the two bodies. Each diagnostic maps back to the authored field it comes from: `strings`, `condition`, `imports`, `meta`, `tags`, a rule field such as `name` or `references`, or the `yara` key when no authored field applies. A diagnostic is never dropped because its position falls in generated text.
 
 ### Constraints
 
@@ -145,13 +145,13 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `harfanglab_yara_form` | A `yara` object sets `signature`, or the decomposed keys, not both. |
 | `harfanglab_yara_section_header` | Decomposed form: `strings` and `condition` contain no `strings:`, `condition:`, or `rule` header. Deploy writes the headers. |
 | `harfanglab_yara_import` | Decomposed form: each `imports` entry is a module the [YARA language](../languages/yara-1.0.md#modules) knows. |
-| `harfanglab_yara_rule_name` | Decomposed form: the YARA rule name deploy derives from the rule `name` is not a YARA keyword and keeps only ASCII letters, digits, and `_`. A name such as `Condition` derives `condition`, and `Détection` keeps `é`; libyara refuses both. |
+| `harfanglab_yara_rule_name` | Decomposed form: the YARA rule name deploy derives from the rule `name` is not a YARA keyword, keeps only ASCII letters, digits, and `_`, and is at most 128 characters. A name such as `Condition` derives `condition`, `Détection` keeps `é`, and a 140-character name derives a 140-character identifier; libyara refuses all three. |
 
 ### YARA profile
 
 The [HarfangLab profile](../languages/yara-1.0.md#platform-profiles) of the YARA language: dialect `libyara4`, UTF-8, no size limit, one or more YARA rules per `signature`, and confirmed modules `pe`, `elf`, `math`, `hash`, and `time`.
 
-Every non-private rule of a `signature` SHOULD set meta `context`. A missing `context` is `yara_meta_missing`. A value other than `file`, `memory`, `file,memory`, `file.pe`, `file.elf`, or `file.macho` is the `harfanglab_yara_context` [advisory](../validation.md#platform-advisories). `file`, `memory`, and `file,memory` are the values HarfangLab's published rules use. `file.pe`, `file.elf`, and `file.macho` are the values the decomposed form's `os` rewrite writes. No HarfangLab document defines the key ([RFC 0015](../../rfcs/0015-yara-language.md#harfanglab-yara)).
+Every non-private rule of a `signature` SHOULD set meta `context`. A missing `context` is `yara_meta_missing`. A value that is not a comma-joined list, without blanks, of `file`, `memory`, `file.pe`, `file.elf`, and `file.macho` is the `harfanglab_yara_context` [advisory](../validation.md#platform-advisories). `file`, `memory`, and `file,memory` are the values HarfangLab's published rules use. `file.pe`, `file.elf`, and `file.macho` are the values the decomposed form's `os` rewrite writes, alone or with others (`file.pe,memory`). The advisory applies to the decomposed form too, on the `context` deploy writes. A present `context` that is not a string is the advisory, not `yara_meta_missing`. No HarfangLab document defines the key ([RFC 0015](../../rfcs/0015-yara-language.md#harfanglab-yara)).
 
 ### Deploy
 
@@ -268,3 +268,4 @@ Fixtures: [fixtures/platforms/harfanglab-sigma.yaml](../../fixtures/platforms/ha
 | 1.0 | 2026-09-30 | Initial field contract from the HarfangLab configuration model and deployer. |
 | 1.1 | 2026-10-16 | `rule_id_bundle` is removed. Legacy external-id keys fail `external_id_in_rule`, and migration removes them as `external_id_unused` ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Identity stays `metadata.uuid`. Schema id unchanged. |
 | 1.2 | 2026-11-10 | `yara.signature`: a whole YARA text (`YaraSignature`), deployed as the YaraFile `content` verbatim, beside the decomposed form. A block is one kind: `sigma` and `yara` together fail `harfanglab_rule_kind`, replacing "deploy MUST publish `sigma`". New constraint codes and the HarfangLab YARA profile; YARA is checked offline against [yara-1.0](../languages/yara-1.0.md) ([RFC 0015](../../rfcs/0015-yara-language.md)). The YARA deployer is otherwise unchanged. Schema id unchanged. |
+| 1.3 | 2026-11-10 | Clarifications from the first implementation review: the decomposed form is checked exactly as deploy assembles it, every diagnostic mapped to an authored field and none dropped; `harfanglab_yara_rule_name` also covers a derived name over 128 characters; `harfanglab_yara_context` accepts any comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho`, applies to the decomposed form, and covers a non-string `context`. Schema id unchanged. |
