@@ -480,7 +480,15 @@ A tenant with an unknown setup key, a literal `api_key`, or an id that is not 24
 
 #### 6.7 Deploy
 
-Bitdefender is **state-backed**: the rule id lives under `platforms.bitdefender.<tenant>` in `.opentide/states/deployment/<uuid>.json`, and matches `^[0-9a-f]{24}$`.
+Bitdefender is **state-backed**, like Defender for Endpoint, SentinelOne, CrowdStrike, and Sysdig. GravityZone assigns the rule id, and nothing on the rule can carry it. The id lives in deployment state, never in the rule file:
+
+- **Where.** `platforms.bitdefender.<tenant>` in `.opentide/states/deployment/<uuid>.json` (`deployment.state::1.0`). The tenant key is the configured tenant `name`, whitespace-stripped. One binding per tenant.
+- **Shape.** The 24-hex string `createCustomRule` returns, stored lower-case. It matches `^[0-9a-f]{24}$`; anything else fails `external_id_shape` on write and `deployment_state_shape` on read.
+- **Decisions.** Deploy MUST follow the [deploy decisions](../specs/deployment-state.md#deploy-decisions) of deployment state (table below). It MUST NOT find a rule by listing (`getCustomRulesList`), by name, or by the `opentide:<uuid>` tag.
+- **No orphan creates.** Deploy MUST NOT call `createCustomRule` unless the returned id can be kept. It refuses with `deployment_state_ignored` when the state directory is gitignored, and with `deployment_state_unpersisted` when the run cannot persist state. Generated CI follows the deployment-state [CI requirements](../specs/deployment-state.md#continuous-integration) as for every state-backed platform.
+- **The id is the create's only output.** `createCustomRule` is always sent with `returnRuleId: true`. A create answered with anything but a 24-hex string fails the rule with `bitdefender_create_no_id`. GravityZone may have created a rule that opentide holds no handle on, and deploy MUST NOT look it up to recover the id. The failure names the rule `name`, so the operator can find and remove the rule in the console.
+- **Writes and reads.** The binding is written as soon as the create returns, before any later call for that rule. It is removed only after a successful `deleteCustomRule`, after a `-32002` on delete, or by the `DISABLEMENT`-on-missing path below. Status and reporting (`opentide deploy plan`, the status interfaces) read the id from the shard only.
+- **No legacy keys.** `rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` on a `bitdefender` block fail `external_id_in_rule`, as on every block. Bitdefender never had a legacy key, so `migrate-state` has nothing to move for it.
 
 A create sends (detection kind; `id` is a fresh UUID per request):
 
@@ -598,7 +606,13 @@ The language server checks both forms. A decomposed block is analysed as the rul
 
 #### 7.3 Identity and deploy
 
-HarfangLab YARA becomes **state-backed**: the YaraFile id is recorded under `platforms.harfanglab.<tenant>` and stored verbatim (non-empty, no surrounding whitespace, as CrowdStrike's). Sigma is unchanged and stays addressed by `metadata.uuid`. A block is one kind ([§7.4](#74-one-kind-per-block)), so a HarfangLab binding is always a YaraFile.
+HarfangLab YARA becomes **state-backed**: the YaraFile id is recorded under `platforms.harfanglab.<tenant>` and stored verbatim (non-empty, no surrounding whitespace, as CrowdStrike's). The rules of [§6.7](#67-deploy) apply as written there:
+
+- deploy follows the deployment-state decisions;
+- it refuses a create it cannot persist (`deployment_state_ignored`, `deployment_state_unpersisted`);
+- it never finds a file by listing or by name.
+
+A `POST` whose `status[0]` has no `id` fails the rule with `harfanglab_yara_no_id`. Its only exception is the one-time, operator-run adoption in [§7.6](#76-migration). Sigma is unchanged and stays addressed by `metadata.uuid`. A block is one kind ([§7.4](#74-one-kind-per-block)), so a HarfangLab binding is always a YaraFile.
 
 | Block status strategy | Binding | HarfangLab calls |
 |-----------------------|---------|------------------|
@@ -654,11 +668,13 @@ On acceptance, the same PR adds or changes:
    - state-backed platforms table;
    - the Bitdefender id pattern;
    - `harfanglab` YaraFile ids;
-   - "Deploying a rule to HarfangLab MUST NOT create a shard" becomes "… with a Sigma block only".
-6. `specs/validation.md` 1.6: advisories `bitdefender_registry_full_hive`, `bitdefender_contains_no_wildcard`, `bitdefender_severity_collapsed`, `harfanglab_yara_context`, and the shared YARA warnings.
-7. `specs/objects/rule-1.0.md`, `rule-1.1.md`: `configurations.bitdefender` row and history.
-8. `SPECS.md` (three rows, one new), `CHANGELOG.md` (one section per spec), `rfcs/README.md` (status `accepted`), `llms.txt`.
-9. `scripts/`: `test_platform_bitdefender.py` and `test_language_yara.py`, which prove the fixtures below. `scripts/validate.py` lists the new fixtures.
+   - "Deploying a rule to HarfangLab MUST NOT create a shard" becomes "… with a Sigma block only";
+   - the shard format's platform-key table gains `bitdefender` (24-hex, lower-case) and `harfanglab` (verbatim, as `crowdstrike`).
+6. `schemas/deployment.state.1.0.schema.json`: `platforms` is closed (`additionalProperties: false`), so it gains `"bitdefender": {"$ref": "#/$defs/objectIdTenants"}` and `"harfanglab": {"$ref": "#/$defs/verbatimTenants"}`, plus a new `$defs/objectIdTenants` (tenant name to a string matching `^[0-9a-f]{24}$`). `schema_id` stays `deployment.state::1.0`: the change is additive, and older shards stay valid.
+7. `specs/validation.md` 1.6: advisories `bitdefender_registry_full_hive`, `bitdefender_contains_no_wildcard`, `bitdefender_severity_collapsed`, `harfanglab_yara_context`, and the shared YARA warnings.
+8. `specs/objects/rule-1.0.md`, `rule-1.1.md`: `configurations.bitdefender` row and history.
+9. `SPECS.md` (three rows, one new), `CHANGELOG.md` (one section per spec), `rfcs/README.md` (status `accepted`), `llms.txt`.
+10. `scripts/`: `test_platform_bitdefender.py` and `test_language_yara.py`, which prove the fixtures below. `scripts/validate.py` lists the new fixtures.
 
 ### 9. Fixtures
 
@@ -680,6 +696,8 @@ On acceptance, the same PR adds or changes:
 | `fixtures/invalid/rule-yara-signature-alias.yaml` | `yara_signature_alias` |
 | `fixtures/deployment/valid/<uuid>.json` | A shard with a `bitdefender` and a `harfanglab` binding |
 | `fixtures/deployment/invalid/bitdefender-bad-id.json` | A Bitdefender id that is not 24 hex |
+| `fixtures/deployment/invalid/bitdefender-uppercase-id.json` | A Bitdefender id in upper case |
+| `fixtures/deployment/invalid/harfanglab-blank-id.json` | A whitespace-only HarfangLab YaraFile id |
 
 ### 10. Analysis engine (language-server)
 
@@ -742,10 +760,10 @@ Sizing uses the Sysdig addition as the baseline: about 2,700 lines of Python in 
 | O1 | `bitdefender` models (block, kinds, criterion, actions, targets) and tenant setup models | opentide | 2–3 | S1 |
 | O2 | JSON-RPC client on `TenantSession`: envelope, error mapping, auth modes, create/delete rate limiter, `Retry-After` | opentide | 2–3 | — |
 | O3 | Compiler: derived fields, normalisation, settings by kind, full actions, targets resolution; `api_body` golden tests against fixtures | opentide | 2–3 | O1 |
-| O4 | Deployer: deployment-state shard (24-hex), create/update/disable/delete, recreate, name conflict, unconfirmed create | opentide | 3 | O2, O3 |
+| O4 | Deployer on deployment state: `bitdefender` in `STATE_PLATFORMS` (not `INTEGER_ID_PLATFORMS` or `MIGRATED_PLATFORMS`), a 24-hex rule in `normalise_external_id`, `screen_tenant` / `record_created` / `record_deleted`; create/update/disable/delete, recreate, name conflict, `bitdefender_create_no_id`, unconfirmed create | opentide | 3 | O2, O3 |
 | O5 | Wiring (~25 registrations), bundled TOML, template, diagnostics pages, docs, MCP | opentide | 2–3 | O1 |
 | O6 | Tests: model, compile, deployer (fake JSON-RPC server), setup, e2e | opentide | 4–5 | O1–O4 |
-| H1 | HarfangLab: `yara.signature`, optional `strings`, YaraFile state backing, PATCH/DELETE by id, `enabled`, `status[]` parsing, one kind per block (`harfanglab_rule_kind`) | opentide | 4–5 | S1 |
+| H1 | HarfangLab: `yara.signature`, optional `strings`, YaraFile state backing (`harfanglab` in `STATE_PLATFORMS`, verbatim ids), PATCH/DELETE by id, `enabled`, `status[]` parsing, one kind per block (`harfanglab_rule_kind`) | opentide | 4–5 | S1 |
 | H2 | `migrate-state --adopt harfanglab`, `harfanglab_adoption_pending` | opentide | 2 | H1 |
 | H3 | HarfangLab YARA tests (none exist today): golden content, payloads, state, adoption | opentide | 2–3 | H1, H2 |
 | E1 | Engine bump (with Rust 1.95) and YARA wiring in `validate`, `lint`, `explain`, MCP | opentide | 1–2 | L6, L8, L9 |
