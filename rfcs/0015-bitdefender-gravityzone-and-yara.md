@@ -183,7 +183,7 @@ Requirements:
 - `signature` MUST contain at least one rule that is neither `private` nor `global`.
 - `include` MUST NOT appear (`yara_include`). Neither vendor resolves includes: the API takes one text with no file system behind it.
 - Rule names MUST be unique within `signature` (`yara_duplicate_rule`).
-- **Literal.** `signature` MUST be written out in the block as its own string. A YAML alias (`signature: *name`) that reuses text from elsewhere in the file fails static validation with `yara_signature_alias`. A block that deploys YARA shows that YARA. A rule that targets two platforms writes the text in each block.
+- **Literal.** `signature` MUST be written out in the block as its own string. A YAML alias (`signature: *name`) that reuses text from elsewhere in the file fails static validation with `yara_signature_alias`. A block that deploys YARA shows that YARA. One opentide rule MAY carry a `yara` block for each platform, Bitdefender and HarfangLab, as any rule may target several platforms. Each block writes its own `signature`, and each is checked under its own platform profile.
 
 The key is `signature`: a YARA text is the signature the EDR scans files and memory with, the term detection engineers use and the one HarfangLab uses for its YARA *signatures engine*. One `signature` may hold several YARA rules, as one `.yar` file does. Other names were rejected:
 
