@@ -1,6 +1,6 @@
 ---
 spec: platform-bitdefender
-version: "1.1"
+version: "1.2"
 schema_id: platform::bitdefender::1.0
 status: normative
 supersedes: null
@@ -122,7 +122,7 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `bitdefender_rule_kind` | Exactly one of `detection` and `yara` is set. |
 | `bitdefender_target` | `target` is a detection target from the [`detection`](#detection-bitdefenderdetection) table. The exclusion-only targets `flow` and `bitbucket repository` are refused. |
 | `bitdefender_criterion_shape` | A criterion has `field` and exactly one of `is`, `contains`, and `any`. `is` is a string or an integer, `contains` is a string, and `any` is a non-empty list of strings or integers. A boolean is none of these. |
-| `bitdefender_criterion_field` | `field` belongs to the `target` in the [criteria catalogue](#criteria-catalogue). |
+| `bitdefender_criterion_field` | `field` belongs to the `target` in the [criteria catalogue](#criteria-catalogue). `detection`, the alert filter, is never a criterion field: on every target it is this error, and the block writes `alert` instead. |
 | `bitdefender_criterion_relation` | Enum fields take `is` or `any`; `File.CertificateSignedStatus`, `Connection.Protocol`, and `Registry.DataType` take `is` only. `contains` is not allowed on `*.MD5` and `*.SHA2`. |
 | `bitdefender_criterion_value` | An enum field's value is one of its values. A port is an integer from 0 to 65535. |
 | `bitdefender_criteria_combination` | The catalogue's pairing rules hold. EDR-only and XDR-only fields or values are not mixed. `File.Certificate*` needs `File.Name` or `File.FullPathName`. `Connection.Protocol` needs `Connection.Domain`. An XDR detection uses `alert` or an operation criterion, not both. |
@@ -390,3 +390,4 @@ Fixtures:
 |---------|------|-------|
 | 1.0 | 2026-11-10 | Initial field contract ([RFC 0016](../../rfcs/0016-bitdefender-gravityzone-platform.md)): `detection` and `yara` kinds, criteria catalogue, derived name, description, severity, and tags; whole-payload updates; the GravityZone id in deployment state; no exclusion rules. |
 | 1.1 | 2026-11-10 | Clarifications from the first implementation review: an update sends `filters: []` and `targets: {}` when the block has none, so a removed alert filter or target scope does not survive on GravityZone (create still omits them); the `connection` row lists the XDR fields Bitdefender's criteria page gives (`Connection.SourceUser`, `Connection.DestinationUser`, `Connection.Email.Subject`, and a `.Name` and `.Operation` per XDR resource); three enum fields take `is` only; value types per relation; one `field_path` per code; the `HKLU` hint for `HKEY_USERS` keys without a SID. Schema id unchanged. |
+| 1.2 | 2026-11-10 | `detection` as a criterion field is `bitdefender_criterion_field` (error) on every target, open ones included: the alert filter is written as `alert`. Found where opentide and the language server disagreed. Schema id unchanged. |

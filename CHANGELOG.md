@@ -296,6 +296,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - First language spec, [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) ([RFC 0015](rfcs/0015-yara-language.md)): `YaraSignature`, the libyara 4.5 dialect with YARA-X as warnings, stable `yara_*` diagnostics, and the `bitdefender` and `harfanglab` profiles. Answers the YARA questions of [specifications#68](https://github.com/opentidehq/specifications/issues/68).
 
+## platform-bitdefender 1.2
+
+- `detection` as a criterion field is `bitdefender_criterion_field` (error) on every target; the alert filter is written as `alert`. Aligns opentide and the language server. Schema id unchanged.
+
 ## platform-bitdefender 1.1
 
 - Clarifications from the first implementation review, checked against Bitdefender's criteria page: the `connection` row lists its XDR fields; `File.CertificateSignedStatus`, `Connection.Protocol`, and `Registry.DataType` take `is` only; value types per relation (no booleans); one `field_path` per code so opentide and the editor agree; the `HKLU` hint for `HKEY_USERS` keys without a SID. Schema id unchanged. The fixture checker follows.

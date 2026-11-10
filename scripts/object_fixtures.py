@@ -866,6 +866,8 @@ def _bd_criterion_errors(criterion: Any, target: str, path: str) -> list[CheckEr
         return [CheckError("bitdefender_criterion_shape", "any takes strings or integers", path)]
     errors: list[CheckError] = []
     field_name = criterion["field"]
+    if field_name == "detection":
+        return [CheckError("bitdefender_criterion_field", "the alert filter is written as `alert`, not a criterion", path)]
     known = BITDEFENDER_FIELDS.get(target)
     if known is not None and field_name not in known:
         errors.append(CheckError("bitdefender_criterion_field", f"{field_name!r} is not a {target} field", path))
