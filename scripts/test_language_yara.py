@@ -74,7 +74,7 @@ class SpecShapeTests(unittest.TestCase):
     def test_frontmatter_and_sections(self) -> None:
         text = _read(SPEC)
         self.assertIn("spec: language-yara", text)
-        self.assertIn('version: "1.4"', text)
+        self.assertIn('version: "1.5"', text)
         self.assertIn("status: normative", text)
         self.assertEqual(re.findall(r"^## (.+)$", text, flags=re.MULTILINE), SECTIONS)
 
