@@ -249,7 +249,7 @@ class SpecShapeTests(unittest.TestCase):
 
     def test_field_paths_are_fixed(self) -> None:
         text = _read(SPEC)
-        self.assertIn('version: "1.1"', text)
+        self.assertIn('version: "1.2"', text)
         self.assertIn("| `bitdefender_action_scope` | `actions.<key>` |", text)
 
     def test_no_exclusion_and_whole_payload(self) -> None:
@@ -352,6 +352,8 @@ class CheckerTests(unittest.TestCase):
             _codes(validate_bitdefender_block(block(detection=detection, targets={"endpoint_tags": [], "companies": ["a"]}))),
             {"bitdefender_targets_shape"},
         )
+        alert_field = {"target": "email", "criteria": [{"field": "detection", "is": "Some alert"}]}
+        self.assertEqual(_codes(validate_bitdefender_block(block(detection=alert_field))), {"bitdefender_criterion_field"})
         xdr = {"target": "connection", "criteria": [{"field": "Connection.SourceUser", "is": "bob"}]}
         self.assertEqual(validate_bitdefender_block(block(detection=xdr)), [])
         is_only = {"target": "registry", "criteria": [{"field": "Registry.DataType", "any": ["dword"]}]}
