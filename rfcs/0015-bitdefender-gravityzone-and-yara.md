@@ -136,7 +136,9 @@ HarfangLab publishes no public API reference. The facts below come from third-pa
 | `hl_status` ∈ `stable`, `testing`, `experimental` | confirmed | Sent |
 | `PATCH …/YaraFile/{id}` accepts `content`, `name`, `source_id`, `hl_status`, and `enabled`, and echoes `content` back ([OpenCTI `harfanglab-intel` `patch_yara_file`](https://github.com/OpenCTI-Platform/connectors/blob/master/stream/harfanglab-intel/src/harfanglab_intel_connector/api_client.py); the legacy connector used `PUT …/YaraFile/{id}/`) | confirmed | Never updates in place |
 | `global_state`, `rule_confidence_override`, `rule_level_override` on a YaraFile | **no public source** for or against: public clients send them on IOC rules only. Assumed accepted by maintainer decision (2026-11-10). | Sent |
-| HarfangLab's own rules set meta `context` to `"file"`, `"memory"`, or `"file,memory"` and never set `os`, `arch`, `score`, or `id` | confirmed | Rewrites `file` to `file.pe`, `file.elf`, or `file.macho`; these values appear in no vendor material |
+| No HarfangLab document defines YARA meta. HarfangLab's own rules ([HarfangLab/iocs](https://github.com/HarfangLab/iocs) at `3e2b674`) set `context` on every rule, with 79 uses: `"file"` 67, `"memory"` 6, `"file,memory"` 6. Plain `file` covers PE, HTML, LNK, and OLE/MSI files alike. They never set `os`, `arch`, `score`, or `id`. | confirmed (vendor usage, not vendor docs) | Rewrites `file` to `file.pe`, `file.elf`, or `file.macho` |
+| `file.pe`, `file.elf`, `file.macho`, `process`, and `thread` come from a single source: CoreTide commit `e1fae48` (2025-12-18, "complete implementation of harfanglab deployer"), which cites nothing. `process` and `thread` start as a commented sketch in that work's `IMPLEMENTATION.md`. opentide imported this code, and the opentidehq/skills HarfangLab page copies it. No vendor or third-party material uses any of these values. | confirmed (provenance) | Required by the model |
+| HarfangLab sums per-rule scores per file. A real alert reads *"Binary was found malicious by 2 rule(s) with a score of 120"* with `level: high` (Sekoia intake-formats `HarfangLab/harfanglab/tests/alert.json`). | confirmed (one sample) | 0–100 score bands with no source |
 | Engine version (libyara or YARA-X) and modules | **not published** | `imports` takes any string |
 | A rule with both `sigma` and `yara` is classed as Sigma and skipped on a `YARA` tenant | confirmed (`deployer.py:318-335`) | YARA half never deploys |
 
@@ -265,7 +267,7 @@ Warnings (reported, never rejecting):
 | Size | ≤ 30,000 characters (`bitdefender_yara_size`, error) | no documented limit |
 | YARA rules per `signature` | one or more | one or more |
 | Confirmed modules | `pe`, `elf`, `math`, `hash`, `time` | `pe`, `elf`, `math`, `hash`, `time` |
-| Recommended meta | none | `context` on every non-private rule, valued `file`, `memory`, or `file,memory` (`yara_meta_missing`; another value is `harfanglab_yara_context`, warning) |
+| Recommended meta | none | `context` on every non-private rule, valued `file`, `memory`, or `file,memory`, the values HarfangLab's published rules use (`yara_meta_missing`; any other value is `harfanglab_yara_context`, warning) |
 
 ### 6. Bitdefender block (`platform::bitdefender::1.0`)
 
@@ -595,7 +597,7 @@ The decomposed rule name is fixed so it always compiles. Today a Tide name that 
 
 An empty `strings` omits the `strings:` header, which today is emitted and refused.
 
-The decomposed form stays valid and is not deprecated by this RFC. Its `file` → `file.pe`/`file.elf`/`file.macho` rewrite is kept as specified (see [Unresolved questions](#unresolved-questions)). The `signature` form does no rewriting: the author writes `context` in each rule's meta, and the [HarfangLab profile](#54-platform-profiles) checks it.
+The decomposed form stays valid and is not deprecated by this RFC. Its `file` → `file.pe`/`file.elf`/`file.macho` rewrite is **dropped**: deploy writes `meta.context` as authored, joined with commas. The rewrite has no source beyond CoreTide commit `e1fae48` ([§3.2](#32-harfanglab-yara)), and HarfangLab's own rules use plain `file` for every OS and file type. A decomposed `meta.context` value other than `file` or `memory` is the `harfanglab_yara_context` warning. The `os`, `arch`, and `score` meta that deploy writes stay as they are, as opentide conventions: HarfangLab's published rules use none of them, and its engine sums per-rule scores instead of reading 0–100 bands. The `signature` form does no rewriting: the author writes `context` in each rule's meta, and the [HarfangLab profile](#54-platform-profiles) checks it.
 
 The language server checks both forms. A decomposed block is analysed as the rule deploy assembles, with each diagnostic mapped back to `strings` or `condition`.
 
@@ -790,7 +792,7 @@ Milestones:
 - **Rate limits make the first deploy slow.** At 5 creates per minute per key, a 300-rule catalogue takes about an hour to create the first time. Updates are not limited that way. CI jobs need a timeout to match, or several API keys.
 - **On-premises GravityZone is not covered.** It has no Incidents API. Its customers keep custom rules in the console.
 - **YARA rules per company are capped at 50.** A large YARA catalogue has to pack several rules into one block's `signature`.
-- **The HarfangLab rework is a behaviour change for existing users.** YaraFile ids join deployment state, an adoption step runs once, and a block with both `sigma` and `yara` must be split into two rules.
+- **The HarfangLab rework is a behaviour change for existing users.** YaraFile ids join deployment state, an adoption step runs once, a block with both `sigma` and `yara` must be split into two rules, and the next deploy of a decomposed rule rewrites its `context` meta from `file.pe`/`file.elf`/`file.macho` back to the authored `file`.
 - **YARA engine versions and module lists are not public.** Bitdefender's agent ships libyara at an unpublished version. HarfangLab names no engine. Module support is assumed on both. A rule that uses a feature newer than the agent's libyara, or a module the agent lacks, fails at deploy (`bitdefender_*` API error, `harfanglab_yara_rejected`) instead of at validation.
 - **The criteria catalogue is copied from a web page.** When Bitdefender adds fields, the sync script has to run, and until then a new field is an error.
 - **The engine follows YARA-X's release train.** The `yara-x-*` crates need Rust 1.95 today and raise their minimum about every two months, which moves the language server's and opentide's toolchain with them. Two parsers (tree-sitter and `yara-x-parser`) can disagree, and the agreement test has to keep them aligned.
@@ -822,8 +824,7 @@ These need a live GravityZone cloud tenant and a HarfangLab console (V1). Answer
 
 1. **GravityZone `updateCustomRule`.** Does a full `settings` replace the stored one, including `automaticActions`? What does an update with a different `type` return?
 2. **GravityZone errors.** What error does `createCustomRule` return for a duplicate name? Is name uniqueness per type, so that a console exclusion can block a detection rule's name?
-3. **HarfangLab `context` values.** Are `file.pe`, `file.elf`, `file.macho`, `process`, and `thread` valid, or only `file` and `memory`? The decomposed-form rewrite is kept or dropped on this answer.
-4. **HarfangLab Sigma identity.** Does it honour the Sigma `id`? Out of scope here, but the same check covers it, and it is filed against specifications#68.
+3. **HarfangLab Sigma identity.** Does it honour the Sigma `id`? Out of scope here, but the same check covers it, and it is filed against specifications#68.
 
 ### Resolved before acceptance
 
@@ -833,6 +834,7 @@ These need a live GravityZone cloud tenant and a HarfangLab console (V1). Answer
 | GravityZone YARA modules (`import "pe"`, …) | Assumed to compile | No public source. Maintainer decision, 2026-11-10 |
 | HarfangLab `PATCH YaraFile` with `content` | Yes, in place | OpenCTI `harfanglab-intel` `patch_yara_file` |
 | HarfangLab `global_state`, `rule_confidence_override`, `rule_level_override` on YaraFile | Assumed accepted | No public source. Maintainer decision, 2026-11-10 |
+| HarfangLab `context` values | `file`, `memory`, `file,memory`. The `file.pe`/`file.elf`/`file.macho` rewrite is dropped; `process` and `thread` are not values. | HarfangLab/iocs (79 uses, no other value). The other values trace to CoreTide `e1fae48`, which cites no source. The vendor docs portal is not public. |
 
 ### Open design points
 
