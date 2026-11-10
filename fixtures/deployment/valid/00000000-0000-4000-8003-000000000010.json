@@ -1,6 +1,9 @@
 {
   "object_uuid": "00000000-0000-4000-8003-000000000010",
   "platforms": {
+    "bitdefender": {
+      "gravityzone-eu": "6372b7a3897aaa77ee021642"
+    },
     "crowdstrike": {
       "falcon-prod": "c5e1b2a0e4c84f0a9d3b7e6a1c8f0d22"
     },
