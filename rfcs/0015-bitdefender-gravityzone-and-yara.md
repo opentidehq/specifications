@@ -12,11 +12,12 @@
 
 ## Summary
 
-This RFC adds a tenth detection platform, `bitdefender` (display name **Bitdefender GravityZone**, schema `platform::bitdefender::1.0`). Its block is one GravityZone **custom detection rule** of one of three kinds:
+This RFC adds a tenth detection platform, `bitdefender` (display name **Bitdefender GravityZone**, schema `platform::bitdefender::1.0`). Its block is one GravityZone **custom detection rule** of one of two kinds:
 
 - `detection`: a Basic rule, made of criteria on a process, file, connection, registry, or XDR event;
-- `yara`: a YARA detection rule;
-- `exclusion`: an exclusion rule.
+- `yara`: a YARA detection rule.
+
+GravityZone exclusion rules are out of scope. An exclusion suppresses detections and detects nothing, so it is not an opentide rule. Deploy creates, updates, and deletes detection rules (`type: 1`) only.
 
 Deploy goes through the GravityZone Public API (JSON-RPC 2.0, Incidents API) with `createCustomRule`, `updateCustomRule`, and `deleteCustomRule`. GravityZone assigns each rule a 24-hex id, which is kept in [deployment state](../specs/deployment-state.md).
 
@@ -42,7 +43,7 @@ The change is additive for rule files. It adds `configurations.bitdefender`, new
 
 ## Motivation
 
-- **Bitdefender GravityZone is a common EDR/XDR, and opentide cannot reach it.** Teams keep GravityZone custom rules in the console, outside their detection catalogue, without objectives, review, or lifecycle. Since GravityZone v6.74 (June 2026), the Public API can create, update, and delete detection, exclusion, and YARA rules. A detection-as-code platform is possible for the first time.
+- **Bitdefender GravityZone is a common EDR/XDR, and opentide cannot reach it.** Teams keep GravityZone custom rules in the console, outside their detection catalogue, without objectives, review, or lifecycle. Since GravityZone v6.74 (June 2026), the Public API can create, update, and delete custom detection rules, Basic and YARA. A detection-as-code platform is possible for the first time.
 - **YARA is the second rule language two EDRs accept, and opentide has no spec for it.** HarfangLab's block has decomposed `strings` and `condition` fields, so it can express only one rule, always with a `strings:` section. It has no private or global helper rules, no tags, and no condition-only rule (`pe.imphash() == "…"`). Nothing compiles the YARA text before it reaches the tenant ([specifications#68](https://github.com/opentidehq/specifications/issues/68), [language-server#165](https://github.com/opentidehq/language-server/issues/165)). Adding Bitdefender with its own YARA field would create a second, different YARA contract.
 - **HarfangLab YARA deploy has defects the spec currently codifies.** The spec says a YARA rule is deleted by `metadata.uuid`, but HarfangLab assigns its own YaraFile id, so delete targets an id the tenant never had. YARA ignores `DISABLEMENT`. A rule with both `sigma` and `yara` never deploys its YARA half. A YaraFile that fails to compile comes back as HTTP 200 and is reported as deployed. [§3.2](#32-harfanglab-yara) has the evidence.
 - **One YARA contract for every EDR.** A detection engineer who writes YARA for a malware family wants it on every EDR that runs YARA. With one `YaraSignature` shape and one language spec, YARA is written and checked the same way for HarfangLab and Bitdefender. Each platform block still carries its own text, so a block never deploys text written somewhere else.
@@ -267,7 +268,7 @@ Warnings (reported, never rejecting):
 
 #### 6.1 Shape
 
-The block root holds the rule's identity, labels, scope, and response. Below it sits **exactly one kind object**: `detection`, `yara`, or `exclusion`. The kind decides the GravityZone `type` and `subtype`, and which root keys apply.
+The block root holds the rule's identity, labels, scope, and response. Below it sits **exactly one kind object**: `detection` or `yara`. The kind decides the GravityZone `type` and `subtype`, and which root keys apply.
 
 ```yaml
 configurations:
@@ -283,7 +284,7 @@ configurations:
     actions:                          # automatic actions; detection and yara only
       kill_process: {include_children: true}
       collect_investigation_package: true
-    detection:                        # exactly one of detection | yara | exclusion
+    detection:                        # exactly one of detection | yara
       target: process
       alert: null                     # optional: GravityZone alert name (filters[detection])
       criteria:
@@ -320,42 +321,26 @@ configurations:
         }
 ```
 
-```yaml
-configurations:
-  bitdefender:
-    enabled: true
-    schema: platform::bitdefender::1.0
-    status: PRODUCTION
-    exclusion:
-      target: process
-      criteria:
-        - field: Process.FullPathName
-          is: C:\Program Files\Backup\agent.exe
-        - field: Process.CommandLine
-          contains: "*--snapshot*"
-```
-
 #### 6.2 Block fields
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `severity` | string | optional | [derived](#64-derived-fields) | `Low`, `Medium`, or `High`. Not allowed with `exclusion`. |
+| `severity` | string | optional | [derived](#64-derived-fields) | `Low`, `Medium`, or `High`. |
 | `tags` | list[string] | optional | null | Extra GravityZone tags. Deploy adds the [derived tags](#64-derived-fields). |
 | `targets` | [BitdefenderTargets](#targets) | optional | tenant `targets` | Endpoint tags or companies the rule applies to. |
-| `actions` | [BitdefenderActions](#actions) | optional | null | Automatic actions. Not allowed with `exclusion`. |
-| `detection` | [BitdefenderCriteriaRule](#detection-and-exclusion) | conditional | — | A Basic detection rule (`type: 1`, `subtype: 0`) |
+| `actions` | [BitdefenderActions](#actions) | optional | null | Automatic actions. |
+| `detection` | [BitdefenderDetection](#detection) | conditional | — | A Basic detection rule (`type: 1`, `subtype: 0`) |
 | `yara` | [BitdefenderYara](#yara) | conditional | — | A YARA detection rule (`type: 1`, `subtype: 1`) |
-| `exclusion` | [BitdefenderCriteriaRule](#detection-and-exclusion) | conditional | — | An exclusion rule (`type: 2`, `subtype: 0`) |
 
 The shared `name` is the GravityZone rule name; empty means the opentide rule `name`. `status` is required, as on `elastic` and `sysdig`.
 
-##### `detection` and `exclusion`
+##### `detection`
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `target` | string | yes | — | A GravityZone target from [§3.1](#custom-rule-methods-incidents-api-v10-only), written as the API spells it (`process`, `user connection`). `flow` and `bitbucket repository` are exclusion-only. |
+| `target` | string | yes | — | A GravityZone target from [§3.1](#custom-rule-methods-incidents-api-v10-only), written as the API spells it (`process`, `user connection`). The exclusion-only targets `flow` and `bitbucket repository` are not allowed. |
 | `criteria` | list[Criterion] | yes | — | At least one. All criteria must match (AND). |
-| `alert` | string | optional | null | `detection` only. The GravityZone alert (detection) name; sent as `filters: [{field: "detection", value: <alert>}]`. |
+| `alert` | string | optional | null | The GravityZone alert (detection) name; sent as `filters: [{field: "detection", value: <alert>}]`. |
 
 `criteria[]` (Criterion) has `field` and **exactly one** relation key:
 
@@ -405,9 +390,8 @@ Static validation MUST reject a block that breaks any of these, and report the c
 
 | Code | Constraint |
 |------|------------|
-| `bitdefender_rule_kind` | Exactly one of `detection`, `yara`, `exclusion` is set. |
-| `bitdefender_exclusion_keys` | With `exclusion`, `severity` and `actions` are not set. |
-| `bitdefender_target` | `target` is a GravityZone target; `flow` and `bitbucket repository` only under `exclusion`. |
+| `bitdefender_rule_kind` | Exactly one of `detection` and `yara` is set. Any other kind key (`exclusion` included) is an unknown key. |
+| `bitdefender_target` | `target` is a GravityZone detection target. The exclusion-only targets `flow` and `bitbucket repository` are refused. |
 | `bitdefender_criterion_shape` | A criterion has `field` and exactly one of `is`, `contains`, `any`. `any` is a non-empty list. `is` and `contains` are scalars. |
 | `bitdefender_criterion_field` | `field` belongs to the `target` in the [catalogue](#65-criteria-catalogue). |
 | `bitdefender_criterion_relation` | Enum fields (`*.Operation`, `*.DataType`, `*.Protocol`, `*.CertificateSignedStatus`, …) take `is` or `any` only. `contains` is not allowed on `*.MD5` and `*.SHA2`. |
@@ -457,7 +441,7 @@ enabled = true
 identifier = "bitdefender"
 name = "Bitdefender GravityZone"
 subschema = "Bitdefender GravityZone"
-description = "Custom detection, YARA, and exclusion rules for GravityZone EDR/XDR."
+description = "Custom detection and YARA detection rules for GravityZone EDR/XDR."
 flags = []
 
 [[tenants]]
@@ -542,16 +526,15 @@ Settings by kind:
 |------|--------------------|-----------------|
 | `detection` | 1 / 0 | `status`, `severity`, `target`, `criteriaList`, `filters` (when `alert` is set), `automaticActions` |
 | `yara` | 1 / 1 | `status` (from `on_access`, or `0` under `DISABLEMENT`), `severity`, `yaraQuery` (the `signature`), `automaticActions` |
-| `exclusion` | 2 / 0 | `status`, `target`, `criteriaList` |
 
-**Automatic actions are sent in full.** Every action type the kind allows is sent, each `enabled: true` or `false`: seven types for `detection`, six for `yara` (no kill process), none for `exclusion`. An update therefore turns off an action removed from the block. With tenant `automatic_actions = false`, the key is omitted.
+**Automatic actions are sent in full.** Every action type the kind allows is sent, each `enabled: true` or `false`: seven types for `detection`, six for `yara` (no kill process). An update therefore turns off an action removed from the block. With tenant `automatic_actions = false`, the key is omitted.
 
 | Block status strategy | Binding | GravityZone calls |
 |-----------------------|---------|-------------------|
 | `PREVIEW`, `RELEASE`, `UNIVERSAL` | none | `createCustomRule` with `returnRuleId: true`; the returned id is recorded |
 | `PREVIEW`, `RELEASE`, `UNIVERSAL` | present | `updateCustomRule` with `ruleId`, `type`, `name`, `description`, `tags`, the full `settings`, and `targets` |
-| `DISABLEMENT` | present | `updateCustomRule` as above with `settings.status: 0` (Basic and exclusion: inactive; YARA: on-access off) |
-| `DELETION` | present | `deleteCustomRule` with `ruleId` and `type`, then the binding is removed |
+| `DISABLEMENT` | present | `updateCustomRule` as above with `settings.status: 0` (Basic: inactive; YARA: on-access off) |
+| `DELETION` | present | `deleteCustomRule` with `ruleId` and `type: 1` (the API defaults to exclusion), then the binding is removed |
 | `DISABLEMENT`, `DELETION` | none | `external_id_missing` (warning), no call |
 
 Failure handling:
@@ -630,7 +613,7 @@ HarfangLab YARA becomes **state-backed**: the YaraFile id is recorded under `pla
 
 #### 7.4 One kind per block
 
-A HarfangLab block carries **either** `sigma` (a detection) **or** `yara`, as a Bitdefender block carries exactly one of `detection`, `yara`, and `exclusion`. Both together fail static validation with `harfanglab_rule_kind`. The rule "when both are present, deploy MUST publish `sigma` and MUST NOT publish `yara`" is removed, because both can no longer be present. A block with neither still validates, and deploy still fails it, as today.
+A HarfangLab block carries **either** `sigma` (a detection) **or** `yara`, as a Bitdefender block carries exactly one of `detection` and `yara`. Both together fail static validation with `harfanglab_rule_kind`. The rule "when both are present, deploy MUST publish `sigma` and MUST NOT publish `yara`" is removed, because both can no longer be present. A block with neither still validates, and deploy still fails it, as today.
 
 A detection and a YARA file for the same threat are two opentide rules, each with its own `metadata.uuid`, review, status, and deployment history.
 
@@ -665,7 +648,7 @@ On acceptance, the same PR adds or changes:
 4. `specs/platforms/index.md` 1.5:
    - ten platforms;
    - capability row `bitdefender | Bitdefender GravityZone | yes* | no‡ | GravityZone criteria or YARA`;
-   - static-validation bar `bitdefender | status, exactly one of detection, yara, exclusion`, and `harfanglab | at most one of sigma, yara`;
+   - static-validation bar `bitdefender | status, exactly one of detection, yara`, and `harfanglab | at most one of sigma, yara`;
    - external-ids rows: `bitdefender` (shard) and `harfanglab` (Sigma by `metadata.uuid`, YARA by shard).
 5. `specs/deployment-state.md` 1.4:
    - state-backed platforms table;
@@ -684,13 +667,12 @@ On acceptance, the same PR adds or changes:
 | `fixtures/platforms/bitdefender.yaml` | Minimal block per kind |
 | `fixtures/valid/rule-bitdefender-detection-1.0.yaml` | Process rule, `any`/`is`/`contains`, actions, endpoint-tag targets |
 | `fixtures/valid/rule-bitdefender-yara-1.0.yaml` | Several YARA rules in one `signature`, a private helper rule, `pe` import, `on_access: false` |
-| `fixtures/valid/rule-bitdefender-exclusion-1.0.yaml` | Exclusion |
 | `fixtures/platforms/bitdefender/*.api.json` | The JSON-RPC bodies deploy sends for each valid fixture (create, update, disable) |
 | `fixtures/platforms/harfanglab-yara-signature.yaml` | `harfanglab.yara.signature` |
 | `fixtures/platforms/harfanglab/*.api.json` | YaraFile `POST` and `PATCH` bodies |
 | `fixtures/invalid/rule-bitdefender-two-kinds.yaml` | `bitdefender_rule_kind` |
 | `fixtures/invalid/rule-bitdefender-criterion-field.yaml` | `bitdefender_criterion_field` (`Process.Hash` on `process`) |
-| `fixtures/invalid/rule-bitdefender-exclusion-actions.yaml` | `bitdefender_exclusion_keys` |
+| `fixtures/invalid/rule-bitdefender-exclusion.yaml` | An `exclusion` key: unknown key, `bitdefender_rule_kind` |
 | `fixtures/invalid/rule-bitdefender-kill-on-yara.yaml` | `bitdefender_action_scope` |
 | `fixtures/invalid/rule-bitdefender-yara-include.yaml` | `yara_include` |
 | `fixtures/invalid/rule-harfanglab-yara-both-forms.yaml` | `harfanglab_yara_form` |
@@ -777,7 +759,7 @@ Milestones:
 
 | Milestone | Content |
 |-----------|---------|
-| M1 | Spec landed; Bitdefender `detection`/`exclusion` deploy; HarfangLab identity, `DISABLEMENT`, and compile-status fixes |
+| M1 | Spec landed; Bitdefender `detection` deploy; HarfangLab identity, `DISABLEMENT`, and compile-status fixes |
 | M2 | Bitdefender `yara` deploy; `harfanglab.yara.signature`; adoption |
 | M3 | Engine 0.13: YARA syntax and semantic checks, injection, Bitdefender criteria checks, in `opentide validate` and editors |
 | M4 | Oracle and conformance green, rename and formatting |
@@ -800,7 +782,7 @@ Milestones:
 - **Decomposed YARA for Bitdefender, like HarfangLab's.** Rejected. It cannot express several rules, private helpers, or condition-only rules, and both vendors accept a whole YARA text.
 - **Deploy-time meta injection** (opentide writes `id`, `score`, `context` into the signature). Rejected. It needs a YARA rewriter in the deploy path and breaks "what was reviewed is what is deployed". Bitdefender stores the text as sent and shows it in the console.
 - **Bitdefender identity by name or by the `opentide:<uuid>` tag.** Rejected. [Deployment state](../specs/deployment-state.md) forbids rediscovery by listing, and `getCustomRulesList` has no filter, so every deploy would page through every rule.
-- **Exclusions as tunings inside a detection block** (as Sysdig's `append_to_rule`). Rejected. A GravityZone exclusion is a separate remote rule with its own id, and a shard binding holds one id per tenant. An exclusion is its own opentide rule, which also gives it its own review and lifecycle.
+- **GravityZone exclusion rules** (`type: 2`), as a third kind or as tunings inside a detection block. Rejected. An exclusion suppresses incidents and detects nothing, so it is not a detection rule and has no objective, threat, or ATT&CK mapping to carry. A tuning would also need a second remote id per tenant, which a shard binding cannot hold. Exclusions stay in the GravityZone console, where they are managed today. Deploy never creates, updates, or deletes one.
 - **Advanced rules (`subtype: 2`, `advancedQuery`).** Deferred. They appear only on unlisted pages. When Bitdefender publishes them, a fourth kind (`advanced`) is an additive change.
 - **The full YARA-X compiler in-process** (`yara_x::Compiler` as the checker). Rejected:
   - It would make YARA-X the contract.
@@ -818,7 +800,7 @@ Milestones:
 These need a live GravityZone cloud tenant and a HarfangLab console (V1). Answers change spec text, not shape:
 
 1. **GravityZone `updateCustomRule`.** Does a full `settings` replace the stored one, including `automaticActions`? What does an update with a different `type` return?
-2. **GravityZone errors.** What error does `createCustomRule` return for a duplicate name? Is name uniqueness per type or across detection and exclusion rules?
+2. **GravityZone errors.** What error does `createCustomRule` return for a duplicate name? Is name uniqueness per type, so that a console exclusion can block a detection rule's name?
 3. **GravityZone YARA.** Do `import "pe"` and the other confirmed modules compile? Is the engine libyara (check a YARA-X-only incompatibility)?
 4. **HarfangLab YaraFile fields.** Does a YaraFile accept `global_state`, `rule_confidence_override`, and `rule_level_override` (`/api/schema` on a console)? Does `PATCH` accept `content`?
 5. **HarfangLab `context` values.** Are `file.pe`, `file.elf`, `file.macho`, `process`, and `thread` valid, or only `file` and `memory`? The decomposed-form rewrite is kept or dropped on this answer.
