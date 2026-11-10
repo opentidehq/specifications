@@ -1,0 +1,9 @@
+{
+  "object_uuid": "00000000-0000-4000-8003-000000000010",
+  "platforms": {
+    "bitdefender": {
+      "gravityzone-eu": "6372b7a3897aaa77ee02164"
+    }
+  },
+  "schema": "deployment.state::1.0"
+}

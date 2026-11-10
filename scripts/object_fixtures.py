@@ -786,6 +786,160 @@ def validate_harfanglab_block(block: dict[str, Any]) -> list[CheckError]:
     return errors
 
 
+BITDEFENDER_TARGETS = frozenset(
+    {
+        "process", "file", "connection", "registry", "user connection", "email", "application", "key vault",
+        "role", "policy", "sharing link", "url", "ssh key", "launch template", "service principal", "user group",
+        "automation account", "automation account hook", "certificate authority", "api", "bucket",
+        "jira project", "confluence page",
+    }
+)
+_BD_CREATED_BY = ("Name", "Path", "FullPathName", "CommandLine", "User")
+BITDEFENDER_FIELDS: dict[str, frozenset[str]] = {
+    "process": frozenset(
+        f"Process.{name}"
+        for name in (
+            "Name", "Path", "FullPathName", "CommandLine", "Parent.Name", "Parent.Path", "Parent.FullPathName",
+            "Parent.CommandLine", "User", "MD5", "SHA2",
+        )
+    ),
+    "file": frozenset(
+        [f"File.{name}" for name in ("Name", "Path", "FullPathName", "Operation", "CertificateSigner",
+                                     "CertificateIssuer", "CertificateSignedStatus", "MD5", "SHA2", "Url",
+                                     "SourceIP", "DestinationIP")]
+        + [f"File.CreatedBy.{name}" for name in _BD_CREATED_BY]
+    ),
+    "connection": frozenset(
+        [f"Connection.{name}" for name in ("SourceIP", "DestinationIP", "SourcePort", "DestinationPort", "URL",
+                                           "Domain", "Protocol", "HTTPUser", "HTTPDownloadedFile",
+                                           "HTTPUploadedFile", "FTPUser", "SSHUser", "TelnetUser", "SMBDomain",
+                                           "SMBSharePath", "SMBUser", "WMIExecQuery", "FileRemotePath",
+                                           "FileRemoteOperation")]
+        + [f"Connection.Process.{name}" for name in _BD_CREATED_BY]
+    ),
+    "registry": frozenset(
+        [f"Registry.{name}" for name in ("Key", "Value", "Data", "DataType", "Operation")]
+        + [f"Registry.CreatedBy.{name}" for name in _BD_CREATED_BY[:4]]
+    ),
+}
+BITDEFENDER_ENUMS: dict[str, frozenset[str]] = {
+    "File.Operation": frozenset({"rename", "copy", "create", "shared", "downloaded", "uploaded", "read", "write", "move"}),
+    "File.CertificateSignedStatus": frozenset({"is_signed", "is_unsigned"}),
+    "Connection.Protocol": frozenset({"http/https", "smb"}),
+    "Connection.FileRemoteOperation": frozenset({"create", "rem_delete", "read", "write", "move"}),
+    "Registry.Operation": frozenset(
+        {"key_created", "key_deleted", "key_renamed", "value_created", "value_deleted", "value_written"}
+    ),
+    "Registry.DataType": frozenset(
+        {"string", "expandablestring", "dword", "qword", "binary", "none", "link", "resource_list",
+         "full_resource_descriptor", "resource_requirements_list"}
+    ),
+}
+BITDEFENDER_ACTIONS = ("isolate", "collect_investigation_package", "sandbox", "kill_process", "antimalware_scan",
+                       "quarantine", "risk_scan")
+_BD_RELATIONS = ("is", "contains", "any")
+
+
+def _bd_criterion_errors(criterion: Any, target: str, path: str) -> list[CheckError]:
+    if not isinstance(criterion, dict) or not isinstance(criterion.get("field"), str):
+        return [CheckError("bitdefender_criterion_shape", "a criterion needs a field", path)]
+    relations = [key for key in _BD_RELATIONS if key in criterion]
+    unknown = set(criterion) - {"field", *_BD_RELATIONS}
+    if len(relations) != 1 or unknown:
+        return [CheckError("bitdefender_criterion_shape", "a criterion has exactly one of is, contains, any", path)]
+    relation, value = relations[0], criterion[relations[0]]
+    if relation == "any" and (not isinstance(value, list) or not value):
+        return [CheckError("bitdefender_criterion_shape", "any takes a non-empty list", path)]
+    if relation != "any" and (isinstance(value, (list, dict)) or value is None):
+        return [CheckError("bitdefender_criterion_shape", f"{relation} takes one value", path)]
+    errors: list[CheckError] = []
+    field_name = criterion["field"]
+    known = BITDEFENDER_FIELDS.get(target)
+    if known is not None and field_name not in known:
+        errors.append(CheckError("bitdefender_criterion_field", f"{field_name!r} is not a {target} field", path))
+    if field_name in BITDEFENDER_ENUMS:
+        if relation == "contains":
+            errors.append(CheckError("bitdefender_criterion_relation", f"{field_name} takes is or any", path))
+        values = value if isinstance(value, list) else [value]
+        bad = [item for item in values if item not in BITDEFENDER_ENUMS[field_name]]
+        if bad:
+            errors.append(CheckError("bitdefender_criterion_value", f"{bad!r} not in {field_name}", path))
+    if relation == "contains" and field_name.endswith((".MD5", ".SHA2")):
+        errors.append(CheckError("bitdefender_criterion_relation", f"contains is not allowed on {field_name}", path))
+    if field_name.endswith("Port"):
+        values = value if isinstance(value, list) else [value]
+        if any(not isinstance(item, int) or isinstance(item, bool) or not 0 <= item <= 65535 for item in values):
+            errors.append(CheckError("bitdefender_criterion_value", "a port is an integer 0-65535", path))
+    return errors
+
+
+def validate_bitdefender_block(block: dict[str, Any]) -> list[CheckError]:
+    """The platform::bitdefender::1.0 constraint codes that need no catalogue beyond the spec's EDR table.
+
+    specs/platforms/bitdefender-1.0.md#constraints. `bitdefender_criteria_combination` and the workspace check
+    `bitdefender_name_duplicate` are left to opentide.
+    """
+    base = "configurations.bitdefender"
+    errors: list[CheckError] = []
+    kinds = [key for key in ("detection", "yara") if key in block]
+    if len(kinds) != 1:
+        errors.append(CheckError("bitdefender_rule_kind", "exactly one of detection and yara", base))
+    severity = block.get("severity")
+    if severity is not None and severity not in ("Low", "Medium", "High"):
+        errors.append(CheckError("bitdefender_severity", f"{severity!r} is not Low, Medium, or High", f"{base}.severity"))
+    targets = block.get("targets")
+    if targets is not None:
+        keys = [key for key in ("endpoint_tags", "companies") if key in (targets if isinstance(targets, dict) else {})]
+        if (
+            not isinstance(targets, dict)
+            or len(keys) != 1
+            or set(targets) - {"endpoint_tags", "companies"}
+            or not isinstance(targets[keys[0]], list)
+            or not targets[keys[0]]
+        ):
+            errors.append(CheckError("bitdefender_targets_shape", "one non-empty list: endpoint_tags or companies", f"{base}.targets"))
+    detection = block.get("detection")
+    target = ""
+    created_by = False
+    if isinstance(detection, dict):
+        target = detection.get("target") if isinstance(detection.get("target"), str) else ""
+        if target not in BITDEFENDER_TARGETS:
+            errors.append(CheckError("bitdefender_target", f"{target!r} is not a detection target", f"{base}.detection.target"))
+        criteria = detection.get("criteria")
+        if not isinstance(criteria, list) or not criteria:
+            errors.append(CheckError("bitdefender_criterion_shape", "criteria is a non-empty list", f"{base}.detection.criteria"))
+            criteria = []
+        for index, criterion in enumerate(criteria):
+            errors.extend(_bd_criterion_errors(criterion, target, f"{base}.detection.criteria.{index}"))
+            if isinstance(criterion, dict) and ".CreatedBy." in str(criterion.get("field", "")):
+                created_by = True
+    actions = block.get("actions")
+    if isinstance(actions, dict):
+        for key in actions:
+            if key not in BITDEFENDER_ACTIONS:
+                errors.append(CheckError("bitdefender_action_scope", f"{key!r} is not an action", f"{base}.actions"))
+        process_like = target in ("process", "file") or created_by
+        for key in ("sandbox", "quarantine"):
+            if key in actions and "detection" in kinds and not process_like:
+                errors.append(CheckError("bitdefender_action_scope", f"{key} needs a process or file target", f"{base}.actions.{key}"))
+        if "kill_process" in actions and ("yara" in kinds or not process_like):
+            errors.append(CheckError("bitdefender_action_scope", "kill_process is a Basic process/file action", f"{base}.actions.kill_process"))
+        scan = actions.get("antimalware_scan")
+        if scan is not None and scan not in ("quick", "full"):
+            errors.append(CheckError("bitdefender_action_scope", "antimalware_scan is quick or full", f"{base}.actions.antimalware_scan"))
+    yara_block = block.get("yara")
+    if isinstance(yara_block, dict):
+        signature = yara_block.get("signature")
+        path = f"{base}.yara.signature"
+        errors.extend(validate_yara_signature(signature, path))
+        if isinstance(signature, str):
+            if not signature.isascii():
+                errors.append(CheckError("bitdefender_yara_ascii", "the signature holds non-ASCII characters", path))
+            if len(signature) > 30000:
+                errors.append(CheckError("bitdefender_yara_size", "the signature exceeds 30,000 characters", path))
+    return errors
+
+
 def aliased_paths(text: str) -> list[str]:
     """Dotted paths whose value is a YAML alias of a node defined earlier in the file."""
     if yaml is None:
@@ -866,6 +1020,8 @@ def validate_rule(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[CheckEr
         errors.extend(validate_sysdig_block(configurations["sysdig"]))
     if isinstance(configurations, dict) and isinstance(configurations.get("harfanglab"), dict):
         errors.extend(validate_harfanglab_block(configurations["harfanglab"]))
+    if isinstance(configurations, dict) and isinstance(configurations.get("bitdefender"), dict):
+        errors.extend(validate_bitdefender_block(configurations["bitdefender"]))
     errors.extend(validate_searches(doc))
     return errors
 
@@ -933,4 +1089,8 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "rule-harfanglab-yara-both-forms.yaml": "harfanglab_yara_form",
     "rule-harfanglab-yara-include.yaml": "yara_include",
     "rule-yara-signature-alias.yaml": "yara_signature_alias",
+    "rule-bitdefender-two-kinds.yaml": "bitdefender_rule_kind",
+    "rule-bitdefender-criterion-field.yaml": "bitdefender_criterion_field",
+    "rule-bitdefender-exclusion.yaml": "bitdefender_rule_kind",
+    "rule-bitdefender-kill-on-yara.yaml": "bitdefender_action_scope",
 }

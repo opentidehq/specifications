@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.6"
+version: "1.7"
 schema_id: null
 status: normative
 supersedes: null
@@ -87,9 +87,12 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `risk_band` | warning | Elastic: an explicit risk score is outside its severity's band |
 | `technique_not_enterprise` | warning | Elastic: the rule names a technique that is not Enterprise ATT&CK, which deploy skips |
 | `sysdig_list_self_reference` | warning | Sysdig: a block list names itself, which Falco keeps as a literal value |
+| `bitdefender_registry_full_hive` | warning | Bitdefender: a `Registry.Key` value starts with a full hive name, so the rule never triggers |
+| `bitdefender_contains_no_wildcard` | warning | Bitdefender: a `contains` value has neither `*` nor `?` |
+| `bitdefender_severity_collapsed` | warning | Bitdefender: `Critical` or `Informational` severity sent as GravityZone `High` or `Low` |
 | `harfanglab_yara_context` | warning | HarfangLab: a YARA rule's meta `context` is not `file`, `memory`, `file,memory`, `file.pe`, `file.elf`, or `file.macho` |
 
-The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories), [sysdig-1.0](platforms/sysdig-1.0.md#advisories), and [harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile).
+The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories), [sysdig-1.0](platforms/sysdig-1.0.md#advisories), [bitdefender-1.0](platforms/bitdefender-1.0.md#advisories), and [harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile).
 
 ### Language diagnostics
 
@@ -110,8 +113,9 @@ Command: `opentide validate query --platform <id> --live`
 | `crowdstrike` | no |
 | `harfanglab` | no. YARA is checked offline by `opentide validate` ([harfanglab-1.0](platforms/harfanglab-1.0.md#query-validation)) |
 | `sysdig` | no. The Falco condition is checked offline by `opentide validate` ([sysdig-1.0](platforms/sysdig-1.0.md#query-validation)) |
+| `bitdefender` | no. Constraints, criteria, and YARA are checked offline by `opentide validate` ([bitdefender-1.0](platforms/bitdefender-1.0.md#query-validation)) |
 
-Requires platform credentials and enabled configuration. Validates deployed or planned rule queries against the live platform API. Query validation is a tenant check on every platform in the query-validation allowlist above: without `--live` the command MUST refuse and name `--live`, and MUST NOT report a pass. `crowdstrike`, `harfanglab`, and `sysdig` report `supported: false` instead ([platforms](platforms/index.md#query-validation-platforms)). `validate query` has no offline mode on any platform; Elastic's query language (KQL, Lucene, EQL, or ES|QL) comes from each rule's block: its `type`, and `language` for the types that take one.
+Requires platform credentials and enabled configuration. Validates deployed or planned rule queries against the live platform API. Query validation is a tenant check on every platform in the query-validation allowlist above: without `--live` the command MUST refuse and name `--live`, and MUST NOT report a pass. `crowdstrike`, `harfanglab`, `sysdig`, and `bitdefender` report `supported: false` instead ([platforms](platforms/index.md#query-validation-platforms)). `validate query` has no offline mode on any platform; Elastic's query language (KQL, Lucene, EQL, or ES|QL) comes from each rule's block: its `type`, and `language` for the types that take one.
 
 ### Specifications-repo fixture checker
 
@@ -148,6 +152,10 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/invalid/rule-harfanglab-yara-both-forms.yaml](../fixtures/invalid/rule-harfanglab-yara-both-forms.yaml) | `harfanglab_yara_form` |
 | [fixtures/invalid/rule-harfanglab-yara-include.yaml](../fixtures/invalid/rule-harfanglab-yara-include.yaml) | `yara_include` |
 | [fixtures/invalid/rule-yara-signature-alias.yaml](../fixtures/invalid/rule-yara-signature-alias.yaml) | `yara_signature_alias` |
+| [fixtures/invalid/rule-bitdefender-two-kinds.yaml](../fixtures/invalid/rule-bitdefender-two-kinds.yaml) | `bitdefender_rule_kind` |
+| [fixtures/invalid/rule-bitdefender-exclusion.yaml](../fixtures/invalid/rule-bitdefender-exclusion.yaml) | `bitdefender_rule_kind` |
+| [fixtures/invalid/rule-bitdefender-criterion-field.yaml](../fixtures/invalid/rule-bitdefender-criterion-field.yaml) | `bitdefender_criterion_field` |
+| [fixtures/invalid/rule-bitdefender-kill-on-yara.yaml](../fixtures/invalid/rule-bitdefender-kill-on-yara.yaml) | `bitdefender_action_scope` |
 | [fixtures/sharing/invalid/unknown-distribution.toml](../fixtures/sharing/invalid/unknown-distribution.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/legacy-targets-table.toml](../fixtures/sharing/invalid/legacy-targets-table.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/duplicate-name.toml](../fixtures/sharing/invalid/duplicate-name.toml) | `duplicate_name` |
@@ -165,6 +173,8 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/deployment/invalid/empty-id.json](../fixtures/deployment/invalid/empty-id.json) | `deployment_state_shape` |
 | [fixtures/deployment/invalid/whitespace-tenant.json](../fixtures/deployment/invalid/whitespace-tenant.json) | `deployment_state_shape` |
 | [fixtures/deployment/invalid/unsupported-platform.json](../fixtures/deployment/invalid/unsupported-platform.json) | `deployment_state_platform` |
+| [fixtures/deployment/invalid/bitdefender-bad-id.json](../fixtures/deployment/invalid/bitdefender-bad-id.json) | `deployment_state_shape` |
+| [fixtures/deployment/invalid/bitdefender-uppercase-id.json](../fixtures/deployment/invalid/bitdefender-uppercase-id.json) | `deployment_state_shape` |
 | [fixtures/deployment/invalid/rule-with-rule-id.yaml](../fixtures/deployment/invalid/rule-with-rule-id.yaml) | `external_id_in_rule` |
 | [fixtures/deployment/invalid/rule-with-rule-id-tenant.yaml](../fixtures/deployment/invalid/rule-with-rule-id-tenant.yaml) | `external_id_in_rule` |
 | [fixtures/deployment/invalid/rule-with-rule-id-bundle.yaml](../fixtures/deployment/invalid/rule-with-rule-id-bundle.yaml) | `external_id_in_rule` |
@@ -176,6 +186,8 @@ Sharing fixtures (`scripts/sharing_fixtures.py`) also prove the merge rule: [ove
 On a rule's `configurations.elastic` block the checker applies three of the [Elastic constraint codes](platforms/elastic-1.0.md#constraints), the ones the invalid Elastic fixture exercises: `language`, `esql_source`, and `suppression_shape`. They are the platform's own codes, so the checker and `opentide validate` report the same name. The other Elastic codes, and every other platform block, are left to opentide.
 
 On a rule's `configurations.sysdig` block the checker applies the [Sysdig constraint codes](platforms/sysdig-1.0.md#constraints) that need no Falco parser: `sysdig_rule_shape`, `sysdig_tuning_keys`, `sysdig_priority`, `sysdig_source`, `sysdig_exception_shape`, `sysdig_definition_name`, and `sysdig_definition_duplicate`. `sysdig_definition_order` and `sysdig_list_in_value` need the Falco tokenizer and are left to opentide.
+
+On a rule's `configurations.bitdefender` block the checker applies the [Bitdefender constraint codes](platforms/bitdefender-1.0.md#constraints) that need only the spec's EDR field table: `bitdefender_rule_kind`, `bitdefender_target`, `bitdefender_criterion_shape`, `bitdefender_criterion_field` (for `process`, `file`, `connection`, and `registry`), `bitdefender_criterion_relation`, `bitdefender_criterion_value`, `bitdefender_action_scope`, `bitdefender_targets_shape`, `bitdefender_severity`, `bitdefender_yara_ascii`, and `bitdefender_yara_size`, plus the parser-free YARA codes on `yara.signature`. `bitdefender_criteria_combination` and the workspace check `bitdefender_name_duplicate` are left to opentide.
 
 On a rule's `configurations.harfanglab` block the checker applies `harfanglab_rule_kind`, `harfanglab_yara_form`, and `harfanglab_yara_section_header`. On any `yara.signature` it applies the [YARA codes](languages/yara-1.0.md#diagnostics) that need no YARA parser: `yara_signature_alias`, `yara_include`, `yara_empty_signature`, and `yara_duplicate_rule`. The other YARA codes are left to the analysis engine.
 
@@ -231,6 +243,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.7 | 2026-11-10 | `bitdefender` is excluded from query validation (`supported: false`) and checked offline by `opentide validate` ([bitdefender-1.0](platforms/bitdefender-1.0.md), [RFC 0016](../rfcs/0016-bitdefender-gravityzone-platform.md)). Advisories `bitdefender_registry_full_hive`, `bitdefender_contains_no_wildcard`, and `bitdefender_severity_collapsed`. The fixture checker applies eleven Bitdefender constraint codes. |
 | 1.6 | 2026-11-10 | [Language diagnostics](#language-diagnostics): the YARA language's errors and warnings ([yara-1.0](languages/yara-1.0.md), [RFC 0015](../rfcs/0015-yara-language.md)). Advisory `harfanglab_yara_context`. HarfangLab YARA is checked offline by `opentide validate`; `validate query` stays `supported: false`. The fixture checker applies three HarfangLab codes and four YARA codes. |
 | 1.5 | 2026-11-03 | [Platform advisories](#platform-advisories): `sysdig_list_self_reference` ([sysdig-1.0](platforms/sysdig-1.0.md#advisories)). |
 | 1.5 | 2026-11-02 | `sysdig` is excluded from query validation (`supported: false`); its Falco condition is checked offline by `opentide validate` ([sysdig-1.0](platforms/sysdig-1.0.md#query-validation)). `validate query` has no offline mode on any platform. The fixture checker applies seven Sysdig constraint codes to `configurations.sysdig` blocks. |

@@ -51,6 +51,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
+- `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md)) is added ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.1`. New fixtures `fixtures/valid/rule-1.1-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
 - Correct the `severity` pin to `alert_severity::1.0`. The normative text, the default (`Informational`) and every rule fixture already used alert labels, but the pin named `severity::1.0`, the Threat Severity incident scale, so a conforming rule failed validation. Corrected in place, as the pin disagreed with this spec rather than the spec changing; threats keep `severity::1.0`.
@@ -62,6 +63,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.0
 
+- `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md)) is added ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.0`. New fixtures `fixtures/valid/rule-1.0-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
 - Correct the `severity` pin to `alert_severity::1.0`. The normative text, the default (`Informational`) and every rule fixture already used alert labels, but the pin named `severity::1.0`, the Threat Severity incident scale, so a conforming rule failed validation. Corrected in place, as the pin disagreed with this spec rather than the spec changing; threats keep `severity::1.0`.
@@ -135,6 +137,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
 
+## deployment-state 1.4
+
+- `bitdefender` is state-backed: the GravityZone custom rule id, 24 lower-case hex digits, under `platforms.bitdefender.<tenant>` ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). The shard JSON Schema gains `$defs/objectIdTenants`; schema id unchanged. New invalid fixtures `bitdefender-bad-id.json` and `bitdefender-uppercase-id.json`.
+
 ## deployment-state 1.3
 
 - `sysdig` is a state-backed platform: the Sysdig rule id is a canonical decimal string under `platforms.sysdig.<tenant>`. `schemas/deployment.state.1.0.schema.json` accepts the `sysdig` key; `schema_id` stays `deployment.state::1.0` ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)).
@@ -162,6 +168,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## metaschema-keywords 1.0
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
+
+## platforms 1.6
+
+- Bitdefender GravityZone joins the matrix as the tenth platform ([specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md), [RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)): custom detection and YARA detection rules through the GravityZone Public API. It is excluded from query validation (`supported: false`); `opentide validate` checks the block offline. The rule id lives in deployment state.
 
 ## platforms 1.5
 
@@ -274,6 +284,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - First language spec, [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) ([RFC 0015](rfcs/0015-yara-language.md)): `YaraSignature`, the libyara 4.5 dialect with YARA-X as warnings, stable `yara_*` diagnostics, and the `bitdefender` and `harfanglab` profiles. Answers the YARA questions of [specifications#68](https://github.com/opentidehq/specifications/issues/68).
 
+## platform-bitdefender 1.0
+
+- Initial field contract ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)): `detection` (GravityZone Basic criteria) and `yara` (`YaraSignature` plus `on_access`) kinds; severity, tags, targets, and automatic actions; derived name, description, severity, and tags; whole-payload updates; the GravityZone id in deployment state; no exclusion rules. Fixtures, a fixture tenant, and JSON-RPC goldens under `fixtures/platforms/bitdefender/`.
+
 ## sharing 1.3
 
 - `--changed` and the production release name the production deploy by its run strategy (`opentide deploy --strategy RELEASE` on a push) instead of `--plan PRODUCTION`, which opentide 0.17.0 removed. The commit range is unchanged.
@@ -299,6 +313,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.7
+
+- `bitdefender` is excluded from query validation and checked offline. Advisories `bitdefender_registry_full_hive`, `bitdefender_contains_no_wildcard`, `bitdefender_severity_collapsed`. The fixture checker applies eleven Bitdefender constraint codes ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)).
 
 ## validation 1.6
 

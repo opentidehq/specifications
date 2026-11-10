@@ -262,6 +262,14 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "platforms" / "sysdig.yaml",
         FIXTURES / "platforms" / "sysdig" / "rule-sysdig-1.0.api.json",
         FIXTURES / "platforms" / "sysdig" / "rule-sysdig-tuning-1.0.api.json",
+        FIXTURES / "platforms" / "bitdefender.yaml",
+        FIXTURES / "platforms" / "bitdefender" / "tenant.toml",
+        FIXTURES / "platforms" / "bitdefender" / "rule-bitdefender-detection-1.0.create.api.json",
+        FIXTURES / "platforms" / "bitdefender" / "rule-bitdefender-detection-1.0.update.api.json",
+        FIXTURES / "platforms" / "bitdefender" / "rule-bitdefender-detection-1.0.disable.api.json",
+        FIXTURES / "platforms" / "bitdefender" / "rule-bitdefender-yara-1.0.create.api.json",
+        FIXTURES / "valid" / "rule-bitdefender-detection-1.0.yaml",
+        FIXTURES / "valid" / "rule-bitdefender-yara-1.0.yaml",
     ]
     for path in required:
         if not path.is_file():
