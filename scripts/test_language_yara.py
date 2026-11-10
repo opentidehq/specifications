@@ -74,9 +74,15 @@ class SpecShapeTests(unittest.TestCase):
     def test_frontmatter_and_sections(self) -> None:
         text = _read(SPEC)
         self.assertIn("spec: language-yara", text)
-        self.assertIn('version: "1.2"', text)
+        self.assertIn('version: "1.3"', text)
         self.assertIn("status: normative", text)
         self.assertEqual(re.findall(r"^## (.+)$", text, flags=re.MULTILINE), SECTIONS)
+
+    def test_identifier_limit_covers_every_bare_identifier(self) -> None:
+        text = _read(SPEC)
+        dialect = text.split("### Dialect", 1)[1].split("### Modules", 1)[0]
+        self.assertIn("Every identifier except a string identifier is at most 128 characters", dialect)
+        self.assertIn("`for` and `with` variables", dialect)
 
     def test_diagnostics_tables(self) -> None:
         text = _read(SPEC)
