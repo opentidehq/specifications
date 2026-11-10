@@ -1,6 +1,6 @@
 ---
 spec: language-yara
-version: "1.4"
+version: "1.5"
 schema_id: null
 status: normative
 supersedes: null
@@ -84,7 +84,7 @@ The engine knows 13 modules, with their fields, functions, overloads, and types:
 | `yara_undefined_string` | A `$id`, `#id`, `@id`, `!id`, or `$prefix*` in a condition that matches no string of the rule |
 | `yara_unreferenced_string` | A string never used in the condition, when the condition does not use `them` (libyara refuses it) |
 | `yara_undefined_identifier` | A bare identifier that is neither a rule defined earlier in the `signature` nor a module |
-| `yara_rule_identifier_conflict` | A rule named like a YARA keyword |
+| `yara_rule_identifier_conflict` | A rule named like a YARA keyword, or a rule whose name matches a rule wildcard (`any of (a_*)`) that an earlier condition uses |
 | `yara_unknown_module` | `import` of a module libyara does not ship |
 | `yara_module_not_imported` | A module field or function used without an `import` of the module before the rule |
 | `yara_unknown_module_member` | A field or function the module does not have, or the wrong arguments |
@@ -180,3 +180,4 @@ Fixtures: [fixtures/platforms/harfanglab-yara-signature.yaml](../../fixtures/pla
 | 1.2 | 2026-11-10 | Clarifications from the second implementation review, checked against libyara 4.5.4 and YARA-X 1.23: the 128-character limit applies to rule names, rule tags, and meta keys, not to string identifiers; a non-boolean condition for `yara_suspicious_expression` is what YARA-X reports as `non_bool_expr`, so module members YARA-X types as boolean do not warn. No code is added or removed. |
 | 1.3 | 2026-11-10 | Clarification from the third implementation review, checked against libyara 4.5.4 and YARA-X 1.23: the 128-character limit covers every identifier except string identifiers, including `for` and `with` variables, not only rule names, rule tags, and meta keys. No code is added or removed. |
 | 1.4 | 2026-11-10 | `opentide validate query` checks YARA offline (signatures, and `.yar`/`.yara` files under the platform's profile); `--live` stays `supported: false`. Matches [validation 1.9](../validation.md#query-validation). No code is added or removed. |
+| 1.5 | 2026-11-10 | `yara_rule_identifier_conflict` also covers a rule whose name matches a rule wildcard an earlier condition uses, which libyara 4.5.4 refuses ("matches previously used wildcard rule set"). No code is added or removed. |
