@@ -1,6 +1,6 @@
 ---
 spec: platform-bitdefender
-version: "1.2"
+version: "1.3"
 schema_id: platform::bitdefender::1.0
 status: normative
 supersedes: null
@@ -47,7 +47,7 @@ Deploy:
 
 Query validation:
 
-- `opentide validate query --platform bitdefender` MUST report `supported: false`. GravityZone has no dry run in its API.
+- `opentide validate query --platform bitdefender --live` MUST report `supported: false`. GravityZone has no dry run in its API. Without `--live`, `validate query` checks YARA offline, as `opentide validate` does.
 
 ## Definition
 
@@ -302,6 +302,7 @@ Each request is a JSON-RPC 2.0 `POST` to `<url>/v1.0/jsonrpc/incidents` with `Co
 | Check | Bitdefender |
 |-------|-------------|
 | `opentide validate` (offline) | yes: the constraints, the criteria catalogue, and the YARA language for `yara.signature` |
+| `opentide validate query` (offline) | YARA: `yara.signature`, and a `.yar` or `.yara` file under the `bitdefender` profile |
 | `opentide validate query --live` | no (`supported: false`) |
 | `opentide query` | no |
 
@@ -391,3 +392,4 @@ Fixtures:
 | 1.0 | 2026-11-10 | Initial field contract ([RFC 0016](../../rfcs/0016-bitdefender-gravityzone-platform.md)): `detection` and `yara` kinds, criteria catalogue, derived name, description, severity, and tags; whole-payload updates; the GravityZone id in deployment state; no exclusion rules. |
 | 1.1 | 2026-11-10 | Clarifications from the first implementation review: an update sends `filters: []` and `targets: {}` when the block has none, so a removed alert filter or target scope does not survive on GravityZone (create still omits them); the `connection` row lists the XDR fields Bitdefender's criteria page gives (`Connection.SourceUser`, `Connection.DestinationUser`, `Connection.Email.Subject`, and a `.Name` and `.Operation` per XDR resource); three enum fields take `is` only; value types per relation; one `field_path` per code; the `HKLU` hint for `HKEY_USERS` keys without a SID. Schema id unchanged. |
 | 1.2 | 2026-11-10 | `detection` as a criterion field is `bitdefender_criterion_field` (error) on every target, open ones included: the alert filter is written as `alert`. Found where opentide and the language server disagreed. Schema id unchanged. |
+| 1.3 | 2026-11-10 | Query validation: `--live` is `supported: false`; without `--live`, `validate query` checks YARA offline ([validation 1.9](../validation.md#query-validation)). Schema id unchanged. |

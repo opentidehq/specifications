@@ -1,6 +1,6 @@
 ---
 spec: platform-harfanglab
-version: "1.3"
+version: "1.4"
 schema_id: platform::harfanglab::1.0
 status: normative
 supersedes: null
@@ -170,6 +170,7 @@ A YARA rule's `content` is `yara.signature` in the signature form, verbatim, and
 | Check | HarfangLab |
 |-------|------------|
 | `opentide validate` (offline, analysis engine) | YARA: `yara.signature`, and the rule the decomposed form assembles, under the [YARA language](../languages/yara-1.0.md). Sigma: not checked. |
+| `opentide validate query` (offline) | yes: the same YARA check, and a `.yar` or `.yara` file under the `harfanglab` profile |
 | `opentide validate query --live` | no (`supported: false`) |
 
 ## Relationships
@@ -269,3 +270,4 @@ Fixtures: [fixtures/platforms/harfanglab-sigma.yaml](../../fixtures/platforms/ha
 | 1.1 | 2026-10-16 | `rule_id_bundle` is removed. Legacy external-id keys fail `external_id_in_rule`, and migration removes them as `external_id_unused` ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Identity stays `metadata.uuid`. Schema id unchanged. |
 | 1.2 | 2026-11-10 | `yara.signature`: a whole YARA text (`YaraSignature`), deployed as the YaraFile `content` verbatim, beside the decomposed form. A block is one kind: `sigma` and `yara` together fail `harfanglab_rule_kind`, replacing "deploy MUST publish `sigma`". New constraint codes and the HarfangLab YARA profile; YARA is checked offline against [yara-1.0](../languages/yara-1.0.md) ([RFC 0015](../../rfcs/0015-yara-language.md)). The YARA deployer is otherwise unchanged. Schema id unchanged. |
 | 1.3 | 2026-11-10 | Clarifications from the first implementation review: the decomposed form is checked exactly as deploy assembles it, every diagnostic mapped to an authored field and none dropped; `harfanglab_yara_rule_name` also covers a derived name over 128 characters; `harfanglab_yara_context` accepts any comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho`, applies to the decomposed form, and covers a non-string `context`. Schema id unchanged. |
+| 1.4 | 2026-11-10 | Query validation: `opentide validate query` checks YARA offline, `.yar`/`.yara` files included; `--live` stays `supported: false` ([validation 1.9](../validation.md#query-validation)). Schema id unchanged. |

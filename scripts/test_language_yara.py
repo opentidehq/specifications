@@ -74,7 +74,7 @@ class SpecShapeTests(unittest.TestCase):
     def test_frontmatter_and_sections(self) -> None:
         text = _read(SPEC)
         self.assertIn("spec: language-yara", text)
-        self.assertIn('version: "1.3"', text)
+        self.assertIn('version: "1.4"', text)
         self.assertIn("status: normative", text)
         self.assertEqual(re.findall(r"^## (.+)$", text, flags=re.MULTILINE), SECTIONS)
 
@@ -108,7 +108,7 @@ class SpecShapeTests(unittest.TestCase):
 class HarfangLabSpecTests(unittest.TestCase):
     def test_version_and_constraints(self) -> None:
         text = _read(HARFANGLAB)
-        self.assertIn('version: "1.3"', text)
+        self.assertIn('version: "1.4"', text)
         self.assertEqual(
             _table_codes(text, "### Constraints", "### YARA profile"),
             [

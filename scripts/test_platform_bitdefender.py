@@ -249,7 +249,7 @@ class SpecShapeTests(unittest.TestCase):
 
     def test_field_paths_are_fixed(self) -> None:
         text = _read(SPEC)
-        self.assertIn('version: "1.2"', text)
+        self.assertIn('version: "1.3"', text)
         self.assertIn("| `bitdefender_action_scope` | `actions.<key>` |", text)
 
     def test_no_exclusion_and_whole_payload(self) -> None:
@@ -285,7 +285,7 @@ class ListingTests(unittest.TestCase):
         self.assertIn("opentide ships ten detection platform integrations.", text)
         self.assertIn("| `bitdefender` | `platform::bitdefender::1.0` | [bitdefender-1.0.md](bitdefender-1.0.md) |", text)
         self.assertIn("| `bitdefender` | Bitdefender GravityZone | yes* | **no**¶ | GravityZone criteria or YARA |", text)
-        self.assertIn("Excluded: `crowdstrike`, `harfanglab`, `sysdig`, `bitdefender`.", text)
+        self.assertIn("Excluded from `--live`: `crowdstrike`, `harfanglab`, `sysdig`, `bitdefender`.", text)
 
     def test_spec_index_and_llms(self) -> None:
         self.assertIn("[specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md)", _read(ROOT / "SPECS.md"))

@@ -1,6 +1,6 @@
 ---
 spec: language-yara
-version: "1.3"
+version: "1.4"
 schema_id: null
 status: normative
 supersedes: null
@@ -23,7 +23,7 @@ The contract is YARA as libyara 4.5 compiles it. YARA-X 1.x is a second opinion:
 - `signature` MUST NOT contain an `include` directive (`yara_include`). No platform resolves includes: each API takes one text with no file system behind it.
 - Static validation MUST report every [error](#errors) as a failure, and MUST report every [warning](#warnings) without failing the rule.
 - Static validation MUST apply the profile of the platform whose block holds the signature. A signature in two platform blocks is checked once under each profile.
-- `opentide validate query` MUST NOT claim a YARA check. YARA is checked offline by `opentide validate`, and no platform offers a YARA dry run.
+- YARA is checked offline: by `opentide validate`, and by `opentide validate query` without `--live` (a rule's signature, or a `.yar` or `.yara` file under `--platform`'s profile). No platform offers a YARA dry run, so `validate query --live` MUST report `supported: false` for a YARA platform and MUST NOT claim a tenant check.
 
 ## Definition
 
@@ -179,3 +179,4 @@ Fixtures: [fixtures/platforms/harfanglab-yara-signature.yaml](../../fixtures/pla
 | 1.1 | 2026-11-10 | Clarifications from the first implementation review, checked against libyara 4.5.4 and YARA-X 1.23: identifiers are at most 128 characters (`yara_parse_error`); an `import` must come before the rule that uses the module; a rule named like an imported module is `yara_x_incompatible` (libyara compiles it), so `yara_rule_identifier_conflict` covers keywords only; a `yara_x_incompatible` message says what YARA-X refuses rather than quoting it; `yara_slow_pattern` names libyara's own warnings only. No code is added or removed. |
 | 1.2 | 2026-11-10 | Clarifications from the second implementation review, checked against libyara 4.5.4 and YARA-X 1.23: the 128-character limit applies to rule names, rule tags, and meta keys, not to string identifiers; a non-boolean condition for `yara_suspicious_expression` is what YARA-X reports as `non_bool_expr`, so module members YARA-X types as boolean do not warn. No code is added or removed. |
 | 1.3 | 2026-11-10 | Clarification from the third implementation review, checked against libyara 4.5.4 and YARA-X 1.23: the 128-character limit covers every identifier except string identifiers, including `for` and `with` variables, not only rule names, rule tags, and meta keys. No code is added or removed. |
+| 1.4 | 2026-11-10 | `opentide validate query` checks YARA offline (signatures, and `.yar`/`.yara` files under the platform's profile); `--live` stays `supported: false`. Matches [validation 1.9](../validation.md#query-validation). No code is added or removed. |

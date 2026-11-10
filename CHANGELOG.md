@@ -169,6 +169,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
 
+## platforms 1.7
+
+- The query-validation allowlist is the `--live` (tenant) allowlist. Without `--live`, `validate query` checks offline with the analysis engine, YARA and Falco included ([validation 1.9](specs/validation.md#query-validation)).
+
 ## platforms 1.6
 
 - Bitdefender GravityZone joins the matrix as the tenth platform ([specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md), [RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)): custom detection and YARA detection rules through the GravityZone Public API. It is excluded from query validation (`supported: false`); `opentide validate` checks the block offline. The rule id lives in deployment state.
@@ -250,6 +254,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - `platform::crowdstrike::1.0`. Correlation rule: filter `query`, `details.trigger` (`verbose` or `summary`), `details.outcome` (`detection` or `incident`), and `schedule`. No query validator.
 
+## platform-harfanglab 1.4
+
+- `opentide validate query` checks YARA offline, `.yar` and `.yara` files included; `--live` stays `supported: false`. Schema id unchanged.
+
 ## platform-harfanglab 1.3
 
 - The decomposed form is checked exactly as deploy assembles it, with every diagnostic mapped to an authored field and none dropped. `harfanglab_yara_rule_name` also covers a derived name over 128 characters. `harfanglab_yara_context` accepts any comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` (what the decomposed form writes, e.g. `file.pe,memory`), applies to the decomposed form, and covers a non-string `context`. Schema id unchanged.
@@ -280,9 +288,17 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Live query validation through Kibana rule preview, and the Elasticsearch checks (ES|QL pre-flight, aggregation, timestamp, and indicator match fields) before every deploy. No offline check.
 - Fixtures `fixtures/valid/rule-elastic-1.0.yaml`, `fixtures/invalid/rule-elastic-esql-index.yaml`, and `fixtures/platforms/elastic.yaml`.
 
+## platform-sysdig 1.1
+
+- `--live` is `supported: false`; without `--live`, `validate query` checks the Falco condition offline. Schema id unchanged.
+
 ## platform-sysdig 1.0
 
 - Initial field contract for `platform::sysdig::1.0` ([RFC 0014](rfcs/0014-sysdig-falco-platform.md), [specifications#8](https://github.com/opentidehq/specifications/issues/8)): a Falco condition with exceptions and private macros and lists, expanded at deploy; or a tuning of an existing rule (`append_to_rule`). Derived name, `desc`, `priority`, tags, and output. Deployed through the Sysdig Secure API only. The Falco language, exception rules, and list expansion follow libsinsp and Falco's rule loader exactly. Nine constraint codes and one advisory, `sysdig_list_self_reference`; list definition order follows Falco (a list may name a later list). Fixtures under `fixtures/platforms/sysdig/` (the API bodies) and `fixtures/valid/rule-sysdig-*.yaml`.
+
+## language-yara 1.4
+
+- `opentide validate query` checks YARA offline (signatures, and `.yar`/`.yara` files under the platform's profile); `--live` stays `supported: false` and never claims a tenant check. No code added or removed.
 
 ## language-yara 1.3
 
@@ -299,6 +315,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## language-yara 1.0
 
 - First language spec, [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) ([RFC 0015](rfcs/0015-yara-language.md)): `YaraSignature`, the libyara 4.5 dialect with YARA-X as warnings, stable `yara_*` diagnostics, and the `bitdefender` and `harfanglab` profiles. Answers the YARA questions of [specifications#68](https://github.com/opentidehq/specifications/issues/68).
+
+## platform-bitdefender 1.3
+
+- `--live` is `supported: false`; without `--live`, `validate query` checks YARA offline. Schema id unchanged.
 
 ## platform-bitdefender 1.2
 
@@ -337,6 +357,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.9
+
+- Query validation matches `opentide validate query` as it ships (since opentide 0.19): offline by default with the analysis engine (the `queries` check on its own, plus query files), and `--live` as the tenant check with its allowlist. `crowdstrike`, `harfanglab`, `sysdig`, and `bitdefender` stay `supported: false` for `--live`. Replaces "no offline mode on any platform", which the implementation had outgrown.
 
 ## validation 1.8
 

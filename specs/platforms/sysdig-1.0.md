@@ -1,6 +1,6 @@
 ---
 spec: platform-sysdig
-version: "1.0"
+version: "1.1"
 schema_id: platform::sysdig::1.0
 status: normative
 supersedes: null
@@ -43,7 +43,7 @@ Deploy:
 
 Query validation:
 
-- `opentide validate query --platform sysdig` MUST report `supported: false`. Sysdig Secure has no dry-run or preview for a rule. The offline engine check is part of `opentide validate` ([Query validation](#query-validation)).
+- `opentide validate query --platform sysdig --live` MUST report `supported: false`. Sysdig Secure has no dry-run or preview for a rule. The offline engine check is part of `opentide validate`, and of `validate query` without `--live` ([Query validation](#query-validation)).
 
 ## Definition
 
@@ -356,5 +356,6 @@ Fixtures: [fixtures/platforms/sysdig.yaml](../../fixtures/platforms/sysdig.yaml)
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-11-10 | Query validation: `--live` is `supported: false`; without `--live`, `validate query` checks the Falco condition offline ([validation 1.9](../validation.md#query-validation)). Schema id unchanged. |
 | 1.0 | 2026-11-03 | Before merge: configured over the API only (no rules-file delivery; `minimum_engine_version`); the Falco language, exception rules, and list expansion follow libsinsp and Falco's rule loader exactly; `sysdig_definition_order` (macros) and `sysdig_list_in_value` replace `sysdig_definition_cycle`; a list may name a later list, as in Falco, and a list naming itself is the `sysdig_list_self_reference` advisory. |
 | 1.0 | 2026-11-02 | Initial field contract ([RFC 0014](../../rfcs/0014-sysdig-falco-platform.md), [specifications#8](https://github.com/opentidehq/specifications/issues/8)). |
