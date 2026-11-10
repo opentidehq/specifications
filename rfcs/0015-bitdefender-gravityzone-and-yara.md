@@ -6,7 +6,7 @@
 - **Status:** proposed
 - **Created:** 2026-11-09
 - **Issue:** a spec-change issue in opentidehq/specifications, to be opened with this RFC's PR. It answers the YARA half of [opentidehq/specifications#68](https://github.com/opentidehq/specifications/issues/68); the Sigma half of #68 stays open.
-- **Implementation:** opentidehq/opentide (new issue: `bitdefender` platform and HarfangLab YARA rework); [opentidehq/language-server#165](https://github.com/opentidehq/language-server/issues/165) (YARA engine), widened to whole YARA sources and to `configurations.bitdefender`
+- **Implementation:** opentidehq/opentide (new issue: `bitdefender` platform and HarfangLab YARA rework); [opentidehq/language-server#165](https://github.com/opentidehq/language-server/issues/165) (YARA engine), widened to whole YARA rule texts and to `configurations.bitdefender`
 
 > **Review gate.** This RFC is proposed for review only. The normative files it names in [§8](#8-spec-changes-on-acceptance) (`specs/languages/yara-1.0.md`, `specs/platforms/bitdefender-1.0.md`, and the edits to five existing specs, fixtures, `SPECS.md`, and `CHANGELOG.md`) land in the same PR once a maintainer accepts it. That PR follows this text exactly, apart from changes made in review.
 
@@ -22,30 +22,30 @@ Deploy goes through the GravityZone Public API (JSON-RPC 2.0, Incidents API) wit
 
 The RFC also defines **YARA once**, as a shared language spec, `specs/languages/yara-1.0.md`. It covers:
 
-- one `YaraSource` object: the whole YARA text, deployed verbatim;
+- one `YaraRules` object: the whole YARA text, written out in the block and deployed verbatim;
 - the dialect: what libyara 4.5 compiles, and where YARA-X disagrees;
 - a per-platform profile.
 
-Bitdefender (`configurations.bitdefender.yara`) and HarfangLab (`configurations.harfanglab.yara`) both carry a `YaraSource`.
+Bitdefender (`configurations.bitdefender.yara`) and HarfangLab (`configurations.harfanglab.yara`) both carry a `YaraRules`. Each block writes its YARA text out in full: what you see in the block is what that tenant gets.
 
 For HarfangLab, this RFC:
 
-- adds `yara.source` beside the decomposed `strings` and `condition` form;
+- adds `yara.rules` beside the decomposed `strings` and `condition` form;
 - fixes the YARA identity: HarfangLab assigns the YaraFile id, so it now lives in deployment state;
 - makes `DISABLEMENT` work for YARA;
 - reads HarfangLab's per-file compile status instead of trusting HTTP 200;
-- lets a rule carry Sigma and YARA together and deploy each kind to the matching tenant.
+- makes a HarfangLab block one kind: a Sigma rule or a YARA file, never both.
 
-The analysis engine (language-server) gains a YARA language and a Bitdefender criteria catalogue. With them, `opentide validate` and editors check YARA sources, YARA fragments, and GravityZone criteria offline, with diagnostics, highlighting, hover, completion, and go-to-definition.
+The analysis engine (language-server) gains a YARA language and a Bitdefender criteria catalogue. With them, `opentide validate` and editors check YARA rules, decomposed YARA fragments, and GravityZone criteria offline, with diagnostics, highlighting, hover, completion, and go-to-definition.
 
-The change is additive for rule files. It adds `configurations.bitdefender`, new optional keys on `configurations.harfanglab.yara`, and two deployment-state platforms. No `schema_id` changes. One HarfangLab behaviour changes: a rule with both `sigma` and `yara` no longer drops its YARA rule. Existing HarfangLab YARA rules need a one-time adoption into deployment state ([§5.6](#76-migration)).
+The change is additive for rule files. It adds `configurations.bitdefender`, new optional keys on `configurations.harfanglab.yara`, and two deployment-state platforms. No `schema_id` changes. One HarfangLab rule changes: a block with both `sigma` and `yara` no longer validates. Today such a block deploys only its Sigma rule, so splitting it in two changes nothing on any tenant. Existing HarfangLab YARA rules need a one-time adoption into deployment state ([§7.6](#76-migration)).
 
 ## Motivation
 
 - **Bitdefender GravityZone is a common EDR/XDR, and opentide cannot reach it.** Teams keep GravityZone custom rules in the console, outside their detection catalogue, without objectives, review, or lifecycle. Since GravityZone v6.74 (June 2026), the Public API can create, update, and delete detection, exclusion, and YARA rules. A detection-as-code platform is possible for the first time.
 - **YARA is the second rule language two EDRs accept, and opentide has no spec for it.** HarfangLab's block has decomposed `strings` and `condition` fields, so it can express only one rule, always with a `strings:` section. It has no private or global helper rules, no tags, and no condition-only rule (`pe.imphash() == "…"`). Nothing compiles the YARA text before it reaches the tenant ([specifications#68](https://github.com/opentidehq/specifications/issues/68), [language-server#165](https://github.com/opentidehq/language-server/issues/165)). Adding Bitdefender with its own YARA field would create a second, different YARA contract.
 - **HarfangLab YARA deploy has defects the spec currently codifies.** The spec says a YARA rule is deleted by `metadata.uuid`, but HarfangLab assigns its own YaraFile id, so delete targets an id the tenant never had. YARA ignores `DISABLEMENT`. A rule with both `sigma` and `yara` never deploys its YARA half. A YaraFile that fails to compile comes back as HTTP 200 and is reported as deployed. [§3.2](#32-harfanglab-yara) has the evidence.
-- **One author, one rule, two engines.** A detection engineer who writes a YARA rule for a malware family wants it on every EDR that runs YARA. With one `YaraSource` shape, the same text (a YAML anchor in one rule file) can deploy to both vendors, and both are checked against one language spec.
+- **One YARA contract for every EDR.** A detection engineer who writes YARA for a malware family wants it on every EDR that runs YARA. With one `YaraRules` shape and one language spec, YARA is written and checked the same way for HarfangLab and Bitdefender. Each platform block still carries its own text, so a block never deploys text written somewhere else.
 
 ## Research
 
@@ -154,9 +154,9 @@ Neither vendor names its engine. Two consequences follow:
 
 | Path | Change |
 |------|--------|
-| `specs/languages/yara-1.0.md` | **New.** `spec: language-yara`, version `1.0`, no `schema_id`. The `YaraSource` object, the dialect, diagnostics codes, platform profiles. |
+| `specs/languages/yara-1.0.md` | **New.** `spec: language-yara`, version `1.0`, no `schema_id`. The `YaraRules` object, the dialect, diagnostics codes, platform profiles. |
 | `specs/platforms/bitdefender-1.0.md` | **New.** `platform::bitdefender::1.0`, version `1.0`. |
-| `specs/platforms/harfanglab-1.0.md` | 1.1 → **1.2**. `yara.source`, optional `strings`, YaraFile identity in deployment state, `DISABLEMENT`, status parsing, Sigma + YARA. `schema_id` unchanged. |
+| `specs/platforms/harfanglab-1.0.md` | 1.1 → **1.2**. `yara.rules`, optional `strings`, YaraFile identity in deployment state, `DISABLEMENT`, status parsing, one kind per block. `schema_id` unchanged. |
 | `specs/platforms/index.md` | 1.4 → **1.5**. Tenth platform; capability matrix; static-validation bar; external ids; HarfangLab YARA becomes state-backed. |
 | `specs/deployment-state.md` | 1.3 → **1.4**. `bitdefender` (`^[0-9a-f]{24}$`) and `harfanglab` (YaraFile id, verbatim) join the shard's platform set. |
 | `specs/validation.md` | 1.5 → **1.6**. New advisory codes. |
@@ -168,21 +168,23 @@ YARA gets a language spec, not a section inside one platform spec as Falco has i
 
 ### 5. The YARA language (`specs/languages/yara-1.0.md`)
 
-#### 5.1 `YaraSource`
+#### 5.1 `YaraRules`
 
-A `YaraSource` is a YAML object that a platform's `yara` block embeds. Its one shared field:
+A `YaraRules` is a YAML object that a platform's `yara` block embeds. Its one shared field:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `source` | string | yes | A complete YARA source, as a `.yar` file holds it: `import` statements, then one or more rules. It may contain `private` and `global` rules, rule tags, and comments. |
+| `rules` | string | yes | The YARA rules, as a `.yar` file holds them: `import` statements, then one or more rules. They may include `private` and `global` rules, rule tags, and comments. |
 
 Requirements:
 
-- **Verbatim.** Deploy MUST send `source` unchanged apart from line endings normalised to `\n` and a trailing newline. It MUST NOT add, remove, or reorder rules or meta. What the author reviewed is what the tenant compiles. Platform-specific meta that a vendor needs (HarfangLab `context`) is written by the author, and the profile checks it.
-- `source` MUST contain at least one rule that is neither `private` nor `global`.
+- **Verbatim.** Deploy MUST send `rules` unchanged apart from line endings normalised to `\n` and a trailing newline. It MUST NOT add, remove, or reorder rules or meta. What the author reviewed is what the tenant compiles. Platform-specific meta that a vendor needs (HarfangLab `context`) is written by the author, and the profile checks it.
+- `rules` MUST contain at least one rule that is neither `private` nor `global`.
 - `include` MUST NOT appear (`yara_include`). Neither vendor resolves includes: the API takes one text with no file system behind it.
-- Rule names MUST be unique within `source` (`yara_duplicate_rule`).
-- A YAML anchor MAY share one source between platform blocks of the same rule (`source: &yara |` … `source: *yara`). The loader resolves anchors before validation, so each block is checked under its own platform profile.
+- Rule names MUST be unique within `rules` (`yara_duplicate_rule`).
+- **Literal.** `rules` MUST be written out in the block as its own string. A YAML alias (`rules: *name`) that reuses text from elsewhere in the file fails static validation with `yara_rules_alias`. A block that deploys YARA shows that YARA. A rule that targets two platforms writes the text in each block.
+
+The key is `rules` because the value is YARA rules, as YARA's own tools call the contents of a `.yar` file. `source` was considered and rejected. It collides with HarfangLab's *YaraSource*, the rule feed that the tenant's `source_id` names, and with Sysdig's `source`, a Falco event source. `query` (Bitdefender's `yaraQuery`) was rejected because YARA is not a query language. `content` (HarfangLab's field) says nothing about what the text is.
 
 #### 5.2 Dialect
 
@@ -217,11 +219,11 @@ Errors (static validation rejects the rule):
 |------|-----------|
 | `yara_parse_error` | Syntax error |
 | `yara_include` | An `include` directive |
-| `yara_duplicate_rule` | Two rules with one name in a source |
+| `yara_duplicate_rule` | Two rules with one name in `rules` |
 | `yara_duplicate_string` | Two strings with one identifier in a rule (anonymous `$` excepted) |
 | `yara_undefined_string` | A `$id`, `#id`, `@id`, `!id`, or `$prefix*` in a condition matching no string of the rule |
 | `yara_unreferenced_string` | A string never used in the condition, while the condition does not use `them` (libyara refuses it) |
-| `yara_undefined_identifier` | A bare identifier that is no rule defined earlier in the source and no module |
+| `yara_undefined_identifier` | A bare identifier that is no rule defined earlier in `rules` and no module |
 | `yara_unknown_module` | `import` of a module libyara does not ship |
 | `yara_module_not_imported` | `pe.…` (any module) used without its `import` |
 | `yara_unknown_module_member` | A field or function the module does not have, or the wrong arguments |
@@ -232,7 +234,8 @@ Errors (static validation rejects the rule):
 | `yara_number_out_of_range` | An integer literal, size suffix, jump bound, or string index out of libyara's range |
 | `yara_duplicate_tag` | A rule tag repeated on one rule |
 | `yara_rule_identifier_conflict` | A rule named like an imported module or a keyword |
-| `yara_empty_source` | No rule, or only `private` or `global` rules |
+| `yara_empty_rules` | No rule, or only `private` or `global` rules |
+| `yara_rules_alias` | `rules` is a YAML alias instead of its own text |
 
 Warnings (reported, never rejecting):
 
@@ -251,7 +254,7 @@ Warnings (reported, never rejecting):
 |---|---|---|
 | Characters | ASCII only (`bitdefender_yara_ascii`, error) | UTF-8 |
 | Size | ≤ 30,000 characters (`bitdefender_yara_size`, error) | no documented limit |
-| Rules per source | one or more | one or more |
+| Rules per `rules` text | one or more | one or more |
 | Confirmed modules | `pe`, `elf`, `math`, `hash`, `time` | `pe`, `elf`, `math`, `hash`, `time` |
 | Recommended meta | none | `context` on every non-private rule, valued `file`, `memory`, or `file,memory` (`yara_meta_missing`; another value is `harfanglab_yara_context`, warning) |
 
@@ -298,7 +301,7 @@ configurations:
       antimalware_scan: full
     yara:
       on_access: true                 # settings.status; default true
-      source: |
+      rules: |
         import "pe"
 
         rule APT_Loader_Stage1 : loader {
@@ -362,7 +365,7 @@ Writing the relation as the key (`contains: "*-enc*"`) keeps one criterion on on
 
 ##### `yara`
 
-`BitdefenderYara` is a [`YaraSource`](#51-yarasource) plus:
+`BitdefenderYara` is a [`YaraRules`](#51-yararules) plus:
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
@@ -411,7 +414,7 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `bitdefender_yara_ascii`, `bitdefender_yara_size` | [YARA profile](#54-platform-profiles) |
 | `bitdefender_name_duplicate` | Workspace check: two enabled blocks resolve to the same GravityZone name (after [text normalisation](#64-derived-fields)). GravityZone refuses a second rule with one name in a company. |
 
-The YARA `source` is also checked against [§5.3](#53-diagnostics) under the Bitdefender profile.
+The YARA `rules` text is also checked against [§5.3](#53-diagnostics) under the Bitdefender profile.
 
 Advisories (warnings, [validation.md](../specs/validation.md#platform-advisories)):
 
@@ -533,7 +536,7 @@ Settings by kind:
 | Kind | `type` / `subtype` | `settings` keys |
 |------|--------------------|-----------------|
 | `detection` | 1 / 0 | `status`, `severity`, `target`, `criteriaList`, `filters` (when `alert` is set), `automaticActions` |
-| `yara` | 1 / 1 | `status` (from `on_access`, or `0` under `DISABLEMENT`), `severity`, `yaraQuery` (the `source`), `automaticActions` |
+| `yara` | 1 / 1 | `status` (from `on_access`, or `0` under `DISABLEMENT`), `severity`, `yaraQuery` (the `rules` text), `automaticActions` |
 | `exclusion` | 2 / 0 | `status`, `target`, `criteriaList` |
 
 **Automatic actions are sent in full.** Every action type the kind allows is sent, each `enabled: true` or `false`: seven types for `detection`, six for `yara` (no kill process), none for `exclusion`. An update therefore turns off an action removed from the block. With tenant `automatic_actions = false`, the key is omitted.
@@ -561,26 +564,27 @@ Deploy MUST NOT call `getCustomRulesList` on the deploy path. It MUST NOT write 
 
 | Check | Bitdefender |
 |-------|-------------|
-| `opentide validate` (offline) | yes: block constraints, the criteria catalogue, and the YARA engine for `yara.source` |
+| `opentide validate` (offline) | yes: block constraints, the criteria catalogue, and the YARA engine for `yara.rules` |
 | `opentide validate query --live` | no (`supported: false`): GravityZone has no API dry run; "Check rule" is console-only |
 | `opentide query` | no |
 
 ### 7. HarfangLab (`harfanglab-1.0.md`, 1.1 → 1.2)
 
-#### 7.1 `yara.source`
+#### 7.1 `yara.rules`
 
 `HarfangLabYara` takes **either** form:
 
 | Form | Keys | Deploy |
 |------|------|--------|
-| Source (new, preferred) | `source` ([`YaraSource`](#51-yarasource)), plus the YaraFile settings below | `content` is `source`, verbatim |
+| Rules (new, preferred) | `rules` ([`YaraRules`](#51-yararules)), plus the YaraFile settings below | `content` is `rules`, verbatim |
 | Decomposed (existing) | `meta`, `strings` (now optional), `condition`, `imports` | `content` is the one rule assembled as today. Without `strings`, the `strings:` section is omitted. |
 
 New HarfangLab constraints (errors):
 
 | Code | Constraint |
 |------|------------|
-| `harfanglab_yara_form` | `source` is set together with any of `meta`, `strings`, `condition`, `imports`. |
+| `harfanglab_rule_kind` | `sigma` and `yara` are both set. A block is one Sigma rule or one YARA file. |
+| `harfanglab_yara_form` | `rules` is set together with any of `meta`, `strings`, `condition`, `imports`. |
 | `harfanglab_yara_section_header` | Decomposed form: `strings` or `condition` already contains a `strings:`, `condition:`, or `rule` header. Deploy adds the header, so the rule would have two. |
 | `harfanglab_yara_import` | Decomposed form: an `imports` entry is not a YARA module. |
 
@@ -592,7 +596,7 @@ The decomposed rule name is fixed so it always compiles. Today a Tide name that 
 
 An empty `strings` omits the `strings:` header, which today is emitted and refused.
 
-The decomposed form stays valid and is not deprecated by this RFC. Its `file` → `file.pe`/`file.elf`/`file.macho` rewrite is kept as specified (see [Unresolved questions](#unresolved-questions)). The source form does no rewriting: the author writes `context` in each rule's meta, and the [HarfangLab profile](#54-platform-profiles) checks it.
+The decomposed form stays valid and is not deprecated by this RFC. Its `file` → `file.pe`/`file.elf`/`file.macho` rewrite is kept as specified (see [Unresolved questions](#unresolved-questions)). The `rules` form does no rewriting: the author writes `context` in each rule's meta, and the [HarfangLab profile](#54-platform-profiles) checks it.
 
 The language server checks both forms. A decomposed block is analysed as the rule deploy assembles, with each diagnostic mapped back to `strings` or `condition`.
 
@@ -606,7 +610,7 @@ The language server checks both forms. A decomposed block is analysed as the rul
 
 #### 7.3 Identity and deploy
 
-HarfangLab YARA becomes **state-backed**: the YaraFile id is recorded under `platforms.harfanglab.<tenant>` and stored verbatim (non-empty, no surrounding whitespace, as CrowdStrike's). Sigma is unchanged and stays addressed by `metadata.uuid`. Each tenant receives one kind (below), so a tenant binding is always the YaraFile.
+HarfangLab YARA becomes **state-backed**: the YaraFile id is recorded under `platforms.harfanglab.<tenant>` and stored verbatim (non-empty, no surrounding whitespace, as CrowdStrike's). Sigma is unchanged and stays addressed by `metadata.uuid`. A block is one kind ([§7.4](#74-one-kind-per-block)), so a HarfangLab binding is always a YaraFile.
 
 | Block status strategy | Binding | HarfangLab calls |
 |-----------------------|---------|------------------|
@@ -619,14 +623,22 @@ HarfangLab YARA becomes **state-backed**: the YaraFile id is recorded under `pla
 - **Compile status.** Deploy MUST read the `status` list of a `POST` or `PATCH` answer. An empty list, or an entry with `status: false`, fails the rule with `harfanglab_yara_rejected`, quoting `code` and `content`. HTTP 200 alone is not success.
 - **Missing file.** A `404` on `PATCH` recreates the file, with a `harfanglab_yara_recreated` warning (`DISABLEMENT`: forget, with `harfanglab_yara_missing`). A `404` on `DELETE` succeeds.
 
-#### 7.4 Sigma and YARA in one rule
+#### 7.4 One kind per block
 
-The tenant `type` is compared case-insensitively. A block with both `sigma` and `yara` deploys `sigma` to `Sigma` tenants and `yara` to `YARA` tenants. The rule "deploy MUST publish `sigma` and MUST NOT publish `yara`" is removed. `DELETION` deletes the kind that matches the tenant.
+A HarfangLab block carries **either** `sigma` (a detection) **or** `yara`, as a Bitdefender block carries exactly one of `detection`, `yara`, and `exclusion`. Both together fail static validation with `harfanglab_rule_kind`. The rule "when both are present, deploy MUST publish `sigma` and MUST NOT publish `yara`" is removed, because both can no longer be present. A block with neither still validates, and deploy still fails it, as today.
+
+A detection and a YARA file for the same threat are two opentide rules, each with its own `metadata.uuid`, review, status, and deployment history.
+
+The tenant `type` stays a filter, now compared case-insensitively: a `sigma` block deploys only to `Sigma` tenants, and a `yara` block only to `YARA` tenants.
+
+An existing block with both keys fails `opentide validate` after the upgrade, and its author splits it into two rules. Today only the Sigma half ever reached a tenant. Keeping the `sigma` in the original rule (same uuid) leaves every tenant unchanged. The YARA half becomes a new rule and deploys for the first time.
 
 #### 7.5 What does not change
 
 - Sigma deploy, identity, and fields; the Sigma dialect questions in specifications#68.
-- Every existing decomposed `yara` block validates as before. The only exception is a block whose YARA does not compile: today it reaches the tenant and fails silently there, and now `opentide validate` reports it.
+- Every existing decomposed `yara` block validates as before, with two exceptions:
+  - a block that also has `sigma` ([§7.4](#74-one-kind-per-block));
+  - a block whose YARA does not compile. Today it reaches the tenant and fails silently there; now `opentide validate` reports it.
 
 #### 7.6 Migration
 
@@ -644,11 +656,11 @@ On acceptance, the same PR adds or changes:
 
 1. `specs/languages/yara-1.0.md`: [§5](#5-the-yara-language-specslanguagesyara-10md) as normative text, in the fixed section order (Summary, Requirements, Definition, Relationships, Defaults & overrides, Examples, History).
 2. `specs/platforms/bitdefender-1.0.md`: [§6](#6-bitdefender-block-platformbitdefender10).
-3. `specs/platforms/harfanglab-1.0.md` 1.2: [§7](#7-harfanglab-harfanglab-10md-11--12). This includes correcting the claim that YARA is deleted by `metadata.uuid`.
+3. `specs/platforms/harfanglab-1.0.md` 1.2: [§7](#7-harfanglab-harfanglab-10md-11--12). This includes correcting the claim that YARA is deleted by `metadata.uuid`, and replacing "deploy MUST publish `sigma`" with `harfanglab_rule_kind`.
 4. `specs/platforms/index.md` 1.5:
    - ten platforms;
    - capability row `bitdefender | Bitdefender GravityZone | yes* | no‡ | GravityZone criteria or YARA`;
-   - static-validation bar `bitdefender | status, exactly one of detection, yara, exclusion`;
+   - static-validation bar `bitdefender | status, exactly one of detection, yara, exclusion`, and `harfanglab | at most one of sigma, yara`;
    - external-ids rows: `bitdefender` (shard) and `harfanglab` (Sigma by `metadata.uuid`, YARA by shard).
 5. `specs/deployment-state.md` 1.4:
    - state-backed platforms table;
@@ -666,11 +678,10 @@ On acceptance, the same PR adds or changes:
 |------|--------|
 | `fixtures/platforms/bitdefender.yaml` | Minimal block per kind |
 | `fixtures/valid/rule-bitdefender-detection-1.0.yaml` | Process rule, `any`/`is`/`contains`, actions, endpoint-tag targets |
-| `fixtures/valid/rule-bitdefender-yara-1.0.yaml` | Multi-rule source with a private helper rule, `pe` import, `on_access: false` |
+| `fixtures/valid/rule-bitdefender-yara-1.0.yaml` | Several rules in one `rules` text, a private helper rule, `pe` import, `on_access: false` |
 | `fixtures/valid/rule-bitdefender-exclusion-1.0.yaml` | Exclusion |
-| `fixtures/valid/rule-yara-shared-1.0.yaml` | One source shared by `bitdefender.yara` and `harfanglab.yara` through a YAML anchor |
 | `fixtures/platforms/bitdefender/*.api.json` | The JSON-RPC bodies deploy sends for each valid fixture (create, update, disable) |
-| `fixtures/platforms/harfanglab-yara-source.yaml` | `harfanglab.yara.source` |
+| `fixtures/platforms/harfanglab-yara-rules.yaml` | `harfanglab.yara.rules` |
 | `fixtures/platforms/harfanglab/*.api.json` | YaraFile `POST` and `PATCH` bodies |
 | `fixtures/invalid/rule-bitdefender-two-kinds.yaml` | `bitdefender_rule_kind` |
 | `fixtures/invalid/rule-bitdefender-criterion-field.yaml` | `bitdefender_criterion_field` (`Process.Hash` on `process`) |
@@ -678,12 +689,14 @@ On acceptance, the same PR adds or changes:
 | `fixtures/invalid/rule-bitdefender-kill-on-yara.yaml` | `bitdefender_action_scope` |
 | `fixtures/invalid/rule-bitdefender-yara-include.yaml` | `yara_include` |
 | `fixtures/invalid/rule-harfanglab-yara-both-forms.yaml` | `harfanglab_yara_form` |
+| `fixtures/invalid/rule-harfanglab-sigma-and-yara.yaml` | `harfanglab_rule_kind` |
+| `fixtures/invalid/rule-yara-rules-alias.yaml` | `yara_rules_alias` |
 | `fixtures/deployment/valid/<uuid>.json` | A shard with a `bitdefender` and a `harfanglab` binding |
 | `fixtures/deployment/invalid/bitdefender-bad-id.json` | A Bitdefender id that is not 24 hex |
 
 ### 10. Analysis engine (language-server)
 
-The plan widens [language-server#165](https://github.com/opentidehq/language-server/issues/165) from decomposed HarfangLab fragments to whole sources and adds Bitdefender. It follows the Falco addition (RFC 0014 §6) and its proven shape.
+The plan widens [language-server#165](https://github.com/opentidehq/language-server/issues/165) from decomposed HarfangLab fragments to whole `rules` texts and adds Bitdefender. It follows the Falco addition (RFC 0014 §6) and its proven shape.
 
 **Parser choice.** Two parsers, each with one job, as Falco has with tree-sitter and the libsinsp port:
 
@@ -705,7 +718,7 @@ The **full `yara-x` compiler stays out of the shipped engine**, and runs only as
 | **Crate** | `crates/opentide-yara` (I/O-free, an estimated 4–6k lines): `yara-x-parser` CST → symbol table (rules, strings, tags, imports) → a semantic pass for every [§5.3](#53-diagnostics) code under a `Dialect { Libyara4, YaraX }`. It includes hex-string and regexp checks with libyara's rules, YARA's types and function overloads, and modifier combinations. |
 | **Module catalogue** | `catalogs/yara/modules.toml`: fields, functions, overloads, constants, and types of the 13 modules (`pe` alone has about 145 fields and 34 functions). It is generated by a small Rust tool outside the workspace that walks YARA-X's `mods::module_definition()` reflection, and is marked per dialect from libyara's module sources. Also `language.toml` (keywords, modifiers and their legal combinations, built-ins) and a BSD-3 `NOTICE`. It feeds hover, completion, signature help, and `yara_unknown_module_member`. |
 | **Bitdefender catalogue** | `catalogs/bitdefender/criteria.toml` from the criteria page (`scripts/sync_bitdefender_criteria.py`). `crates/opentide-tide/src/bitdefender.rs` holds the `bitdefender_*` constraint codes, so editors and `opentide validate` agree (as `sysdig.rs` does). Completion and hover for `target`, `field`, and enum values. |
-| **Injection** | `LanguageId::Yara` (`yara`, `.yar`, `.yara`). New paths: `configurations.bitdefender.yara.source`, `configurations.harfanglab.yara.source`, and a two-scalar injection for decomposed `harfanglab.yara.strings` + `.condition` with `imports` (one synthetic rule, offsets mapped back to each scalar). Platform profile chosen by the path. |
+| **Injection** | `LanguageId::Yara` (`yara`, `.yar`, `.yara`). New paths: `configurations.bitdefender.yara.rules`, `configurations.harfanglab.yara.rules` (an alias there is `yara_rules_alias`, not analysed), and a two-scalar injection for decomposed `harfanglab.yara.strings` + `.condition` with `imports` (one synthetic rule, offsets mapped back to each scalar). Platform profile chosen by the path. |
 | **Editor features** | Semantic highlighting (`highlights/queries/yara/highlights.scm` through HighlightSpec, no new capture). Hover on modules, members, keywords, modifiers, and `$` ids (showing the definition). Completion: modules after `import "` and in `yara.imports`, members after `pe.`, ids after `$ # @ !`, modifiers, and meta keys from the profile. Signature help for module overloads. Document symbols and folding per rule. These are **new LSP capabilities**: today definition, references, and folding exist for Tide YAML only, and there is no rename or formatting. Go-to-definition and find-references for strings and rules, rename of string ids (across the two YAML scalars of a decomposed block), and formatting of `.yar`/`.yara` files with `yara-x-fmt`. |
 | **Upstream conformance** | `scripts/sync_yarax_conformance.py` vendors YARA-X's own suites (BSD-3) into `testdata/conformance/yara-x/`: about 167 compiler error cases, 55 warning cases, 71 parser cases, and 586 `rule_true!`/`rule_false!` cases. libyara's `tests/test-rules.c` (BSD-3) covers the libyara dialect. |
 | **Oracle** | `scripts/oracles/yara/oracle.py` compiles every case with `yara-python` 4.5.4 (libyara) and the `yara-x` wheel, records a verdict per dialect, and keeps the differences in `[[yara]]` entries of `testdata/oracles/exceptions.toml`, with a job in `oracle.yml`. The engine's error set MUST equal libyara's verdicts, and `yara_x_incompatible` MUST equal the cases where only YARA-X refuses. Neither package ships or becomes a Cargo dependency. `license-scan.sh` gets a narrow pattern (`yara_python`, `libyara`), because `yara-x-parser` itself ships. |
@@ -735,7 +748,7 @@ Sizing uses the Sysdig addition as the baseline: about 2,700 lines of Python in 
 | L3 | `opentide-yara` engine: semantic pass, every §5.3 code, both dialects, profiles | language-server | 15–20 | L1 |
 | L4 | Module catalogue generator, `modules.toml`, `language.toml`, NOTICE | language-server | 4–5 | L0 |
 | L5 | Editor features: hover, completion, signature help, symbols, folding, definition, references, rename, formatting (new LSP capabilities, stdio e2e tests) | language-server | 8–10 | L3, L4 |
-| L6 | Tide injection: `yara.source` paths, composed two-scalar HarfangLab injection with segment map, `harfanglab_*` codes | language-server | 5–7 | L3, S1 |
+| L6 | Tide injection: `yara.rules` paths, composed two-scalar HarfangLab injection with segment map, `harfanglab_*` codes | language-server | 5–7 | L3, S1 |
 | L7 | Upstream conformance (~880 YARA-X cases), external corpus with twins, oracle with both engines | language-server | 9–12 | L3 |
 | L8 | Bitdefender criteria catalogue, sync script, `bitdefender.rs` constraint codes, completion and hover | language-server | 4–5 | S1 |
 | L9 | Packaging, `docs/YARA.md`, release 0.13.0 | language-server | 4–5 | L2, L5–L8 |
@@ -745,7 +758,7 @@ Sizing uses the Sysdig addition as the baseline: about 2,700 lines of Python in 
 | O4 | Deployer: deployment-state shard (24-hex), create/update/disable/delete, recreate, name conflict, unconfirmed create | opentide | 3 | O2, O3 |
 | O5 | Wiring (~25 registrations), bundled TOML, template, diagnostics pages, docs, MCP | opentide | 2–3 | O1 |
 | O6 | Tests: model, compile, deployer (fake JSON-RPC server), setup, e2e | opentide | 4–5 | O1–O4 |
-| H1 | HarfangLab: `yara.source`, optional `strings`, YaraFile state backing, PATCH/DELETE by id, `enabled`, `status[]` parsing, Sigma + YARA per tenant | opentide | 4–5 | S1 |
+| H1 | HarfangLab: `yara.rules`, optional `strings`, YaraFile state backing, PATCH/DELETE by id, `enabled`, `status[]` parsing, one kind per block (`harfanglab_rule_kind`) | opentide | 4–5 | S1 |
 | H2 | `migrate-state --adopt harfanglab`, `harfanglab_adoption_pending` | opentide | 2 | H1 |
 | H3 | HarfangLab YARA tests (none exist today): golden content, payloads, state, adoption | opentide | 2–3 | H1, H2 |
 | E1 | Engine bump (with Rust 1.95) and YARA wiring in `validate`, `lint`, `explain`, MCP | opentide | 1–2 | L6, L8, L9 |
@@ -760,7 +773,7 @@ Milestones:
 | Milestone | Content |
 |-----------|---------|
 | M1 | Spec landed; Bitdefender `detection`/`exclusion` deploy; HarfangLab identity, `DISABLEMENT`, and compile-status fixes |
-| M2 | Bitdefender `yara` deploy; `harfanglab.yara.source`; adoption |
+| M2 | Bitdefender `yara` deploy; `harfanglab.yara.rules`; adoption |
 | M3 | Engine 0.13: YARA syntax and semantic checks, injection, Bitdefender criteria checks, in `opentide validate` and editors |
 | M4 | Oracle and conformance green, rename and formatting |
 
@@ -768,23 +781,25 @@ Milestones:
 
 - **Rate limits make the first deploy slow.** At 5 creates per minute per key, a 300-rule catalogue takes about an hour to create the first time. Updates are not limited that way. CI jobs need a timeout to match, or several API keys.
 - **On-premises GravityZone is not covered.** It has no Incidents API. Its customers keep custom rules in the console.
-- **YARA rules per company are capped at 50.** A large YARA catalogue has to pack several rules into one source.
-- **The HarfangLab rework is a behaviour change for existing users.** YaraFile ids join deployment state, an adoption step runs once, and rules with both blocks start deploying their YARA half.
+- **YARA rules per company are capped at 50.** A large YARA catalogue has to pack several rules into one block's `rules`.
+- **The HarfangLab rework is a behaviour change for existing users.** YaraFile ids join deployment state, an adoption step runs once, and a block with both `sigma` and `yara` must be split into two rules.
 - **Neither vendor names its YARA engine.** The libyara 4.5 contract is the most plausible choice. A vendor on YARA-X would reject some rules the engine accepts, though each such rule carries a `yara_x_incompatible` warning.
 - **The criteria catalogue is copied from a web page.** When Bitdefender adds fields, the sync script has to run, and until then a new field is an error.
 - **The engine follows YARA-X's release train.** The `yara-x-*` crates need Rust 1.95 today and raise their minimum about every two months, which moves the language server's and opentide's toolchain with them. Two parsers (tree-sitter and `yara-x-parser`) can disagree, and the agreement test has to keep them aligned.
 
 ## Alternatives
 
-- **YARA at the rule root** (`detection.yara`, shared by every platform): one source, no anchors. Rejected for now. It needs `rule::1.2`, and the rule document shape is being rethought in [RFC 0012](0012-rule-document-shape.md) and [specifications#24](https://github.com/opentidehq/specifications/issues/24). The `YaraSource` object moves there unchanged if that redesign wants it.
-- **Decomposed YARA for Bitdefender, like HarfangLab's.** Rejected. It cannot express several rules, private helpers, or condition-only rules, and both vendors accept a whole source.
-- **Deploy-time meta injection** (opentide writes `id`, `score`, `context` into the source). Rejected. It needs a YARA rewriter in the deploy path and breaks "what was reviewed is what is deployed". Bitdefender stores the text as sent and shows it in the console.
+- **YARA at the rule root** (`detection.yara`, shared by every platform). Rejected for now. It hides what each platform deploys behind a shared field. It also needs `rule::1.2`, while the rule document shape is being rethought in [RFC 0012](0012-rule-document-shape.md) and [specifications#24](https://github.com/opentidehq/specifications/issues/24). The `YaraRules` object moves there unchanged if that redesign wants it.
+- **YAML anchors to share one text between blocks** (`rules: &yara |` … `rules: *yara`). Rejected. Someone reading the second block would not see the YARA it deploys. Every block carries its text literally, and an alias fails with `yara_rules_alias`.
+- **Sigma and YARA in one HarfangLab block, each deployed to its tenant type.** Proposed in an earlier draft of this RFC and rejected. A block is one detection or one YARA file, as on Bitdefender. Two kinds under one uuid would share one status and one deployment history, and could not be disabled separately.
+- **Decomposed YARA for Bitdefender, like HarfangLab's.** Rejected. It cannot express several rules, private helpers, or condition-only rules, and both vendors accept a whole YARA text.
+- **Deploy-time meta injection** (opentide writes `id`, `score`, `context` into the rules text). Rejected. It needs a YARA rewriter in the deploy path and breaks "what was reviewed is what is deployed". Bitdefender stores the text as sent and shows it in the console.
 - **Bitdefender identity by name or by the `opentide:<uuid>` tag.** Rejected. [Deployment state](../specs/deployment-state.md) forbids rediscovery by listing, and `getCustomRulesList` has no filter, so every deploy would page through every rule.
 - **Exclusions as tunings inside a detection block** (as Sysdig's `append_to_rule`). Rejected. A GravityZone exclusion is a separate remote rule with its own id, and a shard binding holds one id per tenant. An exclusion is its own opentide rule, which also gives it its own review and lifecycle.
 - **Advanced rules (`subtype: 2`, `advancedQuery`).** Deferred. They appear only on unlisted pages. When Bitdefender publishes them, a fourth kind (`advanced`) is an additive change.
 - **The full YARA-X compiler in-process** (`yara_x::Compiler` as the checker). Rejected:
   - It would make YARA-X the contract.
-  - It reports one error per source.
+  - It reports one error per compile.
   - It brings wasmtime and breaks the WASI build.
   - #165 keeps oracle engines out of `Cargo.lock`.
 
