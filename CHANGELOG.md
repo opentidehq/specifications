@@ -163,6 +163,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
 
+## platforms 1.5
+
+- YARA is a language spec ([specs/languages/yara-1.0.md](specs/languages/yara-1.0.md), [RFC 0015](rfcs/0015-yara-language.md)). HarfangLab YARA is checked offline by `opentide validate`; `validate query` stays `supported: false`. The HarfangLab static-validation bar: at most one of `sigma` and `yara` (`harfanglab_rule_kind`).
+
 ## platforms 1.4
 
 - Sysdig Secure joins the matrix as the ninth platform ([specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md), [RFC 0014](rfcs/0014-sysdig-falco-platform.md)): Falco rules deployed through the Sysdig Secure API. It is excluded from query validation (`supported: false`); `opentide validate` checks the Falco condition offline.
@@ -236,6 +240,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - `platform::crowdstrike::1.0`. Correlation rule: filter `query`, `details.trigger` (`verbose` or `summary`), `details.outcome` (`detection` or `incident`), and `schedule`. No query validator.
 
+## platform-harfanglab 1.2
+
+- `yara.signature` (`YaraSignature`): a whole YARA text, deployed as the YaraFile `content` verbatim, beside the decomposed form. A block is one kind: `sigma` and `yara` together fail `harfanglab_rule_kind`, which replaces "deploy MUST publish `sigma`". Constraint codes `harfanglab_yara_form`, `harfanglab_yara_section_header`, `harfanglab_yara_import`, and `harfanglab_yara_rule_name`; the HarfangLab YARA profile and the `harfanglab_yara_context` advisory ([RFC 0015](rfcs/0015-yara-language.md)). The YARA deployer is otherwise unchanged. Schema id unchanged. New fixtures `fixtures/platforms/harfanglab-yara-signature.yaml` and four invalid fixtures.
+
 ## platform-harfanglab 1.1
 
 - `rule_id_bundle` removed. Legacy external-id keys fail `external_id_in_rule`; migration removes them as `external_id_unused`. Identity stays `metadata.uuid` ([RFC 0010](rfcs/0010-deployment-external-ids.md)). Schema id unchanged.
@@ -262,6 +270,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial field contract for `platform::sysdig::1.0` ([RFC 0014](rfcs/0014-sysdig-falco-platform.md), [specifications#8](https://github.com/opentidehq/specifications/issues/8)): a Falco condition with exceptions and private macros and lists, expanded at deploy; or a tuning of an existing rule (`append_to_rule`). Derived name, `desc`, `priority`, tags, and output. Deployed through the Sysdig Secure API only. The Falco language, exception rules, and list expansion follow libsinsp and Falco's rule loader exactly. Nine constraint codes and one advisory, `sysdig_list_self_reference`; list definition order follows Falco (a list may name a later list). Fixtures under `fixtures/platforms/sysdig/` (the API bodies) and `fixtures/valid/rule-sysdig-*.yaml`.
 
+## language-yara 1.0
+
+- First language spec, [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) ([RFC 0015](rfcs/0015-yara-language.md)): `YaraSignature`, the libyara 4.5 dialect with YARA-X as warnings, stable `yara_*` diagnostics, and the `bitdefender` and `harfanglab` profiles. Answers the YARA questions of [specifications#68](https://github.com/opentidehq/specifications/issues/68).
+
 ## sharing 1.3
 
 - `--changed` and the production release name the production deploy by its run strategy (`opentide deploy --strategy RELEASE` on a push) instead of `--plan PRODUCTION`, which opentide 0.17.0 removed. The commit range is unchanged.
@@ -287,6 +299,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.6
+
+- [Language diagnostics](specs/validation.md#language-diagnostics): a language spec's errors fail validation and its warnings are reported like advisories; the YARA codes ([RFC 0015](rfcs/0015-yara-language.md)). Advisory `harfanglab_yara_context`. The fixture checker applies `harfanglab_rule_kind`, `harfanglab_yara_form`, `harfanglab_yara_section_header`, and the YARA codes that need no parser.
 
 ## validation 1.5
 

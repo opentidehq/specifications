@@ -1,6 +1,6 @@
 ---
 spec: platform-harfanglab
-version: "1.1"
+version: "1.2"
 schema_id: platform::harfanglab::1.0
 status: normative
 supersedes: null
@@ -10,17 +10,21 @@ supersedes: null
 
 ## Summary
 
-`configurations.harfanglab` is a HarfangLab detection rule, either a Sigma behavioural rule or a YARA scan rule. There is no query validator. The HarfangLab rule id is the Tide rule's `metadata.uuid` for both kinds. A block may carry both `sigma` and `yara`; deploy publishes the Sigma rule and does not publish the YARA rule in that case.
+`configurations.harfanglab` is a HarfangLab detection rule of one kind: a Sigma behavioural rule **or** a YARA scan rule, never both. There is no query validator. The HarfangLab rule id is the Tide rule's `metadata.uuid` for both kinds.
+
+A YARA block is written either as a whole YARA text (`yara.signature`, a [`YaraSignature`](../languages/yara-1.0.md#yarasignature)) or in the decomposed form (`meta`, `strings`, `condition`, `imports`) that deploy assembles into one rule. Both are checked offline against the [YARA language](../languages/yara-1.0.md) under the [HarfangLab profile](#yara-profile).
 
 Shared fields are defined in [platforms](index.md#shared-platform-block).
 
 ## Requirements
 
 - Static validation MUST NOT require `sigma` or `yara`. `maturity`, `confidence`, and `action` have defaults, so a block with only the shared fields validates.
+- A block MUST NOT carry both `sigma` and `yara` (`harfanglab_rule_kind`). A Sigma detection and a YARA file for the same threat are two opentide rules.
 - Deploy MUST fail unless `sigma` or `yara` is present.
-- When both are present, deploy MUST publish `sigma` and MUST NOT publish `yara`.
 - A `sigma` object MUST include `logsource.category`, `logsource.product`, `selections`, and `condition` for static validation. Each selection MUST include `name`, `field`, and `value`. The HarfangLab loader supplies an empty `selections` list when that key is omitted, so registry load accepts a Sigma block the validator rejects.
-- A `yara` object MUST include `meta.context`, `meta.os`, `strings`, and `condition`.
+- A `yara` object MUST use exactly one form. The **signature** form sets `signature` and none of `meta`, `strings`, `condition`, `imports` (`harfanglab_yara_form`). The **decomposed** form MUST include `meta.context`, `meta.os`, `strings`, and `condition`.
+- A block MUST satisfy every [constraint](#constraints), reported with its code.
+- `yara.signature`, and the rule the decomposed form assembles, MUST be checked against the [YARA language](../languages/yara-1.0.md) under the [HarfangLab profile](#yara-profile). Its errors fail static validation; its warnings do not.
 - `action` SHOULD be `Alert`, `Alert & Block`, or `Alert, Block & Quarantine`. Any other string deploys as `alert`.
 - `maturity` SHOULD be `Stable`, `Testing`, or `Experimental`. Any other string deploys as `experimental`.
 - `confidence` SHOULD be `Weak`, `Moderate`, or `Strong`. Any other string deploys as `moderate`.
@@ -35,9 +39,9 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 | `maturity` | string | optional | `Experimental` | Rule maturity. Mapped to HarfangLab `hl_status`. |
 | `confidence` | string | optional | `Moderate` | Analyst confidence. Mapped to `rule_confidence_override`. |
 | `action` | string | optional | `Alert` | What the agent does on a match. Mapped to `global_state`. |
-| `tags` | list[string] | optional | null | Sigma tags, and the YARA `tags` meta line. |
-| `sigma` | [HarfangLabSigma](#sigma-harfanglabsigma) | optional | null | Behavioural rule. Preferred when `yara` is also set. |
-| `yara` | [HarfangLabYara](#yara-harfanglabyara) | optional | null | File or memory scan rule. |
+| `tags` | list[string] | optional | null | Sigma tags, and the YARA `tags` meta line of the decomposed form. |
+| `sigma` | [HarfangLabSigma](#sigma-harfanglabsigma) | optional | null | Behavioural rule. Not with `yara`. |
+| `yara` | [HarfangLabYara](#yara-harfanglabyara) | optional | null | File or memory scan rule. Not with `sigma`. |
 
 ### Action, maturity, and confidence
 
@@ -98,7 +102,17 @@ Deploy builds a Sigma YAML document. The title is the Tide rule `name`, the id i
 
 ### `yara` (HarfangLabYara)
 
-Deploy builds a YARA rule. The rule name is the Tide rule `name` lowercased, with non-alphanumeric characters turned into `_`, and prefixed with `rule_` when it would start with a digit. Meta `id` is `metadata.uuid`.
+A `yara` object takes one of two forms.
+
+**Signature form.** A [`YaraSignature`](../languages/yara-1.0.md#yarasignature):
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `signature` | string | yes | A whole YARA text: imports, then one or more YARA rules, written out in the block. Deploy sends it as the YaraFile `content`, verbatim. |
+
+The author writes every meta line, `context` included. Deploy adds and rewrites nothing.
+
+**Decomposed form.** Deploy builds one YARA rule. The rule name is the Tide rule `name` lowercased, with non-alphanumeric characters turned into `_`, and prefixed with `rule_` when it would start with a digit. Meta `id` is `metadata.uuid`.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -119,19 +133,49 @@ Deploy builds a YARA rule. The rule name is the Tide rule `name` lowercased, wit
 
 Author meta uses `metadata.author`, then `metadata.organisation.name`. `metadata.created` and `metadata.modified` are written when set. Public references are joined into meta `references`.
 
+The language server checks the decomposed form as the rule deploy assembles it: the `import` lines, the derived rule name, the generated meta, and the two bodies. Each diagnostic maps back to `strings`, `condition`, `imports`, or the rule `name`.
+
+### Constraints
+
+Static validation MUST reject a block that breaks any of these, and report the code:
+
+| Code | Constraint |
+|------|------------|
+| `harfanglab_rule_kind` | `sigma` and `yara` are not both set. |
+| `harfanglab_yara_form` | A `yara` object sets `signature`, or the decomposed keys, not both. |
+| `harfanglab_yara_section_header` | Decomposed form: `strings` and `condition` contain no `strings:`, `condition:`, or `rule` header. Deploy writes the headers. |
+| `harfanglab_yara_import` | Decomposed form: each `imports` entry is a module the [YARA language](../languages/yara-1.0.md#modules) knows. |
+| `harfanglab_yara_rule_name` | Decomposed form: the YARA rule name deploy derives from the rule `name` is not a YARA keyword and keeps only ASCII letters, digits, and `_`. A name such as `Condition` derives `condition`, and `Détection` keeps `é`; libyara refuses both. |
+
+### YARA profile
+
+The [HarfangLab profile](../languages/yara-1.0.md#platform-profiles) of the YARA language: dialect `libyara4`, UTF-8, no size limit, one or more YARA rules per `signature`, and confirmed modules `pe`, `elf`, `math`, `hash`, and `time`.
+
+Every non-private rule of a `signature` SHOULD set meta `context`. A missing `context` is `yara_meta_missing`. A value other than `file`, `memory`, `file,memory`, `file.pe`, `file.elf`, or `file.macho` is the `harfanglab_yara_context` [advisory](../validation.md#platform-advisories). `file`, `memory`, and `file,memory` are the values HarfangLab's published rules use. `file.pe`, `file.elf`, and `file.macho` are the values the decomposed form's `os` rewrite writes. No HarfangLab document defines the key ([RFC 0015](../../rfcs/0015-yara-language.md#harfanglab-yara)).
+
 ### Deploy
 
 | Block status strategy | HarfangLab result |
 |-----------------------|-------------------|
 | `DISABLEMENT` | Sigma rule disabled (`global_state: disabled`, `enabled: false`). A YARA rule is still created or updated with the `action` mapping. |
-| `DELETION` | Sigma or YARA rule deleted by `metadata.uuid`. Sigma is chosen when both blocks are present. |
+| `DELETION` | The Sigma or YARA rule deleted by `metadata.uuid`. |
 | any other | Create or update by `metadata.uuid`. |
 
 The tenant `source_id` is sent with the rule. The tenant `type` (`Sigma` or `YARA`) selects which HarfangLab API the workspace is configured for; the block's `sigma` / `yara` keys select which compiler runs.
 
+A YARA rule's `content` is `yara.signature` in the signature form, verbatim, and the assembled rule in the decomposed form. Every other part of the YARA deploy is the same for both forms: endpoint, payload fields, name, identity, and the status strategy table above.
+
+### Query validation
+
+| Check | HarfangLab |
+|-------|------------|
+| `opentide validate` (offline, analysis engine) | YARA: `yara.signature`, and the rule the decomposed form assembles, under the [YARA language](../languages/yara-1.0.md). Sigma: not checked. |
+| `opentide validate query --live` | no (`supported: false`) |
+
 ## Relationships
 
 - [platforms](index.md) — shared fields, no query validation, external ids
+- [yara-1.0](../languages/yara-1.0.md) — the YARA language, `YaraSignature`, and the HarfangLab profile
 - [deployment-state.md](../deployment-state.md) — `external_id_unused` in migration; HarfangLab has no shard entry
 - [rule-1.0.md](../objects/rule-1.0.md) — `response.alert_severity` feeds level and score
 - [metadata.md](../metadata.md) — uuid, author, organisation, dates
@@ -194,7 +238,28 @@ configurations:
         $a
 ```
 
-Fixtures: [fixtures/platforms/harfanglab-sigma.yaml](../../fixtures/platforms/harfanglab-sigma.yaml), [fixtures/platforms/harfanglab-yara.yaml](../../fixtures/platforms/harfanglab-yara.yaml).
+YARA, signature form:
+
+```yaml
+configurations:
+  harfanglab:
+    schema: platform::harfanglab::1.0
+    action: "Alert & Block"
+    yara:
+      signature: |
+        import "pe"
+
+        rule Loader_Stage1 {
+          meta:
+            context = "file,memory"
+          strings:
+            $cfg = { 43 46 47 21 [4-16] 00 01 }
+          condition:
+            pe.number_of_sections > 3 and $cfg
+        }
+```
+
+Fixtures: [fixtures/platforms/harfanglab-sigma.yaml](../../fixtures/platforms/harfanglab-sigma.yaml), [fixtures/platforms/harfanglab-yara.yaml](../../fixtures/platforms/harfanglab-yara.yaml), [fixtures/platforms/harfanglab-yara-signature.yaml](../../fixtures/platforms/harfanglab-yara-signature.yaml); invalid: [rule-harfanglab-sigma-and-yara.yaml](../../fixtures/invalid/rule-harfanglab-sigma-and-yara.yaml), [rule-harfanglab-yara-both-forms.yaml](../../fixtures/invalid/rule-harfanglab-yara-both-forms.yaml).
 
 ## History
 
@@ -202,3 +267,4 @@ Fixtures: [fixtures/platforms/harfanglab-sigma.yaml](../../fixtures/platforms/ha
 |---------|------|-------|
 | 1.0 | 2026-09-30 | Initial field contract from the HarfangLab configuration model and deployer. |
 | 1.1 | 2026-10-16 | `rule_id_bundle` is removed. Legacy external-id keys fail `external_id_in_rule`, and migration removes them as `external_id_unused` ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Identity stays `metadata.uuid`. Schema id unchanged. |
+| 1.2 | 2026-11-10 | `yara.signature`: a whole YARA text (`YaraSignature`), deployed as the YaraFile `content` verbatim, beside the decomposed form. A block is one kind: `sigma` and `yara` together fail `harfanglab_rule_kind`, replacing "deploy MUST publish `sigma`". New constraint codes and the HarfangLab YARA profile; YARA is checked offline against [yara-1.0](../languages/yara-1.0.md) ([RFC 0015](../../rfcs/0015-yara-language.md)). The YARA deployer is otherwise unchanged. Schema id unchanged. |

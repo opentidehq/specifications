@@ -29,7 +29,7 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0012](0012-rule-document-shape.md) | Rules should read like the other objects | draft |
 | [0013](0013-visibility-logsource-is-a-dataset.md) | A log source is a dataset, with its columns | accepted |
 | [0014](0014-sysdig-falco-platform.md) | Sysdig Secure and Falco detection platform | accepted |
-| [0015](0015-bitdefender-gravityzone-and-yara.md) | Bitdefender GravityZone platform, and one YARA language for Bitdefender and HarfangLab | proposed |
+| [0015](0015-yara-language.md) | One YARA language across detection platforms | accepted |
 
 ## Numbering
 
