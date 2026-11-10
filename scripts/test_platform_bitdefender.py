@@ -230,7 +230,7 @@ class SpecShapeTests(unittest.TestCase):
 
     def test_constraint_and_advisory_tables(self) -> None:
         text = _read(SPEC)
-        section = text[text.index("### Constraints") : text.index("### Criteria catalogue")]
+        section = text[text.index("### Constraints") : text.index("Every implementation reports each code")]
         self.assertEqual(re.findall(r"^\| `(bitdefender_[a-z_]+)` \|", section, flags=re.MULTILINE), CONSTRAINTS)
         advisories = text[text.index("### Advisories") : text.index("### Name and description")]
         self.assertEqual(re.findall(r"^\| `(bitdefender_[a-z_]+)` \|", advisories, flags=re.MULTILINE), ADVISORIES)
@@ -242,6 +242,11 @@ class SpecShapeTests(unittest.TestCase):
         section = _read(SPEC).split("### Severity", 1)[1].split("###", 1)[0]
         for label, value in SEVERITY.items():
             self.assertIn(f"| `{label}` | {value} |", section)
+
+    def test_field_paths_are_fixed(self) -> None:
+        text = _read(SPEC)
+        self.assertIn('version: "1.1"', text)
+        self.assertIn("| `bitdefender_action_scope` | `actions.<key>` |", text)
 
     def test_no_exclusion_and_whole_payload(self) -> None:
         text = _read(SPEC)
@@ -343,6 +348,12 @@ class CheckerTests(unittest.TestCase):
             _codes(validate_bitdefender_block(block(detection=detection, targets={"endpoint_tags": [], "companies": ["a"]}))),
             {"bitdefender_targets_shape"},
         )
+        xdr = {"target": "connection", "criteria": [{"field": "Connection.SourceUser", "is": "bob"}]}
+        self.assertEqual(validate_bitdefender_block(block(detection=xdr)), [])
+        is_only = {"target": "registry", "criteria": [{"field": "Registry.DataType", "any": ["dword"]}]}
+        self.assertEqual(_codes(validate_bitdefender_block(block(detection=is_only))), {"bitdefender_criterion_relation"})
+        boolean = {"target": "process", "criteria": [{"field": "Process.Name", "is": True}]}
+        self.assertEqual(_codes(validate_bitdefender_block(block(detection=boolean))), {"bitdefender_criterion_shape"})
         sig = {"signature": "rule A {\n  condition:\n    true // é\n}\n"}
         self.assertEqual(_codes(validate_bitdefender_block(block(yara=sig))), {"bitdefender_yara_ascii"})
 

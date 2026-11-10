@@ -795,6 +795,12 @@ BITDEFENDER_TARGETS = frozenset(
     }
 )
 _BD_CREATED_BY = ("Name", "Path", "FullPathName", "CommandLine", "User")
+_BD_XDR_RESOURCES = (
+    "File", "Application", "KeyVault", "Role", "Policy", "SharingLink", "Url", "SshKey", "LaunchTemplate",
+    "ServicePrincipal", "UserGroup", "AutomationAccount", "AutomationAccountHook", "Api", "CertificateAuthority",
+    "Bucket", "ConfluencePage", "JiraProject",
+)
+_BD_IS_ONLY = frozenset({"File.CertificateSignedStatus", "Connection.Protocol", "Registry.DataType"})
 BITDEFENDER_FIELDS: dict[str, frozenset[str]] = {
     "process": frozenset(
         f"Process.{name}"
@@ -816,6 +822,8 @@ BITDEFENDER_FIELDS: dict[str, frozenset[str]] = {
                                            "SMBSharePath", "SMBUser", "WMIExecQuery", "FileRemotePath",
                                            "FileRemoteOperation")]
         + [f"Connection.Process.{name}" for name in _BD_CREATED_BY]
+        + ["Connection.SourceUser", "Connection.DestinationUser", "Connection.Email.Subject", "Connection.Email.Operation"]
+        + [f"Connection.{resource}.{leaf}" for resource in _BD_XDR_RESOURCES for leaf in ("Name", "Operation")]
     ),
     "registry": frozenset(
         [f"Registry.{name}" for name in ("Key", "Value", "Data", "DataType", "Operation")]
@@ -850,16 +858,21 @@ def _bd_criterion_errors(criterion: Any, target: str, path: str) -> list[CheckEr
     relation, value = relations[0], criterion[relations[0]]
     if relation == "any" and (not isinstance(value, list) or not value):
         return [CheckError("bitdefender_criterion_shape", "any takes a non-empty list", path)]
-    if relation != "any" and (isinstance(value, (list, dict)) or value is None):
-        return [CheckError("bitdefender_criterion_shape", f"{relation} takes one value", path)]
+    if relation == "is" and (isinstance(value, bool) or not isinstance(value, (str, int))):
+        return [CheckError("bitdefender_criterion_shape", "is takes a string or an integer", path)]
+    if relation == "contains" and not isinstance(value, str):
+        return [CheckError("bitdefender_criterion_shape", "contains takes a string", path)]
+    if relation == "any" and any(isinstance(item, bool) or not isinstance(item, (str, int)) for item in value):
+        return [CheckError("bitdefender_criterion_shape", "any takes strings or integers", path)]
     errors: list[CheckError] = []
     field_name = criterion["field"]
     known = BITDEFENDER_FIELDS.get(target)
     if known is not None and field_name not in known:
         errors.append(CheckError("bitdefender_criterion_field", f"{field_name!r} is not a {target} field", path))
     if field_name in BITDEFENDER_ENUMS:
-        if relation == "contains":
-            errors.append(CheckError("bitdefender_criterion_relation", f"{field_name} takes is or any", path))
+        if relation == "contains" or (relation == "any" and field_name in _BD_IS_ONLY):
+            allowed = "is" if field_name in _BD_IS_ONLY else "is or any"
+            errors.append(CheckError("bitdefender_criterion_relation", f"{field_name} takes {allowed}", path))
         values = value if isinstance(value, list) else [value]
         bad = [item for item in values if item not in BITDEFENDER_ENUMS[field_name]]
         if bad:
@@ -917,7 +930,7 @@ def validate_bitdefender_block(block: dict[str, Any]) -> list[CheckError]:
     if isinstance(actions, dict):
         for key in actions:
             if key not in BITDEFENDER_ACTIONS:
-                errors.append(CheckError("bitdefender_action_scope", f"{key!r} is not an action", f"{base}.actions"))
+                errors.append(CheckError("bitdefender_action_scope", f"{key!r} is not an action", f"{base}.actions.{key}"))
         process_like = target in ("process", "file") or created_by
         for key in ("sandbox", "quarantine"):
             if key in actions and "detection" in kinds and not process_like:

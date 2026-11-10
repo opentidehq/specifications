@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.7"
+version: "1.8"
 schema_id: null
 status: normative
 supersedes: null
@@ -90,7 +90,7 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `bitdefender_registry_full_hive` | warning | Bitdefender: a `Registry.Key` value starts with a full hive name, so the rule never triggers |
 | `bitdefender_contains_no_wildcard` | warning | Bitdefender: a `contains` value has neither `*` nor `?` |
 | `bitdefender_severity_collapsed` | warning | Bitdefender: `Critical` or `Informational` severity sent as GravityZone `High` or `Low` |
-| `harfanglab_yara_context` | warning | HarfangLab: a YARA rule's meta `context` is not `file`, `memory`, `file,memory`, `file.pe`, `file.elf`, or `file.macho` |
+| `harfanglab_yara_context` | warning | HarfangLab: a YARA rule's meta `context` is not a comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` |
 
 The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories), [sysdig-1.0](platforms/sysdig-1.0.md#advisories), [bitdefender-1.0](platforms/bitdefender-1.0.md#advisories), and [harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile).
 
@@ -243,6 +243,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.8 | 2026-11-10 | `harfanglab_yara_context` accepts any comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` ([harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile) 1.3). |
 | 1.7 | 2026-11-10 | `bitdefender` is excluded from query validation (`supported: false`) and checked offline by `opentide validate` ([bitdefender-1.0](platforms/bitdefender-1.0.md), [RFC 0016](../rfcs/0016-bitdefender-gravityzone-platform.md)). Advisories `bitdefender_registry_full_hive`, `bitdefender_contains_no_wildcard`, and `bitdefender_severity_collapsed`. The fixture checker applies eleven Bitdefender constraint codes. |
 | 1.6 | 2026-11-10 | [Language diagnostics](#language-diagnostics): the YARA language's errors and warnings ([yara-1.0](languages/yara-1.0.md), [RFC 0015](../rfcs/0015-yara-language.md)). Advisory `harfanglab_yara_context`. HarfangLab YARA is checked offline by `opentide validate`; `validate query` stays `supported: false`. The fixture checker applies three HarfangLab codes and four YARA codes. |
 | 1.5 | 2026-11-03 | [Platform advisories](#platform-advisories): `sysdig_list_self_reference` ([sysdig-1.0](platforms/sysdig-1.0.md#advisories)). |
