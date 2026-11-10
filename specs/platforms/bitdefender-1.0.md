@@ -265,14 +265,16 @@ Each request is a JSON-RPC 2.0 `POST` to `<url>/v1.0/jsonrpc/incidents` with `Co
 
 | Kind | `type` / `subtype` | `settings` |
 |------|--------------------|------------|
-| `detection` | 1 / 0 | `status`, `severity`, `target`, `criteriaList` (`[{field, relation, value}]`, in block order), `filters` (only when `alert` is set), `automaticActions` |
+| `detection` | 1 / 0 | `status`, `severity`, `target`, `criteriaList` (`[{field, relation, value}]`, in block order), `filters` (`[{field: "detection", value: <alert>}]`, or `[]` without `alert`; omitted on create without `alert`), `automaticActions` |
 | `yara` | 1 / 1 | `status`, `severity`, `yaraQuery` (`signature` with `\n` line endings and one trailing newline), `automaticActions` |
 
 `settings.status` is `1`, or `0` under `DISABLEMENT`. On a `yara` rule it is `1` only when `on_access` is `true`, and `0` otherwise.
 
 **Automatic actions.** Every action type the kind allows is sent, in type order, each with `enabled: true` or `false`: types 1–7 for `detection`, and 1, 2, 3, 5, 6, 7 for `yara`. An enabled `kill_process` or `quarantine` carries `settings: {includeParent, includeChildren}`. An enabled `antimalware_scan` carries `settings: {type: 1}` for `quick` or `{type: 2}` for `full`. A disabled entry carries only `type` and `enabled`. With tenant `automatic_actions = false`, `automaticActions` is omitted.
 
-**Targets.** `targets.endpoint_tags` is sent as `targets.endpointTags: [{tagId, companyId}]`, and `targets.companies` as `targets.companiesIds`. Without block or tenant `targets`, `targets` is omitted, and the rule applies to the whole company. A partner tenant's `company_id` is sent as `companyId` on create.
+**Targets.** `targets.endpoint_tags` is sent as `targets.endpointTags: [{tagId, companyId}]`, and `targets.companies` as `targets.companiesIds`. Without block or tenant `targets`, the rule applies to the whole company: a create omits `targets`, and an update sends `"targets": {}`. A partner tenant's `company_id` is sent as `companyId` on create.
+
+**Nothing is left to the stored rule.** GravityZone keeps the stored value of any optional parameter an update does not send, so an update sends an explicit value for every parameter the block can change: `filters: []` when `alert` was removed, `targets: {}` when targets were removed. A tenant that refuses an empty value fails the rule with its `error`, rather than leaving the rule scoped or filtered as before.
 
 | Block status strategy | Binding in deployment state | GravityZone calls |
 |-----------------------|-----------------------------|-------------------|
@@ -387,4 +389,4 @@ Fixtures:
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-11-10 | Initial field contract ([RFC 0016](../../rfcs/0016-bitdefender-gravityzone-platform.md)): `detection` and `yara` kinds, criteria catalogue, derived name, description, severity, and tags; whole-payload updates; the GravityZone id in deployment state; no exclusion rules. |
-| 1.1 | 2026-11-10 | Clarifications from the first implementation review: the `connection` row lists the XDR fields Bitdefender's criteria page gives (`Connection.SourceUser`, `Connection.DestinationUser`, `Connection.Email.Subject`, and a `.Name` and `.Operation` per XDR resource); three enum fields take `is` only; value types per relation; one `field_path` per code; the `HKLU` hint for `HKEY_USERS` keys without a SID. Schema id unchanged. |
+| 1.1 | 2026-11-10 | Clarifications from the first implementation review: an update sends `filters: []` and `targets: {}` when the block has none, so a removed alert filter or target scope does not survive on GravityZone (create still omits them); the `connection` row lists the XDR fields Bitdefender's criteria page gives (`Connection.SourceUser`, `Connection.DestinationUser`, `Connection.Email.Subject`, and a `.Name` and `.Operation` per XDR resource); three enum fields take `is` only; value types per relation; one `field_path` per code; the `HKLU` hint for `HKEY_USERS` keys without a SID. Schema id unchanged. |

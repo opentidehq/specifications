@@ -132,7 +132,7 @@ def gz_actions(kind: str, actions: dict[str, Any]) -> list[dict[str, Any]]:
     return entries
 
 
-def gz_settings(rule: dict[str, Any], strategy: str) -> tuple[int, dict[str, Any]]:
+def gz_settings(rule: dict[str, Any], strategy: str, update: bool = False) -> tuple[int, dict[str, Any]]:
     block = rule["configurations"]["bitdefender"]
     disabled = strategy == "DISABLEMENT"
     if "detection" in block:
@@ -150,6 +150,8 @@ def gz_settings(rule: dict[str, Any], strategy: str) -> tuple[int, dict[str, Any
         }
         if detection.get("alert"):
             settings["filters"] = [{"field": "detection", "value": detection["alert"]}]
+        elif update:
+            settings["filters"] = []
         settings["automaticActions"] = gz_actions("detection", block.get("actions") or {})
         return 0, settings
     yara_block = block["yara"]
@@ -179,7 +181,7 @@ def gz_targets(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any] | 
 
 
 def build(rule: dict[str, Any], setup: dict[str, Any], method: str, strategy: str = "RELEASE") -> dict[str, Any]:
-    subtype, settings = gz_settings(rule, strategy)
+    subtype, settings = gz_settings(rule, strategy, update=method == "updateCustomRule")
     params: dict[str, Any] = {}
     if method == "updateCustomRule":
         params["ruleId"] = SAMPLE_RULE_ID
@@ -197,6 +199,8 @@ def build(rule: dict[str, Any], setup: dict[str, Any], method: str, strategy: st
     targets = gz_targets(rule, setup)
     if targets:
         params["targets"] = targets
+    elif method == "updateCustomRule":
+        params["targets"] = {}
     if method == "createCustomRule":
         params["returnRuleId"] = True
     return {"jsonrpc": "2.0", "method": method, "params": params}
