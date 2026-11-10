@@ -1,6 +1,6 @@
 ---
 spec: language-yara
-version: "1.1"
+version: "1.2"
 schema_id: null
 status: normative
 supersedes: null
@@ -52,7 +52,7 @@ The language is **YARA as libyara 4.5 compiles it**:
 
 A rule without a `strings:` section is valid. Two libyara limits are part of the dialect:
 
-- An identifier (a rule name, a rule tag, a string identifier) is at most 128 characters. A longer one is `yara_parse_error`, as libyara refuses it as a syntax error.
+- A rule name, a rule tag, and a meta key are at most 128 characters. A longer one is `yara_parse_error`, as libyara refuses it as a syntax error. String identifiers (`$name`) have no such limit in libyara 4.5 or YARA-X.
 - An `import` applies to the rules after it. A module used in a rule before its `import` is `yara_module_not_imported`.
 
 | Engine verdict | Report |
@@ -101,7 +101,7 @@ The engine knows 13 modules, with their fields, functions, overloads, and types:
 | `yara_x_incompatible` | libyara compiles it and YARA-X 1.x does not. The message says what YARA-X refuses. |
 | `yara_slow_pattern` | libyara's slow-scanning warnings: a short or all-wildcard atom, a regexp with no fixed atom, a hex jump too wide to scan fast |
 | `yara_entrypoint_deprecated` | `entrypoint`, deprecated in libyara (use `pe.entry_point` or `elf.entry_point`) and refused by YARA-X |
-| `yara_suspicious_expression` | An invariant or unsatisfiable condition, a non-boolean condition, or an integer compared with a boolean |
+| `yara_suspicious_expression` | An invariant or unsatisfiable condition, a non-boolean condition, or an integer compared with a boolean. A condition is non-boolean where YARA-X 1.x reports `non_bool_expr`: an integer, float, or string expression. A module member YARA-X types as boolean (`pe.is_dll()`, `pe.is_32bit()`, `pe.exports(…)`) is boolean, although libyara returns it as an integer. |
 | `yara_module_unconfirmed` | A known module outside the profile's confirmed set |
 | `yara_meta_missing` | A meta key the profile recommends is missing on a non-private rule |
 
@@ -177,3 +177,4 @@ Fixtures: [fixtures/platforms/harfanglab-yara-signature.yaml](../../fixtures/pla
 |---------|------|-------|
 | 1.0 | 2026-11-10 | Initial language spec ([RFC 0015](../../rfcs/0015-yara-language.md)): `YaraSignature`, the libyara 4.5 dialect with YARA-X warnings, diagnostics codes, and the `bitdefender` and `harfanglab` profiles. Answers the YARA questions of [specifications#68](https://github.com/opentidehq/specifications/issues/68). |
 | 1.1 | 2026-11-10 | Clarifications from the first implementation review, checked against libyara 4.5.4 and YARA-X 1.23: identifiers are at most 128 characters (`yara_parse_error`); an `import` must come before the rule that uses the module; a rule named like an imported module is `yara_x_incompatible` (libyara compiles it), so `yara_rule_identifier_conflict` covers keywords only; a `yara_x_incompatible` message says what YARA-X refuses rather than quoting it; `yara_slow_pattern` names libyara's own warnings only. No code is added or removed. |
+| 1.2 | 2026-11-10 | Clarifications from the second implementation review, checked against libyara 4.5.4 and YARA-X 1.23: the 128-character limit applies to rule names, rule tags, and meta keys, not to string identifiers; a non-boolean condition for `yara_suspicious_expression` is what YARA-X reports as `non_bool_expr`, so module members YARA-X types as boolean do not warn. No code is added or removed. |

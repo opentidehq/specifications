@@ -284,6 +284,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial field contract for `platform::sysdig::1.0` ([RFC 0014](rfcs/0014-sysdig-falco-platform.md), [specifications#8](https://github.com/opentidehq/specifications/issues/8)): a Falco condition with exceptions and private macros and lists, expanded at deploy; or a tuning of an existing rule (`append_to_rule`). Derived name, `desc`, `priority`, tags, and output. Deployed through the Sysdig Secure API only. The Falco language, exception rules, and list expansion follow libsinsp and Falco's rule loader exactly. Nine constraint codes and one advisory, `sysdig_list_self_reference`; list definition order follows Falco (a list may name a later list). Fixtures under `fixtures/platforms/sysdig/` (the API bodies) and `fixtures/valid/rule-sysdig-*.yaml`.
 
+## language-yara 1.2
+
+- Clarifications from the second implementation review: the 128-character limit applies to rule names, rule tags, and meta keys, not string identifiers (libyara and YARA-X accept longer `$` identifiers); `yara_suspicious_expression`'s non-boolean condition follows YARA-X's `non_bool_expr`, so `pe.is_dll()` and other members YARA-X types as boolean do not warn. No code added or removed.
+
 ## language-yara 1.1
 
 - Clarifications from the first implementation review, checked against libyara 4.5.4 and YARA-X 1.23: identifiers are at most 128 characters (`yara_parse_error`); an `import` must come before the rule that uses the module (`yara_module_not_imported`); a rule named like an imported module is `yara_x_incompatible`, and `yara_rule_identifier_conflict` covers keywords only; `yara_x_incompatible` messages say what YARA-X refuses; `yara_slow_pattern` names libyara's own warnings. No code added or removed.
