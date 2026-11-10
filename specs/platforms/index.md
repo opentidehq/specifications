@@ -1,6 +1,6 @@
 ---
 spec: platforms
-version: "1.6"
+version: "1.7"
 schema_id: null
 status: normative
 supersedes: null
@@ -81,9 +81,9 @@ These specs describe the blocks as the engine accepts them today, including ever
 
 `sentinel`, `defender_for_endpoint`, `splunk`, `sentinel_one`, `carbon_black_cloud`, `elastic`
 
-Query validation is a tenant check on every platform in this allowlist: `opentide validate query --live`. Without `--live` the command refuses and names `--live`.
+This is the `--live` allowlist: a tenant check, `opentide validate query --live`. Without `--live`, `validate query` checks offline with the analysis engine, in each platform's language that the engine parses ([validation](../validation.md#query-validation)).
 
-Excluded: `crowdstrike`, `harfanglab`, `sysdig`, `bitdefender`. Implementations MUST report `supported: false` for those four and MUST NOT invent a passing result.
+Excluded from `--live`: `crowdstrike`, `harfanglab`, `sysdig`, `bitdefender`. Implementations MUST report `supported: false` for those four with `--live` and MUST NOT invent a passing result. HarfangLab and Bitdefender YARA and the Sysdig Falco condition are still checked offline.
 
 ### What a block must contain to validate
 
@@ -224,6 +224,7 @@ Vocabulary files are not platform configuration. See [configuration.md](../confi
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.7 | 2026-11-10 | Query validation platforms: the allowlist is the `--live` (tenant) allowlist; `validate query` without `--live` checks offline, YARA and Falco included ([validation 1.9](../validation.md#query-validation)). |
 | 1.6 | 2026-11-10 | Bitdefender GravityZone joins the matrix as the tenth platform ([bitdefender-1.0](bitdefender-1.0.md), [RFC 0016](../../rfcs/0016-bitdefender-gravityzone-platform.md)): custom detection and YARA detection rules through the GravityZone Public API; no query validation, offline checks in `opentide validate`; the GravityZone rule id lives in deployment state. |
 | 1.5 | 2026-11-10 | YARA is a language spec ([yara-1.0](../languages/yara-1.0.md), [RFC 0015](../../rfcs/0015-yara-language.md)); HarfangLab YARA is checked offline by `opentide validate` (still `supported: false` for `validate query`). A HarfangLab block carries at most one of `sigma` and `yara`. |
 | 1.4 | 2026-11-02 | Sysdig Secure joins the matrix as the ninth platform ([sysdig-1.0](sysdig-1.0.md), [RFC 0014](../../rfcs/0014-sysdig-falco-platform.md)): Falco rules deployed through the Sysdig Secure API; no live query validation, an offline Falco check in `opentide validate`; the Sysdig rule id lives in deployment state. |

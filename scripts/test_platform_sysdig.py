@@ -104,7 +104,7 @@ class ListingTests(unittest.TestCase):
         self.assertIn("opentide ships ten detection platform integrations.", text)
         self.assertIn("| `sysdig` | `platform::sysdig::1.0` | [sysdig-1.0.md](sysdig-1.0.md) |", text)
         self.assertIn("| `sysdig` | Sysdig Secure | yes* | **no**‡ | Falco condition |", text)
-        self.assertIn("Excluded: `crowdstrike`, `harfanglab`, `sysdig`, `bitdefender`.", text)
+        self.assertIn("Excluded from `--live`: `crowdstrike`, `harfanglab`, `sysdig`, `bitdefender`.", text)
 
     def test_spec_index_and_llms(self) -> None:
         self.assertIn("[specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)", _read(ROOT / "SPECS.md"))

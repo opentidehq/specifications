@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.8"
+version: "1.9"
 schema_id: null
 status: normative
 supersedes: null
@@ -100,7 +100,11 @@ A language spec MAY define diagnostics with stable codes. Its errors fail static
 
 ### Query validation
 
-Command: `opentide validate query --platform <id> --live`
+Commands: `opentide validate query` (offline, the default) and `opentide validate query --platform <id> --live` (the tenant check).
+
+**Offline**, the analysis engine parses each query in its platform's language, with no tenant, credentials, or network. It is the `queries` check of `opentide validate` on its own, and it also takes a query file (`.kql`, `.spl`, `.yar`, ...). A platform with no offline parser (`sentinel_one`) refuses offline and names `--live`. HarfangLab and Bitdefender YARA (`.yar`, `.yara`) and the Sysdig Falco condition are checked offline.
+
+**`--live`** sends a platform's rule queries to its tenants. The table is the `--live` allowlist:
 
 | Platform | Supported |
 |----------|-----------|
@@ -111,11 +115,11 @@ Command: `opentide validate query --platform <id> --live`
 | `carbon_black_cloud` | yes |
 | `elastic` | yes, live only: Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md#query-validation)) |
 | `crowdstrike` | no |
-| `harfanglab` | no. YARA is checked offline by `opentide validate` ([harfanglab-1.0](platforms/harfanglab-1.0.md#query-validation)) |
-| `sysdig` | no. The Falco condition is checked offline by `opentide validate` ([sysdig-1.0](platforms/sysdig-1.0.md#query-validation)) |
+| `harfanglab` | no. YARA is checked offline ([harfanglab-1.0](platforms/harfanglab-1.0.md#query-validation)) |
+| `sysdig` | no. The Falco condition is checked offline ([sysdig-1.0](platforms/sysdig-1.0.md#query-validation)) |
 | `bitdefender` | no. Constraints, criteria, and YARA are checked offline by `opentide validate` ([bitdefender-1.0](platforms/bitdefender-1.0.md#query-validation)) |
 
-Requires platform credentials and enabled configuration. Validates deployed or planned rule queries against the live platform API. Query validation is a tenant check on every platform in the query-validation allowlist above: without `--live` the command MUST refuse and name `--live`, and MUST NOT report a pass. `crowdstrike`, `harfanglab`, `sysdig`, and `bitdefender` report `supported: false` instead ([platforms](platforms/index.md#query-validation-platforms)). `validate query` has no offline mode on any platform; Elastic's query language (KQL, Lucene, EQL, or ES|QL) comes from each rule's block: its `type`, and `language` for the types that take one.
+`--live` requires platform credentials and enabled configuration, and validates deployed or planned rule queries against the live platform API. `crowdstrike`, `harfanglab`, `sysdig`, and `bitdefender` report `supported: false` for `--live` ([platforms](platforms/index.md#query-validation-platforms)) and MUST NOT report a pass. An offline check MUST NOT be reported as a tenant check. Elastic's query language (KQL, Lucene, EQL, or ES|QL) comes from each rule's block: its `type`, and `language` for the types that take one.
 
 ### Specifications-repo fixture checker
 
@@ -243,6 +247,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.9 | 2026-11-10 | [Query validation](#query-validation) matches `opentide validate query` as it ships (since opentide 0.19): offline by default with the analysis engine, the `queries` check on its own plus query files; `--live` is the tenant check and its allowlist. HarfangLab and Bitdefender YARA (`.yar`, `.yara`) and the Sysdig Falco condition are checked offline; `--live` stays `supported: false` for `crowdstrike`, `harfanglab`, `sysdig`, and `bitdefender`. Replaces "no offline mode on any platform". |
 | 1.8 | 2026-11-10 | `harfanglab_yara_context` accepts any comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` ([harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile) 1.3). |
 | 1.7 | 2026-11-10 | `bitdefender` is excluded from query validation (`supported: false`) and checked offline by `opentide validate` ([bitdefender-1.0](platforms/bitdefender-1.0.md), [RFC 0016](../rfcs/0016-bitdefender-gravityzone-platform.md)). Advisories `bitdefender_registry_full_hive`, `bitdefender_contains_no_wildcard`, and `bitdefender_severity_collapsed`. The fixture checker applies eleven Bitdefender constraint codes. |
 | 1.6 | 2026-11-10 | [Language diagnostics](#language-diagnostics): the YARA language's errors and warnings ([yara-1.0](languages/yara-1.0.md), [RFC 0015](../rfcs/0015-yara-language.md)). Advisory `harfanglab_yara_context`. HarfangLab YARA is checked offline by `opentide validate`; `validate query` stays `supported: false`. The fixture checker applies three HarfangLab codes and four YARA codes. |
