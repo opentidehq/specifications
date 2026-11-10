@@ -119,7 +119,9 @@ YARA constraints ([YARA detection rules](https://www.bitdefender.com/business/su
 - An active EDR licence, not "EDR (Report only)".
 - *"A single YARA rule … can contain multiple individual YARA rules."*
 
-Bitdefender does not document the YARA engine version or its modules.
+**Engine: libyara.** BEST's open-source notices for [Windows](https://www.bitdefender.com/business/support/en/77209-521335-open-source-software-used-by-best-for-windows.html) and [Linux](https://www.bitdefender.com/business/support/en/77209-521336-open-source-software-used-by-best-for-linux.html) list *YARA* (BSD-3-Clause) with a link to `yara.readthedocs.io`, libyara's documentation. Neither mentions YARA-X. The YARA rules page also links its *Writing YARA rules* and `include` references to libyara's documentation. The libyara version is not published, and the [macOS notice](https://www.bitdefender.com/business/support/en/77209-521337-open-source-software-used-by-best-for-macos.html) does not list YARA.
+
+**Modules: no public source.** No Bitdefender page lists or excludes modules, and no example uses `import`. The documented syntax limits are ASCII, 30,000 characters, and no `include`. Imports are not among them. By maintainer decision (2026-11-10), the libyara modules of the Bitdefender profile ([§5.4](#54-platform-profiles)) are assumed to compile.
 
 ### 3.2 HarfangLab YARA
 
@@ -132,7 +134,8 @@ HarfangLab publishes no public API reference. The facts below come from third-pa
 | HarfangLab assigns the YaraFile `id` (`status[0].id`). Update is `PATCH …/YaraFile/{id}`, delete is `DELETE …/YaraFile/{id}`. Clients find files by `name__exact` within `source_id`, and names may repeat. | confirmed | Deletes `YaraFile/{metadata.uuid}`, an id the tenant never had; updates by re-`POST` with an undocumented `overwrite: true` |
 | `enabled` is a YaraFile field | confirmed | Never sent, so `DISABLEMENT` has no effect |
 | `hl_status` ∈ `stable`, `testing`, `experimental` | confirmed | Sent |
-| `global_state`, `rule_confidence_override`, `rule_level_override` on a YaraFile | **unverified** (confirmed only on IOC and Sigma rules) | Sent |
+| `PATCH …/YaraFile/{id}` accepts `content`, `name`, `source_id`, `hl_status`, and `enabled`, and echoes `content` back ([OpenCTI `harfanglab-intel` `patch_yara_file`](https://github.com/OpenCTI-Platform/connectors/blob/master/stream/harfanglab-intel/src/harfanglab_intel_connector/api_client.py); the legacy connector used `PUT …/YaraFile/{id}/`) | confirmed | Never updates in place |
+| `global_state`, `rule_confidence_override`, `rule_level_override` on a YaraFile | **no public source** for or against: public clients send them on IOC rules only. Assumed accepted by maintainer decision (2026-11-10). | Sent |
 | HarfangLab's own rules set meta `context` to `"file"`, `"memory"`, or `"file,memory"` and never set `os`, `arch`, `score`, or `id` | confirmed | Rewrites `file` to `file.pe`, `file.elf`, or `file.macho`; these values appear in no vendor material |
 | Engine version (libyara or YARA-X) and modules | **not published** | `imports` takes any string |
 | A rule with both `sigma` and `yara` is classed as Sigma and skipped on a `YARA` tenant | confirmed (`deployer.py:318-335`) | YARA half never deploys |
@@ -144,9 +147,9 @@ Two reference compilers exist, both BSD-3-Clause:
 - **libyara 4.5** (VirusTotal YARA, C; Python `yara-python`). Every EDR that shipped YARA before 2025 embeds libyara. This includes HarfangLab (YARA since 2020) and Bitdefender (YARA GA November 2024, seven months before YARA-X 1.0).
 - **YARA-X 1.x** (Rust). Faster, with better diagnostics and a formatter. It is stricter than libyara in documented places ([*Differences with YARA*](https://virustotal.github.io/yara-x/docs/writing_rules/differences-with-yara/)): escape sequences in strings, regexp syntax, duplicate rule names, `base64` modifier lengths, and some module fields. Some modules are missing or differ, such as `cuckoo` and `magic`.
 
-Neither vendor names its engine. Two consequences follow:
+Bitdefender's endpoint agent ships libyara ([§3.1](#31-bitdefender-gravityzone-public-api)). HarfangLab does not name its engine. Two consequences follow:
 
-- The **contract is libyara 4.5**, the engine both vendors most plausibly run.
+- The **contract is libyara 4.5**: the engine Bitdefender's agent ships, and the one HarfangLab most plausibly runs.
 - **YARA-X is a second opinion.** A rule only YARA-X rejects is a warning, so authors who later move to a YARA-X engine see the problem early.
 
 ## Detailed design
@@ -602,7 +605,7 @@ The language server checks both forms. A decomposed block is analysed as the rul
 |-------|------|---------|----------------|
 | `file_name` | string | the rule `name` slug + `.yar` | `name`; also the YARA namespace alerts show |
 
-`maturity` and `action` keep their meaning. `maturity` maps to `hl_status` (confirmed). `action` maps to `global_state`, which is sent on a YaraFile only once the [verification gate](#pre-acceptance-verification) confirms the field, and so are `rule_confidence_override` and `rule_level_override`. `overwrite` is no longer sent.
+`maturity` and `action` keep their meaning. `maturity` maps to `hl_status` (confirmed). `action` maps to `global_state`, and `confidence` to `rule_confidence_override`, both through the existing mapping tables. Deploy also sends `rule_level_override` from `response.alert_severity`. No public client sends these three on a YaraFile; they are sent on the maintainers' assumption that a YaraFile takes them as IOC and Sigma rules do. A tenant that refuses one answers with an error or `status: false`, and the rule fails with `harfanglab_yara_rejected` instead of deploying without it. `overwrite` is no longer sent.
 
 #### 7.3 Identity and deploy
 
@@ -616,9 +619,9 @@ A `POST` whose `status[0]` has no `id` fails the rule with `harfanglab_yara_no_i
 
 | Block status strategy | Binding | HarfangLab calls |
 |-----------------------|---------|------------------|
-| `PREVIEW`, `RELEASE`, `UNIVERSAL` | none | `POST /api/data/threat_intelligence/YaraFile/` with `source_id`, `name`, `content`, `enabled: true`, `hl_status`; record `status[0].id` |
-| `PREVIEW`, `RELEASE`, `UNIVERSAL` | present | `PATCH …/YaraFile/{id}/` with the same fields |
-| `DISABLEMENT` | present | `PATCH …/YaraFile/{id}/` with `enabled: false` |
+| `PREVIEW`, `RELEASE`, `UNIVERSAL` | none | `POST /api/data/threat_intelligence/YaraFile/` (the trailing `/` is required) with `source_id`, `name`, `content`, `enabled: true`, `hl_status`, `global_state`, `rule_confidence_override`, `rule_level_override`; record `status[0].id` |
+| `PREVIEW`, `RELEASE`, `UNIVERSAL` | present | `PATCH …/YaraFile/{id}` with the same fields, `content` included |
+| `DISABLEMENT` | present | `PATCH …/YaraFile/{id}` with `enabled: false` (and `global_state: disabled`) |
 | `DELETION` | present | `DELETE …/YaraFile/{id}/`, then the binding is removed |
 | `DISABLEMENT`, `DELETION` | none | `external_id_missing` (warning), no call |
 
@@ -788,7 +791,7 @@ Milestones:
 - **On-premises GravityZone is not covered.** It has no Incidents API. Its customers keep custom rules in the console.
 - **YARA rules per company are capped at 50.** A large YARA catalogue has to pack several rules into one block's `signature`.
 - **The HarfangLab rework is a behaviour change for existing users.** YaraFile ids join deployment state, an adoption step runs once, and a block with both `sigma` and `yara` must be split into two rules.
-- **Neither vendor names its YARA engine.** The libyara 4.5 contract is the most plausible choice. A vendor on YARA-X would reject some rules the engine accepts, though each such rule carries a `yara_x_incompatible` warning.
+- **YARA engine versions and module lists are not public.** Bitdefender's agent ships libyara at an unpublished version. HarfangLab names no engine. Module support is assumed on both. A rule that uses a feature newer than the agent's libyara, or a module the agent lacks, fails at deploy (`bitdefender_*` API error, `harfanglab_yara_rejected`) instead of at validation.
 - **The criteria catalogue is copied from a web page.** When Bitdefender adds fields, the sync script has to run, and until then a new field is an error.
 - **The engine follows YARA-X's release train.** The `yara-x-*` crates need Rust 1.95 today and raise their minimum about every two months, which moves the language server's and opentide's toolchain with them. Two parsers (tree-sitter and `yara-x-parser`) can disagree, and the agreement test has to keep them aligned.
 
@@ -819,10 +822,17 @@ These need a live GravityZone cloud tenant and a HarfangLab console (V1). Answer
 
 1. **GravityZone `updateCustomRule`.** Does a full `settings` replace the stored one, including `automaticActions`? What does an update with a different `type` return?
 2. **GravityZone errors.** What error does `createCustomRule` return for a duplicate name? Is name uniqueness per type, so that a console exclusion can block a detection rule's name?
-3. **GravityZone YARA.** Do `import "pe"` and the other confirmed modules compile? Is the engine libyara (check a YARA-X-only incompatibility)?
-4. **HarfangLab YaraFile fields.** Does a YaraFile accept `global_state`, `rule_confidence_override`, and `rule_level_override` (`/api/schema` on a console)? Does `PATCH` accept `content`?
-5. **HarfangLab `context` values.** Are `file.pe`, `file.elf`, `file.macho`, `process`, and `thread` valid, or only `file` and `memory`? The decomposed-form rewrite is kept or dropped on this answer.
-6. **HarfangLab Sigma identity.** Does it honour the Sigma `id`? Out of scope here, but the same check covers it, and it is filed against specifications#68.
+3. **HarfangLab `context` values.** Are `file.pe`, `file.elf`, `file.macho`, `process`, and `thread` valid, or only `file` and `memory`? The decomposed-form rewrite is kept or dropped on this answer.
+4. **HarfangLab Sigma identity.** Does it honour the Sigma `id`? Out of scope here, but the same check covers it, and it is filed against specifications#68.
+
+### Resolved before acceptance
+
+| Question | Answer | Basis |
+|---|---|---|
+| GravityZone YARA engine | libyara, version unpublished (macOS undisclosed) | BEST open-source notices for Windows and Linux; the YARA rules page links libyara's docs |
+| GravityZone YARA modules (`import "pe"`, …) | Assumed to compile | No public source. Maintainer decision, 2026-11-10 |
+| HarfangLab `PATCH YaraFile` with `content` | Yes, in place | OpenCTI `harfanglab-intel` `patch_yara_file` |
+| HarfangLab `global_state`, `rule_confidence_override`, `rule_level_override` on YaraFile | Assumed accepted | No public source. Maintainer decision, 2026-11-10 |
 
 ### Open design points
 
