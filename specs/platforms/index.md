@@ -1,6 +1,6 @@
 ---
 spec: platforms
-version: "1.4"
+version: "1.5"
 schema_id: null
 status: normative
 supersedes: null
@@ -33,7 +33,7 @@ These specs describe the blocks as the engine accepts them today, including ever
 - Platform identifiers MUST use the keys in the capability matrix (snake_case).
 - A platform MUST be marked `enabled: true` in merged configuration to appear in `enabled_systems()`.
 - Deploy and validate capabilities MUST be reported honestly. A platform without a query validator MUST NOT claim query validation support.
-- CrowdStrike, HarfangLab, and Sysdig MUST NOT advertise query validation (`can_validate: false`). Sysdig's Falco condition is checked offline by `opentide validate` ([sysdig-1.0](sysdig-1.0.md#query-validation)), which is not query validation.
+- CrowdStrike, HarfangLab, and Sysdig MUST NOT advertise query validation (`can_validate: false`). Sysdig's Falco condition ([sysdig-1.0](sysdig-1.0.md#query-validation)) and HarfangLab's YARA ([harfanglab-1.0](harfanglab-1.0.md#query-validation), [yara-1.0](../languages/yara-1.0.md)) are checked offline by `opentide validate`, which is not query validation.
 - A typed block SHOULD set `schema` to `platform::<identifier>::1.0`. Implementations MUST accept a missing `schema` and MUST accept a legacy identifier (`sentinel::2.4`, `splunk::2.0`, `splunk::3.0`, `carbon_black_cloud::3.0`, and the same shape for the other platforms). The identifier is not a closed enum.
 - Unknown keys on a block MUST fail static validation. The model forbids them.
 - A block MUST NOT carry a vendor-assigned external id. `rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` at the root of any block, on every platform, MUST fail with `external_id_in_rule` ([External rule ids](#external-rule-ids)).
@@ -59,7 +59,7 @@ These specs describe the blocks as the engine accepts them today, including ever
 | `sentinel_one` | SentinelOne | yes* | yes | S1QL | [sentinel-one-1.0](sentinel-one-1.0.md) |
 | `carbon_black_cloud` | VMware Carbon Black Cloud | yes | yes | Lucene | [carbon-black-cloud-1.0](carbon-black-cloud-1.0.md) |
 | `crowdstrike` | CrowdStrike Falcon | yes* | **no** | correlation filter | [crowdstrike-1.0](crowdstrike-1.0.md) |
-| `harfanglab` | HarfangLab | yes* | **no** | Sigma or YARA | [harfanglab-1.0](harfanglab-1.0.md) |
+| `harfanglab` | HarfangLab | yes* | **no**§ | Sigma or YARA | [harfanglab-1.0](harfanglab-1.0.md) |
 | `elastic` | Elastic Security | yes* | yes† | KQL, Lucene, EQL, or ES\|QL, chosen by the block's `type` and `language` | [elastic-1.0](elastic-1.0.md) |
 | `sysdig` | Sysdig Secure | yes* | **no**‡ | Falco condition | [sysdig-1.0](sysdig-1.0.md) |
 
@@ -68,6 +68,8 @@ These specs describe the blocks as the engine accepts them today, including ever
 † Live only, through Kibana rule preview (`/api/detection_engine/rules/preview`) plus the Elasticsearch checks, against a tenant, for every language the block can carry. Elastic has no offline syntax check ([elastic-1.0](elastic-1.0.md#query-validation)).
 
 ‡ Sysdig Secure has no rule preview. The analysis engine checks the Falco condition offline in `opentide validate` and in editors ([sysdig-1.0](sysdig-1.0.md#query-validation)).
+
+§ HarfangLab has no rule preview. The analysis engine checks YARA offline against the [YARA language](../languages/yara-1.0.md) in `opentide validate` and in editors. Sigma is not checked.
 
 ### Query validation platforms
 
@@ -91,7 +93,7 @@ This is the static-validation bar. Deploy adds the constraints in each platform 
 | `sentinel_one` | `condition` (with `type`) |
 | `carbon_black_cloud` | `query` |
 | `crowdstrike` | `details` (with `trigger` and `outcome`), `schedule` (with `frequency` and `lookback`), `query` |
-| `harfanglab` | no platform field is required; `maturity`, `confidence`, and `action` have defaults. Deploy requires `sigma` or `yara` |
+| `harfanglab` | no platform field is required; `maturity`, `confidence`, and `action` have defaults. At most one of `sigma` and `yara` (`harfanglab_rule_kind`). Deploy requires one of them |
 | `sysdig` | `status`, and `condition`, or `append_to_rule` with `condition` or `exceptions`. Every block also meets the [Sysdig constraints](sysdig-1.0.md#constraints) |
 | `elastic` | `type`, `status`, and `query` (except for `machine_learning`), plus the type object: `threshold`, `new_terms`, `threat`, or `machine_learning` for those types. Every block also meets the [Elastic constraints](elastic-1.0.md#constraints) |
 
@@ -215,6 +217,7 @@ Vocabulary files are not platform configuration. See [configuration.md](../confi
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.5 | 2026-11-10 | YARA is a language spec ([yara-1.0](../languages/yara-1.0.md), [RFC 0015](../../rfcs/0015-yara-language.md)); HarfangLab YARA is checked offline by `opentide validate` (still `supported: false` for `validate query`). A HarfangLab block carries at most one of `sigma` and `yara`. |
 | 1.4 | 2026-11-02 | Sysdig Secure joins the matrix as the ninth platform ([sysdig-1.0](sysdig-1.0.md), [RFC 0014](../../rfcs/0014-sysdig-falco-platform.md)): Falco rules deployed through the Sysdig Secure API; no live query validation, an offline Falco check in `opentide validate`; the Sysdig rule id lives in deployment state. |
 | 1.3 | 2026-10-20 | Block `tenants`: omitted means every tenant the run reaches; opentide 0.17.0 removed deployment plans. |
 | 1.0 | 2026-06-25 | Initial matrix for seven bundled platforms |

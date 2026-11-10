@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.5"
+version: "1.6"
 schema_id: null
 status: normative
 supersedes: null
@@ -87,8 +87,13 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `risk_band` | warning | Elastic: an explicit risk score is outside its severity's band |
 | `technique_not_enterprise` | warning | Elastic: the rule names a technique that is not Enterprise ATT&CK, which deploy skips |
 | `sysdig_list_self_reference` | warning | Sysdig: a block list names itself, which Falco keeps as a literal value |
+| `harfanglab_yara_context` | warning | HarfangLab: a YARA rule's meta `context` is not `file`, `memory`, `file,memory`, `file.pe`, `file.elf`, or `file.macho` |
 
-The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories) and [sysdig-1.0](platforms/sysdig-1.0.md#advisories).
+The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories), [sysdig-1.0](platforms/sysdig-1.0.md#advisories), and [harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile).
+
+### Language diagnostics
+
+A language spec MAY define diagnostics with stable codes. Its errors fail static validation like a constraint code. Its warnings are reported like advisories and never set `VALIDATION_ERROR_RAISED`. The YARA codes are in [yara-1.0](languages/yara-1.0.md#diagnostics): every `yara_*` error fails the rule, and the warnings are `yara_x_incompatible`, `yara_slow_pattern`, `yara_entrypoint_deprecated`, `yara_suspicious_expression`, `yara_module_unconfirmed`, and `yara_meta_missing`.
 
 ### Query validation
 
@@ -103,7 +108,7 @@ Command: `opentide validate query --platform <id> --live`
 | `carbon_black_cloud` | yes |
 | `elastic` | yes, live only: Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md#query-validation)) |
 | `crowdstrike` | no |
-| `harfanglab` | no |
+| `harfanglab` | no. YARA is checked offline by `opentide validate` ([harfanglab-1.0](platforms/harfanglab-1.0.md#query-validation)) |
 | `sysdig` | no. The Falco condition is checked offline by `opentide validate` ([sysdig-1.0](platforms/sysdig-1.0.md#query-validation)) |
 
 Requires platform credentials and enabled configuration. Validates deployed or planned rule queries against the live platform API. Query validation is a tenant check on every platform in the query-validation allowlist above: without `--live` the command MUST refuse and name `--live`, and MUST NOT report a pass. `crowdstrike`, `harfanglab`, and `sysdig` report `supported: false` instead ([platforms](platforms/index.md#query-validation-platforms)). `validate query` has no offline mode on any platform; Elastic's query language (KQL, Lucene, EQL, or ES|QL) comes from each rule's block: its `type`, and `language` for the types that take one.
@@ -139,6 +144,10 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/invalid/rule-elastic-esql-index.yaml](../fixtures/invalid/rule-elastic-esql-index.yaml) | `esql_source` (also `language` and `suppression_shape`) |
 | [fixtures/invalid/rule-search-language.yaml](../fixtures/invalid/rule-search-language.yaml) | `search_language` |
 | [fixtures/invalid/rule-sysdig-tuning-output.yaml](../fixtures/invalid/rule-sysdig-tuning-output.yaml) | `sysdig_tuning_keys` (also `sysdig_exception_shape`) |
+| [fixtures/invalid/rule-harfanglab-sigma-and-yara.yaml](../fixtures/invalid/rule-harfanglab-sigma-and-yara.yaml) | `harfanglab_rule_kind` |
+| [fixtures/invalid/rule-harfanglab-yara-both-forms.yaml](../fixtures/invalid/rule-harfanglab-yara-both-forms.yaml) | `harfanglab_yara_form` |
+| [fixtures/invalid/rule-harfanglab-yara-include.yaml](../fixtures/invalid/rule-harfanglab-yara-include.yaml) | `yara_include` |
+| [fixtures/invalid/rule-yara-signature-alias.yaml](../fixtures/invalid/rule-yara-signature-alias.yaml) | `yara_signature_alias` |
 | [fixtures/sharing/invalid/unknown-distribution.toml](../fixtures/sharing/invalid/unknown-distribution.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/legacy-targets-table.toml](../fixtures/sharing/invalid/legacy-targets-table.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/duplicate-name.toml](../fixtures/sharing/invalid/duplicate-name.toml) | `duplicate_name` |
@@ -167,6 +176,8 @@ Sharing fixtures (`scripts/sharing_fixtures.py`) also prove the merge rule: [ove
 On a rule's `configurations.elastic` block the checker applies three of the [Elastic constraint codes](platforms/elastic-1.0.md#constraints), the ones the invalid Elastic fixture exercises: `language`, `esql_source`, and `suppression_shape`. They are the platform's own codes, so the checker and `opentide validate` report the same name. The other Elastic codes, and every other platform block, are left to opentide.
 
 On a rule's `configurations.sysdig` block the checker applies the [Sysdig constraint codes](platforms/sysdig-1.0.md#constraints) that need no Falco parser: `sysdig_rule_shape`, `sysdig_tuning_keys`, `sysdig_priority`, `sysdig_source`, `sysdig_exception_shape`, `sysdig_definition_name`, and `sysdig_definition_duplicate`. `sysdig_definition_order` and `sysdig_list_in_value` need the Falco tokenizer and are left to opentide.
+
+On a rule's `configurations.harfanglab` block the checker applies `harfanglab_rule_kind`, `harfanglab_yara_form`, and `harfanglab_yara_section_header`. On any `yara.signature` it applies the [YARA codes](languages/yara-1.0.md#diagnostics) that need no YARA parser: `yara_signature_alias`, `yara_include`, `yara_empty_signature`, and `yara_duplicate_rule`. The other YARA codes are left to the analysis engine.
 
 On a rule's `response.procedure.searches[]` the checker reports `search_language` when `language` is set with a `system` other than `elastic`, or with a value other than `kuery`, `lucene`, `eql`, or `esql` ([rule-1.1](objects/rule-1.1.md#searches-responsesearch)).
 
@@ -220,6 +231,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.6 | 2026-11-10 | [Language diagnostics](#language-diagnostics): the YARA language's errors and warnings ([yara-1.0](languages/yara-1.0.md), [RFC 0015](../rfcs/0015-yara-language.md)). Advisory `harfanglab_yara_context`. HarfangLab YARA is checked offline by `opentide validate`; `validate query` stays `supported: false`. The fixture checker applies three HarfangLab codes and four YARA codes. |
 | 1.5 | 2026-11-03 | [Platform advisories](#platform-advisories): `sysdig_list_self_reference` ([sysdig-1.0](platforms/sysdig-1.0.md#advisories)). |
 | 1.5 | 2026-11-02 | `sysdig` is excluded from query validation (`supported: false`); its Falco condition is checked offline by `opentide validate` ([sysdig-1.0](platforms/sysdig-1.0.md#query-validation)). `validate query` has no offline mode on any platform. The fixture checker applies seven Sysdig constraint codes to `configurations.sysdig` blocks. |
 | 1.4 | 2026-10-23 | Fixture checker code `search_language` for `response.procedure.searches[].language` ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). |

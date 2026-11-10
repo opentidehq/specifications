@@ -730,6 +730,90 @@ SEARCH_LANGUAGES: dict[str, frozenset[str]] = {
 }
 
 
+_YARA_INCLUDE = re.compile(r"^\s*include\s+\"", re.MULTILINE)
+_YARA_RULE = re.compile(r"^\s*((?:(?:private|global)\s+)*)rule\s+([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE)
+_YARA_SECTION_HEADER = re.compile(r"^\s*(?:strings\s*:|condition\s*:|(?:(?:private|global)\s+)*rule\s+[A-Za-z_])", re.MULTILINE)
+
+
+def validate_yara_signature(signature: Any, path: str) -> list[CheckError]:
+    """The YARA codes of specs/languages/yara-1.0.md that need no YARA parser."""
+    errors: list[CheckError] = []
+    if not isinstance(signature, str) or not signature.strip():
+        return [CheckError("yara_empty_signature", "signature MUST be a non-blank YARA text", path)]
+    if _YARA_INCLUDE.search(signature):
+        errors.append(CheckError("yara_include", "include is not allowed in a signature", path))
+    rules = _YARA_RULE.findall(signature)
+    if not any(not modifiers.strip() for modifiers, _ in rules):
+        errors.append(CheckError("yara_empty_signature", "no rule that is neither private nor global", path))
+    seen: set[str] = set()
+    for _, name in rules:
+        if name in seen:
+            errors.append(CheckError("yara_duplicate_rule", f"rule {name!r} is defined twice", path))
+        seen.add(name)
+    return errors
+
+
+def validate_harfanglab_block(block: dict[str, Any]) -> list[CheckError]:
+    """The platform::harfanglab::1.0 constraint codes that need no YARA parser.
+
+    specs/platforms/harfanglab-1.0.md#constraints. `harfanglab_yara_import` and
+    `harfanglab_yara_rule_name` need the module catalogue and are left to opentide.
+    """
+    base = "configurations.harfanglab"
+    errors: list[CheckError] = []
+    sigma, yara_block = block.get("sigma"), block.get("yara")
+    if sigma is not None and yara_block is not None:
+        errors.append(CheckError("harfanglab_rule_kind", "a block carries sigma or yara, not both", base))
+    if not isinstance(yara_block, dict):
+        return errors
+    decomposed = [key for key in ("meta", "strings", "condition", "imports") if key in yara_block]
+    if "signature" in yara_block:
+        if decomposed:
+            errors.append(
+                CheckError(
+                    "harfanglab_yara_form",
+                    f"signature is set with decomposed keys {', '.join(decomposed)}",
+                    f"{base}.yara",
+                )
+            )
+        errors.extend(validate_yara_signature(yara_block["signature"], f"{base}.yara.signature"))
+    for key in ("strings", "condition"):
+        body = yara_block.get(key)
+        if isinstance(body, str) and _YARA_SECTION_HEADER.search(body):
+            errors.append(
+                CheckError("harfanglab_yara_section_header", f"{key} holds a section or rule header", f"{base}.yara.{key}")
+            )
+    return errors
+
+
+def aliased_paths(text: str) -> list[str]:
+    """Dotted paths whose value is a YAML alias of a node defined earlier in the file."""
+    if yaml is None:
+        return []
+    try:
+        root = yaml.compose(text)
+    except Exception:  # noqa: BLE001 - parse errors are reported by load_yaml
+        return []
+    seen: set[int] = set()
+    found: list[str] = []
+
+    def walk(node: Any, path: str) -> None:
+        if id(node) in seen and isinstance(node, yaml.ScalarNode):
+            found.append(path)
+            return
+        seen.add(id(node))
+        if isinstance(node, yaml.MappingNode):
+            for key, value in node.value:
+                walk(value, f"{path}.{key.value}" if path else str(key.value))
+        elif isinstance(node, yaml.SequenceNode):
+            for index, value in enumerate(node.value):
+                walk(value, f"{path}.{index}")
+
+    if root is not None:
+        walk(root, "")
+    return found
+
+
 def validate_searches(doc: dict[str, Any]) -> list[CheckError]:
     """`language` on a hunt search is set only for a system that lists it, with a listed value."""
     response = doc.get("response")
@@ -780,6 +864,8 @@ def validate_rule(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[CheckEr
         errors.extend(validate_elastic_block(configurations["elastic"]))
     if isinstance(configurations, dict) and isinstance(configurations.get("sysdig"), dict):
         errors.extend(validate_sysdig_block(configurations["sysdig"]))
+    if isinstance(configurations, dict) and isinstance(configurations.get("harfanglab"), dict):
+        errors.extend(validate_harfanglab_block(configurations["harfanglab"]))
     errors.extend(validate_searches(doc))
     return errors
 
@@ -807,7 +893,12 @@ def validate_fixture_file(path: Path, vocabs: dict[str, Vocab]) -> list[CheckErr
         doc = load_yaml(path)
     except Exception as exc:  # noqa: BLE001 — surface parse errors as fixture failures
         return [CheckError("yaml_parse_error", str(exc))]
-    return validate_document(doc, vocabs)
+    errors = validate_document(doc, vocabs)
+    for dotted in aliased_paths(path.read_text(encoding="utf-8")):
+        parts = dotted.split(".")
+        if len(parts) == 4 and parts[0] == "configurations" and parts[2:] == ["yara", "signature"]:
+            errors.append(CheckError("yara_signature_alias", "signature MUST be written in the block, not aliased", dotted))
+    return errors
 
 
 EXPECTED_INVALID_CODES: dict[str, str] = {
@@ -838,4 +929,8 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "rule-elastic-esql-index.yaml": "esql_source",
     "rule-search-language.yaml": "search_language",
     "rule-sysdig-tuning-output.yaml": "sysdig_tuning_keys",
+    "rule-harfanglab-sigma-and-yara.yaml": "harfanglab_rule_kind",
+    "rule-harfanglab-yara-both-forms.yaml": "harfanglab_yara_form",
+    "rule-harfanglab-yara-include.yaml": "yara_include",
+    "rule-yara-signature-alias.yaml": "yara_signature_alias",
 }
