@@ -911,8 +911,9 @@ def validate_bitdefender_block(block: dict[str, Any]) -> list[CheckError]:
             or set(targets) - {"endpoint_tags", "companies"}
             or not isinstance(targets[keys[0]], list)
             or not targets[keys[0]]
+            or not all(isinstance(alias, str) and alias.strip() for alias in targets[keys[0]])
         ):
-            errors.append(CheckError("bitdefender_targets_shape", "one non-empty list: endpoint_tags or companies", f"{base}.targets"))
+            errors.append(CheckError("bitdefender_targets_shape", "one non-empty list of non-blank aliases: endpoint_tags or companies", f"{base}.targets"))
     detection = block.get("detection")
     target = ""
     created_by = False

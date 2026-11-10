@@ -316,6 +316,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - First language spec, [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) ([RFC 0015](rfcs/0015-yara-language.md)): `YaraSignature`, the libyara 4.5 dialect with YARA-X as warnings, stable `yara_*` diagnostics, and the `bitdefender` and `harfanglab` profiles. Answers the YARA questions of [specifications#68](https://github.com/opentidehq/specifications/issues/68).
 
+## platform-bitdefender 1.4
+
+- `targets`, block and tenant default: exactly one of `endpoint_tags` and `companies` when present, a non-empty list with no blank alias (`bitdefender_targets_shape`). A tenant `targets` that breaks it fails configuration load and never means the whole company. Schema id unchanged.
+
 ## platform-bitdefender 1.3
 
 - `--live` is `supported: false`; without `--live`, `validate query` checks YARA offline. Schema id unchanged.
