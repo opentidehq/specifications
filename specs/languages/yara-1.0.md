@@ -1,6 +1,6 @@
 ---
 spec: language-yara
-version: "1.2"
+version: "1.3"
 schema_id: null
 status: normative
 supersedes: null
@@ -52,7 +52,7 @@ The language is **YARA as libyara 4.5 compiles it**:
 
 A rule without a `strings:` section is valid. Two libyara limits are part of the dialect:
 
-- A rule name, a rule tag, and a meta key are at most 128 characters. A longer one is `yara_parse_error`, as libyara refuses it as a syntax error. String identifiers (`$name`) have no such limit in libyara 4.5 or YARA-X.
+- Every identifier except a string identifier is at most 128 characters: rule names, rule tags, meta keys, `for` and `with` variables, and any other bare identifier. A longer one is `yara_parse_error`, as libyara refuses it as a syntax error. String identifiers (`$name`, and `#name`, `@name`, `!name`) have no such limit in libyara 4.5 or YARA-X.
 - An `import` applies to the rules after it. A module used in a rule before its `import` is `yara_module_not_imported`.
 
 | Engine verdict | Report |
@@ -74,7 +74,7 @@ The engine knows 13 modules, with their fields, functions, overloads, and types:
 
 | Code | Condition |
 |------|-----------|
-| `yara_parse_error` | Syntax error, including an identifier longer than 128 characters |
+| `yara_parse_error` | Syntax error, including an identifier other than a string identifier longer than 128 characters |
 | `yara_include` | An `include` directive |
 | `yara_signature_alias` | `signature` is a YAML alias instead of its own text |
 | `yara_empty_signature` | No YARA rule, or only `private` or `global` rules |
@@ -178,3 +178,4 @@ Fixtures: [fixtures/platforms/harfanglab-yara-signature.yaml](../../fixtures/pla
 | 1.0 | 2026-11-10 | Initial language spec ([RFC 0015](../../rfcs/0015-yara-language.md)): `YaraSignature`, the libyara 4.5 dialect with YARA-X warnings, diagnostics codes, and the `bitdefender` and `harfanglab` profiles. Answers the YARA questions of [specifications#68](https://github.com/opentidehq/specifications/issues/68). |
 | 1.1 | 2026-11-10 | Clarifications from the first implementation review, checked against libyara 4.5.4 and YARA-X 1.23: identifiers are at most 128 characters (`yara_parse_error`); an `import` must come before the rule that uses the module; a rule named like an imported module is `yara_x_incompatible` (libyara compiles it), so `yara_rule_identifier_conflict` covers keywords only; a `yara_x_incompatible` message says what YARA-X refuses rather than quoting it; `yara_slow_pattern` names libyara's own warnings only. No code is added or removed. |
 | 1.2 | 2026-11-10 | Clarifications from the second implementation review, checked against libyara 4.5.4 and YARA-X 1.23: the 128-character limit applies to rule names, rule tags, and meta keys, not to string identifiers; a non-boolean condition for `yara_suspicious_expression` is what YARA-X reports as `non_bool_expr`, so module members YARA-X types as boolean do not warn. No code is added or removed. |
+| 1.3 | 2026-11-10 | Clarification from the third implementation review, checked against libyara 4.5.4 and YARA-X 1.23: the 128-character limit covers every identifier except string identifiers, including `for` and `with` variables, not only rule names, rule tags, and meta keys. No code is added or removed. |
