@@ -36,7 +36,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Elastic Security platform | 1.1 | `platform::elastic::1.0` | normative | [specs/platforms/elastic-1.0.md](specs/platforms/elastic-1.0.md) |
 | Sysdig Secure platform | 1.0 | `platform::sysdig::1.0` | normative | [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md) |
 | Bitdefender GravityZone platform | 1.1 | `platform::bitdefender::1.0` | normative | [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md) |
-| YARA language | 1.1 | — | normative | [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) |
+| YARA language | 1.2 | — | normative | [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) |
 | Validation | 1.8 | — | normative | [specs/validation.md](specs/validation.md) |
 | Sharing | 1.3 | — | normative | [specs/sharing.md](specs/sharing.md) |
 | MISP connector | 1.0 | `sharing::misp::1.0` | normative | [specs/sharing/misp-1.0.md](specs/sharing/misp-1.0.md) |
