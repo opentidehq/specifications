@@ -1,6 +1,6 @@
 ---
 spec: platform-bitdefender
-version: "1.3"
+version: "1.4"
 schema_id: platform::bitdefender::1.0
 status: normative
 supersedes: null
@@ -97,7 +97,7 @@ A [`YaraSignature`](../languages/yara-1.0.md#yarasignature), plus:
 | `endpoint_tags` | list[string] | Aliases from the tenant's `endpoint_tags` table. Each resolves to `{tagId, companyId}`. |
 | `companies` | list[string] | Partner tenants: aliases from the tenant's `companies` table. Each resolves to a company id. |
 
-At most one of the two is set, and each list is non-empty. A rule file carries aliases, never GravityZone ids, because ids differ per tenant. An alias the tenant does not define fails that rule at deploy (`bitdefender_target_unknown`).
+When `targets` is present, exactly one of the two is set, and its list is non-empty and holds no blank alias (one that is empty or only whitespace). A rule file carries aliases, never GravityZone ids, because ids differ per tenant. An alias the tenant does not define fails that rule at deploy (`bitdefender_target_unknown`).
 
 ### `actions` (BitdefenderActions)
 
@@ -127,7 +127,7 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `bitdefender_criterion_value` | An enum field's value is one of its values. A port is an integer from 0 to 65535. |
 | `bitdefender_criteria_combination` | The catalogue's pairing rules hold. EDR-only and XDR-only fields or values are not mixed. `File.Certificate*` needs `File.Name` or `File.FullPathName`. `Connection.Protocol` needs `Connection.Domain`. An XDR detection uses `alert` or an operation criterion, not both. |
 | `bitdefender_action_scope` | Each action is allowed for the kind and target ([`actions`](#actions-bitdefenderactions)). |
-| `bitdefender_targets_shape` | At most one of `targets.endpoint_tags` and `targets.companies`; each list is non-empty. |
+| `bitdefender_targets_shape` | `targets`, when present, sets exactly one of `targets.endpoint_tags` and `targets.companies`; the list is non-empty and holds no blank alias. |
 | `bitdefender_severity` | `severity` is `Low`, `Medium`, or `High`. |
 | `bitdefender_yara_ascii` | `yara.signature` holds ASCII characters only. |
 | `bitdefender_yara_size` | `yara.signature` is at most 30,000 characters. |
@@ -251,13 +251,13 @@ tier0-servers = { tag_id = "5b680f6fb1a43d860a7b23c8", company_id = "61827b80364
 | `key_type` | string | no | `personal` | `personal`: HTTP Basic, the key as user name and an empty password. `service`: `X-API-Key: <key>`. |
 | `company_id` | string | no | the key's company | Partner tenants: the company that owns created rules (`companyId`), 24 hex |
 | `automatic_actions` | bool | no | `true` | `false` for subscriptions without automatic actions. Deploy then omits `automaticActions` and reports `bitdefender_actions_unsupported` (warning) for a block that sets `actions`. |
-| `targets` | table | no | none | Default `targets` for blocks that set none, as `{endpoint_tags = [...]}` or `{companies = [...]}` |
+| `targets` | table | no | none | Default `targets` for blocks that set none, as `{endpoint_tags = [...]}` or `{companies = [...]}`, with the block's shape: exactly one list, non-empty, no blank alias |
 | `endpoint_tags` | table | no | `{}` | Alias → `{tag_id, company_id}`, each 24 hex |
 | `companies` | table | no | `{}` | Alias → company id, 24 hex |
 | `tags` | list[string] | no | `[]` | Tags added to every rule deployed to this tenant |
 | `ssl` | bool | yes | — | Shared tenant setup (TLS verification) |
 
-A tenant with an unknown setup key, a literal `api_key`, or an id that is not 24 hex fails configuration load. On-premises GravityZone has no Incidents API. An on-premises URL fails the tenant with `bitdefender_incidents_api_unavailable` at the first `-32601` (method not found).
+A tenant with an unknown setup key, a literal `api_key`, an id that is not 24 hex, or a `targets` table that breaks the block's shape fails configuration load. A tenant default never resolves to the whole company: only a tenant without `targets` does. On-premises GravityZone has no Incidents API. An on-premises URL fails the tenant with `bitdefender_incidents_api_unavailable` at the first `-32601` (method not found).
 
 ### Deploy
 
@@ -393,3 +393,4 @@ Fixtures:
 | 1.1 | 2026-11-10 | Clarifications from the first implementation review: an update sends `filters: []` and `targets: {}` when the block has none, so a removed alert filter or target scope does not survive on GravityZone (create still omits them); the `connection` row lists the XDR fields Bitdefender's criteria page gives (`Connection.SourceUser`, `Connection.DestinationUser`, `Connection.Email.Subject`, and a `.Name` and `.Operation` per XDR resource); three enum fields take `is` only; value types per relation; one `field_path` per code; the `HKLU` hint for `HKEY_USERS` keys without a SID. Schema id unchanged. |
 | 1.2 | 2026-11-10 | `detection` as a criterion field is `bitdefender_criterion_field` (error) on every target, open ones included: the alert filter is written as `alert`. Found where opentide and the language server disagreed. Schema id unchanged. |
 | 1.3 | 2026-11-10 | Query validation: `--live` is `supported: false`; without `--live`, `validate query` checks YARA offline ([validation 1.9](../validation.md#query-validation)). Schema id unchanged. |
+| 1.4 | 2026-11-10 | `targets` (block and tenant default): when present, exactly one of `endpoint_tags` and `companies`, a non-empty list with no blank alias (`bitdefender_targets_shape`). A tenant `targets` that breaks it fails configuration load and never resolves to the whole company. Clarifies "at most one", which every implementation already read as exactly one. Schema id unchanged. |
