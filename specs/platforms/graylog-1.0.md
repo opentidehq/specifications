@@ -392,9 +392,9 @@ Deploy never reads `state` from a create response: it may say `DISABLED` while t
 | A stream or notification alias the tenant does not define | `graylog_alias_unknown`, before any call for that rule |
 | A create gets no answer (timeout, connection reset) | `graylog_create_unconfirmed`. Not retried: titles are not unique, so a retry may create a second definition. The failure names the title (and, on 7.2, the `opentide.<uuid>` tag). |
 | `GET /api/system` reports a version below 6.3, or no version | `graylog_version_unsupported`: the tenant stops |
-| `GET /api/system` gets no answer | `graylog_tenant_unreachable`: the tenant stops |
+| Any request other than a create gets no answer | `graylog_tenant_unreachable`: the tenant stops |
 | A create answers 2xx without an `id` | `graylog_create_unconfirmed`, as above |
-| Any other non-2xx answer, or no answer to an update or delete | `graylog_request_failed`, with the status and Graylog's message: the rule fails |
+| Any other non-2xx answer | `graylog_request_failed`, with the status and Graylog's message: the rule fails |
 
 ### Query validation
 
