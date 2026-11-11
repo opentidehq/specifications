@@ -91,11 +91,6 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `bitdefender_contains_no_wildcard` | warning | Bitdefender: a `contains` value has neither `*` nor `?` |
 | `bitdefender_severity_collapsed` | warning | Bitdefender: `Critical` or `Informational` severity sent as GravityZone `High` or `Low` |
 | `graylog_overlapping_window` | warning | Graylog: a filter's `schedule.window` is longer than `schedule.every`, so each message alerts once per overlapping run |
-| `graylog_lowercase_operator` | warning | Graylog: `and`, `or`, or `not` as a bare term in `query`, which Graylog searches as a word |
-| `graylog_regex_operator` | warning | Graylog: an unescaped `#`, `&`, `<`, `>`, or `~` inside a regex, which Lucene reads as an operator |
-| `graylog_regex_quote` | warning | Graylog: an unescaped `"` inside a regex, which then matches nothing |
-| `graylog_double_backslash` | warning | Graylog: four backslashes in a row in `query`, which match two literal backslashes |
-| `graylog_analyzed_field` | warning | Graylog: a regex, wildcard, or range on the tokenised `message` or `full_message` |
 | `graylog_all_streams` | warning | Graylog: no streams or stream categories on the block or the tenant |
 | `graylog_title_duplicate` | warning | Graylog: two enabled blocks resolve to one event definition title |
 | `harfanglab_yara_context` | warning | HarfangLab: a YARA rule's meta `context` is not a comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` |
@@ -104,7 +99,7 @@ The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#a
 
 ### Language diagnostics
 
-A language spec MAY define diagnostics with stable codes. Its errors fail static validation like a constraint code. Its warnings are reported like advisories and never set `VALIDATION_ERROR_RAISED`. The YARA codes are in [yara-1.0](languages/yara-1.0.md#diagnostics): every `yara_*` error fails the rule, and the warnings are `yara_x_incompatible`, `yara_slow_pattern`, `yara_entrypoint_deprecated`, `yara_suspicious_expression`, `yara_module_unconfirmed`, and `yara_meta_missing`.
+A language spec MAY define diagnostics with stable codes. Its errors fail static validation like a constraint code. Its warnings are reported like advisories and never set `VALIDATION_ERROR_RAISED`. The Graylog dialect of the Lucene engine adds `graylog_leading_wildcard` and `graylog_regex_unsupported` (errors) and `graylog_regex_operator`, `graylog_regex_quote`, `graylog_double_backslash`, and `graylog_analyzed_field` (warnings) ([graylog-1.0](platforms/graylog-1.0.md#query-diagnostics)). The YARA codes are in [yara-1.0](languages/yara-1.0.md#diagnostics): every `yara_*` error fails the rule, and the warnings are `yara_x_incompatible`, `yara_slow_pattern`, `yara_entrypoint_deprecated`, `yara_suspicious_expression`, `yara_module_unconfirmed`, and `yara_meta_missing`.
 
 ### Query validation
 
@@ -207,7 +202,7 @@ On a rule's `configurations.sysdig` block the checker applies the [Sysdig constr
 
 On a rule's `configurations.bitdefender` block the checker applies the [Bitdefender constraint codes](platforms/bitdefender-1.0.md#constraints) that need only the spec's EDR field table: `bitdefender_rule_kind`, `bitdefender_target`, `bitdefender_criterion_shape`, `bitdefender_criterion_field` (for `process`, `file`, `connection`, and `registry`), `bitdefender_criterion_relation`, `bitdefender_criterion_value`, `bitdefender_action_scope`, `bitdefender_targets_shape`, `bitdefender_severity`, `bitdefender_yara_ascii`, and `bitdefender_yara_size`, plus the parser-free YARA codes on `yara.signature`. `bitdefender_criteria_combination` and the workspace check `bitdefender_name_duplicate` are left to opentide.
 
-On a rule's `configurations.graylog` block the checker applies the [Graylog constraint codes](platforms/graylog-1.0.md#constraints) that need no query parser: `graylog_query_blank`, `graylog_list_shape`, `graylog_schedule` (a cron expression's field count only), `graylog_event_limit`, `graylog_aggregation` (the full condition grammar), `graylog_event_field`, `graylog_event_key`, `graylog_priority`, and `graylog_field_name`. `graylog_query_syntax`, `graylog_leading_wildcard`, and `graylog_regex_unsupported` need the Graylog dialect and are left to the analysis engine.
+On a rule's `configurations.graylog` block the checker applies the [Graylog constraint codes](platforms/graylog-1.0.md#constraints) that need no query parser: `graylog_query_blank`, `graylog_list_shape`, `graylog_schedule` (a cron expression's field count only), `graylog_event_limit`, `graylog_aggregation` (the full condition grammar), `graylog_event_field`, `graylog_event_key`, `graylog_priority`, and `graylog_field_name`. The query's codes need the Graylog dialect and are left to the analysis engine.
 
 On a rule's `configurations.harfanglab` block the checker applies `harfanglab_rule_kind`, `harfanglab_yara_form`, and `harfanglab_yara_section_header`. On any `yara.signature` it applies the [YARA codes](languages/yara-1.0.md#diagnostics) that need no YARA parser: `yara_signature_alias`, `yara_include`, `yara_empty_signature`, and `yara_duplicate_rule`. The other YARA codes are left to the analysis engine.
 
@@ -263,7 +258,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.10 | 2026-11-11 | `graylog` is in the `--live` allowlist through `POST /api/search/validate`, and Graylog queries (Lucene, Graylog dialect) are checked offline ([graylog-1.0](platforms/graylog-1.0.md), [RFC 0017](../rfcs/0017-graylog-platform.md)). Eight Graylog advisories. The fixture checker applies nine Graylog constraint codes. |
+| 1.10 | 2026-11-11 | `graylog` is in the `--live` allowlist through `POST /api/search/validate`, and Graylog queries (Lucene, Graylog dialect) are checked offline ([graylog-1.0](platforms/graylog-1.0.md), [RFC 0017](../rfcs/0017-graylog-platform.md)). Three Graylog advisories, and six Graylog dialect codes for the query. The fixture checker applies nine Graylog constraint codes. |
 | 1.9 | 2026-11-10 | [Query validation](#query-validation) matches `opentide validate query` as it ships (since opentide 0.19): offline by default with the analysis engine, the `queries` check on its own plus query files; `--live` is the tenant check and its allowlist. HarfangLab and Bitdefender YARA (`.yar`, `.yara`) and the Sysdig Falco condition are checked offline; `--live` stays `supported: false` for `crowdstrike`, `harfanglab`, `sysdig`, and `bitdefender`. Replaces "no offline mode on any platform". |
 | 1.8 | 2026-11-10 | `harfanglab_yara_context` accepts any comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` ([harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile) 1.3). |
 | 1.7 | 2026-11-10 | `bitdefender` is excluded from query validation (`supported: false`) and checked offline by `opentide validate` ([bitdefender-1.0](platforms/bitdefender-1.0.md), [RFC 0016](../rfcs/0016-bitdefender-gravityzone-platform.md)). Advisories `bitdefender_registry_full_hive`, `bitdefender_contains_no_wildcard`, and `bitdefender_severity_collapsed`. The fixture checker applies eleven Bitdefender constraint codes. |

@@ -168,15 +168,14 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `graylog_event_key` | Each `event_key` item is an `event_fields` name. |
 | `graylog_priority` | `priority` is `Informational`, `Low`, `Medium`, `High`, or `Critical`. |
 | `graylog_field_name` | Each `aggregation.group_by` item matches `[A-Za-z0-9_.@-]+`. A field in the condition that does not is `graylog_aggregation`: the grammar's `field` rule. |
-| `graylog_query_syntax` | `query` parses under the [Graylog dialect](#query-dialect). |
-| `graylog_leading_wildcard` | No term in `query` starts with `*` or `?`, unless every targeted tenant sets `allow_leading_wildcard`. |
-| `graylog_regex_unsupported` | No regex in `query` uses a construct Lucene's regex engine silently matches nothing with: an inline flag such as `(?i)`, `\b`, `\B`, lookahead or lookbehind, or a backreference. |
+
+The query itself is checked by the analysis engine ([Query dialect](#query-dialect)), with its own codes.
 
 Every implementation reports each code at the same `field_path`, so opentide and the editor name the same finding. Paths are under `configurations.graylog`:
 
 | Code | `field_path` |
 |------|--------------|
-| `graylog_query_blank`, `graylog_query_syntax`, `graylog_leading_wildcard`, `graylog_regex_unsupported` | `query` |
+| `graylog_query_blank` | `query` |
 | `graylog_list_shape` | the list field (`streams`, `aggregation.group_by`, …) |
 | `graylog_schedule` | `schedule`, or the offending `schedule.<key>` |
 | `graylog_event_limit` | `event_limit` |
@@ -185,7 +184,8 @@ Every implementation reports each code at the same `field_path`, so opentide and
 | `graylog_event_key` | `event_key` |
 | `graylog_priority` | `priority` |
 | `graylog_field_name` | `aggregation.group_by` |
-| advisories | `query` for the query advisories; `schedule` for `graylog_overlapping_window`; the block for `graylog_all_streams` and `graylog_title_duplicate` |
+| advisories | `schedule` for `graylog_overlapping_window`; the block for `graylog_all_streams` and `graylog_title_duplicate` |
+| [query diagnostics](#query-diagnostics) | `query`, with the range of the offending text |
 
 ### Advisories
 
@@ -194,22 +194,27 @@ Advisories are [warnings](../validation.md#platform-advisories): validation repo
 | Code | When | Why |
 |------|------|-----|
 | `graylog_overlapping_window` | `window` is longer than `every` on a filter (no `aggregation`). | Each message alerts once per overlapping run. |
-| `graylog_lowercase_operator` | `and`, `or`, or `not` appears as a bare term in `query`. | Graylog searches the word: its operators are upper case. |
-| `graylog_regex_operator` | A regex in `query` holds an unescaped `#`, `&`, `<`, `>`, or `~`. | Lucene reads them as regex operators, and Graylog's validator still says OK. |
-| `graylog_regex_quote` | A regex in `query` holds an unescaped `"`. | The regex matches nothing. |
-| `graylog_double_backslash` | `query` holds four backslashes in a row. | `\\` is one literal backslash in a Graylog query, so `\\\\` matches two. |
-| `graylog_analyzed_field` | A regex, wildcard, or range applies to `message` or `full_message`. | Those fields are tokenised: a regex or wildcard matches single tokens, never the whole value. |
 | `graylog_all_streams` | The block and the tenant set no `streams` and no `stream_categories`. | The definition searches every stream the token's user can read. |
 | `graylog_title_duplicate` | Workspace check: two enabled `graylog` blocks resolve to one title. | Graylog allows it, and its alert list cannot tell the two apart. |
 
 ### Query dialect
 
-The query is Graylog's search syntax. Graylog passes it to OpenSearch or Elasticsearch `query_string` unchanged, with `allow_leading_wildcard` set from the server's `allow_leading_wildcard_searches` (default `false`). The default operator is OR, and an unqualified term searches every field. The dialect is the engine's Lucene parser (Elastic dialect), with these differences:
+The query is Graylog's search syntax. Graylog passes it to OpenSearch or Elasticsearch `query_string` unchanged, with `allow_leading_wildcard` set from the server's `allow_leading_wildcard_searches` (default `false`). The default operator is OR, and an unqualified term searches every field. Field names match `[A-Za-z0-9_.@-]+`, and `_exists_:<field>` tests a field's presence. Regex bodies follow Lucene's regex syntax: anchored, with alternation `(a|b)`, numeric intervals `<16-31>`, `\d`, `\w`, and `\s`.
 
-- A leading wildcard is `graylog_leading_wildcard`.
-- `and`, `or`, and `not` in lower case are terms, reported as `graylog_lowercase_operator`.
-- Regex bodies follow Lucene's regex syntax (anchored; alternation `(a|b)`, numeric intervals `<16-31>`, `\d`, `\w`, `\s`), with `graylog_regex_unsupported`, `graylog_regex_operator`, and `graylog_regex_quote`.
-- Field names match `[A-Za-z0-9_.@-]+`. `_exists_:<field>` tests a field's presence.
+The analysis engine checks the query as Lucene (`LanguageId` `lucene`) in a Graylog dialect, chosen by the platform as Carbon Black Cloud's dialect is.
+
+#### Query diagnostics
+
+The engine's Lucene codes apply unchanged. For example, `lucene_parse_error` (error) for a query that does not parse, and `lucene_lowercase_operator` (warning) for `and`, `or`, or `not` written in lower case, which Graylog searches as words. The Graylog dialect adds:
+
+| Code | Severity | When | Why |
+|------|----------|------|-----|
+| `graylog_leading_wildcard` | error | A term starts with `*` or `?`, and a targeted tenant does not set `allow_leading_wildcard`. Offline, with no tenant, it is an error. | Graylog refuses the query ("'*' or '?' not allowed as first character"). A regex with a leading `.*` is the portable form. |
+| `graylog_regex_unsupported` | error | A regex uses an inline flag such as `(?i)`, `\b`, `\B`, lookahead or lookbehind, or a backreference. | Lucene's regex engine accepts none of them, and Graylog matches nothing without saying so. |
+| `graylog_regex_operator` | warning | A regex holds an unescaped `#`, `&`, `<`, `>`, or `~`, other than a numeric interval `<n-m>`. | Lucene reads them as regex operators, and Graylog's validator still says OK. |
+| `graylog_regex_quote` | warning | A regex holds an unescaped `"`. | The regex matches nothing. |
+| `graylog_double_backslash` | warning | The query holds four backslashes in a row. | `\\` is one literal backslash in a Graylog query, so `\\\\` matches two. |
+| `graylog_analyzed_field` | warning | A regex, wildcard, or range applies to `message` or `full_message`. | Those fields are tokenised: a regex or wildcard matches single tokens, never the whole value. |
 
 **Case.** `message` and `full_message` are analysed (tokenised and lower-cased), and `source` is a lower-cased keyword. Every other string field is an exact, case-sensitive keyword, and the search syntax has no case-insensitive flag. The documented pattern for case-insensitive rules has two parts:
 

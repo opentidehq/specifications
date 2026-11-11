@@ -287,6 +287,8 @@ V13 accepted this shape on both versions.
 
 ### B.3 Constraints
 
+> **As landed** ([graylog-1.0](../specs/platforms/graylog-1.0.md#constraints)): the query's own findings are the engine's `lucene_*` codes (`lucene_parse_error`, `lucene_lowercase_operator`, …) plus six Graylog dialect codes ([Query diagnostics](../specs/platforms/graylog-1.0.md#query-diagnostics)). `graylog_query_syntax` and `graylog_lowercase_operator` below were folded into the existing Lucene codes, `graylog_case_sensitive` was dropped as too noisy, and `graylog_list_shape` was added for the string-or-list fields.
+
 Static validation MUST reject a block that breaks any of these, and report the code.
 
 | Code | Constraint |

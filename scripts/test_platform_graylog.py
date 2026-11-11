@@ -50,20 +50,16 @@ CONSTRAINTS = [
     "graylog_event_key",
     "graylog_priority",
     "graylog_field_name",
-    "graylog_query_syntax",
-    "graylog_leading_wildcard",
-    "graylog_regex_unsupported",
 ]
-ADVISORIES = [
-    "graylog_overlapping_window",
-    "graylog_lowercase_operator",
-    "graylog_regex_operator",
-    "graylog_regex_quote",
-    "graylog_double_backslash",
-    "graylog_analyzed_field",
-    "graylog_all_streams",
-    "graylog_title_duplicate",
-]
+ADVISORIES = ["graylog_overlapping_window", "graylog_all_streams", "graylog_title_duplicate"]
+DIALECT_CODES = {
+    "graylog_leading_wildcard": "error",
+    "graylog_regex_unsupported": "error",
+    "graylog_regex_operator": "warning",
+    "graylog_regex_quote": "warning",
+    "graylog_double_backslash": "warning",
+    "graylog_analyzed_field": "warning",
+}
 
 
 def _read(path: Path) -> str:
@@ -278,6 +274,10 @@ class SpecShapeTests(unittest.TestCase):
         paths = text[text.index("| Code | `field_path` |") : text.index("### Advisories")]
         for code in CONSTRAINTS:
             self.assertIn(f"`{code}`", paths)
+        dialect = text[text.index("#### Query diagnostics") : text.index("**Case.**")]
+        self.assertEqual(dict(re.findall(r"^\| `(graylog_[a-z_]+)` \| (error|warning) \|", dialect, flags=re.MULTILINE)), DIALECT_CODES)
+        self.assertNotIn("graylog_query_syntax", text)
+        self.assertNotIn("graylog_lowercase_operator", text)
 
     def test_priority_table(self) -> None:
         section = _read(SPEC).split("### Priority", 1)[1].split("###", 1)[0]
