@@ -11,6 +11,9 @@
       "contoso": "12345",
       "fabrikam": "67890"
     },
+    "exabeam": {
+      "exabeam-eu": "016dbc1d-a727-43df-a143-9546dcc81a5a"
+    },
     "sentinel_one": {
       "s1-prod": "4242"
     },
