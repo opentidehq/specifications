@@ -21,8 +21,7 @@ configurations:
     run_frequency: HOURLY
     schedule:
       ensure_enrichment_completeness: true
-    query: |
-      events:
-        $e.metadata.event_type = "USER_LOGIN"
-      condition:
-        $e
+    events: |
+      $e.metadata.event_type = "USER_LOGIN"
+    condition: |
+      $e

@@ -24,18 +24,15 @@ configurations:
     run_frequency: LIVE
     meta:
       data_source: Microsoft Sysmon
-    query: |
-      events:
-        $e.metadata.event_type = "PROCESS_LAUNCH"
-        // Office parent: Word, Excel, or PowerPoint.
-        $e.principal.process.file.full_path = /\\(winword|excel|powerpnt)\.exe$/ nocase
-        $e.target.process.file.full_path = /\\powershell\.exe$/ nocase
-        $e.target.process.command_line = /\s-e(nc|ncodedcommand)?\s/ nocase
-
-      outcome:
-        $risk_score = 70
-        $host = $e.principal.hostname
-        $command_line = $e.target.process.command_line
-
-      condition:
-        $e
+    events: |
+      $e.metadata.event_type = "PROCESS_LAUNCH"
+      // Office parent: Word, Excel, or PowerPoint.
+      $e.principal.process.file.full_path = /\\(winword|excel|powerpnt)\.exe$/ nocase
+      $e.target.process.file.full_path = /\\powershell\.exe$/ nocase
+      $e.target.process.command_line = /\s-e(nc|ncodedcommand)?\s/ nocase
+    outcome: |
+      $risk_score = 70
+      $host = $e.principal.hostname
+      $command_line = $e.target.process.command_line
+    condition: |
+      $e

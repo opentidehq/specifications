@@ -25,7 +25,8 @@ from object_fixtures import (
     load_vocabularies,
     validate_fixture_file,
     validate_google_secops_block,
-    validate_yaral_body,
+    render_yaral_match,
+    validate_yaral_sections,
     yaral_sections,
 )
 
@@ -78,8 +79,9 @@ ADVISORIES = [
 ]
 LANGUAGE_ERRORS = [
     "yaral_parse_error",
-    "yaral_body_header",
-    "yaral_query_alias",
+    "yaral_section_header",
+    "yaral_section_empty",
+    "yaral_section_alias",
     "yaral_section_missing",
     "yaral_section_order",
     "yaral_section_unavailable",
@@ -87,6 +89,7 @@ LANGUAGE_ERRORS = [
     "yaral_reserved_identifier",
     "yaral_undefined_variable",
     "yaral_multi_event_match",
+    "yaral_match_shape",
     "yaral_match_variable",
     "yaral_match_window",
     "yaral_condition_shape",
@@ -179,19 +182,43 @@ def meta(rule: dict[str, Any], stages: dict[str, list[str]]) -> list[tuple[str, 
     return entries
 
 
-def assemble(rule: dict[str, Any], stages: dict[str, list[str]]) -> str:
-    """specs/platforms/google-secops-1.0.md#assembled-rule."""
-    body = rule["configurations"]["google_secops"]["query"].replace("\r\n", "\n").split("\n")
-    while body and not body[0].strip():
-        body.pop(0)
-    while body and not body[-1].strip():
-        body.pop()
+SECTION_ORDER = ("setup", "events", "match", "outcome", "condition", "options", "export")
+OPTION_ORDER = ("allow_zero_values", "suppression_window")
+
+
+def section_lines(block: dict[str, Any], key: str) -> list[str]:
+    """A section's content lines, before indentation: text trimmed of blank edge lines, or rendered YAML."""
+    if key == "match":
+        return [render_yaral_match(block["match"])]
+    if key == "options":
+        options = block["options"]
+        return [f"{k} = {str(options[k]).lower() if isinstance(options[k], bool) else options[k]}" for k in OPTION_ORDER if k in options]
+    lines = block[key].replace("\r\n", "\n").split("\n")
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return lines
+
+
+def assemble_with_labels(rule: dict[str, Any], stages: dict[str, list[str]]) -> tuple[str, dict[str, int]]:
+    """specs/platforms/google-secops-1.0.md#assembled-rule, plus the 1-based line of each section label."""
+    block = rule["configurations"]["google_secops"]
     lines = [f"rule {rule_name(rule)} {{", "  meta:"]
     lines += [f"    {key} = {meta_value(value)}" for key, value in meta(rule, stages)]
-    lines.append("")
-    lines += [("  " + line) if line.strip() else "" for line in body]
+    labels: dict[str, int] = {}
+    for key in SECTION_ORDER:
+        if key not in block:
+            continue
+        lines += ["", f"  {key}:"]
+        labels[key] = len(lines)
+        lines += [("    " + line) if line.strip() else "" for line in section_lines(block, key)]
     lines.append("}")
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines) + "\n", labels
+
+
+def assemble(rule: dict[str, Any], stages: dict[str, list[str]]) -> str:
+    return assemble_with_labels(rule, stages)[0]
 
 
 def instance(setup: dict[str, Any]) -> str:
@@ -331,16 +358,28 @@ class GoldenTests(unittest.TestCase):
         self.assertEqual(dict(meta(spray, self.stages))["tactic"], "TA0001,TA0003,TA0004,TA0005,TA0006")
         self.assertEqual(meta_value('a "b"\\c\nd'), '"a \\"b\\"\\\\c d"')
 
-    def test_body_line_mapping(self) -> None:
-        """Line n of query is line n + k + 3 of the assembled text, two columns to the right."""
+    def test_section_line_mapping(self) -> None:
+        """Line n of a section text is line L + n of the assembled text, four columns to the right."""
         for stem in RULES:
             rule = _load(stem)
-            body = rule["configurations"]["google_secops"]["query"].split("\n")
-            assembled = assemble(rule, self.stages).split("\n")
-            k = len(meta(rule, self.stages))
-            for n, line in enumerate(body, start=1):
-                if line.strip():
-                    self.assertEqual(assembled[n + k + 3 - 1], "  " + line)
+            block = rule["configurations"]["google_secops"]
+            text, labels = assemble_with_labels(rule, self.stages)
+            assembled = text.split("\n")
+            for key in ("events", "outcome", "condition"):
+                if key not in block:
+                    continue
+                self.assertEqual(assembled[labels[key] - 1], f"  {key}:")
+                for n, line in enumerate(block[key].split("\n"), start=1):
+                    if line.strip():
+                        self.assertEqual(assembled[labels[key] + n - 1], "    " + line)
+
+    def test_match_rendering(self) -> None:
+        self.assertEqual(render_yaral_match({"group_by": ["$user", "$ip"], "window": "30m"}), "$user, $ip over 30m")
+        self.assertEqual(render_yaral_match({"group_by": ["$host"], "window": "1h", "type": "tumbling"}), "$host by 1h")
+        self.assertEqual(
+            render_yaral_match({"group_by": ["$user"], "window": "5m", "type": "sliding", "pivot": "$login", "direction": "after"}),
+            "$user over 5m after $login",
+        )
 
     def test_assembled_rule_is_a_rule(self) -> None:
         for stem in RULES:
@@ -396,17 +435,17 @@ class CheckerTests(unittest.TestCase):
 
     def test_invalid_fixtures_report_their_code(self) -> None:
         names = [name for name in EXPECTED_INVALID_CODES if name.startswith("rule-google-secops-")]
-        self.assertEqual(len(names), 5)
+        self.assertEqual(len(names), 6)
         for name in names:
             with self.subTest(name=name):
                 codes = _codes(validate_fixture_file(FIXTURES / "invalid" / name, self.vocabs))
                 self.assertIn(EXPECTED_INVALID_CODES[name], codes)
 
     def test_block_codes(self) -> None:
-        body = "events:\n  $e.metadata.event_type = \"USER_LOGIN\"\ncondition:\n  $e\n"
+        sections = {"events": "$e.metadata.event_type = \"USER_LOGIN\"\n", "condition": "$e\n"}
 
         def block(**keys: Any) -> dict[str, Any]:
-            return {"enabled": True, "schema": "platform::google_secops::1.0", "status": "STAGING", "query": body, **keys}
+            return {"enabled": True, "schema": "platform::google_secops::1.0", "status": "STAGING", **sections, **keys}
 
         self.assertEqual(validate_google_secops_block(block()), [])
         self.assertEqual(_codes(validate_google_secops_block(block(name="bad-name"))), {"google_secops_rule_name"})
@@ -430,24 +469,45 @@ class CheckerTests(unittest.TestCase):
                 self.assertEqual(_codes(validate_google_secops_block(block(meta={key: "x"}))), {"google_secops_meta_key"})
         self.assertEqual(_codes(validate_google_secops_block(block(meta={"count": 3}))), {"google_secops_meta_key"})
 
-    def test_body_codes(self) -> None:
-        path = "configurations.google_secops.query"
-        ok = "events:\n  $e.metadata.event_type = \"USER_LOGIN\"\n  $u = $e.target.user.userid\nmatch:\n  $u over 10m\noutcome:\n  $n = count($e.metadata.id)\ncondition:\n  #e > 5\noptions:\n  allow_zero_values = true\n  suppression_window = 1h\n"
-        self.assertEqual(validate_yaral_body(ok, path), [])
-        self.assertEqual(_codes(validate_yaral_body(ok.replace("10m", "15d"), path)), {"yaral_match_window"})
-        self.assertEqual(_codes(validate_yaral_body(ok.replace("10m", "10s"), path)), {"yaral_match_window"})
-        self.assertEqual(validate_yaral_body(ok.replace("10m", "3d"), path), [])
-        self.assertEqual(_codes(validate_yaral_body(ok.replace("over 10m", "by 4d"), path)), {"yaral_match_window"})
-        export_first = ok.replace("options:", "export:\n  %hits.write_row(user: $u)\noptions:")
-        self.assertEqual(validate_yaral_body(export_first, path), [])
-        self.assertEqual(_codes(validate_yaral_body(ok.replace("allow_zero_values", "allow_nulls"), path)), {"yaral_option"})
-        swapped = "condition:\n  $e\nevents:\n  $e.metadata.event_type = \"USER_LOGIN\"\n"
-        self.assertEqual(_codes(validate_yaral_body(swapped, path)), {"yaral_section_order"})
-        quoted = "events:\n  $e.metadata.description = \"condition: none\" // match: in a comment\n"
-        self.assertEqual(_codes(validate_yaral_body(quoted, path)), {"yaral_section_missing"})
-        block_comment = "events:\n  $e.metadata.event_type = \"USER_LOGIN\"\n/*\ncondition:\n*/\ncondition:\n  $e\n"
-        self.assertEqual(validate_yaral_body(block_comment, path), [])
-        self.assertEqual(_codes(validate_yaral_body("meta:\n  a = \"b\"\n" + ok, path)), {"yaral_body_header"})
+    def test_section_codes(self) -> None:
+        base = "configurations.google_secops"
+        ok = {
+            "events": "$e.metadata.event_type = \"USER_LOGIN\"\n$u = $e.target.user.userid\n",
+            "match": {"group_by": ["$u"], "window": "10m"},
+            "outcome": "$n = count($e.metadata.id)\n",
+            "condition": "#e > 5\n",
+            "options": {"allow_zero_values": True, "suppression_window": "1h"},
+        }
+
+        def codes(**changes: Any) -> set[str]:
+            block = {**ok, **changes}
+            return _codes(validate_yaral_sections({k: v for k, v in block.items() if v is not ...}, base))
+
+        self.assertEqual(codes(), set())
+        self.assertEqual(codes(condition=...), {"yaral_section_missing"})
+        self.assertEqual(codes(condition=None), {"yaral_section_empty"})
+        self.assertEqual(codes(outcome="  \n"), {"yaral_section_empty"})
+        self.assertEqual(codes(events="events:\n  $e.metadata.event_type = \"X\"\n"), {"yaral_section_header"})
+        self.assertEqual(codes(condition="$e\noptions:\n  allow_zero_values = true\n"), {"yaral_section_header"})
+        self.assertEqual(codes(events="$e.metadata.description = \"condition: none\" // match: in a comment\n"), set())
+        self.assertEqual(codes(match={"group_by": ["$u"], "window": "15d"}), {"yaral_match_window"})
+        self.assertEqual(codes(match={"group_by": ["$u"], "window": "3d"}), set())
+        self.assertEqual(codes(match={"group_by": ["$u"], "window": "4d", "type": "tumbling"}), {"yaral_match_window"})
+        self.assertEqual(codes(match={"group_by": ["$u"], "window": "10s"}), {"yaral_match_window"})
+        self.assertEqual(codes(match={"group_by": [], "window": "10m"}), {"yaral_match_shape"})
+        self.assertEqual(codes(match={"group_by": ["u"], "window": "10m"}), {"yaral_match_shape"})
+        self.assertEqual(codes(match={"group_by": ["$u"], "window": "10m", "type": "sliding"}), {"yaral_match_shape"})
+        self.assertEqual(codes(match={"group_by": ["$u"], "window": "10m", "pivot": "$e"}), {"yaral_match_shape"})
+        self.assertEqual(
+            codes(match={"group_by": ["$u"], "window": "10m", "type": "sliding", "pivot": "$e", "direction": "after"}), set()
+        )
+        self.assertEqual(codes(options={"allow_zero_values": "yes"}), {"yaral_option"})
+        self.assertEqual(codes(options={"allow_nulls": True}), {"yaral_option"})
+        self.assertEqual(codes(options={"suppression_window": "1 hour"}), {"yaral_option"})
+        self.assertEqual(
+            _codes(validate_google_secops_block({"status": "STAGING", "query": "events:\n  $e\n", "events": "$e.metadata.event_type = \"X\"\n", "condition": "$e\n"})),
+            {"unknown_key"},
+        )
 
 
 if __name__ == "__main__":

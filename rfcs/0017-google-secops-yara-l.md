@@ -13,10 +13,10 @@
 
 Add an eleventh detection platform, `google_secops` (display name **Google Security Operations (SIEM)**, schema `platform::google_secops::1.0`), and a language spec for **YARA-L 2.0** (`language-yara-l` 1.0).
 
-- The block holds a YARA-L **body**, the rule's sections from `events:` on, under `query`. Deploy assembles the rule: `rule <derived name> {`, a generated `meta:` section (author, description, severity, priority, ATT&CK tactic and technique ids, `opentide_uuid`, `opentide_version`, extra keys), and the body, verbatim.
+- The block holds the rule's **sections as keys**: `events`, `outcome`, and `condition` (and `setup`, `export`) as YARA-L text, and `match` and `options` as YAML objects. Deploy assembles the rule: `rule <derived name> {`, a generated `meta:` section (author, description, severity, priority, ATT&CK tactic and technique ids, `opentide_uuid`, `opentide_version`, extra keys), then each section under its label.
 - Deploy goes through the Chronicle API **v1**: `verifyRuleText`, `rules.create`, `rules.patch` (text), and `rules.updateDeployment` (enabled, alerting, run frequency, archive). The rule id (`ru_<uuid>`) lives in [deployment state](../specs/deployment-state.md).
 - `PREVIEW` deploys a running, **non-alerting** rule; `RELEASE` an alerting one. `DELETION` archives by default and never deletes detections.
-- `verifyRuleText` is a real tenant compile that creates nothing, so `google_secops` joins the `--live` allowlist. The analysis engine checks YARA-L offline with 26 error and 4 warning codes, from a UDM field catalogue and a function catalogue generated from Google's pages.
+- `verifyRuleText` is a real tenant compile that creates nothing, so `google_secops` joins the `--live` allowlist. The analysis engine checks YARA-L offline with 28 error and 4 warning codes, from a UDM field catalogue and a function catalogue generated from Google's pages.
 - YARA-L is highlighted with the existing HighlightSpec captures; no capture is added.
 - Hunts (`response.procedure.searches[]` with `system: google_secops`) are YARA-L searches, checked under a `search` profile and runnable with `opentide query` through `udmSearch`.
 
@@ -87,14 +87,14 @@ No YARA-L language server or linter exists.
 
 | Path | Content |
 |------|---------|
-| `specs/languages/yara-l-1.0.md` (new) | Text forms (`YaraLRule`, `YaraLBody`, `YaraLSearch`), the `rule` and `search` profiles, sections, lexical structure, expressions, `match`/`outcome`/`condition`/`options` rules, limits, UDM and function catalogues, diagnostics, highlighting |
+| `specs/languages/yara-l-1.0.md` (new) | Text forms (`YaraLRule`, `YaraLSearch`), the block form (`YaraLSections`, `YaraLMatch`, `YaraLOptions`), the `rule` and `search` profiles, sections, lexical structure, expressions, `match`/`outcome`/`condition`/`options` rules, limits, UDM and function catalogues, diagnostics, highlighting |
 | `specs/platforms/google-secops-1.0.md` (new) | Block, constraints, advisories, rule name, meta, severity, assembly, tenant setup, deploy, deletion, errors, query validation, `opentide query` |
 | `specs/platforms/index.md` 1.8 | Eleventh platform; `--live` allowlist; static-validation bar; external ids |
 | `specs/validation.md` 1.10 | `--live` row, advisories, language diagnostics, fixture checker |
 | `specs/deployment-state.md` 1.5 | `google_secops` is state-backed: `ru_<uuid>` |
 | `specs/objects/rule-1.0.md`, `rule-1.1.md` | `configurations.google_secops`; `system: google_secops` searches are YARA-L |
 
-### 2. The block carries a body, deploy assembles the rule
+### 2. The block carries the sections, deploy assembles the rule
 
 ```yaml
 configurations:
@@ -106,22 +106,35 @@ configurations:
     severity: High                # Info | Low | Medium | High | Critical; default from response.alert_severity
     priority: High                # default: severity
     alerting: null                # default: false under PREVIEW, true under RELEASE
-    run_frequency: LIVE           # LIVE | LIVE_CUSTOMIZABLE | HOURLY_CUSTOMIZABLE | DAILY; default: first allowed
+    run_frequency: LIVE_CUSTOMIZABLE  # LIVE | LIVE_CUSTOMIZABLE | HOURLY_CUSTOMIZABLE | DAILY; default: first allowed
     schedule:                     # customizable frequencies only
       ensure_enrichment_completeness: true
       late_arriving_data_adjustment: 30m
     meta:                         # extra meta, after the derived keys
-      data_source: Microsoft Sysmon
-    query: |                      # YaraLBody: events: … options:
-      events:
-        $e.metadata.event_type = "PROCESS_LAUNCH"
-      condition:
-        $e
+      data_source: Okta
+    events: |                     # YARA-L text
+      $fail.metadata.event_type = "USER_LOGIN"
+      $fail.security_result.action = "BLOCK"
+      $fail.target.user.userid = $user
+      $success.metadata.event_type = "USER_LOGIN"
+      $success.security_result.action = "ALLOW"
+      $success.target.user.userid = $user
+    match:                        # YAML: group_by, window, type (hop | tumbling | sliding), pivot, direction
+      group_by: [$user]
+      window: 30m
+    outcome: |                    # YARA-L text
+      $risk_score = max(80)
+    condition: |                  # YARA-L text; a block scalar, because a plain `#fail` is a YAML comment
+      #fail >= 10 and $success
+    options:                      # YAML: allow_zero_values, suppression_window
+      suppression_window: 1h
 ```
 
 The rule name and the `meta` section are what opentide already knows: name, author, description, severity, ATT&CK. Writing them twice, once in Tide and once in YARA-L, would let them drift, and the YARA-L copy is the one analysts see. So opentide owns them, and the author owns the detection logic. The assembled text is fully determined by the rule file: `fixtures/platforms/google-secops/*.yaral` are its goldens, derived from the spec by `scripts/test_platform_google_secops.py`.
 
-The body is sent verbatim, indented two spaces. A line of `query` maps to a fixed line of the assembled rule, so a `verifyRuleText` diagnostic lands on its line in the YAML. This is the HarfangLab decomposed-YARA pattern (one injection spanning generated text) with a single body instead of several fragments.
+**Where the line between YAML and YARA-L falls.** Each section is its own key, so the rule's shape is the schema's business: a missing `condition` is a missing key, sections cannot come out of order, a pasted `rule` header is caught on the key it was pasted into, and each finding names its section (`configurations.google_secops.condition`). `match` and `options` are small closed shapes, a list of placeholders and a window, two typed options, so they are YAML objects that JSON Schema validates and editors complete. `events`, `outcome`, and `condition` are expression languages and stay text, one block scalar each. Splitting them further into YAML lists or maps breaks on YAML's own syntax: `$tactic = "Discovery"` as a map entry `tactic: "Discovery"` loses the quotes that make it a string literal, a regex with `: ` turns a list item into a mapping, and a plain `#fail >= 10` is a YAML comment. That last trap applies to `condition` even as one text, so a null or blank section is its own error (`yaral_section_empty`) with a message that names the `#`.
+
+Each section text is sent verbatim, indented four spaces under its label. A line of a section maps to a fixed line of the assembled rule, so a `verifyRuleText` diagnostic lands on its line in the YAML. This is the HarfangLab decomposed-YARA pattern: one injection spanning several scalars, with the header, meta, labels, `match`, and `options` as generated text.
 
 ### 3. Run state follows the status strategy
 
@@ -146,7 +159,7 @@ Detections are the audit record of what a rule found. `force=true` deletes them,
 
 | Layer | Where | What |
 |-------|-------|------|
-| Static | `opentide validate`, editors | Platform constraints (`google_secops_*`), the YARA-L engine (`yaral_*`) on the body as assembled |
+| Static | `opentide validate`, editors | Platform constraints (`google_secops_*`), the YARA-L engine (`yaral_*`) on the sections as assembled |
 | Live | `opentide validate query --live` | `verifyRuleText` on the assembled text; diagnostics mapped to YAML positions; `allowedRunFrequencies` checked against the block |
 | Deploy | `opentide deploy` | `verifyRuleText` before every create and text update |
 
@@ -161,7 +174,7 @@ The engine is an approximation of a closed compiler, so its error list is limite
 | Crate | `opentide-yaral`: profiles, section checks, scope (event variables, placeholders, outcomes), condition shape, window bounds, outcome aggregation, regex (RE2 syntax via `regex-syntax`), UDM and function lookups |
 | Catalogues | `catalogs/yaral/udm.toml` (field, type, repeated, enum values, deprecated) and `catalogs/yaral/functions.toml` (signature, availability), generated by `scripts/sync_yaral_catalogs.py` from Google's pages, like the GravityZone criteria |
 | Highlighting | `highlights/queries/yaral/highlights.scm` mapping to existing captures ([yara-l-1.0](../specs/languages/yara-l-1.0.md#highlighting)); `generate-highlights` emits `yaral.tmLanguage.json`, Monaco, and Helix |
-| Injection | `configurations.google_secops.query` (the `rule` profile, with the generated header and meta as synthetic text) and `response.procedure.searches[].query` with `system: google_secops` (the `search` profile) |
+| Injection | the section texts of `configurations.google_secops` as one injection (the `rule` profile, with the generated header, meta, labels, `match`, and `options` as synthetic text) and `response.procedure.searches[].query` with `system: google_secops` (the `search` profile) |
 | Editor features | Completion of UDM paths after `$e.`, enum values after `metadata.event_type =`, functions after a namespace; hover with the UDM type and Google's function docs; signature help |
 | Oracle | No offline reference exists. A scheduled CI job runs the conformance corpus through `verifyRuleText` on a sandbox tenant when credentials are present, and `scripts/oracles/README.md` says so. |
 | Corpus | `testdata/conformance/external/yaral/`: community rules from `chronicle/detection-rules` (Apache-2.0) and `.broken.` twins |
@@ -199,14 +212,15 @@ About 30–40 person-days. The platform can ship before the engine with structur
 ## Drawbacks
 
 - **The offline engine approximates a closed compiler.** Google can accept or refuse what the engine does not, and pages disagree (window bounds, `in` limits). `--live` is the authority, and CI should run it.
-- **Copy-paste from Google's console needs a split.** A community rule must lose its header and `meta` to become a block. An import command can do that (unresolved).
+- **Copy-paste from Google's console needs a split.** A community rule must lose its header and `meta`, and each section moves under its own key, with `match` and `options` rewritten as YAML. An import command can do that mechanically (unresolved).
 - **UDM catalogue drift.** A field Google adds is an error until the sync script runs.
 - **`udmSearch` is v1alpha.** `opentide query` can break when Google changes it.
 
 ## Alternatives
 
 - **The whole rule verbatim in the block** (a `YaraSignature`-style `rule` text). Rejected: name, description, severity, and ATT&CK would be written twice and drift, and deploy would have to either rewrite the author's `meta` (forbidden for verbatim text) or leave Google's view of the rule unrelated to the Tide rule.
-- **Structured YAML for sections** (`events:` as a list of predicates). Rejected: YARA-L is a language; splitting it breaks copy-paste, comments, and editor tooling.
+- **One text for the whole body** (`query: |` holding `events:` through `options:`). Rejected after review: section order, required sections, and pasted headers become text-scanning codes instead of schema, findings cannot name their section, and `match` and `options` lose typed validation and completion.
+- **Predicates and outcomes as YAML lists or maps** (`events: [- $e.metadata.event_type = …]`, `outcome: {risk_score: max(80)}`). Rejected: YAML reads string literals, regexes, and `#` counts as its own syntax ([section 2](#2-the-block-carries-the-sections-deploy-assembles-the-rule)), and YARA-L comments and multi-line expressions do not survive.
 - **Identity by rule name or by an `opentide_uuid` meta lookup.** Rejected by deployment state, and Google does not document names as unique.
 - **`DELETION` with `force=true`.** Rejected: it destroys detections.
 - **Mapping PREVIEW to a disabled rule.** Rejected: a disabled rule produces no evidence. Non-alerting runs are Google's own staging mechanism.
@@ -219,7 +233,7 @@ About 30–40 person-days. The platform can ship before the engine with structur
 - How meta `severity` maps to the detection severity enum, and whether Google uses `priority` beyond a label.
 - Whether `export` may precede `options`, or only follow it.
 - A rule-name length limit; none is documented.
-- The exact `queryDialect` value for YARA-L in `udmSearch`, and whether `opentide query --rule` can run a rule body as a search.
+- The exact `queryDialect` value for YARA-L in `udmSearch`, and whether `opentide query --rule` can run a rule's `events` as a search.
 - An `opentide import` that turns a `.yaral` file into a rule with a block, splitting the header and meta.
 - Retrohunts (`rules/{rule}/retrohunts`) as an `opentide hunt` command; they write detections, so they are not `opentide query`.
 - Curated rule sets (`ur_…`) and findings refinements (exclusions) are console objects and stay out of scope.

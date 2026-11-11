@@ -18,14 +18,15 @@ YARA-L shares its name and little else with [YARA](yara-1.0.md). Google's keywor
 
 ## Requirements
 
-- A platform block that deploys a YARA-L rule MUST carry a [`YaraLBody`](#yaralbody) under its `query` key: the rule's sections from `events:` on, without the `rule` header or `meta:`. Deploy assembles the [`YaraLRule`](#yaralrule) around it.
-- A `query` holding a `rule` header or a `meta:` section MUST fail static validation with `yaral_body_header`.
-- A YAML alias at a YARA-L `query` MUST fail with `yaral_query_alias`. The text is written out in the block, as a [`YaraSignature`](yara-1.0.md#yarasignature) is.
-- Deploy MUST send the body verbatim inside the assembled rule. It MAY normalise line endings to `\n`, drop leading and trailing blank lines, and indent each non-blank line by two spaces. It MUST NOT add, remove, reorder, or rewrite a section, an expression, a comment, or a literal of the body.
+- A platform block that deploys a YARA-L rule MUST carry [`YaraLSections`](#yaralsections): one key per rule section, `events` and `condition` required. Deploy assembles the [`YaraLRule`](#yaralrule) from them: the `rule` header and `meta:` from the opentide rule, then each section under its label, in [order](#sections).
+- `events`, `outcome`, `condition`, `setup`, and `export` MUST be YARA-L text. `match` and `options` MUST be YAML objects, validated by their field tables. A section text MUST NOT hold a section label, a `rule` header, or braces around a rule (`yaral_section_header`).
+- A section key that is present with no text (YAML `null`, or blank) MUST fail with `yaral_section_empty`. A plain YAML scalar that starts with `#` is a YAML comment, so `condition: #fail > 3` loads as null; the message MUST say so.
+- A YAML alias at a section key MUST fail with `yaral_section_alias`. Each text is written out in the block, as a [`YaraSignature`](yara-1.0.md#yarasignature) is.
+- Deploy MUST send each section text verbatim. It MAY normalise line endings to `\n`, drop leading and trailing blank lines, and indent each non-blank line by four spaces. It MUST NOT add, remove, reorder, or rewrite an expression, a comment, or a literal of a section.
 - Static validation MUST report every [error](#errors) as a failure and every [warning](#warnings) without failing the rule.
-- Static validation MUST check a block's body as part of the rule deploy assembles, so a finding has the same verdict in the block and in a `.yaral` file. A finding inside the body MUST be reported at its line and column in the YAML; a finding that only the generated header or meta can raise is a platform constraint code instead.
+- Static validation MUST check a block's sections as the one rule deploy assembles, so a finding has the same verdict in the block and in a `.yaral` file, and a variable bound in `events` is in scope in `match`, `outcome`, and `condition`. A finding inside a section text MUST be reported at its line and column in the YAML; a finding in `match` or `options` at that key; a finding that only the generated header or meta can raise is a platform constraint code instead.
 - The engine MUST NOT report a reference list, a data table, a rule name in a composite rule, or a curated rule as unknown. They live in the tenant.
-- YARA-L is checked offline by `opentide validate` and by `opentide validate query` without `--live` (a block's body, or a `.yaral` file). `--live` is the tenant compile (`verifyRuleText`). An offline result MUST NOT be reported as a tenant check.
+- YARA-L is checked offline by `opentide validate` and by `opentide validate query` without `--live` (a block's sections, or a `.yaral` file). `--live` is the tenant compile (`verifyRuleText`). An offline result MUST NOT be reported as a tenant check.
 
 ## Definition
 
@@ -34,7 +35,7 @@ YARA-L shares its name and little else with [YARA](yara-1.0.md). Google's keywor
 | Form | Where | Content |
 |------|-------|---------|
 | `YaraLRule` | a `.yaral` file; the text deploy sends | One rule: `rule <name> {`, `meta:`, then the [sections](#sections), then `}`. Comments may precede and follow it. |
-| `YaraLBody` | `configurations.google_secops.query` | The sections of one rule from `events:` on. No `rule` header, no braces around it, no `meta:`. |
+| `YaraLSections` | `configurations.google_secops` (its `events`, `match`, `outcome`, `condition`, `options`, `setup`, `export` keys) | One rule's sections as separate keys. No `rule` header and no `meta`. |
 | `YaraLSearch` | `response.procedure.searches[].query` with `system: google_secops`; `opentide query --platform google_secops` | A YARA-L search: the `events` predicates, with or without the `events:` label, then the optional search sections. |
 
 A file holds one rule. Google stores one rule per resource, and `verifyRuleText` takes one. A second `rule` in a file is `yaral_parse_error`.
@@ -59,11 +60,42 @@ rule <identifier> {
 }
 ```
 
-#### YaraLBody
+#### YaraLSections
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `query` | string | yes | The sections `events:` through `options:`, in [order](#sections), as written in a rule. Non-blank. |
+| Key | Type | Required | Section | Content |
+|-----|------|----------|---------|---------|
+| `setup` | string | no | `setup:` | YARA-L text |
+| `events` | string | yes | `events:` | YARA-L text: predicates, placeholder assignments, joins |
+| `match` | [YaraLMatch](#yaralmatch) | with two or more event variables | `match:` | A YAML object |
+| `outcome` | string | no | `outcome:` | YARA-L text: `$name = <expression>` lines |
+| `condition` | string | yes | `condition:` | YARA-L text: one boolean expression |
+| `options` | [YaraLOptions](#yaraloptions) | no | `options:` | A YAML object |
+| `export` | string | no | `export:` | YARA-L text: `%table.write_row(…)` calls |
+
+The order of the keys in the YAML does not matter: deploy writes the sections in [section order](#sections). Write the texts as block scalars (`|`). A plain or quoted scalar works but YAML rewrites it: a plain one loses everything after ` #`, and a double-quoted one consumes its backslashes.
+
+Section texts stay text, not YAML lists or maps. An expression that YAML would load as a mapping or a quoted string (`$tactic = "Discovery"` as `tactic: "Discovery"` loses its quotes) cannot be told apart from a literal, and YARA-L comments, regexes, and multi-line expressions would not survive. `match` and `options` are the two closed shapes YAML can type exactly.
+
+#### YaraLMatch
+
+| Field | Type | Required | Default | Rendered |
+|-------|------|----------|---------|----------|
+| `group_by` | list[string] | yes | — | The placeholders, each `$name`, non-empty, no repeats, joined with `, ` |
+| `window` | duration | yes | — | `<n>m`, `<n>h`, or `<n>d`, within the [bounds](#match) of `type` |
+| `type` | string | no | `hop` | `hop` → `over`, `tumbling` → `by`, `sliding` → `over … before\|after $pivot` |
+| `pivot` | string | with `sliding` | — | The event variable the window is anchored on, `$name` |
+| `direction` | string | with `sliding` | — | `before` or `after` |
+
+`{group_by: [$user, $ip], window: 30m}` renders `$user, $ip over 30m`; `{group_by: [$host], window: 1h, type: tumbling}` renders `$host by 1h`; `{group_by: [$user], window: 5m, type: sliding, pivot: $login, direction: after}` renders `$user over 5m after $login`. A shape outside this table (no `group_by`, `pivot` without `sliding`, `sliding` without `pivot` and `direction`, a name that is not `$identifier`) is `yaral_match_shape`.
+
+#### YaraLOptions
+
+| Field | Type | Default | Rendered |
+|-------|------|---------|----------|
+| `allow_zero_values` | boolean | `false` | `allow_zero_values = true` |
+| `suppression_window` | duration (`m`, `h`, `d`) | none | `suppression_window = 1h` |
+
+Only keys that are set are rendered, in this order. Any other key, or a value of the wrong type, is `yaral_option`.
 
 ### Profiles
 
@@ -71,7 +103,7 @@ A profile names which sections, functions, and data a text may use. The engine p
 
 | Profile | Used by | Sections | `meta` |
 |---------|---------|----------|--------|
-| `rule` | `YaraLRule`, `YaraLBody` | `meta`, `setup`, `events`, `match`, `outcome`, `condition`, `options`, `export` | required in a `YaraLRule`; generated for a `YaraLBody` |
+| `rule` | `YaraLRule`, `YaraLSections` | `meta`, `setup`, `events`, `match`, `outcome`, `condition`, `options`, `export` | required in a `YaraLRule`; generated for `YaraLSections` |
 | `search` | `YaraLSearch` | `events` (label optional), `match`, `outcome`, `condition`, `dedup`, `order`, `limit`, `select`, `unselect`, and named `stage <name> { … }` blocks (multi-stage search) | not used: Google ignores it in search, so it is `yaral_section_unavailable` |
 
 ### Sections
@@ -201,15 +233,17 @@ Field paths are checked against the Unified Data Model: the event model (`metada
 | Code | Condition |
 |------|-----------|
 | `yaral_parse_error` | Syntax error, including a second `rule` in one text |
-| `yaral_body_header` | A `YaraLBody` holds a `rule` header, braces around the rule, or a `meta:` section |
-| `yaral_query_alias` | A YARA-L `query` is a YAML alias instead of its own text |
-| `yaral_section_missing` | A required section is absent (`meta` in a `YaraLRule`; `events` and `condition` in a rule) |
-| `yaral_section_order` | A section is repeated or out of order |
+| `yaral_section_header` | A section text holds a section label, a `rule` header, or braces around a rule |
+| `yaral_section_empty` | A section key with no text: YAML `null` (a plain scalar starting with `#` is a YAML comment) or blank |
+| `yaral_section_alias` | A section key is a YAML alias instead of its own text |
+| `yaral_section_missing` | A required section is absent: `meta` in a `YaraLRule`; `events` and `condition` in a rule, as a label in a file or a key in a block |
+| `yaral_section_order` | A section is repeated or out of order in a `YaraLRule` |
 | `yaral_section_unavailable` | A section the profile does not have (`dedup` in a rule, `options` in a search) |
 | `yaral_meta_duplicate` | A meta key appears twice, or a meta value is not a double-quoted string |
 | `yaral_reserved_identifier` | A keyword used as a rule name, meta key, or variable; `$window_start`, `$window_end` |
 | `yaral_undefined_variable` | A `$name` or `#name` in `match`, `outcome`, or `condition` that `events` or `outcome` does not define; an event variable of `events` absent from `condition` |
 | `yaral_multi_event_match` | Two or more event variables without a `match` section |
+| `yaral_match_shape` | A `YaraLMatch` outside its field table |
 | `yaral_match_variable` | A `match` name that is not a placeholder bound in `events` |
 | `yaral_match_window` | A window outside the [bounds](#match) of its kind and profile, or with another unit |
 | `yaral_condition_shape` | `not` or a comma on event and placeholder terms, `or` across more event variables than the profile allows, `or` in an unbounded condition, or non-existence without a window and a bounded event |
@@ -260,11 +294,11 @@ YARA-L uses the frozen [HighlightSpec](https://github.com/opentidehq/language-se
 | `{`, `}`, `(`, `)`, `[`, `]` | `punctuation.bracket` |
 | `,`, `:` | `punctuation.delimiter` |
 
-The language id is `yaral`, the file suffixes `.yaral` (Google's community convention) and `.yl2`, and the TextMate scope `source.yaral`. Google's own VS Code grammar uses `source.yara-l`; opentide's scope differs so both can be installed. In a Tide rule, `configurations.google_secops.query` is a YARA-L injection under the `rule` profile, and `response.procedure.searches[].query` with `system: google_secops` under the `search` profile.
+The language id is `yaral`, the file suffixes `.yaral` (Google's community convention) and `.yl2`, and the TextMate scope `source.yaral`. Google's own VS Code grammar uses `source.yara-l`; opentide's scope differs so both can be installed. In a Tide rule, the section texts of `configurations.google_secops` (`setup`, `events`, `outcome`, `condition`, `export`) are one YARA-L injection under the `rule` profile, spanning the scalars as the rule deploy assembles them; `match` and `options` are YAML, highlighted as Tide properties. `response.procedure.searches[].query` with `system: google_secops` is a YARA-L injection under the `search` profile.
 
 ## Relationships
 
-- [google-secops-1.0](../platforms/google-secops-1.0.md): `configurations.google_secops.query`, the assembled rule, `verifyRuleText`
+- [google-secops-1.0](../platforms/google-secops-1.0.md): `configurations.google_secops` sections, the assembled rule, `verifyRuleText`
 - [platforms](../platforms/index.md): capability matrix and static-validation bar
 - [validation.md](../validation.md): language diagnostics, offline and live query validation
 - [rule-1.1.md](../objects/rule-1.1.md): `response.procedure.searches[]`
@@ -275,14 +309,15 @@ The language id is `yaral`, the file suffixes `.yaral` (Google's community conve
 
 | Setting | Default |
 |---------|---------|
-| Profile | `rule` for `YaraLRule` and `YaraLBody`; `search` for `YaraLSearch` |
+| Profile | `rule` for `YaraLRule` and `YaraLSections`; `search` for `YaraLSearch` |
+| `match.type` | `hop` |
 | UDM and function catalogues | the versions pinned in the analysis engine |
 
 There are no overrides. A workspace cannot add UDM fields or functions: a custom field lives under `additional.fields`, which is not checked.
 
 ## Examples
 
-A block body (the `rule` profile):
+Block sections (the `rule` profile):
 
 ```yaml
 configurations:
@@ -290,18 +325,36 @@ configurations:
     enabled: true
     schema: platform::google_secops::1.0
     status: STAGING
-    query: |
-      events:
-        $e.metadata.event_type = "PROCESS_LAUNCH"
-        $e.principal.process.file.full_path = /\\(winword|excel|powerpnt)\.exe$/ nocase
-        $e.target.process.file.full_path = /\\powershell\.exe$/ nocase
-        $e.target.process.command_line = /\s-e(nc|ncodedcommand)?\s/ nocase
-        $host = $e.principal.hostname
-      outcome:
-        $risk_score = 70
-        $command_line = $e.target.process.command_line
-      condition:
-        $e
+    events: |
+      $e.metadata.event_type = "PROCESS_LAUNCH"
+      $e.principal.process.file.full_path = /\\(winword|excel|powerpnt)\.exe$/ nocase
+      $e.target.process.file.full_path = /\\powershell\.exe$/ nocase
+      $e.target.process.command_line = /\s-e(nc|ncodedcommand)?\s/ nocase
+      $host = $e.principal.hostname
+    outcome: |
+      $risk_score = 70
+      $command_line = $e.target.process.command_line
+    condition: |
+      $e
+```
+
+A multi-event rule, with `match` and `options` as YAML:
+
+```yaml
+    events: |
+      $fail.metadata.event_type = "USER_LOGIN"
+      $fail.security_result.action = "BLOCK"
+      $fail.target.user.userid = $user
+      $success.metadata.event_type = "USER_LOGIN"
+      $success.security_result.action = "ALLOW"
+      $success.target.user.userid = $user
+    match:
+      group_by: [$user]
+      window: 30m
+    condition: |
+      #fail >= 10 and $success
+    options:
+      suppression_window: 1h
 ```
 
 A hunt (the `search` profile):
@@ -324,10 +377,10 @@ response:
             $launches desc
 ```
 
-Fixtures: [fixtures/platforms/google-secops.yaml](../../fixtures/platforms/google-secops.yaml), the rules under `fixtures/valid/rule-google-secops-*.yaml`, and the rule text deploy assembles from each under [fixtures/platforms/google-secops/](../../fixtures/platforms/google-secops/); invalid: [rule-google-secops-body-header.yaml](../../fixtures/invalid/rule-google-secops-body-header.yaml), [rule-google-secops-search-section.yaml](../../fixtures/invalid/rule-google-secops-search-section.yaml), [rule-google-secops-missing-condition.yaml](../../fixtures/invalid/rule-google-secops-missing-condition.yaml).
+Fixtures: [fixtures/platforms/google-secops.yaml](../../fixtures/platforms/google-secops.yaml), the rules under `fixtures/valid/rule-google-secops-*.yaml`, and the rule text deploy assembles from each under [fixtures/platforms/google-secops/](../../fixtures/platforms/google-secops/); invalid: [rule-google-secops-section-header.yaml](../../fixtures/invalid/rule-google-secops-section-header.yaml), [rule-google-secops-condition-comment.yaml](../../fixtures/invalid/rule-google-secops-condition-comment.yaml), [rule-google-secops-sliding-no-pivot.yaml](../../fixtures/invalid/rule-google-secops-sliding-no-pivot.yaml), [rule-google-secops-missing-condition.yaml](../../fixtures/invalid/rule-google-secops-missing-condition.yaml).
 
 ## History
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-11-11 | Initial language spec ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md)): `YaraLRule`, `YaraLBody`, and `YaraLSearch`; the `rule` and `search` profiles; sections, lexical structure, expressions, and limits from Google's YARA-L pages; UDM and function catalogues; 26 error and 4 warning codes; HighlightSpec mapping with no new capture. |
+| 1.0 | 2026-11-11 | Initial language spec ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md)): `YaraLRule`, `YaraLSections` (section texts as keys, `match` and `options` as YAML objects), and `YaraLSearch`; the `rule` and `search` profiles; sections, lexical structure, expressions, and limits from Google's YARA-L pages; UDM and function catalogues; 28 error and 4 warning codes; HighlightSpec mapping with no new capture. |

@@ -43,31 +43,27 @@ configurations:
     schedule:
       ensure_enrichment_completeness: true
       late_arriving_data_adjustment: 30m
-    query: |
-      events:
-        $fail.metadata.event_type = "USER_LOGIN"
-        $fail.security_result.action = "BLOCK"
-        $fail.principal.ip = $ip
-        $fail.target.user.userid = $user
+    events: |
+      $fail.metadata.event_type = "USER_LOGIN"
+      $fail.security_result.action = "BLOCK"
+      $fail.principal.ip = $ip
+      $fail.target.user.userid = $user
 
-        $success.metadata.event_type = "USER_LOGIN"
-        $success.security_result.action = "ALLOW"
-        $success.principal.ip = $ip
-        $success.target.user.userid = $user
+      $success.metadata.event_type = "USER_LOGIN"
+      $success.security_result.action = "ALLOW"
+      $success.principal.ip = $ip
+      $success.target.user.userid = $user
 
-        $fail.metadata.event_timestamp.seconds < $success.metadata.event_timestamp.seconds
-
-      match:
-        $user, $ip over 30m
-
-      outcome:
-        $risk_score = max(80)
-        $risk_entity_to_score = $user
-        $failed_attempts = count_distinct($fail.metadata.id)
-        $target_hosts = array_distinct($success.target.hostname)
-
-      condition:
-        #fail >= 10 and $success
-
-      options:
-        suppression_window = 1h
+      $fail.metadata.event_timestamp.seconds < $success.metadata.event_timestamp.seconds
+    match:
+      group_by: [$user, $ip]
+      window: 30m
+    outcome: |
+      $risk_score = max(80)
+      $risk_entity_to_score = $user
+      $failed_attempts = count_distinct($fail.metadata.id)
+      $target_hosts = array_distinct($success.target.hostname)
+    condition: |
+      #fail >= 10 and $success
+    options:
+      suppression_window: 1h

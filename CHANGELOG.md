@@ -308,11 +308,11 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-google-secops 1.0
 
-- Initial field contract for `platform::google_secops::1.0` ([RFC 0017](rfcs/0017-google-secops-yara-l.md)): a YARA-L body under `query`, assembled into a rule with a derived name and meta (author, description, severity, priority, ATT&CK `tactic` and `technique`, `opentide_uuid`, `opentide_version`); `severity`, `priority`, `alerting`, `run_frequency`, `schedule`, and extra `meta`; six constraint codes and three advisories. Deploy uses the Chronicle API v1 (`verifyRuleText`, `rules`, `rules/{rule}/deployment`): `PREVIEW` runs without alerting, `RELEASE` alerts, `DELETION` archives by default and never forces a delete. Live validation with `verifyRuleText`; `opentide query` through `udmSearch`. Goldens under `fixtures/platforms/google-secops/` (assembled `.yaral` text and request bodies), derived by `scripts/test_platform_google_secops.py`.
+- Initial field contract for `platform::google_secops::1.0` ([RFC 0017](rfcs/0017-google-secops-yara-l.md)): the rule's YARA-L sections as keys (`events`, `outcome`, `condition`, `setup`, `export` as text; `match` and `options` as YAML objects), assembled into a rule with a derived name and meta (author, description, severity, priority, ATT&CK `tactic` and `technique`, `opentide_uuid`, `opentide_version`); `severity`, `priority`, `alerting`, `run_frequency`, `schedule`, and extra `meta`; six constraint codes and three advisories. Deploy uses the Chronicle API v1 (`verifyRuleText`, `rules`, `rules/{rule}/deployment`): `PREVIEW` runs without alerting, `RELEASE` alerts, `DELETION` archives by default and never forces a delete. Live validation with `verifyRuleText`; `opentide query` through `udmSearch`. Goldens under `fixtures/platforms/google-secops/` (assembled `.yaral` text and request bodies), derived by `scripts/test_platform_google_secops.py`.
 
 ## language-yara-l 1.0
 
-- Initial language spec for YARA-L 2.0 ([specs/languages/yara-l-1.0.md](specs/languages/yara-l-1.0.md), [RFC 0017](rfcs/0017-google-secops-yara-l.md)): the `YaraLRule`, `YaraLBody`, and `YaraLSearch` text forms; `rule` and `search` profiles; sections (including `setup` and `export`), lexical structure, expressions, window bounds, outcome and condition rules, and limits from Google's pages; UDM and function catalogues; 26 error and 4 warning codes; a HighlightSpec mapping that adds no capture.
+- Initial language spec for YARA-L 2.0 ([specs/languages/yara-l-1.0.md](specs/languages/yara-l-1.0.md), [RFC 0017](rfcs/0017-google-secops-yara-l.md)): the `YaraLRule` and `YaraLSearch` text forms and the `YaraLSections` block form (`YaraLMatch`, `YaraLOptions`); `rule` and `search` profiles; sections (including `setup` and `export`), lexical structure, expressions, window bounds, outcome and condition rules, and limits from Google's pages; UDM and function catalogues; 28 error and 4 warning codes; a HighlightSpec mapping that adds no capture.
 
 ## language-yara 1.5
 
@@ -386,7 +386,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## validation 1.10
 
-- `google_secops` joins the `--live` allowlist: `verifyRuleText` compiles the assembled rule and creates nothing ([RFC 0017](rfcs/0017-google-secops-yara-l.md)). YARA-L (`.yaral`) is checked offline, and the `yaral_*` codes join language diagnostics. Advisories `google_secops_risk_score_missing`, `google_secops_rule_id_literal`, and `google_secops_live_frequency_unavailable`. The fixture checker applies five Google SecOps constraint codes and seven YARA-L codes; five invalid rule fixtures.
+- `google_secops` joins the `--live` allowlist: `verifyRuleText` compiles the assembled rule and creates nothing ([RFC 0017](rfcs/0017-google-secops-yara-l.md)). YARA-L (`.yaral`) is checked offline, and the `yaral_*` codes join language diagnostics. Advisories `google_secops_risk_score_missing`, `google_secops_rule_id_literal`, and `google_secops_live_frequency_unavailable`. The fixture checker applies five Google SecOps constraint codes and seven YARA-L codes; six invalid rule fixtures.
 
 ## validation 1.9
 

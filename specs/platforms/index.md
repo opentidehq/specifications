@@ -104,7 +104,7 @@ This is the static-validation bar. Deploy adds the constraints in each platform 
 | `harfanglab` | no platform field is required; `maturity`, `confidence`, and `action` have defaults. At most one of `sigma` and `yara` (`harfanglab_rule_kind`). Deploy requires one of them |
 | `sysdig` | `status`, and `condition`, or `append_to_rule` with `condition` or `exceptions`. Every block also meets the [Sysdig constraints](sysdig-1.0.md#constraints) |
 | `bitdefender` | `status`, and exactly one of `detection` and `yara`. Every block also meets the [Bitdefender constraints](bitdefender-1.0.md#constraints) |
-| `google_secops` | `status` and `query`. The body passes the [YARA-L language](../languages/yara-l-1.0.md) checks, and the block meets the [Google SecOps constraints](google-secops-1.0.md#constraints) |
+| `google_secops` | `status`, `events`, and `condition`, and `match` with two or more event variables. The sections pass the [YARA-L language](../languages/yara-l-1.0.md) checks, and the block meets the [Google SecOps constraints](google-secops-1.0.md#constraints) |
 | `elastic` | `type`, `status`, and `query` (except for `machine_learning`), plus the type object: `threshold`, `new_terms`, `threat`, or `machine_learning` for those types. Every block also meets the [Elastic constraints](elastic-1.0.md#constraints) |
 
 ### Shared platform block

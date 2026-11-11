@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-`configurations.google_secops` is one Google Security Operations (Google SecOps, formerly Chronicle) **custom detection rule**, written in [YARA-L 2.0](../languages/yara-l-1.0.md). The block carries the rule body (`query`): its sections from `events:` on. Deploy assembles the whole rule around it, `rule <name> {`, a generated `meta:` section, and the body, and manages it through the Chronicle API v1: `rules` for the text and `rules/{rule}/deployment` for its run state.
+`configurations.google_secops` is one Google Security Operations (Google SecOps, formerly Chronicle) **custom detection rule**, written in [YARA-L 2.0](../languages/yara-l-1.0.md). The block carries the rule's sections as keys ([`YaraLSections`](../languages/yara-l-1.0.md#yaralsections)): `events`, `outcome`, and `condition` (and `setup`, `export`) as YARA-L text, and `match` and `options` as YAML objects. Deploy assembles the whole rule from them, `rule <name> {`, a generated `meta:` section, then each section under its label, and manages it through the Chronicle API v1: `rules` for the text and `rules/{rule}/deployment` for its run state.
 
 Google assigns each rule an id (`ru_<uuid>`) at create time. That id is kept in [deployment state](../deployment-state.md), never on the rule. Google SecOps is the first platform since Elastic with a real tenant compile: `verifyRuleText` compiles a rule without creating it, so `google_secops` is in the `--live` allowlist. The analysis engine also checks YARA-L offline.
 
@@ -20,10 +20,10 @@ Shared fields are defined in [platforms](index.md#shared-platform-block). The de
 
 Static validation (`opentide validate`) and registry load:
 
-- `status` and a non-blank `query` MUST be present.
-- `query` MUST be a [`YaraLBody`](../languages/yara-l-1.0.md#yaralbody) and MUST be checked against the [YARA-L language](../languages/yara-l-1.0.md) under the `rule` profile, as part of the rule deploy [assembles](#assembled-rule). Its errors fail static validation; its warnings do not.
+- `status`, `events`, and `condition` MUST be present; `match` MUST be present when `events` has two or more event variables.
+- The section keys MUST form [`YaraLSections`](../languages/yara-l-1.0.md#yaralsections) and MUST be checked against the [YARA-L language](../languages/yara-l-1.0.md) under the `rule` profile, together, as the rule deploy [assembles](#assembled-rule). Its errors fail static validation; its warnings do not.
 - A block MUST satisfy every [constraint](#constraints), reported with its code.
-- Unknown keys MUST fail, at the block root and inside `schedule`.
+- Unknown keys MUST fail, at the block root and inside `schedule`, `match`, and `options`. A `query` key is unknown: the rule is written as sections, not one text.
 - Legacy external-id keys (`rule_id`, `rule_id_bundle`, `rule_id::<tenant>`) MUST fail with `external_id_in_rule` ([External rule ids](index.md#external-rule-ids)).
 
 Deploy:
@@ -39,7 +39,7 @@ Deploy:
 Query validation:
 
 - `opentide validate query --platform google_secops --live` MUST compile each rule's assembled text with `verifyRuleText` and report Google's diagnostics. It MUST NOT create, update, or run a rule.
-- Without `--live`, `validate query` checks YARA-L offline, as `opentide validate` does: a block's body, or a `.yaral` file.
+- Without `--live`, `validate query` checks YARA-L offline, as `opentide validate` does: a block's sections, or a `.yaral` file.
 
 ## Definition
 
@@ -47,7 +47,13 @@ Query validation:
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `query` | string | yes | — | The [`YaraLBody`](../languages/yara-l-1.0.md#yaralbody): sections `events:` through `options:` |
+| `setup` | string | optional | null | YARA-L `setup` section text |
+| `events` | string | yes | — | YARA-L `events` section text |
+| `match` | [YaraLMatch](../languages/yara-l-1.0.md#yaralmatch) | conditional | null | `group_by`, `window`, and `type` (`hop`, `tumbling`, `sliding` with `pivot` and `direction`). Required with two or more event variables. |
+| `outcome` | string | optional | null | YARA-L `outcome` section text |
+| `condition` | string | yes | — | YARA-L `condition` section text |
+| `options` | [YaraLOptions](../languages/yara-l-1.0.md#yaraloptions) | optional | null | `allow_zero_values`, `suppression_window` |
+| `export` | string | optional | null | YARA-L `export` section text |
 | `severity` | string | optional | [derived](#severity) | `Info`, `Low`, `Medium`, `High`, or `Critical`. Written as meta `severity`. |
 | `priority` | string | optional | `severity` | Same values. Written as meta `priority`. |
 | `alerting` | boolean | optional | [by strategy](#deploy) | Whether detections become alerts (`RuleDeployment.alerting`) |
@@ -77,7 +83,7 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `google_secops_meta_key` | Each `meta` key is an identifier, not a keyword, and not a [derived key](#meta); each value is a string. |
 | `google_secops_name_duplicate` | Workspace check: no two enabled `google_secops` blocks resolve to one rule name. A composite rule that names one would match both. |
 
-The [YARA-L codes](../languages/yara-l-1.0.md#diagnostics) apply to `query`.
+The [YARA-L codes](../languages/yara-l-1.0.md#diagnostics) apply to the sections.
 
 | Code | `field_path` |
 |------|--------------|
@@ -87,7 +93,7 @@ The [YARA-L codes](../languages/yara-l-1.0.md#diagnostics) apply to `query`.
 | `google_secops_schedule` | `schedule`, or `schedule.late_arriving_data_adjustment` |
 | `google_secops_meta_key` | `meta.<key>` |
 | `google_secops_name_duplicate` | the block |
-| `yaral_*` | `query`, with the range inside it |
+| `yaral_*` | the section key (`events`, `condition`, …), with the range inside its text; `match.<field>` and `options.<field>` for the YAML sections |
 
 Paths are under `configurations.google_secops`.
 
@@ -98,7 +104,7 @@ Advisories are [warnings](../validation.md#platform-advisories): validation repo
 | Code | When | Why |
 |------|------|-----|
 | `google_secops_risk_score_missing` | `outcome` assigns no `$risk_score`. | Google scores every alert 40 and every non-alerting detection 15, whatever the rule detects. |
-| `google_secops_rule_id_literal` | The body compares `detection.detection.rule_id` with a literal `ru_…` id. | The id differs per tenant and changes when a rule is recreated. Match the producer with `detection.detection.rule_name`, which opentide derives the same way in every tenant. |
+| `google_secops_rule_id_literal` | `events` or `condition` compares `detection.detection.rule_id` with a literal `ru_…` id. | The id differs per tenant and changes when a rule is recreated. Match the producer with `detection.detection.rule_name`, which opentide derives the same way in every tenant. |
 | `google_secops_live_frequency_unavailable` | `run_frequency` is `LIVE` and the rule has two or more event variables. | Google maps it to `LIVE_CUSTOMIZABLE`; the stored value then differs from the block on every deploy. |
 
 ### Rule name
@@ -139,7 +145,7 @@ The block `severity`, else `response.alert_severity`:
 | `Critical` | `Critical` |
 | missing | `Medium` |
 
-The alert's risk score is not derived: it is the body's `$risk_score` outcome ([advisory](#advisories)).
+The alert's risk score is not derived: it is the `$risk_score` line of `outcome` ([advisory](#advisories)).
 
 ### Assembled rule
 
@@ -149,12 +155,33 @@ rule <rule name> {
     <key> = "<value>"
     ...
 
-  <body line>
-  ...
+  setup:
+    <setup line>
+
+  events:
+    <events line>
+    ...
+
+  match:
+    <group_by> over|by <window> [before|after <pivot>]
+
+  outcome:
+    <outcome line>
+
+  condition:
+    <condition line>
+
+  options:
+    <key> = <value>
+
+  export:
+    <export line>
 }
 ```
 
-The body is `query` with line endings normalised to `\n`, leading and trailing blank lines removed, and each non-blank line indented by two spaces; blank lines stay empty. One blank line separates `meta` from the body, and the text ends with `}` and one newline. Nothing else is added. Line `n` of `query` (after the leading blank lines) is line `n + k + 3` of the assembled text, where `k` is the number of meta lines, and its column is two more.
+Each section present in the block is written in this order, as its label indented two spaces and its content indented four, with one blank line before it. A text section is its YARA-L text with line endings normalised to `\n`, leading and trailing blank lines removed, and each non-blank line indented by four spaces; blank lines stay empty. `match` and `options` are rendered from their YAML ([YaraLMatch](../languages/yara-l-1.0.md#yaralmatch), [YaraLOptions](../languages/yara-l-1.0.md#yaraloptions)). The text ends with `}` and one newline. Nothing else is added.
+
+Line `n` of a section text (after its leading blank lines) is line `L + n` of the assembled text, where `L` is the line of that section's label, and its column is four more. The engine and the live validator use this to put a finding on its line in the YAML.
 
 ### Tenant setup
 
@@ -258,7 +285,7 @@ opentide never sends `force=true`: that deletes the rule's detections, which are
 | Check | Google SecOps |
 |-------|---------------|
 | `opentide validate` (offline) | yes: the constraints and the YARA-L language, `rule` profile |
-| `opentide validate query` (offline) | YARA-L: a block's body, and a `.yaral` file |
+| `opentide validate query` (offline) | YARA-L: a block's sections, and a `.yaral` file |
 | `opentide validate query --live` | yes: `verifyRuleText` on the assembled text |
 | `opentide query` | yes: a YARA-L search through `udmSearch` |
 
@@ -271,14 +298,14 @@ opentide never sends `force=true`: that deletes the rule's detections, which are
 | a block `run_frequency` outside `allowedRunFrequencies` | invalid: `google_secops_run_frequency_not_allowed` |
 | HTTP 401 or 403 | the tenant fails |
 
-A diagnostic's `position` (1-based lines and columns, end inclusive) is mapped into the block's `query` ([Assembled rule](#assembled-rule)). A position inside the generated header or meta, or no position, is reported on the block. `verifyRuleText` resolves the tenant's reference lists and data tables, which the offline check cannot.
+A diagnostic's `position` (1-based lines and columns, end inclusive) is mapped into the section key it falls in ([Assembled rule](#assembled-rule)). A position inside the generated header or meta, or no position, is reported on the block. `verifyRuleText` resolves the tenant's reference lists and data tables, which the offline check cannot.
 
 **Query.** `opentide query --platform google_secops` sends a [`YaraLSearch`](../languages/yara-l-1.0.md#text-forms) to `GET <endpoint>/v1alpha/<instance resource>:udmSearch` with `query`, `timeRange.startTime`, `timeRange.endTime`, and `limit` (at most 10,000). The method is read-only and saves nothing. It is `v1alpha`: Google has no `v1` search method yet. `opentide query --rule` is not supported for `google_secops`: a rule runs in the detection engine, and a retrohunt writes detections.
 
 ## Relationships
 
 - [platforms](index.md): shared fields, capability matrix, external ids
-- [yara-l-1.0](../languages/yara-l-1.0.md): `YaraLBody`, the YARA-L language, the `rule` and `search` profiles
+- [yara-l-1.0](../languages/yara-l-1.0.md): `YaraLSections`, `YaraLMatch`, `YaraLOptions`, the YARA-L language, the `rule` and `search` profiles
 - [deployment-state.md](../deployment-state.md): the rule id
 - [deployment.md](../deployment.md): status strategies
 - [elastic-1.0](elastic-1.0.md#attck): the ATT&CK technique union and the tactic table
@@ -311,18 +338,17 @@ configurations:
     run_frequency: LIVE
     meta:
       data_source: Microsoft Sysmon
-    query: |
-      events:
-        $e.metadata.event_type = "PROCESS_LAUNCH"
-        $e.principal.process.file.full_path = /\\(winword|excel|powerpnt)\.exe$/ nocase
-        $e.target.process.file.full_path = /\\powershell\.exe$/ nocase
-        $e.target.process.command_line = /\s-e(nc|ncodedcommand)?\s/ nocase
-      outcome:
-        $risk_score = 70
-        $host = $e.principal.hostname
-        $command_line = $e.target.process.command_line
-      condition:
-        $e
+    events: |
+      $e.metadata.event_type = "PROCESS_LAUNCH"
+      $e.principal.process.file.full_path = /\\(winword|excel|powerpnt)\.exe$/ nocase
+      $e.target.process.file.full_path = /\\powershell\.exe$/ nocase
+      $e.target.process.command_line = /\s-e(nc|ncodedcommand)?\s/ nocase
+    outcome: |
+      $risk_score = 70
+      $host = $e.principal.hostname
+      $command_line = $e.target.process.command_line
+    condition: |
+      $e
 ```
 
 A multi-event rule with a window, aggregations, and suppression:
@@ -338,35 +364,33 @@ configurations:
     run_frequency: LIVE_CUSTOMIZABLE
     schedule:
       ensure_enrichment_completeness: true
-    query: |
-      events:
-        $fail.metadata.event_type = "USER_LOGIN"
-        $fail.security_result.action = "BLOCK"
-        $fail.principal.ip = $ip
-        $fail.target.user.userid = $user
+    events: |
+      $fail.metadata.event_type = "USER_LOGIN"
+      $fail.security_result.action = "BLOCK"
+      $fail.principal.ip = $ip
+      $fail.target.user.userid = $user
 
-        $success.metadata.event_type = "USER_LOGIN"
-        $success.security_result.action = "ALLOW"
-        $success.principal.ip = $ip
-        $success.target.user.userid = $user
+      $success.metadata.event_type = "USER_LOGIN"
+      $success.security_result.action = "ALLOW"
+      $success.principal.ip = $ip
+      $success.target.user.userid = $user
 
-        $fail.metadata.event_timestamp.seconds < $success.metadata.event_timestamp.seconds
-
-      match:
-        $user, $ip over 30m
-
-      outcome:
-        $risk_score = max(80)
-        $risk_entity_to_score = $user
-        $failed_attempts = count_distinct($fail.metadata.id)
-        $target_hosts = array_distinct($success.target.hostname)
-
-      condition:
-        #fail >= 10 and $success
-
-      options:
-        suppression_window = 1h
+      $fail.metadata.event_timestamp.seconds < $success.metadata.event_timestamp.seconds
+    match:
+      group_by: [$user, $ip]
+      window: 30m
+    outcome: |
+      $risk_score = max(80)
+      $risk_entity_to_score = $user
+      $failed_attempts = count_distinct($fail.metadata.id)
+      $target_hosts = array_distinct($success.target.hostname)
+    condition: |
+      #fail >= 10 and $success
+    options:
+      suppression_window: 1h
 ```
+
+`condition` is a block scalar on purpose: `condition: #fail >= 10 and $success` as a plain scalar is a YAML comment, loads as null, and fails with `yaral_section_empty`.
 
 Fixtures:
 
@@ -379,4 +403,4 @@ Fixtures:
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-11-11 | Initial field contract ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md)): a YARA-L body assembled into a rule with derived name and meta; severity, priority, alerting, run frequency, schedule customizations; Chronicle API v1 deploy with the rule id in deployment state; archive by default on `DELETION`, never a forced delete; live validation with `verifyRuleText`; `opentide query` through `udmSearch`. |
+| 1.0 | 2026-11-11 | Initial field contract ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md)): YARA-L sections as keys (`events`, `outcome`, `condition`, `setup`, `export` as text; `match` and `options` as YAML objects) assembled into a rule with derived name and meta; severity, priority, alerting, run frequency, schedule customizations; Chronicle API v1 deploy with the rule id in deployment state; archive by default on `DELETION`, never a forced delete; live validation with `verifyRuleText`; `opentide query` through `udmSearch`. |

@@ -18,11 +18,10 @@ configurations:
     enabled: true
     schema: platform::google_secops::1.0
     status: STAGING
-    query: |
-      events:
-        $e.metadata.event_type = "PROCESS_LAUNCH"
-        $e.target.process.file.full_path = /\\mshta\.exe$/ nocase
-      outcome:
-        $risk_score = 40
-      condition:
-        $e
+    events: |
+      $e.metadata.event_type = "PROCESS_LAUNCH"
+      $e.target.process.file.full_path = /\\mshta\.exe$/ nocase
+    outcome: |
+      $risk_score = 40
+    condition: |
+      $e

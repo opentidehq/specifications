@@ -21,8 +21,7 @@ configurations:
     meta:
       severity: Low
       data_source: Okta
-    query: |
-      events:
-        $e.metadata.event_type = "USER_LOGIN"
-      condition:
-        $e
+    events: |
+      $e.metadata.event_type = "USER_LOGIN"
+    condition: |
+      $e

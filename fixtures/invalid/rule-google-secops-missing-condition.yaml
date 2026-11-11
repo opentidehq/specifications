@@ -1,4 +1,4 @@
-# A rule body without a condition section.
+# A block without a condition key.
 # Expected code: yaral_section_missing.
 name: Google SecOps rule without a condition
 metadata:
@@ -18,7 +18,5 @@ configurations:
     enabled: true
     schema: platform::google_secops::1.0
     status: STAGING
-    query: |
-      events:
-        $e.metadata.event_type = "NETWORK_DNS"
-        // condition: $e is in a comment, so it does not count.
+    events: |
+      $e.metadata.event_type = "NETWORK_DNS"
