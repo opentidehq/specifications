@@ -3,11 +3,12 @@
 - **RFC:** 0017
 - **Title:** Graylog detection platform (native event definitions)
 - **Author:** opentide maintainers
-- **Status:** draft
+- **Status:** accepted
 - **Created:** 2026-11-11
+- **Accepted:** 2026-11-11, with the normative text in [specs/platforms/graylog-1.0.md](../specs/platforms/graylog-1.0.md)
 - **Issue:** to be opened in opentidehq/specifications (spec-change)
 - **Related:** [RFC 0016](0016-bitdefender-gravityzone-platform.md) and [RFC 0014](0014-sysdig-falco-platform.md) (the state-backed platform pattern); [RFC 0010](0010-deployment-external-ids.md) (deployment external ids); [RFC 0007](0007-elastic-security-platform.md) (the ATT&CK and duration conventions reused here)
-- **Implementation:** not started. This RFC is research and design only. The normative file it proposes, `specs/platforms/graylog-1.0.md`, lands in a later specifications PR.
+- **Implementation:** opentidehq/opentide (the `graylog` platform); opentidehq/language-server (`Dialect::Graylog` and the Graylog block checker)
 
 ## Summary
 
@@ -164,7 +165,7 @@ A later RFC can add Sigma as an authoring source that is converted into native e
 
 ## Part B: Graylog platform (`platform::graylog::1.0`)
 
-Proposed file: `specs/platforms/graylog-1.0.md` (`spec: platform-graylog`, `version: "1.0"`, `schema_id: platform::graylog::1.0`). Part B keeps the letter of earlier drafts, so references in review threads still resolve.
+Normative file: [specs/platforms/graylog-1.0.md](../specs/platforms/graylog-1.0.md) (`spec: platform-graylog`, `version: "1.0"`, `schema_id: platform::graylog::1.0`). Part B keeps the letter of earlier drafts, so references in review threads still resolve. Where this RFC and the spec differ, the spec wins.
 
 ### B.1 Shape
 
@@ -175,17 +176,18 @@ configurations:
     schema: platform::graylog::1.0
     status: PRODUCTION                  # shared; required
     name: ""                            # shared; empty → the opentide rule name
-    streams: [sysmon]                   # tenant aliases
+    streams: sysmon                     # a tenant alias, or a list of them
     schedule: {every: 5m, window: 15m}
     aggregation:
-      group_by: [source]
+      group_by: source
       condition: count() >= 3 OR card(parent_image_lc) >= 2
     event_fields:
-      host: ${source.source}
-      user: ${source.User}
-    event_key: [host]
+      host: source                      # a bare field name: copy that message field
+      user: User
+      account: "${source.User}@${source.Domain}"   # a template
+    event_key: host
     grace_period: 30m
-    notifications: [soc-slack]          # tenant aliases
+    notifications: soc-slack            # a tenant alias, or a list of them
     summary: Obfuscated PowerShell from ${source.ParentImage} on ${source.source}   # 7.1+
     remediation: Isolate the host and collect the process tree.
     query: >-
@@ -203,21 +205,34 @@ configurations:
 | `query` | string | yes | — | A Graylog search query ([B.7](#b7-graylog-query-dialect)). Non-blank. |
 | `priority` | string | optional | [derived](#b4-derived-fields) | `Informational`, `Low`, `Medium`, `High`, or `Critical` |
 | `alert` | boolean | optional | `true` | `false` makes fired events plain events, not alerts |
-| `tags` | list[string] | optional | `[]` | Added to the [derived tags](#b4-derived-fields) (7.2+) |
-| `streams` | list[string] | optional | tenant `streams` | Aliases from the tenant's `stream_ids` table |
-| `stream_categories` | list[string] | optional | `[]` | Graylog stream categories, as written |
+| `tags` | string or list[string] | optional | `[]` | Added to the [derived tags](#b4-derived-fields) (7.2+) |
+| `streams` | string or list[string] | optional | tenant `streams` | Aliases from the tenant's `stream_ids` table |
+| `stream_categories` | string or list[string] | optional | `[]` | Graylog stream categories, as written |
 | `schedule` | [Schedule](#schedule) | optional | `{every: 5m}` | When the definition runs and what it searches |
 | `event_limit` | integer | optional | `100` | Filter only: at most this many events per run, 1–1,000 |
 | `aggregation` | [Aggregation](#aggregation) | optional | null | Turns the filter into an aggregation |
-| `event_fields` | map | optional | `{}` | Event field name → template string, or `{lookup: {table, key_field}}` |
-| `event_key` | list[string] | optional | `[]` | Event fields that make up the event key |
-| `notifications` | list[string] | optional | `[]` | Aliases from the tenant's `notification_ids` table |
+| `event_fields` | map | optional | `{}` | Event field name → a [value](#event-field-values) |
+| `event_key` | string or list[string] | optional | `[]` | Event fields that make up the event key |
+| `notifications` | string or list[string] | optional | `[]` | Aliases from the tenant's `notification_ids` table |
 | `grace_period` | duration | optional | `0s` | Per event key |
 | `backlog` | integer | optional | `0` | Messages attached to a notification (`backlog_size`), 0 or more |
 | `summary` | string | optional | null | Event summary template (7.1+) |
 | `remediation` | string | optional | null | Remediation steps |
 
 The shared `name` is the definition title. `status` is required, as on `elastic`, `sysdig`, and `bitdefender`.
+
+**List fields.** `tags`, `streams`, `stream_categories`, `event_key`, `notifications`, and `aggregation.group_by` take one string or a list of strings. A string is a one-item list. The list is the canonical form templates and documentation write. opentide already takes this shape elsewhere (Elastic's `job_id`, Sysdig's `fields`).
+
+#### Event field values
+
+| Written | Meaning | Graylog provider |
+|---------|---------|------------------|
+| a bare field name (`source`, `User`; matches `[A-Za-z0-9_.@-]+`) | copy that field of the message that fired the event | `template-v1`, template `${source.<field>}` |
+| a string containing `${` | a Graylog template, sent as written | `template-v1`, the string |
+| `{template: <string>}` | a template or constant text, sent as written | `template-v1`, the string |
+| `{lookup: {table: <name>, key_field: <field>}}` | a lookup-table value keyed by a message field | `lookup-v1` |
+
+A string that is neither a field name nor contains `${` is `graylog_event_field`: constant text is written `{template: "…"}`. `${source.X}` is Graylog's own syntax, and in it `source` names the message, not the `source` field. The bare form spares authors `${source.source}`.
 
 #### Schedule
 
@@ -280,7 +295,7 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `graylog_schedule` | Exactly one of `every` and `cron`. Durations follow the grammar and are greater than zero. `cron` has 6 or 7 fields and parses as Quartz (V11). `timezone` is an IANA zone. `window` is set with `cron`. |
 | `graylog_event_limit` | `event_limit` is 1–1,000 (V11). It is not set together with `aggregation`. |
 | `graylog_aggregation` | `condition` parses under the [grammar](#aggregation-condition-grammar). Each function has the arguments it needs. `group_by` has unique, non-empty field names, and needs a `condition` (V12). |
-| `graylog_event_field` | Each `event_fields` name is a valid Graylog field name (`[A-Za-z0-9_.@-]+`). A template is non-blank. A lookup names `table` and `key_field`. |
+| `graylog_event_field` | Each `event_fields` name is a valid Graylog field name (`[A-Za-z0-9_.@-]+`). Each value is one of the [value forms](#event-field-values): a bare field name, a string containing `${`, `{template}` with a non-blank string, or `{lookup}` naming `table` and `key_field`. |
 | `graylog_event_key` | Each `event_key` entry is an `event_fields` key (V12) |
 | `graylog_priority` | `priority` is one of the five names |
 | `graylog_field_name` | A field name in `query`, `group_by`, or a condition is a valid Graylog field name |
@@ -316,10 +331,10 @@ Advisories (warnings, [validation.md](../specs/validation.md#platform-advisories
 | `remediation_steps` | `remediation` | all |
 | `config.query` | `query` | all |
 | `config.streams`, `stream_categories` | ids resolved from the aliases; categories as written | all |
-| `config.series`, `conditions`, `group_by` | from `aggregation`; empty and `{"expression": null}` for a filter | all |
+| `config.series`, `conditions`, `group_by` | from `aggregation` (`group_by` as a list); empty and `{"expression": null}` for a filter | all |
 | `config` intervals and cron | from `schedule` | all |
-| `field_spec` | `event_fields`; each template provider `{type: template-v1, template, require_values: false}`. `exclude_empty_fields` is never sent: it is 7.2+ only, nested, and refused before 7.2. | all |
-| `key_spec` | `event_key` | all |
+| `field_spec` | `event_fields`, by the [value forms](#event-field-values); each template provider `{type: template-v1, template, require_values: false}`, each lookup `{type: lookup-v1, table_name, key_field}`. `exclude_empty_fields` is never sent: it is 7.2+ only, nested, and refused before 7.2. | all |
+| `key_spec` | `event_key`, as a list | all |
 | `notification_settings` | `grace_period` in ms, `backlog` | all |
 | `notifications` | ids resolved from the aliases | all |
 | `_scope` | always `DEFAULT` (V15) | all |

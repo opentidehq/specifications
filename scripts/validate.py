@@ -270,6 +270,10 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "platforms" / "bitdefender" / "rule-bitdefender-yara-1.0.create.api.json",
         FIXTURES / "valid" / "rule-bitdefender-detection-1.0.yaml",
         FIXTURES / "valid" / "rule-bitdefender-yara-1.0.yaml",
+        FIXTURES / "platforms" / "graylog.yaml",
+        FIXTURES / "platforms" / "graylog" / "tenant.toml",
+        FIXTURES / "valid" / "rule-graylog-aggregation-1.0.yaml",
+        FIXTURES / "valid" / "rule-graylog-filter-1.1.yaml",
     ]
     for path in required:
         if not path.is_file():
