@@ -51,6 +51,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
+- `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, draft, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0017](rfcs/0017-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md)) is added ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.1`. New fixtures `fixtures/valid/rule-1.1-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
@@ -63,6 +64,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.0
 
+- `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, draft, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0017](rfcs/0017-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md)) is added ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.0`. New fixtures `fixtures/valid/rule-1.0-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
@@ -137,6 +139,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
 
+## deployment-state 1.5
+
+- `exabeam` is state-backed: the Exabeam correlation rule id, a lower-case canonical UUID, under `platforms.exabeam.<tenant>` ([RFC 0017](rfcs/0017-exabeam-platform.md)). The shard JSON Schema gains `$defs/uuidTenants`; schema id unchanged. New invalid fixtures `exabeam-bad-id.json` and `exabeam-uppercase-id.json`.
+
 ## deployment-state 1.4
 
 - `bitdefender` is state-backed: the GravityZone custom rule id, 24 lower-case hex digits, under `platforms.bitdefender.<tenant>` ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). The shard JSON Schema gains `$defs/objectIdTenants`; schema id unchanged. New invalid fixtures `bitdefender-bad-id.json` and `bitdefender-uppercase-id.json`.
@@ -168,6 +174,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## metaschema-keywords 1.0
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
+
+## platforms 1.8
+
+- Exabeam New-Scale SIEM joins the matrix as the eleventh platform, in draft ([specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md), [RFC 0017](rfcs/0017-exabeam-platform.md)): correlation rules through the Correlation Rules API; `--live` checks each sequence filter through Exabeam Search; the rule UUID lives in deployment state.
 
 ## platforms 1.7
 
@@ -340,6 +350,14 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial field contract ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)): `detection` (GravityZone Basic criteria) and `yara` (`YaraSignature` plus `on_access`) kinds; severity, tags, targets, and automatic actions; derived name, description, severity, and tags; whole-payload updates; the GravityZone id in deployment state; no exclusion rules. Fixtures, a fixture tenant, and JSON-RPC goldens under `fixtures/platforms/bitdefender/`.
 
+## platform-exabeam 1.0
+
+- Draft field contract ([RFC 0017](rfcs/0017-exabeam-platform.md)): sequences with any-match or threshold conditions, correlation, suppression, delay, schedule, and outcomes; derived name, description (with ATT&CK), and severity; whole-body `PUT`; the rule UUID in deployment state; `--live` filter checks and hunts through Search. Fixtures, a fixture tenant, and request goldens under `fixtures/platforms/exabeam/`.
+
+## language-exabeam 1.0
+
+- Draft language spec, [specs/languages/exabeam-1.0.md](specs/languages/exabeam-1.0.md) ([RFC 0017](rfcs/0017-exabeam-platform.md)): the Exabeam Query Language (language id `exabeam`, never `eql`), its filter and advanced grammars, `rule` and `search` profiles, the CIM field catalogue, highlighting on the existing HighlightSpec captures, and stable `exabeam_*` diagnostics. Conformance queries and highlight goldens under `fixtures/languages/exabeam/`, checked by `scripts/exabeam_language.py`.
+
 ## sharing 1.3
 
 - `--changed` and the production release name the production deploy by its run strategy (`opentide deploy --strategy RELEASE` on a push) instead of `--plan PRODUCTION`, which opentide 0.17.0 removed. The commit range is unchanged.
@@ -365,6 +383,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.10
+
+- `exabeam` (draft) joins the `--live` allowlist for its filters, through Exabeam Search, and is checked offline against the Exabeam Query Language. Advisories `exabeam_outcome_silent`, `exabeam_correlation_window`, `exabeam_name_duplicate`; the language's diagnostics. The fixture checker applies the Exabeam constraint codes ([RFC 0017](rfcs/0017-exabeam-platform.md)).
 
 ## validation 1.9
 

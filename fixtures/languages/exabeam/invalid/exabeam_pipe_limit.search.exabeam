@@ -1,0 +1,1 @@
+vendor:"a" AS t1 | from t1 WHERE vendor:"a" AS t2 | from t2 WHERE vendor:"a" AS t3 | from t3 WHERE vendor:"a" AS t4 | from t4 WHERE vendor:"a" AS t5 | from t5 WHERE vendor:"a" AS t6 | from t6 WHERE vendor:"a"

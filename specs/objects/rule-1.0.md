@@ -79,7 +79,7 @@ This document is the **exemplar spec** — all object specs follow the same sect
 | `query` | string | yes | Query text |
 | `language` | string | no | Query language, for a `system` with more than one. Omitted with `system: elastic`: unknown. |
 
-`language` names the query language when `system` alone does not. With `system: elastic` it MUST be one of the names [elastic-1.0](../platforms/elastic-1.0.md) uses: `kuery` (KQL), `lucene`, `eql`, or `esql` (ES\|QL). `language` MUST NOT be set with any other `system`, because the system alone names the language: `sentinel` and `defender_for_endpoint` are KQL, `splunk` is SPL, and no other system has a language in this revision. With `system: elastic`, an omitted `language` (or an empty one, YAML `null`) means the language is unknown and the query is not analysed, as before the field existed.
+`language` names the query language when `system` alone does not. With `system: elastic` it MUST be one of the names [elastic-1.0](../platforms/elastic-1.0.md) uses: `kuery` (KQL), `lucene`, `eql`, or `esql` (ES\|QL). `language` MUST NOT be set with any other `system`, because the system alone names the language: `sentinel` and `defender_for_endpoint` are KQL, `splunk` is SPL, `exabeam` is the Exabeam Query Language ([exabeam-1.0](../languages/exabeam-1.0.md), profile `search`), and no other system has a language in this revision. With `system: elastic`, an omitted `language` (or an empty one, YAML `null`) means the language is unknown and the query is not analysed, as before the field existed.
 
 ### Platform block (PlatformConfigBase)
 
@@ -111,6 +111,7 @@ Typed optional blocks keyed by platform identifier:
 | `elastic` | ElasticConfig | `platform::elastic::1.0` | [elastic-1.0.md](../platforms/elastic-1.0.md) |
 | `sysdig` | SysdigConfig | `platform::sysdig::1.0` | [sysdig-1.0.md](../platforms/sysdig-1.0.md) |
 | `bitdefender` | BitdefenderConfig | `platform::bitdefender::1.0` | [bitdefender-1.0.md](../platforms/bitdefender-1.0.md) |
+| `exabeam` | ExabeamConfig | `platform::exabeam::1.0` | [exabeam-1.0.md](../platforms/exabeam-1.0.md) (draft) |
 
 Shared block fields and the capability matrix are in [platforms/index.md](../platforms/index.md). Each link above is the field contract for that block.
 
@@ -194,6 +195,7 @@ configurations:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-11-11 | `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, draft, [exabeam-1.0.md](../platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0017](../../rfcs/0017-exabeam-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-11-10 | `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [bitdefender-1.0.md](../platforms/bitdefender-1.0.md)) is added ([RFC 0016](../../rfcs/0016-bitdefender-gravityzone-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-11-02 | `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [sysdig-1.0.md](../platforms/sysdig-1.0.md)) is added ([RFC 0014](../../rfcs/0014-sysdig-falco-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-10-23 | Optional `response.procedure.searches[].language`: `kuery`, `lucene`, `eql`, or `esql` with `system: elastic`, and not set with any other system. Omitted means unknown, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |

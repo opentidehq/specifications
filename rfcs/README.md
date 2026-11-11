@@ -31,6 +31,7 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0014](0014-sysdig-falco-platform.md) | Sysdig Secure and Falco detection platform | accepted |
 | [0015](0015-yara-language.md) | One YARA language across detection platforms | accepted |
 | [0016](0016-bitdefender-gravityzone-platform.md) | Bitdefender GravityZone detection platform | accepted |
+| [0017](0017-exabeam-platform.md) | Exabeam New-Scale SIEM and the Exabeam Query Language | draft |
 
 ## Numbering
 

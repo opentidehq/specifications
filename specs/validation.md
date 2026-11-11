@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.9"
+version: "1.10"
 schema_id: null
 status: normative
 supersedes: null
@@ -90,19 +90,22 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `bitdefender_registry_full_hive` | warning | Bitdefender: a `Registry.Key` value starts with a full hive name, so the rule never triggers |
 | `bitdefender_contains_no_wildcard` | warning | Bitdefender: a `contains` value has neither `*` nor `?` |
 | `bitdefender_severity_collapsed` | warning | Bitdefender: `Critical` or `Informational` severity sent as GravityZone `High` or `Low` |
+| `exabeam_outcome_silent` | warning | Exabeam: `outcome: none` and no `email`, so the rule only writes a `rule-trigger` event |
+| `exabeam_correlation_window` | warning | Exabeam: `correlation.within` is shorter than the longest sequence `threshold.within` |
+| `exabeam_name_duplicate` | warning | Exabeam: two enabled blocks resolve to one Exabeam rule name |
 | `harfanglab_yara_context` | warning | HarfangLab: a YARA rule's meta `context` is not a comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` |
 
-The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories), [sysdig-1.0](platforms/sysdig-1.0.md#advisories), [bitdefender-1.0](platforms/bitdefender-1.0.md#advisories), and [harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile).
+The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories), [sysdig-1.0](platforms/sysdig-1.0.md#advisories), [bitdefender-1.0](platforms/bitdefender-1.0.md#advisories), [exabeam-1.0](platforms/exabeam-1.0.md#advisories), and [harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile).
 
 ### Language diagnostics
 
-A language spec MAY define diagnostics with stable codes. Its errors fail static validation like a constraint code. Its warnings are reported like advisories and never set `VALIDATION_ERROR_RAISED`. The YARA codes are in [yara-1.0](languages/yara-1.0.md#diagnostics): every `yara_*` error fails the rule, and the warnings are `yara_x_incompatible`, `yara_slow_pattern`, `yara_entrypoint_deprecated`, `yara_suspicious_expression`, `yara_module_unconfirmed`, and `yara_meta_missing`.
+A language spec MAY define diagnostics with stable codes. Its errors fail static validation like a constraint code. Its warnings are reported like advisories and never set `VALIDATION_ERROR_RAISED`. The YARA codes are in [yara-1.0](languages/yara-1.0.md#diagnostics): every `yara_*` error fails the rule, and the warnings are `yara_x_incompatible`, `yara_slow_pattern`, `yara_entrypoint_deprecated`, `yara_suspicious_expression`, `yara_module_unconfirmed`, and `yara_meta_missing`. The Exabeam Query Language codes are in [exabeam-1.0](languages/exabeam-1.0.md#diagnostics) (draft): every `exabeam_*` language error fails the rule, and its warnings are `exabeam_mixed_boolean`, `exabeam_wildcard_in_phrase`, `exabeam_single_value_list`, `exabeam_unquoted_value`, `exabeam_legacy_regex`, `exabeam_unknown_field`, and `exabeam_string_field_number`.
 
 ### Query validation
 
 Commands: `opentide validate query` (offline, the default) and `opentide validate query --platform <id> --live` (the tenant check).
 
-**Offline**, the analysis engine parses each query in its platform's language, with no tenant, credentials, or network. It is the `queries` check of `opentide validate` on its own, and it also takes a query file (`.kql`, `.spl`, `.yar`, ...). A platform with no offline parser (`sentinel_one`) refuses offline and names `--live`. HarfangLab and Bitdefender YARA (`.yar`, `.yara`) and the Sysdig Falco condition are checked offline.
+**Offline**, the analysis engine parses each query in its platform's language, with no tenant, credentials, or network. It is the `queries` check of `opentide validate` on its own, and it also takes a query file (`.kql`, `.spl`, `.yar`, ...). A platform with no offline parser (`sentinel_one`) refuses offline and names `--live`. HarfangLab and Bitdefender YARA (`.yar`, `.yara`), the Sysdig Falco condition, and the Exabeam Query Language (sequence queries, `system: exabeam` hunts, `.exabeam` files) are checked offline.
 
 **`--live`** sends a platform's rule queries to its tenants. The table is the `--live` allowlist:
 
@@ -114,6 +117,7 @@ Commands: `opentide validate query` (offline, the default) and `opentide validat
 | `sentinel_one` | yes |
 | `carbon_black_cloud` | yes |
 | `elastic` | yes, live only: Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md#query-validation)) |
+| `exabeam` | yes, the filter only: Exabeam Search over the last 15 minutes; the rule's condition is checked offline ([exabeam-1.0](platforms/exabeam-1.0.md#query-validation)) |
 | `crowdstrike` | no |
 | `harfanglab` | no. YARA is checked offline ([harfanglab-1.0](platforms/harfanglab-1.0.md#query-validation)) |
 | `sysdig` | no. The Falco condition is checked offline ([sysdig-1.0](platforms/sysdig-1.0.md#query-validation)) |
@@ -247,6 +251,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.10 | 2026-11-11 | `exabeam` (draft, [RFC 0017](../rfcs/0017-exabeam-platform.md)) joins the `--live` allowlist for its filters, through Exabeam Search, and is checked offline against the [Exabeam Query Language](languages/exabeam-1.0.md). Advisories `exabeam_outcome_silent`, `exabeam_correlation_window`, `exabeam_name_duplicate`; the language's diagnostics. The fixture checker applies the Exabeam constraint codes and the language errors the reference checker proves. |
 | 1.9 | 2026-11-10 | [Query validation](#query-validation) matches `opentide validate query` as it ships (since opentide 0.19): offline by default with the analysis engine, the `queries` check on its own plus query files; `--live` is the tenant check and its allowlist. HarfangLab and Bitdefender YARA (`.yar`, `.yara`) and the Sysdig Falco condition are checked offline; `--live` stays `supported: false` for `crowdstrike`, `harfanglab`, `sysdig`, and `bitdefender`. Replaces "no offline mode on any platform". |
 | 1.8 | 2026-11-10 | `harfanglab_yara_context` accepts any comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` ([harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile) 1.3). |
 | 1.7 | 2026-11-10 | `bitdefender` is excluded from query validation (`supported: false`) and checked offline by `opentide validate` ([bitdefender-1.0](platforms/bitdefender-1.0.md), [RFC 0016](../rfcs/0016-bitdefender-gravityzone-platform.md)). Advisories `bitdefender_registry_full_hive`, `bitdefender_contains_no_wildcard`, and `bitdefender_severity_collapsed`. The fixture checker applies eleven Bitdefender constraint codes. |

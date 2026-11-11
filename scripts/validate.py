@@ -270,6 +270,15 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "platforms" / "bitdefender" / "rule-bitdefender-yara-1.0.create.api.json",
         FIXTURES / "valid" / "rule-bitdefender-detection-1.0.yaml",
         FIXTURES / "valid" / "rule-bitdefender-yara-1.0.yaml",
+        FIXTURES / "platforms" / "exabeam.yaml",
+        FIXTURES / "platforms" / "exabeam" / "tenant.toml",
+        FIXTURES / "platforms" / "exabeam" / "rule-exabeam-threshold-1.0.create.api.json",
+        FIXTURES / "platforms" / "exabeam" / "rule-exabeam-threshold-1.0.update.api.json",
+        FIXTURES / "platforms" / "exabeam" / "rule-exabeam-threshold-1.0.disable.api.json",
+        FIXTURES / "platforms" / "exabeam" / "rule-exabeam-threshold-1.0.validate.api.json",
+        FIXTURES / "platforms" / "exabeam" / "rule-exabeam-sequence-1.0.create.api.json",
+        FIXTURES / "valid" / "rule-exabeam-threshold-1.0.yaml",
+        FIXTURES / "valid" / "rule-exabeam-sequence-1.0.yaml",
     ]
     for path in required:
         if not path.is_file():
