@@ -332,7 +332,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-graylog 1.1
 
-- Clarifications from the engine's oracle run against Graylog 7.2.2 and 6.3.5. Graylog refuses `\b` and `\B` (`graylog_regex_unsupported`). `graylog_regex_quote` is a paired quote; an unpaired one does not parse (`lucene_regexp`). New `graylog_open_range` (error): Graylog's validator refuses an open range bound, so deploy cannot save it. `_exists_:source` matches every message, since the validator refuses `*` and `*:*`. The fixture checker's condition parser requires commas between arguments. Schema id unchanged.
+- Clarifications from the engine's oracle run against Graylog 7.2.2 and 6.3.5. Graylog refuses `\b` and `\B` (`graylog_regex_unsupported`). `graylog_regex_quote` is a paired quote; an unpaired one does not parse (`lucene_regexp`). New `graylog_open_range` (error): Graylog's validator refuses an open range bound, so deploy cannot save it. `_exists_:source` matches every message, since the validator refuses `*` and `*:*`. The failure table names `graylog_tenant_unreachable`, `graylog_request_failed`, and a create answered 2xx without an `id` (`graylog_create_unconfirmed`). The fixture checker's condition parser requires commas between arguments. Schema id unchanged.
 
 ## platform-graylog 1.0
 
