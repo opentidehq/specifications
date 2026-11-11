@@ -51,6 +51,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
+- `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md)) is added ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.1`. New fixtures `fixtures/valid/rule-1.1-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
@@ -63,6 +64,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.0
 
+- `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md)) is added ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.0`. New fixtures `fixtures/valid/rule-1.0-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
@@ -137,6 +139,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
 
+## deployment-state 1.5
+
+- `graylog` is state-backed: the Graylog event definition id, 24 lower-case hex digits, under `platforms.graylog.<tenant>` ([RFC 0017](rfcs/0017-graylog-platform.md)). The shard JSON Schema maps `graylog` to `$defs/objectIdTenants`; schema id unchanged. New invalid fixture `graylog-bad-id.json`.
+
 ## deployment-state 1.4
 
 - `bitdefender` is state-backed: the GravityZone custom rule id, 24 lower-case hex digits, under `platforms.bitdefender.<tenant>` ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). The shard JSON Schema gains `$defs/objectIdTenants`; schema id unchanged. New invalid fixtures `bitdefender-bad-id.json` and `bitdefender-uppercase-id.json`.
@@ -168,6 +174,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## metaschema-keywords 1.0
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
+
+## platforms 1.8
+
+- Graylog joins the matrix as the eleventh platform ([specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md), [RFC 0017](rfcs/0017-graylog-platform.md)): native event definitions on Graylog 6.3 to 7.2. It is in the `--live` allowlist through `POST /api/search/validate`, and its event definition id lives in deployment state.
 
 ## platforms 1.7
 
@@ -320,6 +330,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - First language spec, [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) ([RFC 0015](rfcs/0015-yara-language.md)): `YaraSignature`, the libyara 4.5 dialect with YARA-X as warnings, stable `yara_*` diagnostics, and the `bitdefender` and `harfanglab` profiles. Answers the YARA questions of [specifications#68](https://github.com/opentidehq/specifications/issues/68).
 
+## platform-graylog 1.0
+
+- Initial field contract ([RFC 0017](rfcs/0017-graylog-platform.md)): one `aggregation-v1` event definition per block. The query is in Graylog's search syntax, with an optional aggregation (`group_by` and a condition grammar compiled to Graylog's series and condition tree). Also streams, schedule, event fields (a bare field name, a template, `{template}`, or `{lookup}`), notifications, summary, and remediation. String-or-list fields. Graylog 6.3, 7.0, 7.1, and 7.2, with each request built for the detected version; the event definition id in deployment state; `--live` through `/api/search/validate`. Fixtures, a fixture tenant, and per-version request goldens under `fixtures/platforms/graylog/`.
+
 ## platform-bitdefender 1.4
 
 - `targets`, block and tenant default: exactly one of `endpoint_tags` and `companies` when present, a non-empty list with no blank alias (`bitdefender_targets_shape`). A tenant `targets` that breaks it fails configuration load and never means the whole company. Schema id unchanged.
@@ -365,6 +379,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.10
+
+- `graylog` is in the `--live` allowlist through `POST /api/search/validate`, and Graylog queries (Lucene, Graylog dialect) are checked offline ([RFC 0017](rfcs/0017-graylog-platform.md)). Advisories `graylog_overlapping_window`, `graylog_all_streams`, and `graylog_title_duplicate`; Graylog dialect codes `graylog_leading_wildcard`, `graylog_regex_unsupported`, `graylog_regex_operator`, `graylog_regex_quote`, `graylog_double_backslash`, and `graylog_analyzed_field`. The fixture checker applies nine Graylog constraint codes; four new invalid fixtures.
 
 ## validation 1.9
 

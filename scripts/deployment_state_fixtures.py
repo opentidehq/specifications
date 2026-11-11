@@ -21,7 +21,7 @@ RULE_FIXTURE_DIRS = (
     ROOT / "fixtures" / "cross-object",
 )
 
-STATE_PLATFORMS = ("bitdefender", "crowdstrike", "defender_for_endpoint", "sentinel_one", "sysdig")
+STATE_PLATFORMS = ("bitdefender", "crowdstrike", "defender_for_endpoint", "graylog", "sentinel_one", "sysdig")
 LEGACY_MAP_KEYS = ("rule_id", "rule_id_bundle")
 LEGACY_TENANT_PREFIX = "rule_id::"
 
@@ -39,6 +39,7 @@ EXPECTED_INVALID_SHARDS = {
     "unsupported-platform.json": (_VALID_NAME, "deployment_state_platform"),
     "bitdefender-bad-id.json": (_VALID_NAME, "deployment_state_shape"),
     "bitdefender-uppercase-id.json": (_VALID_NAME, "deployment_state_shape"),
+    "graylog-bad-id.json": (_VALID_NAME, "deployment_state_shape"),
 }
 EXPECTED_INVALID_RULES = {
     "rule-with-rule-id.yaml": "external_id_in_rule",

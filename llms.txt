@@ -30,6 +30,7 @@
 - specs/platforms/elastic-1.0.md (schema_id: platform::elastic::1.0)
 - specs/platforms/sysdig-1.0.md (schema_id: platform::sysdig::1.0)
 - specs/platforms/bitdefender-1.0.md (schema_id: platform::bitdefender::1.0)
+- specs/platforms/graylog-1.0.md (schema_id: platform::graylog::1.0)
 - specs/languages/yara-1.0.md (YARA language: YaraSignature, dialect, diagnostics, platform profiles)
 - specs/validation.md
 - specs/sharing.md
