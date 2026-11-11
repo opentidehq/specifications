@@ -159,7 +159,7 @@ A later RFC can add Sigma as an authoring source that is converted into native e
 2. **Graylog 6.3, 7.0, 7.1, and 7.2.** Deploy detects the version and builds each request for it. Fields a version lacks are left out, or carried another way ([B.4](#b4-derived-fields)).
 3. **State-backed identity.** The server-assigned id goes in deployment state. Client-assigned ids are rejected (V7).
 4. **Graylog checks before save.** Every query goes through `/api/search/validate` first (V8).
-5. **One engine language.** `graylog`, a dialect of the existing Lucene parser, injected into `configurations.graylog.query`. The aggregation condition is a field of the block. The block checker parses it, with positions, and it is not a separate language.
+5. **No new engine language.** The query is `lucene` in a new `Dialect::Graylog`, chosen by the platform as Carbon Black Cloud's dialect is, and injected into `configurations.graylog.query`. The aggregation condition is a field of the block. The block checker parses it, with positions, and it is not a separate language.
 
 ---
 
@@ -486,11 +486,11 @@ Deploy MUST NOT call `/execute`, MUST NOT list definitions, and MUST NOT write t
 | Check | Graylog |
 |-------|---------|
 | `opentide validate` (offline) | block constraints, the aggregation condition, and the Graylog dialect |
-| `opentide validate query` (offline) | the query, or a `.graylog` file |
+| `opentide validate query` (offline) | the query, or a `.lucene` file under `--platform graylog` |
 | `opentide validate query --live` | `POST /api/search/validate` per tenant, with the block's streams and `window`. `ERROR` is an error; `WARNING` and `INFO` are warnings, with Graylog's positions. |
-| `opentide query` | `POST /api/search/messages`, read-only, language `graylog`. On 6.3 and 7.0, a dotted field name in `fields` is split for decorators: the runner asks for such fields only from 7.1. |
+| `opentide query` | `POST /api/search/messages`, read-only, language `lucene` (Graylog dialect). On 6.3 and 7.0, a dotted field name in `fields` is split for decorators: the runner asks for such fields only from 7.1. |
 
-Graylog joins the query-validation allowlist ([platforms](../specs/platforms/index.md#query-validation-platforms)). `OFFLINE_QUERY_LANGUAGES["graylog"]` is `("graylog",)`.
+Graylog joins the query-validation allowlist ([platforms](../specs/platforms/index.md#query-validation-platforms)). `OFFLINE_QUERY_LANGUAGES["graylog"]` is `("lucene",)`.
 
 ### B.10 Case-insensitive matching
 
@@ -511,11 +511,11 @@ Q7 tested this pattern. Pipelines are in Graylog Open on every supported version
 
 ## Part C: Analysis engine and language server
 
-### C.1 One language
+### C.1 No new language
 
 | `LanguageId` | Where it appears | Built on |
 |--------------|------------------|----------|
-| `graylog` | `configurations.graylog.query` (injected, as for every query string); `.graylog` query files | `opentide-lucene` with `Dialect::Graylog` |
+| `lucene` with `Dialect::Graylog` | `configurations.graylog.query` (injected, as for every query string); `.lucene` query files under `--platform graylog` | `opentide-lucene`, the dialect chosen by the platform, as for `carbon_black_cloud` |
 
 The aggregation `condition` is a block field. `opentide-tide`'s Graylog block checker (like `bitdefender.rs` and `sysdig.rs`) parses it with the [grammar](#aggregation-condition-grammar). It reports `graylog_aggregation` at the exact span. Completion of the 12 function names comes from the same checker. Injection would only buy separate highlighting for a one-line expression, which does not justify a second language.
 

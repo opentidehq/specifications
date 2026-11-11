@@ -16,7 +16,7 @@ Deploy creates, updates, schedules, unschedules, and deletes the definition thro
 
 Graylog assigns every definition a 24-hex id at create time. That id is kept in deployment state ([deployment-state.md](../deployment-state.md)), never on the rule. Every update sends the whole definition.
 
-Graylog checks queries with `POST /api/search/validate`, so Graylog is in the `--live` allowlist. Offline, the analysis engine checks the query with its Graylog dialect.
+Graylog checks queries with `POST /api/search/validate`, so Graylog is in the `--live` allowlist. Offline, the analysis engine checks the query as Lucene in its Graylog dialect, chosen by the platform as Carbon Black Cloud's is.
 
 Shared fields are defined in [platforms](index.md#shared-platform-block). The design, the research behind it, and why Sigma is not part of it are in [RFC 0017](../../rfcs/0017-graylog-platform.md).
 
@@ -392,9 +392,9 @@ Deploy never reads `state` from a create response: it may say `DISABLED` while t
 | Check | Graylog |
 |-------|---------|
 | `opentide validate` (offline) | yes: the constraints, the condition grammar, and the Graylog dialect |
-| `opentide validate query` (offline) | the block's `query`, and `.graylog` query files |
+| `opentide validate query` (offline) | the block's `query`, and `.lucene` query files under `--platform graylog` |
 | `opentide validate query --live` | yes: `POST /api/search/validate` per tenant, with the block's streams and a relative range of `window` (a query file: no streams, 300 seconds). `ERROR` explanations are errors; `WARNING` and `INFO` explanations are warnings, with Graylog's line and column. |
-| `opentide query` | yes: `POST /api/search/messages`, read-only, language `graylog`. On 6.3 and 7.0, Graylog splits a requested field name on `.`. The runner then requests no dotted field and reads the whole message instead. |
+| `opentide query` | yes: `POST /api/search/messages`, read-only, language `lucene` in the Graylog dialect. On 6.3 and 7.0, Graylog splits a requested field name on `.`. The runner then requests no dotted field and reads the whole message instead. |
 
 ## Relationships
 

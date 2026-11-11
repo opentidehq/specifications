@@ -382,7 +382,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## validation 1.10
 
-- `graylog` is in the `--live` allowlist through `POST /api/search/validate`, and Graylog queries (`.graylog`) are checked offline ([RFC 0017](rfcs/0017-graylog-platform.md)). Advisories `graylog_overlapping_window`, `graylog_lowercase_operator`, `graylog_regex_operator`, `graylog_regex_quote`, `graylog_double_backslash`, `graylog_analyzed_field`, `graylog_all_streams`, and `graylog_title_duplicate`. The fixture checker applies nine Graylog constraint codes; four new invalid fixtures.
+- `graylog` is in the `--live` allowlist through `POST /api/search/validate`, and Graylog queries (Lucene, Graylog dialect) are checked offline ([RFC 0017](rfcs/0017-graylog-platform.md)). Advisories `graylog_overlapping_window`, `graylog_lowercase_operator`, `graylog_regex_operator`, `graylog_regex_quote`, `graylog_double_backslash`, `graylog_analyzed_field`, `graylog_all_streams`, and `graylog_title_duplicate`. The fixture checker applies nine Graylog constraint codes; four new invalid fixtures.
 
 ## validation 1.9
 
