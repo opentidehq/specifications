@@ -1,0 +1,32 @@
+# A search-only section (order) in a rule body.
+# Expected code: yaral_section_unavailable.
+name: Google SecOps rule with a search section
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000064
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+  author: Detection Engineering
+description: |
+  A rule body that sorts its results like a search.
+status: STAGING
+severity: Medium
+configurations:
+  google_secops:
+    enabled: true
+    schema: platform::google_secops::1.0
+    status: STAGING
+    query: |
+      events:
+        $e.metadata.event_type = "USER_LOGIN"
+        $user = $e.target.user.userid
+      match:
+        $user over 1h
+      outcome:
+        $logins = count($e.metadata.id)
+      condition:
+        $e
+      order:
+        $logins desc

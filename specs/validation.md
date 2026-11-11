@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.9"
+version: "1.10"
 schema_id: null
 status: normative
 supersedes: null
@@ -90,19 +90,22 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `bitdefender_registry_full_hive` | warning | Bitdefender: a `Registry.Key` value starts with a full hive name, so the rule never triggers |
 | `bitdefender_contains_no_wildcard` | warning | Bitdefender: a `contains` value has neither `*` nor `?` |
 | `bitdefender_severity_collapsed` | warning | Bitdefender: `Critical` or `Informational` severity sent as GravityZone `High` or `Low` |
+| `google_secops_risk_score_missing` | warning | Google SecOps: the body assigns no `$risk_score`, so Google scores every alert 40 |
+| `google_secops_rule_id_literal` | warning | Google SecOps: the body matches a producer rule by a literal `ru_…` id, which differs per tenant |
+| `google_secops_live_frequency_unavailable` | warning | Google SecOps: `run_frequency: LIVE` on a multi-event rule, which Google stores as `LIVE_CUSTOMIZABLE` |
 | `harfanglab_yara_context` | warning | HarfangLab: a YARA rule's meta `context` is not a comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` |
 
-The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories), [sysdig-1.0](platforms/sysdig-1.0.md#advisories), [bitdefender-1.0](platforms/bitdefender-1.0.md#advisories), and [harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile).
+The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories), [sysdig-1.0](platforms/sysdig-1.0.md#advisories), [bitdefender-1.0](platforms/bitdefender-1.0.md#advisories), [google-secops-1.0](platforms/google-secops-1.0.md#advisories), and [harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile).
 
 ### Language diagnostics
 
-A language spec MAY define diagnostics with stable codes. Its errors fail static validation like a constraint code. Its warnings are reported like advisories and never set `VALIDATION_ERROR_RAISED`. The YARA codes are in [yara-1.0](languages/yara-1.0.md#diagnostics): every `yara_*` error fails the rule, and the warnings are `yara_x_incompatible`, `yara_slow_pattern`, `yara_entrypoint_deprecated`, `yara_suspicious_expression`, `yara_module_unconfirmed`, and `yara_meta_missing`.
+A language spec MAY define diagnostics with stable codes. Its errors fail static validation like a constraint code. Its warnings are reported like advisories and never set `VALIDATION_ERROR_RAISED`. The YARA codes are in [yara-1.0](languages/yara-1.0.md#diagnostics): every `yara_*` error fails the rule, and the warnings are `yara_x_incompatible`, `yara_slow_pattern`, `yara_entrypoint_deprecated`, `yara_suspicious_expression`, `yara_module_unconfirmed`, and `yara_meta_missing`. The YARA-L codes are in [yara-l-1.0](languages/yara-l-1.0.md#diagnostics): every `yaral_*` error fails the rule, and the warnings are `yaral_deprecated_field`, `yaral_unfiltered_event`, `yaral_leading_wildcard_regex`, and `yaral_reference_list_deprecated`.
 
 ### Query validation
 
 Commands: `opentide validate query` (offline, the default) and `opentide validate query --platform <id> --live` (the tenant check).
 
-**Offline**, the analysis engine parses each query in its platform's language, with no tenant, credentials, or network. It is the `queries` check of `opentide validate` on its own, and it also takes a query file (`.kql`, `.spl`, `.yar`, ...). A platform with no offline parser (`sentinel_one`) refuses offline and names `--live`. HarfangLab and Bitdefender YARA (`.yar`, `.yara`) and the Sysdig Falco condition are checked offline.
+**Offline**, the analysis engine parses each query in its platform's language, with no tenant, credentials, or network. It is the `queries` check of `opentide validate` on its own, and it also takes a query file (`.kql`, `.spl`, `.yar`, ...). A platform with no offline parser (`sentinel_one`) refuses offline and names `--live`. HarfangLab and Bitdefender YARA (`.yar`, `.yara`), Google SecOps YARA-L (`.yaral`), and the Sysdig Falco condition are checked offline.
 
 **`--live`** sends a platform's rule queries to its tenants. The table is the `--live` allowlist:
 
@@ -114,6 +117,7 @@ Commands: `opentide validate query` (offline, the default) and `opentide validat
 | `sentinel_one` | yes |
 | `carbon_black_cloud` | yes |
 | `elastic` | yes, live only: Kibana rule preview and the Elasticsearch checks ([elastic-1.0](platforms/elastic-1.0.md#query-validation)) |
+| `google_secops` | yes: `verifyRuleText` compiles the assembled rule and creates nothing ([google-secops-1.0](platforms/google-secops-1.0.md#query-validation)). YARA-L is also checked offline |
 | `crowdstrike` | no |
 | `harfanglab` | no. YARA is checked offline ([harfanglab-1.0](platforms/harfanglab-1.0.md#query-validation)) |
 | `sysdig` | no. The Falco condition is checked offline ([sysdig-1.0](platforms/sysdig-1.0.md#query-validation)) |
@@ -160,6 +164,11 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/invalid/rule-bitdefender-exclusion.yaml](../fixtures/invalid/rule-bitdefender-exclusion.yaml) | `bitdefender_rule_kind` |
 | [fixtures/invalid/rule-bitdefender-criterion-field.yaml](../fixtures/invalid/rule-bitdefender-criterion-field.yaml) | `bitdefender_criterion_field` |
 | [fixtures/invalid/rule-bitdefender-kill-on-yara.yaml](../fixtures/invalid/rule-bitdefender-kill-on-yara.yaml) | `bitdefender_action_scope` |
+| [fixtures/invalid/rule-google-secops-body-header.yaml](../fixtures/invalid/rule-google-secops-body-header.yaml) | `yaral_body_header` |
+| [fixtures/invalid/rule-google-secops-search-section.yaml](../fixtures/invalid/rule-google-secops-search-section.yaml) | `yaral_section_unavailable` |
+| [fixtures/invalid/rule-google-secops-missing-condition.yaml](../fixtures/invalid/rule-google-secops-missing-condition.yaml) | `yaral_section_missing` |
+| [fixtures/invalid/rule-google-secops-hourly.yaml](../fixtures/invalid/rule-google-secops-hourly.yaml) | `google_secops_run_frequency` (also `google_secops_schedule`) |
+| [fixtures/invalid/rule-google-secops-meta-reserved.yaml](../fixtures/invalid/rule-google-secops-meta-reserved.yaml) | `google_secops_meta_key` |
 | [fixtures/sharing/invalid/unknown-distribution.toml](../fixtures/sharing/invalid/unknown-distribution.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/legacy-targets-table.toml](../fixtures/sharing/invalid/legacy-targets-table.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/duplicate-name.toml](../fixtures/sharing/invalid/duplicate-name.toml) | `duplicate_name` |
@@ -179,6 +188,8 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/deployment/invalid/unsupported-platform.json](../fixtures/deployment/invalid/unsupported-platform.json) | `deployment_state_platform` |
 | [fixtures/deployment/invalid/bitdefender-bad-id.json](../fixtures/deployment/invalid/bitdefender-bad-id.json) | `deployment_state_shape` |
 | [fixtures/deployment/invalid/bitdefender-uppercase-id.json](../fixtures/deployment/invalid/bitdefender-uppercase-id.json) | `deployment_state_shape` |
+| [fixtures/deployment/invalid/google-secops-bare-uuid.json](../fixtures/deployment/invalid/google-secops-bare-uuid.json) | `deployment_state_shape` |
+| [fixtures/deployment/invalid/google-secops-revision-id.json](../fixtures/deployment/invalid/google-secops-revision-id.json) | `deployment_state_shape` |
 | [fixtures/deployment/invalid/rule-with-rule-id.yaml](../fixtures/deployment/invalid/rule-with-rule-id.yaml) | `external_id_in_rule` |
 | [fixtures/deployment/invalid/rule-with-rule-id-tenant.yaml](../fixtures/deployment/invalid/rule-with-rule-id-tenant.yaml) | `external_id_in_rule` |
 | [fixtures/deployment/invalid/rule-with-rule-id-bundle.yaml](../fixtures/deployment/invalid/rule-with-rule-id-bundle.yaml) | `external_id_in_rule` |
@@ -192,6 +203,8 @@ On a rule's `configurations.elastic` block the checker applies three of the [Ela
 On a rule's `configurations.sysdig` block the checker applies the [Sysdig constraint codes](platforms/sysdig-1.0.md#constraints) that need no Falco parser: `sysdig_rule_shape`, `sysdig_tuning_keys`, `sysdig_priority`, `sysdig_source`, `sysdig_exception_shape`, `sysdig_definition_name`, and `sysdig_definition_duplicate`. `sysdig_definition_order` and `sysdig_list_in_value` need the Falco tokenizer and are left to opentide.
 
 On a rule's `configurations.bitdefender` block the checker applies the [Bitdefender constraint codes](platforms/bitdefender-1.0.md#constraints) that need only the spec's EDR field table: `bitdefender_rule_kind`, `bitdefender_target`, `bitdefender_criterion_shape`, `bitdefender_criterion_field` (for `process`, `file`, `connection`, and `registry`), `bitdefender_criterion_relation`, `bitdefender_criterion_value`, `bitdefender_action_scope`, `bitdefender_targets_shape`, `bitdefender_severity`, `bitdefender_yara_ascii`, and `bitdefender_yara_size`, plus the parser-free YARA codes on `yara.signature`. `bitdefender_criteria_combination` and the workspace check `bitdefender_name_duplicate` are left to opentide.
+
+On a rule's `configurations.google_secops` block the checker applies the [Google SecOps constraint codes](platforms/google-secops-1.0.md#constraints) that need no YARA-L parser: `google_secops_rule_name`, `google_secops_severity`, `google_secops_run_frequency`, `google_secops_schedule`, and `google_secops_meta_key`. On `query` it applies the [YARA-L codes](languages/yara-l-1.0.md#diagnostics) a section scanner can decide: `yaral_query_alias`, `yaral_body_header`, `yaral_section_missing`, `yaral_section_order`, `yaral_section_unavailable`, `yaral_match_window`, and `yaral_option`. The workspace check `google_secops_name_duplicate` and the other YARA-L codes are left to opentide and the analysis engine.
 
 On a rule's `configurations.harfanglab` block the checker applies `harfanglab_rule_kind`, `harfanglab_yara_form`, and `harfanglab_yara_section_header`. On any `yara.signature` it applies the [YARA codes](languages/yara-1.0.md#diagnostics) that need no YARA parser: `yara_signature_alias`, `yara_include`, `yara_empty_signature`, and `yara_duplicate_rule`. The other YARA codes are left to the analysis engine.
 
@@ -247,6 +260,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.10 | 2026-11-11 | `google_secops` joins the `--live` allowlist: `verifyRuleText` compiles the assembled rule without creating it ([google-secops-1.0](platforms/google-secops-1.0.md), [RFC 0017](../rfcs/0017-google-secops-yara-l.md)). YARA-L (`.yaral`) is checked offline ([yara-l-1.0](languages/yara-l-1.0.md)); its codes join [language diagnostics](#language-diagnostics). Advisories `google_secops_risk_score_missing`, `google_secops_rule_id_literal`, and `google_secops_live_frequency_unavailable`. The fixture checker applies five Google SecOps constraint codes and seven YARA-L codes. |
 | 1.9 | 2026-11-10 | [Query validation](#query-validation) matches `opentide validate query` as it ships (since opentide 0.19): offline by default with the analysis engine, the `queries` check on its own plus query files; `--live` is the tenant check and its allowlist. HarfangLab and Bitdefender YARA (`.yar`, `.yara`) and the Sysdig Falco condition are checked offline; `--live` stays `supported: false` for `crowdstrike`, `harfanglab`, `sysdig`, and `bitdefender`. Replaces "no offline mode on any platform". |
 | 1.8 | 2026-11-10 | `harfanglab_yara_context` accepts any comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` ([harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile) 1.3). |
 | 1.7 | 2026-11-10 | `bitdefender` is excluded from query validation (`supported: false`) and checked offline by `opentide validate` ([bitdefender-1.0](platforms/bitdefender-1.0.md), [RFC 0016](../rfcs/0016-bitdefender-gravityzone-platform.md)). Advisories `bitdefender_registry_full_hive`, `bitdefender_contains_no_wildcard`, and `bitdefender_severity_collapsed`. The fixture checker applies eleven Bitdefender constraint codes. |

@@ -956,6 +956,183 @@ def validate_bitdefender_block(block: dict[str, Any]) -> list[CheckError]:
     return errors
 
 
+# --- Google SecOps and YARA-L (specs/platforms/google-secops-1.0.md, specs/languages/yara-l-1.0.md) ---
+
+YARAL_KEYWORDS = frozenset(
+    {
+        "rule", "meta", "events", "match", "outcome", "condition", "options", "dedup", "order", "limit",
+        "select", "unselect", "and", "or", "not", "nocase", "in", "regex", "cidr", "any", "all", "over",
+        "by", "before", "after", "if", "of", "true", "false", "asc", "desc", "setup", "export", "stage",
+    }
+)
+YARAL_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# Section -> rank. `options` and `export` share a rank: either may come last (yara-l-1.0.md#sections).
+YARAL_SECTION_RANK = {
+    "meta": 1, "setup": 2, "events": 3, "match": 4, "outcome": 5, "condition": 6, "options": 7, "export": 7,
+    "dedup": 8, "order": 9, "limit": 10, "select": 11, "unselect": 11,
+}
+YARAL_SECTION_ORDER = tuple(YARAL_SECTION_RANK)
+YARAL_RULE_SECTIONS = frozenset({"meta", "setup", "events", "match", "outcome", "condition", "options", "export"})
+# Window kind -> maximum minutes under the rule profile.
+YARAL_RULE_WINDOW_MAX = {"over": 14 * 1440, "by": 72 * 60}
+YARAL_SECTION_LABEL = re.compile(r"^\s*(" + "|".join(YARAL_SECTION_ORDER) + r")\s*:", re.IGNORECASE)
+YARAL_RULE_HEADER = re.compile(r"^\s*rule\s+[A-Za-z_][A-Za-z0-9_]*\s*\{?", re.IGNORECASE)
+YARAL_WINDOW = re.compile(r"\b(over|by)\s+(\d+)([A-Za-z]*)\b", re.IGNORECASE)
+YARAL_OPTIONS = {"allow_zero_values": re.compile(r"^(true|false)$", re.IGNORECASE),
+                 "suppression_window": re.compile(r"^[1-9][0-9]*[mhd]$")}
+SECOPS_SEVERITIES = frozenset({"Info", "Low", "Medium", "High", "Critical"})
+SECOPS_RUN_FREQUENCIES = frozenset({"LIVE", "LIVE_CUSTOMIZABLE", "HOURLY_CUSTOMIZABLE", "DAILY"})
+SECOPS_CUSTOMIZABLE = frozenset({"LIVE_CUSTOMIZABLE", "HOURLY_CUSTOMIZABLE"})
+SECOPS_DERIVED_META = frozenset(
+    {"author", "description", "severity", "priority", "tactic", "technique", "opentide_uuid", "opentide_version"}
+)
+SECOPS_DURATION = re.compile(r"^[1-9][0-9]*[smhd]$")
+
+
+def yaral_code_lines(text: str) -> list[str]:
+    """The text's lines with comments and string, raw-string, and regex literal contents blanked.
+
+    A section scanner, not a parser: it keeps line numbers and columns so a label or a keyword
+    inside a comment or a literal never counts.
+    """
+    out: list[str] = []
+    in_block = False
+    for line in text.replace("\r\n", "\n").split("\n"):
+        buf: list[str] = []
+        i = 0
+        quote: str | None = None
+        while i < len(line):
+            ch = line[i]
+            if in_block:
+                if line.startswith("*/", i):
+                    in_block = False
+                    buf.append("  ")
+                    i += 2
+                    continue
+                buf.append(" ")
+            elif quote:
+                if quote == '"' and ch == "\\" and i + 1 < len(line):
+                    buf.append("  ")
+                    i += 2
+                    continue
+                if ch == quote:
+                    quote = None
+                    buf.append(ch)
+                else:
+                    buf.append(" ")
+            elif line.startswith("//", i):
+                break
+            elif line.startswith("/*", i):
+                in_block = True
+                buf.append("  ")
+                i += 2
+                continue
+            elif ch in "\"`":
+                quote = ch
+                buf.append(ch)
+            else:
+                buf.append(ch)
+            i += 1
+        out.append("".join(buf))
+    return out
+
+
+def yaral_sections(text: str) -> list[tuple[str, int, list[str]]]:
+    """(section, line index, content lines) in text order. Content before the first label is 'events' in a search."""
+    lines = yaral_code_lines(text)
+    sections: list[tuple[str, int, list[str]]] = []
+    for index, line in enumerate(lines):
+        found = YARAL_SECTION_LABEL.match(line)
+        if found:
+            rest = line[found.end():]
+            sections.append((found.group(1).lower(), index, [rest] if rest.strip() else []))
+        elif sections:
+            sections[-1][2].append(line)
+    return sections
+
+
+def validate_yaral_body(text: Any, path: str) -> list[CheckError]:
+    """The YARA-L codes a section scanner can decide on a YaraLBody (rule profile)."""
+    if not isinstance(text, str) or not text.strip():
+        return [CheckError("missing_field", "query is a non-blank YARA-L body", path)]
+    errors: list[CheckError] = []
+    lines = yaral_code_lines(text)
+    labels = [found.group(1).lower() for found in map(YARAL_SECTION_LABEL.match, lines) if found]
+    if any(YARAL_RULE_HEADER.match(line) for line in lines) or "meta" in labels:
+        errors.append(CheckError("yaral_body_header", "the body starts at events:; deploy writes the rule header and meta", path))
+    sections = yaral_sections(text)
+    names = [name for name, _, _ in sections]
+    for name in names:
+        if name not in YARAL_RULE_SECTIONS:
+            errors.append(CheckError("yaral_section_unavailable", f"{name}: is a search section, not a rule section", path))
+    for required in ("events", "condition"):
+        if required not in names:
+            errors.append(CheckError("yaral_section_missing", f"a rule needs a {required}: section", path))
+    ranks = [YARAL_SECTION_RANK[name] for name in names]
+    if len(set(names)) != len(names) or ranks != sorted(ranks):
+        errors.append(CheckError("yaral_section_order", "sections appear once, in the order meta, setup, events, match, outcome, condition, then options or export", path))
+    for name, _, content in sections:
+        joined = " ".join(content)
+        if name == "match":
+            for window in YARAL_WINDOW.finditer(joined):
+                amount, unit = int(window.group(2)), window.group(3).lower()
+                minutes = {"m": 1, "h": 60, "d": 1440}.get(unit)
+                limit = YARAL_RULE_WINDOW_MAX[window.group(1).lower()]
+                if minutes is None or not 1 <= amount * minutes <= limit:
+                    errors.append(CheckError("yaral_match_window", f"{window.group(0)!r}: over is 1m to 14d, by is 1m to 72h, in m, h, or d", path))
+        if name == "options":
+            for line in content:
+                if not line.strip():
+                    continue
+                key, sep, value = line.partition("=")
+                key, value = key.strip(), value.strip()
+                check = YARAL_OPTIONS.get(key)
+                if not sep or check is None or not check.match(value):
+                    errors.append(CheckError("yaral_option", f"{line.strip()!r} is not allow_zero_values or suppression_window with a valid value", path))
+    return errors
+
+
+def validate_google_secops_block(block: dict[str, Any]) -> list[CheckError]:
+    """The platform::google_secops::1.0 constraint codes that need no YARA-L parser.
+
+    specs/platforms/google-secops-1.0.md#constraints. The workspace check `google_secops_name_duplicate`
+    and the YARA-L codes beyond the section scanner are left to opentide and the analysis engine.
+    """
+    base = "configurations.google_secops"
+    errors: list[CheckError] = []
+    if block.get("status") is None:
+        errors.append(CheckError("missing_field", "status is required on a google_secops block", f"{base}.status"))
+    name = block.get("name")
+    if isinstance(name, str) and name and (not YARAL_IDENTIFIER.match(name) or name.lower() in YARAL_KEYWORDS):
+        errors.append(CheckError("google_secops_rule_name", f"{name!r} is not a YARA-L rule name", f"{base}.name"))
+    for key in ("severity", "priority"):
+        value = block.get(key)
+        if value is not None and value not in SECOPS_SEVERITIES:
+            errors.append(CheckError("google_secops_severity", f"{value!r} is not Info, Low, Medium, High, or Critical", f"{base}.{key}"))
+    frequency = block.get("run_frequency")
+    if frequency is not None and frequency not in SECOPS_RUN_FREQUENCIES:
+        errors.append(CheckError("google_secops_run_frequency", f"{frequency!r} is not LIVE, LIVE_CUSTOMIZABLE, HOURLY_CUSTOMIZABLE, or DAILY", f"{base}.run_frequency"))
+    schedule = block.get("schedule")
+    if schedule is not None:
+        if frequency not in SECOPS_CUSTOMIZABLE:
+            errors.append(CheckError("google_secops_schedule", "schedule needs run_frequency LIVE_CUSTOMIZABLE or HOURLY_CUSTOMIZABLE", f"{base}.schedule"))
+        if isinstance(schedule, dict):
+            adjustment = schedule.get("late_arriving_data_adjustment")
+            if adjustment is not None and not (isinstance(adjustment, str) and SECOPS_DURATION.match(adjustment)):
+                errors.append(CheckError("google_secops_schedule", f"{adjustment!r} is not a positive duration", f"{base}.schedule.late_arriving_data_adjustment"))
+    meta = block.get("meta")
+    if isinstance(meta, dict):
+        for key, value in meta.items():
+            bad_key = not isinstance(key, str) or not YARAL_IDENTIFIER.match(key) or key.lower() in YARAL_KEYWORDS
+            if bad_key or key in SECOPS_DERIVED_META or not isinstance(value, str):
+                errors.append(CheckError("google_secops_meta_key", f"{key!r}: an identifier that deploy does not derive, with a string value", f"{base}.meta.{key}"))
+    if "query" not in block:
+        errors.append(CheckError("missing_field", "query is required on a google_secops block", f"{base}.query"))
+    else:
+        errors.extend(validate_yaral_body(block.get("query"), f"{base}.query"))
+    return errors
+
+
 def aliased_paths(text: str) -> list[str]:
     """Dotted paths whose value is a YAML alias of a node defined earlier in the file."""
     if yaml is None:
@@ -1038,6 +1215,8 @@ def validate_rule(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[CheckEr
         errors.extend(validate_harfanglab_block(configurations["harfanglab"]))
     if isinstance(configurations, dict) and isinstance(configurations.get("bitdefender"), dict):
         errors.extend(validate_bitdefender_block(configurations["bitdefender"]))
+    if isinstance(configurations, dict) and isinstance(configurations.get("google_secops"), dict):
+        errors.extend(validate_google_secops_block(configurations["google_secops"]))
     errors.extend(validate_searches(doc))
     return errors
 
@@ -1070,6 +1249,8 @@ def validate_fixture_file(path: Path, vocabs: dict[str, Vocab]) -> list[CheckErr
         parts = dotted.split(".")
         if len(parts) == 4 and parts[0] == "configurations" and parts[2:] == ["yara", "signature"]:
             errors.append(CheckError("yara_signature_alias", "signature MUST be written in the block, not aliased", dotted))
+        if parts == ["configurations", "google_secops", "query"]:
+            errors.append(CheckError("yaral_query_alias", "a YARA-L query MUST be written in the block, not aliased", dotted))
     return errors
 
 
@@ -1109,4 +1290,9 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "rule-bitdefender-criterion-field.yaml": "bitdefender_criterion_field",
     "rule-bitdefender-exclusion.yaml": "bitdefender_rule_kind",
     "rule-bitdefender-kill-on-yara.yaml": "bitdefender_action_scope",
+    "rule-google-secops-body-header.yaml": "yaral_body_header",
+    "rule-google-secops-search-section.yaml": "yaral_section_unavailable",
+    "rule-google-secops-missing-condition.yaml": "yaral_section_missing",
+    "rule-google-secops-hourly.yaml": "google_secops_run_frequency",
+    "rule-google-secops-meta-reserved.yaml": "google_secops_meta_key",
 }

@@ -346,11 +346,11 @@ class ListingTests(unittest.TestCase):
     def test_platforms_index(self) -> None:
         text = _read(INDEX)
         self.assertGreaterEqual(_version(text), (1, 2))
-        self.assertIn("opentide ships ten detection platform integrations.", text)
+        self.assertIn("opentide ships eleven detection platform integrations.", text)
         self.assertNotIn("not yet in this matrix", text)
         self.assertIn("| `elastic` | `platform::elastic::1.0` | [elastic-1.0.md](elastic-1.0.md) |", text)
         self.assertRegex(text, r"\| `elastic` \| Elastic Security \| yes\* \| yes† \| KQL, Lucene, EQL, or ES\\\|QL")
-        self.assertIn("`carbon_black_cloud`, `elastic`\n", text)
+        self.assertIn("`carbon_black_cloud`, `elastic`, `google_secops`\n", text)
         self.assertIn("| `elastic` | `metadata.uuid` is the Kibana `rule_id`", text)
         self.assertRegex(text, r"\n\| `elastic` \| `type`, `status`, and `query`")
         self.assertIn("| 1.2 | 2026-10-19 |", text)

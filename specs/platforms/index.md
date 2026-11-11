@@ -1,6 +1,6 @@
 ---
 spec: platforms
-version: "1.7"
+version: "1.8"
 schema_id: null
 status: normative
 supersedes: null
@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-opentide ships ten detection platform integrations. Each platform has bundled TOML configuration, a deployer, an optional query validator, and a typed rule block under `configurations.<platform>`.
+opentide ships eleven detection platform integrations. Each platform has bundled TOML configuration, a deployer, an optional query validator, and a typed rule block under `configurations.<platform>`.
 
 The block's schema identifier is `platform::<identifier>::1.0`. This page is the capability matrix and the shared block. The field contract for each block is its own spec:
 
@@ -26,6 +26,7 @@ The block's schema identifier is `platform::<identifier>::1.0`. This page is the
 | `elastic` | `platform::elastic::1.0` | [elastic-1.0.md](elastic-1.0.md) |
 | `sysdig` | `platform::sysdig::1.0` | [sysdig-1.0.md](sysdig-1.0.md) |
 | `bitdefender` | `platform::bitdefender::1.0` | [bitdefender-1.0.md](bitdefender-1.0.md) |
+| `google_secops` | `platform::google_secops::1.0` | [google-secops-1.0.md](google-secops-1.0.md) |
 
 These specs describe the blocks as the engine accepts them today, including every optional key. Generated JSON Schema is a build artifact. Where it disagrees with this page or a platform spec, the spec wins. opentide's usage and SDK pages link here. They do not restate the keys. Change a field here first; the implementation follows.
 
@@ -38,7 +39,7 @@ These specs describe the blocks as the engine accepts them today, including ever
 - A typed block SHOULD set `schema` to `platform::<identifier>::1.0`. Implementations MUST accept a missing `schema` and MUST accept a legacy identifier (`sentinel::2.4`, `splunk::2.0`, `splunk::3.0`, `carbon_black_cloud::3.0`, and the same shape for the other platforms). The identifier is not a closed enum.
 - Unknown keys on a block MUST fail static validation. The model forbids them.
 - A block MUST NOT carry a vendor-assigned external id. `rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` at the root of any block, on every platform, MUST fail with `external_id_in_rule` ([External rule ids](#external-rule-ids)).
-- Registry load is stricter or looser depending on the platform. Defender, Splunk, Carbon Black, Elastic, Sysdig, and Bitdefender pass leftover keys on the block into the model, so an unknown key at the block root fails load as well. The Splunk loader still drops unknown keys inside `scheduling` other than `type`, `expires`, `schedule`, and `timerange`. Sentinel, SentinelOne, CrowdStrike, and HarfangLab drop keys the loader does not map, so those keys pass load and fail `opentide validate`. The [Splunk](splunk-1.0.md) aliases and Defender's `quarantine_files` alias are mapped before that check.
+- Registry load is stricter or looser depending on the platform. Defender, Splunk, Carbon Black, Elastic, Sysdig, and Bitdefender pass leftover keys on the block into the model, so an unknown key at the block root fails load as well. Google SecOps does the same. The Splunk loader still drops unknown keys inside `scheduling` other than `type`, `expires`, `schedule`, and `timerange`. Sentinel, SentinelOne, CrowdStrike, and HarfangLab drop keys the loader does not map, so those keys pass load and fail `opentide validate`. The [Splunk](splunk-1.0.md) aliases and Defender's `quarantine_files` alias are mapped before that check.
 - In every field table, **optional** means the key may be omitted at static validation. A later sentence in that platform spec names the keys deploy or registry load still require.
 - `query`, where the platform spec marks it required, MUST be a string and MUST NOT be empty or whitespace.
 - Static validation (`opentide validate`) MUST enforce the **Required** column of each platform spec. It MUST NOT require a field only because generated JSON Schema lists it.
@@ -64,6 +65,7 @@ These specs describe the blocks as the engine accepts them today, including ever
 | `elastic` | Elastic Security | yes* | yes† | KQL, Lucene, EQL, or ES\|QL, chosen by the block's `type` and `language` | [elastic-1.0](elastic-1.0.md) |
 | `sysdig` | Sysdig Secure | yes* | **no**‡ | Falco condition | [sysdig-1.0](sysdig-1.0.md) |
 | `bitdefender` | Bitdefender GravityZone | yes* | **no**¶ | GravityZone criteria or YARA | [bitdefender-1.0](bitdefender-1.0.md) |
+| `google_secops` | Google Security Operations (SIEM) | yes* | yes‖ | YARA-L 2.0 | [google-secops-1.0](google-secops-1.0.md) |
 
 \* Deploy requires a loaded deployer entry point and `enabled: true` in workspace configuration.
 
@@ -73,13 +75,15 @@ These specs describe the blocks as the engine accepts them today, including ever
 
 ¶ GravityZone has no dry run in its API. `opentide validate` checks the block's constraints and criteria offline, and YARA against the [YARA language](../languages/yara-1.0.md) ([bitdefender-1.0](bitdefender-1.0.md#query-validation)).
 
+‖ Live through `verifyRuleText`, Google's compiler, which creates and runs nothing. The analysis engine also checks YARA-L offline against the [YARA-L language](../languages/yara-l-1.0.md) ([google-secops-1.0](google-secops-1.0.md#query-validation)).
+
 § HarfangLab has no rule preview. The analysis engine checks YARA offline against the [YARA language](../languages/yara-1.0.md) in `opentide validate` and in editors. Sigma is not checked.
 
 ### Query validation platforms
 
 `opentide validate query` supports:
 
-`sentinel`, `defender_for_endpoint`, `splunk`, `sentinel_one`, `carbon_black_cloud`, `elastic`
+`sentinel`, `defender_for_endpoint`, `splunk`, `sentinel_one`, `carbon_black_cloud`, `elastic`, `google_secops`
 
 This is the `--live` allowlist: a tenant check, `opentide validate query --live`. Without `--live`, `validate query` checks offline with the analysis engine, in each platform's language that the engine parses ([validation](../validation.md#query-validation)).
 
@@ -100,6 +104,7 @@ This is the static-validation bar. Deploy adds the constraints in each platform 
 | `harfanglab` | no platform field is required; `maturity`, `confidence`, and `action` have defaults. At most one of `sigma` and `yara` (`harfanglab_rule_kind`). Deploy requires one of them |
 | `sysdig` | `status`, and `condition`, or `append_to_rule` with `condition` or `exceptions`. Every block also meets the [Sysdig constraints](sysdig-1.0.md#constraints) |
 | `bitdefender` | `status`, and exactly one of `detection` and `yara`. Every block also meets the [Bitdefender constraints](bitdefender-1.0.md#constraints) |
+| `google_secops` | `status` and `query`. The body passes the [YARA-L language](../languages/yara-l-1.0.md) checks, and the block meets the [Google SecOps constraints](google-secops-1.0.md#constraints) |
 | `elastic` | `type`, `status`, and `query` (except for `machine_learning`), plus the type object: `threshold`, `new_terms`, `threat`, or `machine_learning` for those types. Every block also meets the [Elastic constraints](elastic-1.0.md#constraints) |
 
 ### Shared platform block
@@ -111,7 +116,7 @@ Every block includes these fields. Platform specs do not repeat them except wher
 | `enabled` | `enabled` | boolean | optional | `false` | When `true`, the block is active for deploy. A rule with no enabled block is still valid. |
 | `name` | `name` | string | optional | `""` | Platform-specific rule name. Empty means the deployer uses the rule `name`, where that platform has a name field. |
 | `platform_schema` | `schema` | string | optional | null | Schema identifier. Canonical value: `platform::<identifier>::1.0`. Templates emit it. Validation does not require it. |
-| `status` | `status` | string | optional | null | Deployment status for this block. When set, it MUST be a status name from [deployment.md](../deployment.md). `DISABLEMENT` disables an existing rule; `DELETION` removes it. Other strategies deploy it enabled. Required on `elastic` ([elastic-1.0](elastic-1.0.md)), `sysdig` ([sysdig-1.0](sysdig-1.0.md)), and `bitdefender` ([bitdefender-1.0](bitdefender-1.0.md)). |
+| `status` | `status` | string | optional | null | Deployment status for this block. When set, it MUST be a status name from [deployment.md](../deployment.md). `DISABLEMENT` disables an existing rule; `DELETION` removes it. Other strategies deploy it enabled. Required on `elastic` ([elastic-1.0](elastic-1.0.md)), `sysdig` ([sysdig-1.0](sysdig-1.0.md)), `bitdefender` ([bitdefender-1.0](bitdefender-1.0.md)), and `google_secops` ([google-secops-1.0](google-secops-1.0.md)). |
 | `flags` | `flags` | list[string] | optional | null | Free-form flags. Splunk modifiers may match on them. |
 | `tenants` | `tenants` | list[string] | optional | null | Tenant names this block targets. Empty or omitted means every tenant the run reaches. |
 | `contributors` | `contributors` | list[string] | optional | null | People credited on the platform rule. CrowdStrike joins them into the rule comment. |
@@ -140,7 +145,7 @@ All bundled platforms default to `enabled = false`. Enable one by setting `enabl
 
 ### External rule ids
 
-Platform blocks MUST NOT contain vendor-assigned external identifiers. Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig, and Bitdefender use the committed deployment-state shard defined in [deployment-state.md](../deployment-state.md). Sentinel, HarfangLab, and Elastic use `metadata.uuid`; Carbon Black Cloud uses `metadata.uuid` for the IOC and the title for the report; Splunk uses its saved-search identity.
+Platform blocks MUST NOT contain vendor-assigned external identifiers. Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig, Bitdefender, and Google SecOps use the committed deployment-state shard defined in [deployment-state.md](../deployment-state.md). Sentinel, HarfangLab, and Elastic use `metadata.uuid`; Carbon Black Cloud uses `metadata.uuid` for the IOC and the title for the report; Splunk uses its saved-search identity.
 
 | Platform | How deploy addresses the remote rule | Where a vendor id lives |
 |----------|--------------------------------------|-------------------------|
@@ -154,10 +159,11 @@ Platform blocks MUST NOT contain vendor-assigned external identifiers. Defender 
 | `elastic` | `metadata.uuid` is the Kibana `rule_id`, in every tenant and space | Nowhere |
 | `sysdig` | Sysdig-assigned Falco rule id | `.opentide/states/deployment/<uuid>.json` |
 | `bitdefender` | GravityZone-assigned custom rule id (24 hex) | `.opentide/states/deployment/<uuid>.json` |
+| `google_secops` | Google-assigned rule id (`ru_<uuid>`) | `.opentide/states/deployment/<uuid>.json` |
 
 Elastic Security ([elastic-1.0](elastic-1.0.md), [RFC 0007](../../rfcs/0007-elastic-security-platform.md)) addresses every rule by `metadata.uuid`. Elastic never stores an external id: Kibana's internal `id` is not recorded in a block or in deployment state.
 
-`rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` are legacy keys from before [RFC 0010](../../rfcs/0010-deployment-external-ids.md). Static validation and every deploy path MUST reject them with `external_id_in_rule`, on every platform block, whether or not a shard also holds the id. No loader folds them into a field. `opentide deploy migrate-state` moves Defender, SentinelOne, and CrowdStrike values into shards (Sysdig and Bitdefender never had a legacy key) and removes the keys from every other platform with an `external_id_unused` warning.
+`rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` are legacy keys from before [RFC 0010](../../rfcs/0010-deployment-external-ids.md). Static validation and every deploy path MUST reject them with `external_id_in_rule`, on every platform block, whether or not a shard also holds the id. No loader folds them into a field. `opentide deploy migrate-state` moves Defender, SentinelOne, and CrowdStrike values into shards (Sysdig, Bitdefender, and Google SecOps never had a legacy key) and removes the keys from every other platform with an `external_id_unused` warning.
 
 Defender also accepts the alias `quarantine_files` for `actions.files.quarantine_file` on the loader path only.
 
@@ -189,6 +195,7 @@ Splunk extras also name `threshold`, `throttling`, and `security_domain` on the 
 | `elastic` | `elastic::1.0` |
 | `sysdig` | `platform::sysdig::1.0` |
 | `bitdefender` | `platform::bitdefender::1.0` |
+| `google_secops` | `platform::google_secops::1.0` |
 
 ### Entry points
 
@@ -200,7 +207,7 @@ Deployers register via `opentide.platforms` entry points. Validators load from `
 - [configuration.md](../configuration.md) — platform TOML merge
 - [deployment.md](../deployment.md) — `status` strategies
 - [validation.md](../validation.md) — `validate` and `validate query`
-- [deployment-state.md](../deployment-state.md) — where Defender, SentinelOne, CrowdStrike, Sysdig, and Bitdefender ids live
+- [deployment-state.md](../deployment-state.md) — where Defender, SentinelOne, CrowdStrike, Sysdig, Bitdefender, and Google SecOps ids live
 - [metaschema-keywords.md](../metaschema-keywords.md) — `tide.config.systems::enabled`, `recomposition`
 - Platform specs linked in the [Summary](#summary)
 
@@ -210,7 +217,7 @@ Deployers register via `opentide.platforms` entry points. Validators load from `
 |---------|---------|----------|
 | Platform enabled | `false` in bundled TOML | `.opentide/configurations/platforms/<id>.toml` |
 | Block `enabled` | `false` | Per-block YAML |
-| Block `status` | null (rule-level status still applies to the rule). Required on `elastic`, `sysdig`, and `bitdefender`, with no default. | Per-block YAML |
+| Block `status` | null (rule-level status still applies to the rule). Required on `elastic`, `sysdig`, `bitdefender`, and `google_secops`, with no default. | Per-block YAML |
 | Block `schema` | omitted | Templates write `platform::<identifier>::1.0` |
 
 Vocabulary files are not platform configuration. See [configuration.md](../configuration.md).
@@ -224,6 +231,7 @@ Vocabulary files are not platform configuration. See [configuration.md](../confi
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.8 | 2026-11-11 | Google Security Operations joins the matrix as the eleventh platform ([google-secops-1.0](google-secops-1.0.md), [RFC 0017](../../rfcs/0017-google-secops-yara-l.md)): YARA-L 2.0 rules through the Chronicle API v1; live query validation with `verifyRuleText` (in the `--live` allowlist) and offline YARA-L checks ([yara-l-1.0](../languages/yara-l-1.0.md)); the rule id lives in deployment state. |
 | 1.7 | 2026-11-10 | Query validation platforms: the allowlist is the `--live` (tenant) allowlist; `validate query` without `--live` checks offline, YARA and Falco included ([validation 1.9](../validation.md#query-validation)). |
 | 1.6 | 2026-11-10 | Bitdefender GravityZone joins the matrix as the tenth platform ([bitdefender-1.0](bitdefender-1.0.md), [RFC 0016](../../rfcs/0016-bitdefender-gravityzone-platform.md)): custom detection and YARA detection rules through the GravityZone Public API; no query validation, offline checks in `opentide validate`; the GravityZone rule id lives in deployment state. |
 | 1.5 | 2026-11-10 | YARA is a language spec ([yara-1.0](../languages/yara-1.0.md), [RFC 0015](../../rfcs/0015-yara-language.md)); HarfangLab YARA is checked offline by `opentide validate` (still `supported: false` for `validate query`). A HarfangLab block carries at most one of `sigma` and `yara`. |

@@ -1,0 +1,382 @@
+---
+spec: platform-google-secops
+version: "1.0"
+schema_id: platform::google_secops::1.0
+status: normative
+supersedes: null
+---
+
+# Google Security Operations (`platform::google_secops::1.0`)
+
+## Summary
+
+`configurations.google_secops` is one Google Security Operations (Google SecOps, formerly Chronicle) **custom detection rule**, written in [YARA-L 2.0](../languages/yara-l-1.0.md). The block carries the rule body (`query`): its sections from `events:` on. Deploy assembles the whole rule around it, `rule <name> {`, a generated `meta:` section, and the body, and manages it through the Chronicle API v1: `rules` for the text and `rules/{rule}/deployment` for its run state.
+
+Google assigns each rule an id (`ru_<uuid>`) at create time. That id is kept in [deployment state](../deployment-state.md), never on the rule. Google SecOps is the first platform since Elastic with a real tenant compile: `verifyRuleText` compiles a rule without creating it, so `google_secops` is in the `--live` allowlist. The analysis engine also checks YARA-L offline.
+
+Shared fields are defined in [platforms](index.md#shared-platform-block). The design and its alternatives are in [RFC 0017](../../rfcs/0017-google-secops-yara-l.md).
+
+## Requirements
+
+Static validation (`opentide validate`) and registry load:
+
+- `status` and a non-blank `query` MUST be present.
+- `query` MUST be a [`YaraLBody`](../languages/yara-l-1.0.md#yaralbody) and MUST be checked against the [YARA-L language](../languages/yara-l-1.0.md) under the `rule` profile, as part of the rule deploy [assembles](#assembled-rule). Its errors fail static validation; its warnings do not.
+- A block MUST satisfy every [constraint](#constraints), reported with its code.
+- Unknown keys MUST fail, at the block root and inside `schedule`.
+- Legacy external-id keys (`rule_id`, `rule_id_bundle`, `rule_id::<tenant>`) MUST fail with `external_id_in_rule` ([External rule ids](index.md#external-rule-ids)).
+
+Deploy:
+
+- Google SecOps is state-backed. Deploy MUST follow the [deploy decisions](../deployment-state.md#deploy-decisions) of deployment state and store the rule id under `platforms.google_secops.<tenant>`, matching `^ru_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`.
+- Deploy MUST NOT find a rule by listing (`rules.list`), by name, or by a meta value. The `opentide_uuid` meta is for analysts and audits.
+- Deploy MUST call `verifyRuleText` with the assembled text before every create and every text update, and MUST NOT create or update a rule that does not verify (`google_secops_verify_failed`).
+- Deploy MUST NOT call `rules.create` unless the returned id can be kept (`deployment_state_ignored`, `deployment_state_unpersisted`), and MUST fail the rule with `google_secops_create_no_id` when the response `name` does not end in a rule id.
+- An update MUST send the text only when it differs from the remote text, so an unchanged rule keeps its revision and its daily detection budget.
+- Deploy MUST NOT delete detections. A `DELETION` archives the rule, or deletes it without `force` when the tenant asks ([Deletion](#deletion)).
+- Deploy MUST NOT write to the rule file.
+
+Query validation:
+
+- `opentide validate query --platform google_secops --live` MUST compile each rule's assembled text with `verifyRuleText` and report Google's diagnostics. It MUST NOT create, update, or run a rule.
+- Without `--live`, `validate query` checks YARA-L offline, as `opentide validate` does: a block's body, or a `.yaral` file.
+
+## Definition
+
+### Block
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `query` | string | yes | — | The [`YaraLBody`](../languages/yara-l-1.0.md#yaralbody): sections `events:` through `options:` |
+| `severity` | string | optional | [derived](#severity) | `Info`, `Low`, `Medium`, `High`, or `Critical`. Written as meta `severity`. |
+| `priority` | string | optional | `severity` | Same values. Written as meta `priority`. |
+| `alerting` | boolean | optional | [by strategy](#deploy) | Whether detections become alerts (`RuleDeployment.alerting`) |
+| `run_frequency` | string | optional | the first one Google allows | `LIVE`, `LIVE_CUSTOMIZABLE`, `HOURLY_CUSTOMIZABLE`, or `DAILY` |
+| `schedule` | [GoogleSecopsSchedule](#schedule-googlesecopsschedule) | optional | null | Schedule customizations, for `LIVE_CUSTOMIZABLE` and `HOURLY_CUSTOMIZABLE` only |
+| `meta` | map[string, string] | optional | null | Extra meta keys, written after the [derived meta](#meta) in the order given |
+
+The shared `name` is the YARA-L rule name, which Google shows as the rule's display name and a composite rule matches with `detection.detection.rule_name`. Empty means the [derived name](#rule-name).
+
+### `schedule` (GoogleSecopsSchedule)
+
+| Field | Type | Default | Sent as |
+|-------|------|---------|---------|
+| `ensure_enrichment_completeness` | boolean | Google's | `scheduleCustomizations.ensureEnrichmentCompleteness` |
+| `late_arriving_data_adjustment` | duration (`30m`, `2h`) | Google's | `scheduleCustomizations.lateArrivingDataAdjustment`, in seconds (`"1800s"`) |
+
+### Constraints
+
+Static validation MUST reject a block that breaks any of these, and report the code:
+
+| Code | Constraint |
+|------|------------|
+| `google_secops_rule_name` | A non-empty `name` is a YARA-L identifier, `[A-Za-z_][A-Za-z0-9_]*`, and not a [keyword](../languages/yara-l-1.0.md#lexical-structure). |
+| `google_secops_severity` | `severity` and `priority` are each `Info`, `Low`, `Medium`, `High`, or `Critical`. |
+| `google_secops_run_frequency` | `run_frequency` is `LIVE`, `LIVE_CUSTOMIZABLE`, `HOURLY_CUSTOMIZABLE`, or `DAILY`. Google's legacy `HOURLY` is refused. |
+| `google_secops_schedule` | `schedule` is set only with `run_frequency` `LIVE_CUSTOMIZABLE` or `HOURLY_CUSTOMIZABLE`, and `late_arriving_data_adjustment` is a positive duration with unit `s`, `m`, `h`, or `d`. |
+| `google_secops_meta_key` | Each `meta` key is an identifier, not a keyword, and not a [derived key](#meta); each value is a string. |
+| `google_secops_name_duplicate` | Workspace check: no two enabled `google_secops` blocks resolve to one rule name. A composite rule that names one would match both. |
+
+The [YARA-L codes](../languages/yara-l-1.0.md#diagnostics) apply to `query`.
+
+| Code | `field_path` |
+|------|--------------|
+| `google_secops_rule_name` | `name` |
+| `google_secops_severity` | `severity` or `priority` |
+| `google_secops_run_frequency` | `run_frequency` |
+| `google_secops_schedule` | `schedule`, or `schedule.late_arriving_data_adjustment` |
+| `google_secops_meta_key` | `meta.<key>` |
+| `google_secops_name_duplicate` | the block |
+| `yaral_*` | `query`, with the range inside it |
+
+Paths are under `configurations.google_secops`.
+
+### Advisories
+
+Advisories are [warnings](../validation.md#platform-advisories): validation reports them under their code and never rejects the rule.
+
+| Code | When | Why |
+|------|------|-----|
+| `google_secops_risk_score_missing` | `outcome` assigns no `$risk_score`. | Google scores every alert 40 and every non-alerting detection 15, whatever the rule detects. |
+| `google_secops_rule_id_literal` | The body compares `detection.detection.rule_id` with a literal `ru_…` id. | The id differs per tenant and changes when a rule is recreated. Match the producer with `detection.detection.rule_name`, which opentide derives the same way in every tenant. |
+| `google_secops_live_frequency_unavailable` | `run_frequency` is `LIVE` and the rule has two or more event variables. | Google maps it to `LIVE_CUSTOMIZABLE`; the stored value then differs from the block on every deploy. |
+
+### Rule name
+
+The shared `name` when set. Otherwise the opentide rule `name`, lower-cased, with every run of characters outside `[a-z0-9]` replaced by one `_`, and `_` trimmed at both ends. A result that starts with a digit gets the prefix `r_`. An empty result is `opentide_` followed by `metadata.uuid` with `-` replaced by `_`.
+
+`Office application spawns encoded PowerShell` → `office_application_spawns_encoded_powershell`.
+
+### Meta
+
+Deploy writes these keys, in this order, then the block `meta` keys in the order given:
+
+| Key | Value | When |
+|-----|-------|------|
+| `author` | `metadata.author`, then the block `contributors`, de-duplicated, joined with `", "` | always |
+| `description` | The opentide `description`, whitespace runs collapsed to one space, trimmed | always |
+| `severity` | [Severity](#severity) | always |
+| `priority` | `priority`, else the severity | always |
+| `tactic` | ATT&CK tactic ids, comma-joined without spaces, in the [tactic table](elastic-1.0.md#attck) order | when there is at least one |
+| `technique` | ATT&CK technique ids, sorted, comma-joined without spaces | when there is at least one |
+| `opentide_uuid` | `metadata.uuid` | always |
+| `opentide_version` | `metadata.version` | always |
+
+The techniques are the rule's `techniques` plus those inherited through `detection_model`, the union [elastic-1.0](elastic-1.0.md#attck) uses. Each technique contributes the tactics of its `tide.vocab.stages`, mapped and renamed as there. `technique` is the key Google's MITRE ATT&CK coverage page reads ([MITRE dashboard](https://cloud.google.com/chronicle/docs/detection/mitre-dashboard)); `tactic` follows Google's community rule style.
+
+Each value is written as a YARA-L double-quoted string: `\` becomes `\\`, `"` becomes `\"`, and every other control character, line breaks included, becomes a space. Google reads `author` and `severity` from the meta into `Rule.author` and `Rule.severity`.
+
+### Severity
+
+The block `severity`, else `response.alert_severity`:
+
+| `response.alert_severity` | meta `severity` |
+|---------------------------|-----------------|
+| `Informational` | `Info` |
+| `Low` | `Low` |
+| `Medium` | `Medium` |
+| `High` | `High` |
+| `Critical` | `Critical` |
+| missing | `Medium` |
+
+The alert's risk score is not derived: it is the body's `$risk_score` outcome ([advisory](#advisories)).
+
+### Assembled rule
+
+```
+rule <rule name> {
+  meta:
+    <key> = "<value>"
+    ...
+
+  <body line>
+  ...
+}
+```
+
+The body is `query` with line endings normalised to `\n`, leading and trailing blank lines removed, and each non-blank line indented by two spaces; blank lines stay empty. One blank line separates `meta` from the body, and the text ends with `}` and one newline. Nothing else is added. Line `n` of `query` (after the leading blank lines) is line `n + k + 3` of the assembled text, where `k` is the number of meta lines, and its column is two more.
+
+### Tenant setup
+
+```toml
+[platform]
+enabled = true
+identifier = "google_secops"
+name = "Google Security Operations"
+subschema = "Google SecOps SIEM"
+description = "YARA-L 2.0 detection rules for Google SecOps SIEM."
+flags = []
+
+[[tenants]]
+name = "secops-eu"
+description = "Google SecOps, EU multi-region"
+strategies = ["PREVIEW", "RELEASE"]
+[tenants.setup]
+ssl = true
+project = "acme-secops"
+location = "eu"
+instance = "3f0ac524-5ae1-4bfd-b86d-53afc953e7e6"
+credentials = "$GOOGLE_SECOPS_CREDENTIALS"
+deletion = "archive"
+```
+
+| `tenants.setup` field | Type | Required | Default | Meaning |
+|-----------------------|------|----------|---------|---------|
+| `project` | string | yes | — | The Google Cloud project bound to the SecOps instance, id or number |
+| `location` | string | yes | — | The instance's region: `us`, `eu`, `europe`, or a Google Cloud region such as `europe-west2` |
+| `instance` | string | yes | — | The SecOps customer id (a UUID) |
+| `endpoint` | string | no | `https://<location>-chronicle.googleapis.com` | The regional service endpoint |
+| `credentials` | string | no | Application Default Credentials | A `$ENV` reference to a service-account key, as a JSON document or a path to one. Without it, the client uses Application Default Credentials (workload identity, `gcloud auth`). |
+| `data_access_scope` | string | no | none | A data access scope id. Sent as `scope: <instance>/dataAccessScopes/<id>` on create and update. |
+| `deletion` | string | no | `archive` | `archive` or `delete` ([Deletion](#deletion)) |
+| `ssl` | bool | yes | — | Shared tenant setup (TLS verification) |
+
+The instance resource is `projects/<project>/locations/<location>/instances/<instance>`. Requests carry an OAuth 2.0 access token for the scope `https://www.googleapis.com/auth/cloud-platform`. The principal needs these permissions on the instance: `chronicle.rules.verifyRuleText`, `chronicle.rules.create`, `chronicle.rules.get`, `chronicle.rules.update`, `chronicle.rules.delete`, `chronicle.ruleDeployments.get`, `chronicle.ruleDeployments.update`, and, for `opentide query`, `chronicle.events.udmSearch`.
+
+A tenant with an unknown setup key, a literal `credentials` value, or a `deletion` other than `archive` and `delete` fails configuration load.
+
+### Deploy
+
+Paths are relative to `<endpoint>/v1/<instance resource>`. The rule resource is `rules/<id>` with the id from deployment state.
+
+| Call | Request |
+|------|---------|
+| verify | `POST :verifyRuleText` with `{"ruleText": <assembled>}` |
+| create | `POST rules` with `{"text": <assembled>}`, plus `scope` |
+| get | `GET rules/<id>?view=FULL` |
+| update text | `PATCH rules/<id>?updateMask=text` with `{"text": <assembled>, "etag": <etag from get>}`, plus `scope` (and `,scope` in the mask) |
+| get deployment | `GET rules/<id>/deployment` |
+| update deployment | `PATCH rules/<id>/deployment?updateMask=<fields>` with those fields |
+| delete | `DELETE rules/<id>` (never with `force=true`) |
+
+`verify` succeeds when the response has `success: true` and no diagnostic with `severity: ERROR`. A failure answers HTTP 200 with `compilationDiagnostics` and no `success`. Its diagnostics fail the rule with `google_secops_verify_failed`, each at its [mapped position](#assembled-rule).
+
+**Run state by strategy.**
+
+| Block status strategy | `enabled` | `alerting` | `runFrequency` |
+|-----------------------|-----------|------------|----------------|
+| `PREVIEW` | `true` | block `alerting`, else `false` | block `run_frequency`, else the first of `LIVE`, `LIVE_CUSTOMIZABLE`, `HOURLY_CUSTOMIZABLE`, `DAILY` in verify's `allowedRunFrequencies` |
+| `RELEASE`, `UNIVERSAL` | `true` | block `alerting`, else `true` | as above |
+| `DISABLEMENT` | `false` | `false` | not sent |
+
+A preview rule runs and records detections without raising alerts, so a staging rule is measured against live data before it pages anyone. `runFrequency` is sent with `scheduleCustomizations` when `schedule` is set. A `run_frequency` that verify does not allow fails the rule with `google_secops_run_frequency_not_allowed` before any write.
+
+| Situation | Calls |
+|-----------|-------|
+| `PREVIEW`, `RELEASE`, `UNIVERSAL`, no binding | verify, create, record the id at once, update deployment with `enabled,alerting,runFrequency` |
+| same, binding present | get; when the remote text differs, verify and update text. Get deployment; when `archived` is `true`, update deployment with `archived` (`false`) alone first. Update deployment with `enabled,alerting,runFrequency` when any differs |
+| `DISABLEMENT`, binding present | update deployment with `enabled,alerting` (both `false`). The text is updated as above, so a disabled rule still matches its file. |
+| `DELETION`, binding present | [Deletion](#deletion) |
+| `DISABLEMENT` or `DELETION`, no binding | `external_id_missing` (warning), no call |
+
+A create whose deployment update then fails keeps its binding: the rule exists. The failure is `google_secops_deployment_failed`, and the next deploy repairs the run state.
+
+#### Deletion
+
+| `deletion` | Calls | Binding |
+|------------|-------|---------|
+| `archive` (default) | update deployment with `enabled,alerting` (`false`), then with `archived` (`true`) | kept. A later deploy with another strategy unarchives the same rule. |
+| `delete` | `DELETE rules/<id>` | removed. When Google refuses because the rule has detections or retrohunts (`FAILED_PRECONDITION`), deploy archives instead, keeps the binding, and warns `google_secops_delete_refused`. |
+
+opentide never sends `force=true`: that deletes the rule's detections, which are the audit trail of what it found.
+
+#### Errors
+
+| Situation | Behaviour |
+|-----------|-----------|
+| `get` or `update text` answers 404 | Create the rule again and replace the binding, with the `google_secops_rule_recreated` warning. Under `DISABLEMENT` or `DELETION`, create nothing, remove the binding, and warn `google_secops_rule_missing`. |
+| `DELETE` answers 404 | Success. The binding is removed. |
+| `update text` answers 409 (`ABORTED`, etag mismatch) | `google_secops_rule_conflict`: the rule changed between get and update. No retry in the same run. |
+| A create answers without a rule id in `name` | `google_secops_create_no_id` |
+| A create gets no answer (timeout, reset) | `google_secops_create_unconfirmed`. Deploy does not retry it: the rule may exist, and the operator binds or removes it. |
+| 401 or 403 | `google_secops_tenant_unauthorized`: the tenant stops. |
+| 429 (`RESOURCE_EXHAUSTED`) or 503 | Wait `Retry-After`, else 2, 4, then 8 seconds, and resend the same request; then fail the rule. |
+| Any other error | The rule fails with Google's `error.status` and `error.message`. |
+
+### Query validation
+
+| Check | Google SecOps |
+|-------|---------------|
+| `opentide validate` (offline) | yes: the constraints and the YARA-L language, `rule` profile |
+| `opentide validate query` (offline) | YARA-L: a block's body, and a `.yaral` file |
+| `opentide validate query --live` | yes: `verifyRuleText` on the assembled text |
+| `opentide query` | yes: a YARA-L search through `udmSearch` |
+
+**Live.** Each rule's assembled text is sent to `verifyRuleText`.
+
+| Response | Result |
+|----------|--------|
+| `success: true`, no `ERROR` diagnostic | valid. `WARNING` diagnostics are reported as `google_secops_compile_warning`. |
+| `ERROR` diagnostics | invalid: each one is `google_secops_compile_error` with Google's `message` and `uri` |
+| a block `run_frequency` outside `allowedRunFrequencies` | invalid: `google_secops_run_frequency_not_allowed` |
+| HTTP 401 or 403 | the tenant fails |
+
+A diagnostic's `position` (1-based lines and columns, end inclusive) is mapped into the block's `query` ([Assembled rule](#assembled-rule)). A position inside the generated header or meta, or no position, is reported on the block. `verifyRuleText` resolves the tenant's reference lists and data tables, which the offline check cannot.
+
+**Query.** `opentide query --platform google_secops` sends a [`YaraLSearch`](../languages/yara-l-1.0.md#text-forms) to `GET <endpoint>/v1alpha/<instance resource>:udmSearch` with `query`, `timeRange.startTime`, `timeRange.endTime`, and `limit` (at most 10,000). The method is read-only and saves nothing. It is `v1alpha`: Google has no `v1` search method yet. `opentide query --rule` is not supported for `google_secops`: a rule runs in the detection engine, and a retrohunt writes detections.
+
+## Relationships
+
+- [platforms](index.md): shared fields, capability matrix, external ids
+- [yara-l-1.0](../languages/yara-l-1.0.md): `YaraLBody`, the YARA-L language, the `rule` and `search` profiles
+- [deployment-state.md](../deployment-state.md): the rule id
+- [deployment.md](../deployment.md): status strategies
+- [elastic-1.0](elastic-1.0.md#attck): the ATT&CK technique union and the tactic table
+- [rule-1.0.md](../objects/rule-1.0.md): `response.alert_severity`, `techniques`, `detection_model`, `description`
+- [validation.md](../validation.md): static validation, advisories, query validation
+- [RFC 0017](../../rfcs/0017-google-secops-yara-l.md): design, research, and alternatives
+
+## Defaults & overrides
+
+| Field | Default |
+|-------|---------|
+| Rule name | Shared `name`, else [derived](#rule-name) |
+| `severity` | [Severity](#severity), else `Medium` |
+| `priority` | `severity` |
+| `alerting` | `false` under `PREVIEW`, `true` under `RELEASE` and `UNIVERSAL` |
+| `run_frequency` | The first allowed of `LIVE`, `LIVE_CUSTOMIZABLE`, `HOURLY_CUSTOMIZABLE`, `DAILY` |
+| `endpoint` | `https://<location>-chronicle.googleapis.com` |
+| `deletion` | `archive` |
+
+## Examples
+
+A single-event rule:
+
+```yaml
+configurations:
+  google_secops:
+    enabled: true
+    schema: platform::google_secops::1.0
+    status: STAGING
+    run_frequency: LIVE
+    meta:
+      data_source: Microsoft Sysmon
+    query: |
+      events:
+        $e.metadata.event_type = "PROCESS_LAUNCH"
+        $e.principal.process.file.full_path = /\\(winword|excel|powerpnt)\.exe$/ nocase
+        $e.target.process.file.full_path = /\\powershell\.exe$/ nocase
+        $e.target.process.command_line = /\s-e(nc|ncodedcommand)?\s/ nocase
+      outcome:
+        $risk_score = 70
+        $host = $e.principal.hostname
+        $command_line = $e.target.process.command_line
+      condition:
+        $e
+```
+
+A multi-event rule with a window, aggregations, and suppression:
+
+```yaml
+configurations:
+  google_secops:
+    enabled: true
+    schema: platform::google_secops::1.0
+    status: PRODUCTION
+    name: password_spray_then_success
+    severity: High
+    run_frequency: LIVE_CUSTOMIZABLE
+    schedule:
+      ensure_enrichment_completeness: true
+    query: |
+      events:
+        $fail.metadata.event_type = "USER_LOGIN"
+        $fail.security_result.action = "BLOCK"
+        $fail.principal.ip = $ip
+        $fail.target.user.userid = $user
+
+        $success.metadata.event_type = "USER_LOGIN"
+        $success.security_result.action = "ALLOW"
+        $success.principal.ip = $ip
+        $success.target.user.userid = $user
+
+        $fail.metadata.event_timestamp.seconds < $success.metadata.event_timestamp.seconds
+
+      match:
+        $user, $ip over 30m
+
+      outcome:
+        $risk_score = max(80)
+        $risk_entity_to_score = $user
+        $failed_attempts = count_distinct($fail.metadata.id)
+        $target_hosts = array_distinct($success.target.hostname)
+
+      condition:
+        #fail >= 10 and $success
+
+      options:
+        suppression_window = 1h
+```
+
+Fixtures:
+
+- block: [fixtures/platforms/google-secops.yaml](../../fixtures/platforms/google-secops.yaml);
+- rules: [fixtures/valid/rule-google-secops-process-1.0.yaml](../../fixtures/valid/rule-google-secops-process-1.0.yaml) and [fixtures/valid/rule-google-secops-spray-1.0.yaml](../../fixtures/valid/rule-google-secops-spray-1.0.yaml);
+- the tenant they deploy to: [fixtures/platforms/google-secops/tenant.toml](../../fixtures/platforms/google-secops/tenant.toml);
+- for each rule, the assembled `.yaral` text and the request bodies deploy sends, under [fixtures/platforms/google-secops/](../../fixtures/platforms/google-secops/).
+
+## History
+
+| Version | Date | Notes |
+|---------|------|-------|
+| 1.0 | 2026-11-11 | Initial field contract ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md)): a YARA-L body assembled into a rule with derived name and meta; severity, priority, alerting, run frequency, schedule customizations; Chronicle API v1 deploy with the rule id in deployment state; archive by default on `DELETION`, never a forced delete; live validation with `verifyRuleText`; `opentide query` through `udmSearch`. |

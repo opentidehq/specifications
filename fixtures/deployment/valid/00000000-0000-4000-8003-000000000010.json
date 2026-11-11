@@ -11,6 +11,9 @@
       "contoso": "12345",
       "fabrikam": "67890"
     },
+    "google_secops": {
+      "secops-eu": "ru_cfc80c6b-f918-42ed-8d5c-9518c13586c1"
+    },
     "sentinel_one": {
       "s1-prod": "4242"
     },

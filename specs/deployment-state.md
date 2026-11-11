@@ -1,6 +1,6 @@
 ---
 spec: deployment-state
-version: "1.4"
+version: "1.5"
 schema_id: deployment.state::1.0
 status: normative
 supersedes: null
@@ -18,7 +18,7 @@ This spec is the normative text of accepted [RFC 0010](../rfcs/0010-deployment-e
 
 ## Requirements
 
-- Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig, and Bitdefender vendor identifiers MUST be stored only in `.opentide/states/deployment/<uuid>.json`. A platform block MUST NOT contain `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>`.
+- Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig, Bitdefender, and Google SecOps vendor identifiers MUST be stored only in `.opentide/states/deployment/<uuid>.json`. A platform block MUST NOT contain `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>`.
 - `<uuid>` MUST be the lowercase canonical form of the rule's `metadata.uuid`, and `object_uuid` MUST equal the filename stem exactly.
 - Tenant keys MUST be non-empty and MUST equal the configured tenant `name` with surrounding whitespace removed. A stored key with leading or trailing whitespace is invalid.
 - External identifiers MUST be JSON strings. Defender, SentinelOne, and Sysdig identifiers MUST match `0|[1-9][0-9]*`. Bitdefender identifiers MUST match `[0-9a-f]{24}` (lower case; a writer lower-cases the id GravityZone returns). CrowdStrike identifiers MUST contain a non-whitespace character and are otherwise stored verbatim.
@@ -47,6 +47,7 @@ A **state-backed platform** is one whose deployer addresses the remote rule by a
 | `crowdstrike` | Correlation rule id returned on create (`resources[0].id`) | **Shard** |
 | `sysdig` ([sysdig-1.0](platforms/sysdig-1.0.md)) | Falco rule `id` returned by `POST /api/secure/rules` | **Shard** |
 | `bitdefender` ([bitdefender-1.0](platforms/bitdefender-1.0.md)) | Custom rule id returned by `createCustomRule` with `returnRuleId: true` | **Shard** |
+| `google_secops` ([google-secops-1.0](platforms/google-secops-1.0.md)) | Rule id, the last segment of the `name` returned by `rules.create` | **Shard** |
 | `sentinel` | Analytics rule id is `metadata.uuid` | None |
 | `splunk` | The saved search; no vendor-assigned id | None |
 | `harfanglab` | Sigma id and YARA meta `id` are `metadata.uuid` | None |
@@ -86,6 +87,7 @@ Inside `platforms`:
 | `crowdstrike` | The create-response id, verbatim, as a string. MUST contain a non-whitespace character. It is not parsed as an integer. |
 | `sysdig` | Canonical decimal integer as a string. |
 | `bitdefender` | 24 lower-case hex digits as a string (`"6372b7a3897aaa77ee021642"`). |
+| `google_secops` | `ru_` and a lower-case canonical UUID, as a string (`"ru_cfc80c6b-f918-42ed-8d5c-9518c13586c1"`). Never a revision (`…@v_…`) and never the full resource name: the instance comes from the tenant. |
 
 A platform key outside this table fails `deployment_state_platform`. A tenant key that is empty, or that has leading or trailing whitespace, fails `deployment_state_shape`. A non-string id, or an id that breaks its platform's pattern, fails `deployment_state_shape`. There is one binding per platform-and-tenant pair.
 
@@ -115,7 +117,7 @@ A writer MUST read the file, change one binding, and write the rest back unchang
 
 ### Deploy decisions
 
-For `defender_for_endpoint`, `sentinel_one`, `crowdstrike`, `sysdig`, and `bitdefender`, per rule and per tenant the run selected, deploy MUST decide in this order. "Create" means a strategy other than `DELETION` or `DISABLEMENT` with no binding. `DISABLEMENT` with a binding is an update that sets the vendor's disabled state. It keeps the binding.
+For `defender_for_endpoint`, `sentinel_one`, `crowdstrike`, `sysdig`, `bitdefender`, and `google_secops`, per rule and per tenant the run selected, deploy MUST decide in this order. "Create" means a strategy other than `DELETION` or `DISABLEMENT` with no binding. `DISABLEMENT` with a binding is an update that sets the vendor's disabled state. It keeps the binding.
 
 | # | Situation | Code | Level | Result |
 |---|-----------|------|-------|--------|
@@ -277,6 +279,9 @@ A rule bound on every state-backed platform, `.opentide/states/deployment/000000
       "contoso": "12345",
       "fabrikam": "67890"
     },
+    "google_secops": {
+      "secops-eu": "ru_cfc80c6b-f918-42ed-8d5c-9518c13586c1"
+    },
     "sentinel_one": {
       "s1-prod": "4242"
     },
@@ -306,6 +311,7 @@ Fixtures: [fixtures/deployment/valid/](../fixtures/deployment/valid/) and [fixtu
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.5 | 2026-11-11 | `google_secops` is state-backed: the Google SecOps rule id, `ru_` and a lower-case UUID, under `platforms.google_secops.<tenant>` ([google-secops-1.0](platforms/google-secops-1.0.md), [RFC 0017](../rfcs/0017-google-secops-yara-l.md)). The shard JSON Schema gains `secopsRuleTenants`. Schema id unchanged. |
 | 1.4 | 2026-11-10 | `bitdefender` is state-backed: the GravityZone custom rule id, 24 lower-case hex digits, under `platforms.bitdefender.<tenant>` ([bitdefender-1.0](platforms/bitdefender-1.0.md), [RFC 0016](../rfcs/0016-bitdefender-gravityzone-platform.md)). The shard JSON Schema gains `objectIdTenants`. Schema id unchanged. |
 | 1.3 | 2026-11-02 | `sysdig` is state-backed: the Sysdig rule id is a canonical decimal string under `platforms.sysdig.<tenant>` ([sysdig-1.0](platforms/sysdig-1.0.md), [RFC 0014](../rfcs/0014-sysdig-falco-platform.md)). `schema_id` stays `deployment.state::1.0`. |
 | 1.2 | 2026-10-20 | A run that cannot persist state is defined by its run strategies, not a deployment plan: any CI run but a `RELEASE` run on a push. opentide 0.17.0 removed deployment plans; the generated jobs keep the same behaviour. |
