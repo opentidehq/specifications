@@ -1,6 +1,6 @@
 ---
 spec: platform-graylog
-version: "1.0"
+version: "1.1"
 schema_id: platform::graylog::1.0
 status: normative
 supersedes: null
@@ -210,9 +210,10 @@ The engine's Lucene codes apply unchanged. For example, `lucene_parse_error` (er
 | Code | Severity | When | Why |
 |------|----------|------|-----|
 | `graylog_leading_wildcard` | error | A term starts with `*` or `?`, and a targeted tenant does not set `allow_leading_wildcard`. Offline, with no tenant, it is an error. | Graylog refuses the query ("'*' or '?' not allowed as first character"). A regex with a leading `.*` is the portable form. |
-| `graylog_regex_unsupported` | error | A regex uses an inline flag such as `(?i)`, `\b`, `\B`, lookahead or lookbehind, or a backreference. | Lucene's regex engine accepts none of them, and Graylog matches nothing without saying so. |
+| `graylog_regex_unsupported` | error | A regex uses an inline flag such as `(?i)`, `\b`, `\B`, lookahead or lookbehind, or a backreference. | Lucene's regex engine has none of them. Graylog refuses `\b` and `\B`, and matches nothing for the others without saying so. |
 | `graylog_regex_operator` | warning | A regex holds an unescaped `#`, `&`, `<`, `>`, or `~`, other than a numeric interval `<n-m>`. | Lucene reads them as regex operators, and Graylog's validator still says OK. |
-| `graylog_regex_quote` | warning | A regex holds an unescaped `"`. | The regex matches nothing. |
+| `graylog_regex_quote` | warning | A regex holds a pair of unescaped `"`. | Lucene reads the quoted part as a literal string and drops the quote characters. An unpaired `"` does not parse: that is `lucene_regexp` (error). |
+| `graylog_open_range` | error | A range has `*` as a bound (`[1 TO *]`, `{* TO 5}`). | Graylog's validator refuses it, so deploy cannot save the definition. Write `field:>=1` or `field:<5`. |
 | `graylog_double_backslash` | warning | The query holds four backslashes in a row. | `\\` is one literal backslash in a Graylog query, so `\\\\` matches two. |
 | `graylog_analyzed_field` | warning | A regex, wildcard, or range applies to `message` or `full_message`. | Those fields are tokenised: a regex or wildcard matches single tokens, never the whole value. |
 
@@ -367,7 +368,7 @@ POST /api/search/validate
 {"query": <query>, "streams": [<ids>], "stream_categories": [...], "timerange": {"type": "relative", "range": <window in seconds>}}
 ```
 
-- `status: ERROR` fails the rule with `graylog_query_invalid` and Graylog's explanations, and nothing is saved.
+- `status: ERROR` fails the rule with `graylog_query_invalid` and Graylog's explanations, and nothing is saved. The validator refuses some queries OpenSearch would run: an open range (`graylog_open_range` offline), and `*` or `*:*`. For every message in the streams, write `_exists_:source`.
 - Explanations of type `UNKNOWN_FIELD` are `graylog_unknown_field` (warning). `INVALID_VALUE_TYPE` explanations are `graylog_value_type` (warning). Every other `WARNING` or `INFO` explanation is `graylog_query_warning` (warning).
 
 | Block status strategy | Binding in deployment state | Graylog calls |
@@ -479,3 +480,4 @@ Fixtures:
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-11-11 | Initial field contract ([RFC 0017](../../rfcs/0017-graylog-platform.md)): one `aggregation-v1` event definition per block. Query, aggregation condition grammar, event-field value forms, and string-or-list fields. Graylog 6.3, 7.0, 7.1, and 7.2, each request built for the detected version. The event definition id in deployment state; `--live` through `/api/search/validate`. |
+| 1.1 | 2026-11-11 | Clarifications from the engine's oracle run against Graylog 7.2.2 and 6.3.5: Graylog refuses `\b` and `\B` (`graylog_regex_unsupported`); `graylog_regex_quote` is a paired quote, an unpaired one being `lucene_regexp`; new `graylog_open_range` (error) for an open range bound, which Graylog's validator refuses; `_exists_:source` for every message, since the validator refuses `*` and `*:*`. Schema id unchanged. |

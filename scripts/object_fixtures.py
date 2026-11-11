@@ -1042,10 +1042,11 @@ def parse_graylog_condition(text: str) -> tuple[dict[str, Any], list[dict[str, A
             raise GraylogConditionError(f"{function!r} is not an aggregation function")
         take("(")
         args: list[str] = []
-        while peek() != ")":
+        if peek() != ")":
             args.append(take())
-            if peek() == ",":
+            while peek() == ",":
                 take(",")
+                args.append(take())
         take(")")
         field_name = args[0] if args else None
         if field_name is not None and not GRAYLOG_FIELD.fullmatch(field_name):

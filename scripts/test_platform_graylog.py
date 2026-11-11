@@ -57,6 +57,7 @@ DIALECT_CODES = {
     "graylog_regex_unsupported": "error",
     "graylog_regex_operator": "warning",
     "graylog_regex_quote": "warning",
+    "graylog_open_range": "error",
     "graylog_double_backslash": "warning",
     "graylog_analyzed_field": "warning",
 }
@@ -324,6 +325,9 @@ class ConditionTests(unittest.TestCase):
             "count() >= ",
             "(count() > 1",
             "count() = 1",
+            "percentile(bytes 95) > 1",
+            "count(a,) > 1",
+            "max(,a) > 1",
         ):
             with self.subTest(text=text), self.assertRaises(GraylogConditionError):
                 parse_graylog_condition(text)
