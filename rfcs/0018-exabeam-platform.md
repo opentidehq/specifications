@@ -134,14 +134,14 @@ subject: "endpoint" | FOREACH dest_host [ select src_host WHERE src_host: @dest_
 
 A second round (2026-11-12) answered the open questions with the strongest evidence available without a tenant. Sources: every page linked from the Search guide's contents (54 pages), the platform release notes for January 2025 to October 2026, the known-issues page, 28 Threat Detection Management pages, the full developers.exabeam.com reference (111 operations, OpenAPI parsed) and its changelog, and clones of `ExabeamLabs/new-scale-content-hub` (`4ef758d`) and `ExabeamLabs/CIMLibrary` (`e72bfa2`).
 
-**Exabeam's published rules.** The content hub holds 2,371 correlation rules: 75 written by Exabeam (the Linux rules were added in March 2026) and 2,296 converted from Sigma (October 2025). Every rule has one sequence, `sequencesExecution: CREATION_ORDER`, and a unique name. 2,350 sequences trigger on any match. The 21 thresholds use `count` or `unique_count` with `more_than` or `less_than`, and no rule uses `between`, `changed`, `in`, or `not_in`. No query uses the advanced operators, though the same repository's saved searches do. The reference checker run over every query under the `rule` profile gives this:
+**Exabeam's published rules.** The content hub holds 2,371 correlation rules: 77 written by Exabeam (the Linux rules were added in March 2026) and 2,294 converted from Sigma (October 2025). Every rule has one sequence, `sequencesExecution: CREATION_ORDER`, and a unique name. 2,350 sequences trigger on any match. The 21 thresholds use `count` or `unique_count` with `more_than` or `less_than`, and no rule uses `between`, `changed`, `in`, or `not_in`. No query uses the advanced operators, though the same repository's saved searches do. The reference checker run over every query under the `rule` profile gives this:
 
 | Rules | With an error | Warnings |
 |-------|---------------|----------|
-| 75 written by Exabeam | 0 | 14: `exabeam_legacy_regex` (paths such as `"/var/log/"`), `exabeam_single_group`, `exabeam_mixed_boolean` |
-| 2,296 converted from Sigma | 76 (3.3%) | `exabeam_single_group`, `exabeam_legacy_regex`, `exabeam_mixed_boolean` |
+| 77 written by Exabeam | 0 | 14: `exabeam_legacy_regex` (paths such as `"/var/log/"`), `exabeam_single_group`, `exabeam_mixed_boolean` |
+| 2,294 converted from Sigma | 75 (3.3%) under RE2; 76 with the reference checker, whose regex check is Python's `re` (it refuses `$?`, which RE2 accepts, and accepts an escaped non-breaking space, which RE2 refuses) | `exabeam_single_group`, `exabeam_legacy_regex`, `exabeam_mixed_boolean` |
 
-Each of the 76 errors traced is a defect in the converted rule: a `\\"` that closes a string early (`RGX(".*\\"arn\\:aws…")`), an unescaped `"` inside `RGX`, which the regex page calls an error, or a regex RE2 refuses (`.**`, `[^ \]`). The content hub's licence forbids redistribution, so the language server measures it and does not vendor it.
+Each error traced is a defect in the converted rule: a `\\"` that closes a string early (`RGX(".*\\"arn\\:aws…")`), an unescaped `"` inside `RGX`, which the regex page calls an error, or a regex RE2 refuses (`.**`, `[^ \]`). The content hub's licence forbids redistribution, so the language server measures it and does not vendor it.
 
 | Question | Conclusion | Confidence | Spec |
 |----------|------------|------------|------|
