@@ -20,7 +20,7 @@ SPEC = ROOT / "specs" / "languages" / "exabeam-1.0.md"
 RFC = ROOT / "rfcs" / "0018-exabeam-platform.md"
 LANG = ROOT / "fixtures" / "languages" / "exabeam"
 SECTIONS = ["Summary", "Requirements", "Definition", "Relationships", "Defaults & overrides", "Examples", "History"]
-CATALOGUE_CODES = {"exabeam_unknown_field", "exabeam_string_field_number"}
+CATALOGUE_CODES = {"exabeam_unknown_field", "exabeam_string_field_number", "exabeam_unknown_value"}
 # The HighlightSpec legend in opentidehq/language-server highlights/spec.toml (0.3.0).
 HIGHLIGHT_LEGEND = {
     "comment", "keyword", "operator", "operator.pipe", "function", "function.builtin", "type", "variable",

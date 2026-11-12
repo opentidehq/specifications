@@ -40,7 +40,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Exabeam New-Scale SIEM platform | 1.0 | `platform::exabeam::1.0` | normative | [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md) |
 | Google Security Operations platform | 1.3 | `platform::google_secops::1.0` | normative | [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md) |
 | YARA language | 1.5 | — | normative | [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) |
-| Exabeam Query Language | 1.0 | — | normative | [specs/languages/exabeam-1.0.md](specs/languages/exabeam-1.0.md) |
+| Exabeam Query Language | 1.1 | — | normative | [specs/languages/exabeam-1.0.md](specs/languages/exabeam-1.0.md) |
 | YARA-L language | 1.1 | — | normative | [specs/languages/yara-l-1.0.md](specs/languages/yara-l-1.0.md) |
 | Validation | 1.13 | — | normative | [specs/validation.md](specs/validation.md) |
 | Sharing | 1.3 | — | normative | [specs/sharing.md](specs/sharing.md) |
