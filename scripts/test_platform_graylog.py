@@ -313,6 +313,10 @@ class ConditionTests(unittest.TestCase):
         self.assertEqual(tree["left"]["left"]["expr"], "!")
         self.assertEqual(tree["right"]["right"], {"expr": "number", "value": 2.5})
 
+    def test_nesting_up_to_the_limit(self) -> None:
+        parse_graylog_condition("(" * 32 + "count() > 1" + ")" * 32)
+        parse_graylog_condition("NOT " * 16 + "(" * 16 + "count() > 1" + ")" * 16)
+
     def test_refusals(self) -> None:
         for text in (
             "",
@@ -328,6 +332,9 @@ class ConditionTests(unittest.TestCase):
             "percentile(bytes 95) > 1",
             "count(a,) > 1",
             "max(,a) > 1",
+            "(" * 33 + "count() > 1" + ")" * 33,
+            "NOT " * 33 + "count() > 1",
+            "(" * 5000 + "count() > 1" + ")" * 5000,
         ):
             with self.subTest(text=text), self.assertRaises(GraylogConditionError):
                 parse_graylog_condition(text)
