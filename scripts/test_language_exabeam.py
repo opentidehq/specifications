@@ -195,6 +195,18 @@ class SemanticsTests(unittest.TestCase):
             ("^*a", True),
             ("\\\\b+", True),
             ("a\\\u00a0b", False),
+            ("\\\\0", True),
+            ("\\\\012", True),
+            ("\\\\12", True),
+            ("\\\\18", False),
+            ("[[:foo:]]", False),
+            ("[[:^alpha:]]", True),
+            ("(?P<a.b>x)", False),
+            ("(?P<1a>x)", True),
+            ("(?<n>a)(?<n>b)", False),
+            ("[\\\\Q]\\\\E]", False),
+            ("(" * 999 + "a" + ")" * 999, True),
+            ("(" * 1001 + "a" + ")" * 1001, False),
         ):
             with self.subTest(pattern=pattern):
                 codes = analyze(f'process_name:RGX("{pattern}")', "rule").codes

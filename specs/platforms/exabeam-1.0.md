@@ -26,7 +26,7 @@ Static validation (`opentide validate`) and registry load:
 - `sequences` MUST be a non-empty list. Every sequence MUST have a non-blank `query`.
 - Every `query` MUST be checked against the [Exabeam Query Language](../languages/exabeam-1.0.md) under the `rule` profile. Its errors fail the rule, and its warnings are reported.
 - A block MUST satisfy every [constraint](#constraints). A violation MUST be reported with its constraint code.
-- Unknown keys MUST fail with `unknown_field` at the key's path, at the block root and inside every object in the field tables (`sequences.0.thresold`, `suppression.unit`). A key set to `null` is the same as an absent key, at every level.
+- Unknown keys MUST fail as unknown keys, never as a constraint code, at the key's own path, at the block root and inside every object in the field tables (`sequences.0.thresold`, `suppression.unit`). A key set to `null` is the same as an absent key, at every level.
 - Legacy external-id keys (`rule_id`, `rule_id_bundle`, `rule_id::<tenant>`) MUST fail with `external_id_in_rule` ([External rule ids](index.md#external-rule-ids)).
 - Field names in `sequences[].group_by`, `threshold.field`, `correlation.group_by`, and `suppression.group_by` name fields in the tenant's data. They MUST NOT be checked against a closed list. An implementation MAY report a field the CIM catalogue does not have as the warning `exabeam_unknown_field`, at that field's path.
 
@@ -164,14 +164,14 @@ Every implementation reports each code at the path in this table:
 
 | Code | Field path |
 |------|------------|
-| `unknown_field` | The unknown key's path (`sequences.<N>.<key>`, `sequences.<N>.threshold.<key>`, `correlation.<key>`, `suppression.<key>`, `email.<key>`, `schedule.<N>.<key>`, or `<key>` at the root) |
+| An unknown key (not a constraint code) | The key's path: `sequences.<N>.<key>`, `sequences.<N>.threshold.<key>`, `correlation.<key>`, `suppression.<key>`, `email.<key>`, `schedule.<N>.<key>`, or `<key>` at the root |
 | `exabeam_sequences` | `sequences`; `sequences.<N>` when a sequence is not an object; `sequences.<N>.query` |
 | `exabeam_correlation` | `correlation` |
 | `exabeam_threshold_function`, `exabeam_threshold_operator`, `exabeam_threshold_value` | `sequences.<N>.threshold` |
 | `exabeam_group_by` | `sequences.<N>.group_by`, `correlation.group_by`, or `suppression.group_by` |
 | `exabeam_duration` | `sequences.<N>.threshold.within`, `correlation.within`, `suppression.for` (also when `suppression` is not an object or has no `for`), or `delay` |
 | `exabeam_severity`, `exabeam_outcome`, `exabeam_email` | `severity`, `outcome`, `email` |
-| `exabeam_schedule` | `schedule.<N>`, or `schedule` when it is not a non-empty list |
+| `exabeam_schedule` | `schedule.<N>` (a day key its `every` does not take is `exabeam_schedule`, not an unknown key), or `schedule` when it is not a non-empty list |
 | `exabeam_name_length` | `name` |
 | `exabeam_context_table_trigger` | `sequences.<N>.threshold` |
 | `exabeam_name_duplicate` | `name` |

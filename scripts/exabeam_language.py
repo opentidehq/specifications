@@ -28,7 +28,6 @@ import re
 import sys
 import warnings
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
 PROFILES = ("rule", "search")
@@ -166,6 +165,8 @@ FREE_TEXT_OK = re.compile(r"[A-Za-z0-9_*?]+\Z")
 OPERATOR_WORDS = {"AND", "OR", "NOT", "TO", "IN"}
 EPOCH_MS = re.compile(r"\d{10,}\Z")
 RE2_MAX_REPEAT = 1000
+RE2_MAX_DEPTH = 1000
+POSIX_CLASSES = {"alnum", "alpha", "ascii", "blank", "cntrl", "digit", "graph", "lower", "print", "punct", "space", "upper", "word", "xdigit"}
 # `AS name` closing a statement: before the end, a pipe, GROUP-BY, ORDER-BY, or LIMIT.
 STATEMENT_ALIAS = re.compile(r"(?i)as\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:\||\Z|(?:group|order)-by\b|limit\b)")
 RE2_FLAGS = set("imsU")
@@ -177,8 +178,18 @@ def _re2_check(pattern: str) -> str | None:
     i = 0
     n = len(pattern)
     in_class = False
+    depth = 0
+    names: set[str] = set()
     while i < n:
         ch = pattern[i]
+        if ch == "(" and not in_class and not pattern.startswith("(?", i) or (
+            ch == "(" and not in_class and re.match(r"\(\?[A-Za-z-]*:", pattern[i:])
+        ):
+            depth += 1
+            if depth > RE2_MAX_DEPTH:
+                return f"nesting deeper than {RE2_MAX_DEPTH}"
+        elif ch == ")" and not in_class:
+            depth = max(depth - 1, 0)
         if ch == "\\":
             if i + 1 >= n:
                 return "trailing backslash"
@@ -189,8 +200,15 @@ def _re2_check(pattern: str) -> str | None:
                 out.append("(?:" + ("\\Z" if nx == "z" else pattern[i : i + 2]) + ")")  # RE2 repeats an assertion
                 i += 2
                 continue
-            if nx in "123456789" and not in_class:
-                return "back-references are not RE2"
+            if nx.isdigit():
+                # RE2: `\0` and `\1`-`\7` before another octal digit are octal (up to
+                # three digits); any other digit escape is a back-reference.
+                m = re.compile(r"\\(0[0-7]{0,2}|[1-7][0-7]{1,2})").match(pattern, i)
+                if not m:
+                    return "back-references are not RE2"
+                out.append(f"\\u{int(m.group(1), 8):04x}")
+                i = m.end()
+                continue
             if nx == "Z":
                 return "\\Z is not RE2: write \\z or $"
             if nx == "z" and not in_class:
@@ -212,6 +230,8 @@ def _re2_check(pattern: str) -> str | None:
                 i = m.end()
                 continue
             if nx == "Q":
+                if in_class:
+                    return "\\Q is not an escape inside a class"
                 end = pattern.find("\\E", i + 2)
                 literal = pattern[i + 2 :] if end < 0 else pattern[i + 2 : end]
                 out.append(re.escape(literal))
@@ -226,6 +246,8 @@ def _re2_check(pattern: str) -> str | None:
             elif ch == "[" and pattern.startswith("[:", i):
                 m = re.compile(r"\[:\^?([a-z]+):\]").match(pattern, i)
                 if m:  # an ASCII class such as [:alpha:]; Python reads it as a set
+                    if m.group(1) not in POSIX_CLASSES:
+                        return f"[:{m.group(1)}:] is not an RE2 character class"
                     out.append("a")
                     i = m.end()
                     continue
@@ -253,13 +275,20 @@ def _re2_check(pattern: str) -> str | None:
                 return "back-references are not RE2"
             if rest[:1] == "#":
                 return "comments are not RE2"
-            if rest[:1] == "<":
-                out.append("(?P<")
-                i += 3
-                continue
-            if rest[:2] == "P<":
-                out.append("(?P<")
-                i += 4
+            if rest[:1] == "<" or rest[:2] == "P<":
+                start = i + (3 if rest[:1] == "<" else 4)
+                close = pattern.find(">", start)
+                name = pattern[start:close] if close >= 0 else ""
+                if not re.fullmatch(r"[A-Za-z0-9_]+", name):
+                    return f"invalid capture group name {name!r}"
+                if name in names:
+                    return f"duplicate capture group name {name!r}"
+                names.add(name)
+                out.append(f"(?P<n_{name}>")  # Python names start with a letter or `_`
+                depth += 1
+                if depth > RE2_MAX_DEPTH:
+                    return f"nesting deeper than {RE2_MAX_DEPTH}"
+                i = close + 1
                 continue
             m = re.compile(r"\(\?([A-Za-z]*)(?:-([A-Za-z]*))?([:)])").match(pattern, i)
             if m:
@@ -299,6 +328,8 @@ def _re2_check(pattern: str) -> str | None:
             re.compile("".join(out))
     except re.error as exc:
         return str(exc)
+    except RecursionError:
+        return None  # deep but within RE2's nesting limit: Python's parser recurses, RE2's does not
     return None
 
 
@@ -317,10 +348,32 @@ def _unescape(body: str) -> str:
     return "".join(out)
 
 
-def _instant(text: str) -> datetime:
-    """A range datetime as an aware instant; no zone is UTC."""
-    moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
-    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+EPOCH_MS_CAP = 10**38  # the engine compares epoch milliseconds as 128-bit integers
+
+
+def _days_from_civil(y: int, m: int, d: int) -> int:
+    """Days since 1970-01-01 of a proleptic Gregorian date (Howard Hinnant's algorithm)."""
+    y -= m <= 2
+    era = (y if y >= 0 else y - 399) // 400
+    yoe = y - era * 400
+    doy = (153 * (m + (-3 if m > 2 else 9)) + 2) // 5 + d - 1
+    doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
+    return era * 146097 + doe - 719468
+
+
+def _instant(text: str) -> int:
+    """A range bound on the time line, in epoch milliseconds; a datetime with no zone is UTC."""
+    if EPOCH_MS.match(text):
+        return min(int(text), EPOCH_MS_CAP)
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-]\d{2}:\d{2})?", text)
+    assert m, text
+    y, mo, d, hh, mi, ss = (int(g) for g in m.groups()[:6])
+    millis = int((m.group(7) or "0").ljust(3, "0"))
+    offset = 0
+    if m.group(8) and m.group(8) != "Z":
+        sign = -1 if m.group(8)[0] == "-" else 1
+        offset = sign * (int(m.group(8)[1:3]) * 60 + int(m.group(8)[4:6]))
+    return ((((_days_from_civil(y, mo, d) * 24 + hh) * 60 + mi - offset) * 60) + ss) * 1000 + millis
 
 
 def _is_ip(text: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
@@ -843,7 +896,7 @@ class Parser:
             if b == "*":
                 kinds.append(("open", None))
             elif time_field and EPOCH_MS.match(b):
-                kinds.append(("datetime", datetime.fromtimestamp(int(b) / 1000, timezone.utc)))
+                kinds.append(("datetime", _instant(b)))
             elif NUMBER.match(b):
                 kinds.append(("number", float(b)))
             elif DATETIME.match(b):

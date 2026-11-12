@@ -146,7 +146,7 @@ A second round (2026-11-12) answered the open questions with the strongest evide
 | 77 written by Exabeam | 0 | 14 in 8 rules: `exabeam_legacy_regex` (4 rules, paths such as `"/var/log/"`), `exabeam_single_group` (3), `exabeam_mixed_boolean` (1) |
 | 2,294 converted from Sigma | 75 (3.3%), under RE2 and with the reference checker alike | `exabeam_single_group` (13 rules), `exabeam_mixed_boolean` (3) |
 
-The reference checker approximates RE2 with Python's `re` after refusing or rewriting the syntax the two disagree on (`\Z`, `\pL`, `\z`, `\x{…}`, `\Q…\E`, `(?<n>…)`, the `U` flag, repeat counts over 1000, a repeated assertion such as `$?`, an escaped non-ASCII character); the engine parses RE2 syntax itself.
+The reference checker approximates RE2 with Python's `re` after refusing or rewriting the syntax the two disagree on (`\Z`, `\pL`, `\z`, `\x{…}`, `\Q…\E`, `(?<n>…)`, the `U` flag, repeat counts over 1000, a repeated assertion such as `$?`, an escaped non-ASCII character, octal escapes such as `\12`, RE2's fourteen ASCII classes, capture names, nesting to 1,000 groups); the engine parses RE2 syntax itself, and the two agree on every conformance query.
 
 Each error traced is a defect in the converted rule: a `\\"` that closes a string early (`RGX(".*\\"arn\\:aws…")`), an unescaped `"` inside `RGX`, which the regex page calls an error, or a regex RE2 refuses (`.**`, `[^ \]`). The content hub's licence forbids redistribution, so the language server measures it and does not vendor it.
 
