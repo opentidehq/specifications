@@ -134,7 +134,7 @@ A section label is its name followed by `:`, case-insensitive like every keyword
 | Token | Syntax |
 |-------|--------|
 | Comment | `// …` to end of line; `/* … */`, not nested |
-| Keyword | case-insensitive: `rule`, the section names, `and`, `or`, `not`, `nocase`, `in`, `regex`, `cidr`, `any`, `all`, `over`, `by`, `before`, `after`, `if`, `of`, `true`, `false`, and in search `asc`, `desc`. YARA-L has no `null` and no `is null`: a missing field is its zero value (`""`, `0`, `false`, the first enum value). |
+| Keyword | case-insensitive (the engine recognises lower, UPPER, and Title case; a mixed-case keyword such as `aNd` is `yaral_parse_error`): `rule`, the section names, `and`, `or`, `not`, `nocase`, `in`, `regex`, `cidr`, `any`, `all`, `over`, `by`, `before`, `after`, `if`, `of`, `true`, `false`, and in search `asc`, `desc`. YARA-L has no `null` and no `is null`: a missing field is its zero value (`""`, `0`, `false`, the first enum value). |
 | Identifier | `[A-Za-z_][A-Za-z0-9_]*`. A keyword is not an identifier (`yaral_reserved_identifier`). |
 | Event or placeholder variable | `$` identifier: `$e`, `$user`. `$window_start` and `$window_end` are reserved (`yaral_reserved_identifier`). |
 | Outcome variable | `$` identifier assigned in `outcome` |
@@ -145,7 +145,7 @@ A section label is its name followed by `:`, case-insensitive like every keyword
 | String | `"…"` with the escapes `\\`, `\"`, `\n`, `\r`, `\t`; `` `…` `` raw, no escapes. An unknown escape is `yaral_string_escape`. |
 | Regular expression | `/…/`, optionally followed by `nocase`. RE2 syntax (`yaral_regex`). `\/` is a literal slash. |
 | Integer, float | non-negative decimal: `5`, `3.5`. A sign is the unary operator. |
-| Duration | integer then `m`, `h`, or `d`, no space: `10m`, `1h`, `2d`. Search also takes `w` and `mo`. |
+| Duration | integer then `m`, `h`, or `d`, no space: `10m`, `1h`, `2d`. A search also takes `w` and `mo`, and the unit words `minute`, `hour`, `day`, `week`, `month` with an optional count (`by day`, `over every 2 hour`), as Google's statistics and multi-stage pages write them; a search window in `w`, `mo`, or a unit word is not bound-checked. |
 | Operators | `=`, `!=`, `<`, `<=`, `>`, `>=`, `+`, `-`, `*`, `/`; `[ ]` for map and array index; `.` for field paths and function namespaces |
 
 Precedence from highest: `not` (and `!`), `and`, `or`. In `events`, lines are joined by an implicit `and`, which binds after any explicit `or` on a line.
@@ -187,7 +187,7 @@ Outcome names with platform meaning:
 
 ### `condition`
 
-- Every event variable of `events` MUST appear in `condition`, and a name in `condition` MUST be defined (`yaral_undefined_variable`).
+- Every event variable of `events` MUST be referenced by `condition`, directly (`$e`, `#e`) or through a placeholder or outcome variable it binds, as Google's condition page allows; a name in `condition` MUST be defined (`yaral_undefined_variable`).
 - `$e` means `#e > 0`. Bounded terms are `$e` and `#e > n`; unbounded terms are `!$e`, `#e = 0`, and `#e < n`.
 - Event and placeholder terms are negated with `!`, never `not`, and are never separated by commas (`yaral_condition_shape`).
 - `or` may join at most 2 event variables in a rule, and 3 in a search; `or` is refused in an unbounded condition, and an `or` among event and placeholder terms needs the whole group in parentheses (`yaral_condition_shape`).
@@ -210,10 +210,10 @@ Data tables (`%table.column`) replace reference lists, which Google retires in 2
 
 ### Function catalogue
 
-The engine ships Google's function list with each function's namespace, arity, argument and result types, and availability (rules, search, dashboards). Namespaces: `arrays`, `bytes`, `cast`, `hash`, `math`, `metrics`, `net`, `optimization`, `re`, `strings`, `timestamp`, `window`, plus `fingerprint`, `group`, `if`, and `sample_rate`. Calls nest at most 20 deep (`yaral_nesting_depth`).
+The engine ships Google's function list with each function's namespace, arity, argument and result types, and availability (rules, search, dashboards). Namespaces: `arrays`, `bytes`, `cast`, `hash`, `math`, `metrics`, `net`, `optimization`, `re`, `strings`, `timestamp`, `window`, plus the bare `group` and `if`. Two functions used on Google's syntax pages but missing from its functions page, `arrays.contains` and `cast.as_uint`, are in the catalogue with that evidence. Calls nest at most 20 deep (`yaral_nesting_depth`).
 
 - An unknown namespace or function, or the wrong number of arguments, is `yaral_unknown_function`.
-- A function the profile does not offer is `yaral_function_unavailable`. Under `rule`, that is `group` and `math.round`; under `search`, `fingerprint`, `hash.sha256`, `math.geo_distance`, `metrics.*`, `sample_rate`, and every `window.*` function except `window.range`.
+- A function the profile does not offer is `yaral_function_unavailable`. Under `rule`, that is `group` and `math.round`; under `search`, `hash.fingerprint2011`, `hash.sha256`, `math.geo_distance`, `metrics.*`, `optimization.sample_rate`, and every `window.*` function except `window.range`.
 
 The catalogue is generated from [YARA-L functions](https://cloud.google.com/chronicle/docs/yara-l/functions) by a sync script in language-server (`catalogs/yaral/functions.toml`), as the GravityZone criteria are.
 
@@ -241,7 +241,7 @@ Field paths are checked against the Unified Data Model: the event model (`metada
 | `yaral_section_unavailable` | A section the profile does not have (`dedup` in a rule, `options` in a search) |
 | `yaral_meta_duplicate` | A meta key appears twice, or a meta value is not a double-quoted string |
 | `yaral_reserved_identifier` | A keyword used as a rule name, meta key, or variable; `$window_start`, `$window_end` |
-| `yaral_undefined_variable` | A `$name` or `#name` in `match`, `outcome`, or `condition` that `events` or `outcome` does not define; an event variable of `events` absent from `condition` |
+| `yaral_undefined_variable` | A `$name` or `#name` in `match`, `outcome`, `condition`, `export`, `dedup`, or `order` that `events` or `outcome` does not define; an event variable that `condition` references neither directly nor through a placeholder or outcome it binds |
 | `yaral_multi_event_match` | Two or more event variables without a `match` section |
 | `yaral_match_shape` | A `YaraLMatch` outside its field table |
 | `yaral_match_variable` | A `match` name that is not a placeholder bound in `events` |
@@ -383,4 +383,5 @@ Fixtures: [fixtures/platforms/google-secops.yaml](../../fixtures/platforms/googl
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-11-12 | Clarifications from the language-server implementation, checked against Google's pages and the 410 community rules: `condition` may reference an event variable through a placeholder or outcome it binds; `yaral_undefined_variable` also covers `export`, `dedup`, and `order`; function names are `hash.fingerprint2011` and `optimization.sample_rate`, and `arrays.contains` and `cast.as_uint` are catalogued; search durations take unit words; mixed-case keywords are a parse error. No code is added or removed. |
 | 1.0 | 2026-11-11 | Initial language spec ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md)): `YaraLRule`, `YaraLSections` (section texts as keys, `match` and `options` as YAML objects), and `YaraLSearch`; the `rule` and `search` profiles; sections, lexical structure, expressions, and limits from Google's YARA-L pages; UDM and function catalogues; 28 error and 4 warning codes; HighlightSpec mapping with no new capture. |
