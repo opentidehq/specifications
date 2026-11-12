@@ -167,7 +167,7 @@ Precedence from highest: `not` (and `!`), `and`, `or`. In `events`, lines are jo
 |------|--------|--------|
 | `$a, $b over <d>` | hop | rule: `1m` ≤ d ≤ `14d`; search: `1m` ≤ d ≤ `48h` |
 | `$a, $b over <d> before $pivot` / `after $pivot` | sliding, anchored on a UDM event variable (never an entity) | rule: `1m` ≤ d ≤ `14d`; search: `1m` ≤ d ≤ `48h` |
-| `$a, $b by <d>` | tumbling (Google: pre-GA) | rule: `1m` ≤ d ≤ `72h`; search: `1m` ≤ d ≤ `30d` without joins, `48h` with |
+| `$a, $b by <d>` | tumbling (Google: pre-GA) | rule: `1m` ≤ d ≤ `72h`; search: `1m` ≤ d ≤ `30d` without a join, `48h` with one. A search joins when it has a `cross join`, two or more event variables, or event predicates together with reads of an earlier stage |
 
 Google's pages disagree on the hop bound: `match` syntax says 48 hours, while the run-frequency reference (`DAILY` for windows over 2 days) and composite detections allow 14 days. The engine follows the rules engine: 14 days for a rule, 48 hours for a search ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md#resolved-questions)).
 
@@ -249,7 +249,7 @@ Field paths are checked against the Unified Data Model: the event model (`metada
 | `yaral_condition_shape` | `not` or a comma on event and placeholder terms, `or` across more event variables than the profile allows, `or` in an unbounded condition, or non-existence without a window and a bounded event |
 | `yaral_nocase_on_enum` | `nocase` on a comparison with an enumerated field |
 | `yaral_outcome_limit` | More than 20 outcome variables |
-| `yaral_outcome_aggregation` | An event field outside an aggregation in a rule with `match`, or an aggregation of an outcome variable |
+| `yaral_outcome_aggregation` | In a text with `match`, an event field or a non-`match` placeholder used in `outcome` outside an aggregation; an aggregation of an outcome variable |
 | `yaral_unknown_function` | Unknown function, or the wrong number of arguments |
 | `yaral_function_unavailable` | A function the profile does not offer |
 | `yaral_unknown_udm_field` | A field path the UDM catalogue does not have |
@@ -258,7 +258,7 @@ Field paths are checked against the Unified Data Model: the event model (`metada
 | `yaral_regex` | An invalid RE2 expression in a regex literal or `re.*` argument |
 | `yaral_reference_list_limit` | More `in` statements than the profile allows |
 | `yaral_option` | An unknown option, or a value of the wrong kind |
-| `yaral_export_value` | An `export` `write_row` value that is not an outcome variable (a placeholder, a match variable, or a field): Google exports outcome variables only |
+| `yaral_export_value` | An `export` `write_row` value Google does not export: in a rule, anything but an outcome variable; in a search, a `match` variable (a search may also write scalar fields, as Google's data-tables page shows) |
 | `yaral_window_bound` | `window_start` or `window_end` in `events`, or in a text with no `match` window |
 
 #### Warnings
@@ -388,6 +388,6 @@ Fixtures: [fixtures/platforms/google-secops.yaml](../../fixtures/platforms/googl
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.1 | 2026-11-12 | From a conformance review that ran Google's 765 documented code blocks and 410 community rules through the engine: multi-stage searches (stages and roots that read earlier stages need no `events`, `cross join`, four stages), sliding windows and the `window.*` functions in search, search tumbling windows up to 30 days, `w` and `mo` bound-checked, search grouped fields, `raw`, and top-level maps, `meta` optional in a search, keywords case-insensitive in any mix, `metrics.*` with named arguments and `filter:`, `math.round` with one argument. `yaral_string_escape` is a warning; `yaral_nesting_depth` is removed (Google no longer documents the limit). New errors `yaral_export_value` and `yaral_window_bound`; `yaral_outcome_aggregation` covers non-match placeholders; `any`/`all` on a Struct map is `yaral_type`. A list of the compile errors only the tenant checks. |
+| 1.1 | 2026-11-12 | (Settled during implementation: `yaral_export_value` in a search refuses `match` variables only; what a search join is, for the tumbling bound; the `yaral_outcome_aggregation` row matches the prose.) From a conformance review that ran Google's 765 documented code blocks and 410 community rules through the engine: multi-stage searches (stages and roots that read earlier stages need no `events`, `cross join`, four stages), sliding windows and the `window.*` functions in search, search tumbling windows up to 30 days, `w` and `mo` bound-checked, search grouped fields, `raw`, and top-level maps, `meta` optional in a search, keywords case-insensitive in any mix, `metrics.*` with named arguments and `filter:`, `math.round` with one argument. `yaral_string_escape` is a warning; `yaral_nesting_depth` is removed (Google no longer documents the limit). New errors `yaral_export_value` and `yaral_window_bound`; `yaral_outcome_aggregation` covers non-match placeholders; `any`/`all` on a Struct map is `yaral_type`. A list of the compile errors only the tenant checks. |
 | 1.0 | 2026-11-12 | Clarifications from the language-server implementation, checked against Google's pages and the 410 community rules: `condition` may reference an event variable through a placeholder or outcome it binds; `yaral_undefined_variable` also covers `export`, `dedup`, and `order`; function names are `hash.fingerprint2011` and `optimization.sample_rate`, and `arrays.contains` and `cast.as_uint` are catalogued; search durations take unit words; mixed-case keywords are a parse error. No code is added or removed. |
 | 1.0 | 2026-11-11 | Initial language spec ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md)): `YaraLRule`, `YaraLSections` (section texts as keys, `match` and `options` as YAML objects), and `YaraLSearch`; the `rule` and `search` profiles; sections, lexical structure, expressions, and limits from Google's YARA-L pages; UDM and function catalogues; 28 error and 4 warning codes; HighlightSpec mapping with no new capture. |
