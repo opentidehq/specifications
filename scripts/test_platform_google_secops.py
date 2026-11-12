@@ -82,17 +82,18 @@ LANGUAGE_ERRORS = [
     "yaral_enum_value",
     "yaral_type",
     "yaral_regex",
-    "yaral_string_escape",
     "yaral_reference_list_limit",
     "yaral_option",
+    "yaral_export_value",
+    "yaral_window_bound",
     "yaral_nocase_on_enum",
-    "yaral_nesting_depth",
 ]
 LANGUAGE_WARNINGS = [
     "yaral_deprecated_field",
     "yaral_unfiltered_event",
     "yaral_leading_wildcard_regex",
     "yaral_reference_list_deprecated",
+    "yaral_string_escape",
 ]
 
 

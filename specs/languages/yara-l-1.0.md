@@ -1,6 +1,6 @@
 ---
 spec: language-yara-l
-version: "1.0"
+version: "1.1"
 schema_id: null
 status: normative
 supersedes: null
@@ -104,7 +104,7 @@ A profile names which sections, functions, and data a text may use. The engine p
 | Profile | Used by | Sections | `meta` |
 |---------|---------|----------|--------|
 | `rule` | `YaraLRule`, `YaraLSections` | `meta`, `setup`, `events`, `match`, `outcome`, `condition`, `options`, `export` | required in a `YaraLRule`; generated for `YaraLSections` |
-| `search` | `YaraLSearch` | `events` (label optional), `match`, `outcome`, `condition`, `dedup`, `order`, `limit`, `select`, `unselect`, and named `stage <name> { … }` blocks (multi-stage search) | not used: Google ignores it in search, so it is `yaral_section_unavailable` |
+| `search` | `YaraLSearch` | `events` (label optional), `match`, `outcome`, `condition`, `dedup`, `order`, `limit`, `select`, `unselect`, and up to four named `stage <name> { … }` blocks with a root query (multi-stage search) | optional and ignored, as Google's getting-started table says |
 
 ### Sections
 
@@ -114,7 +114,7 @@ Sections appear at most once, in this order. A section out of order or repeated 
 |---|---------|--------|----------|---------|
 | 1 | `meta` | required (`YaraLRule`) | — | `key = "value"` lines. Keys are identifiers, values double-quoted strings. A key appears once (`yaral_meta_duplicate`). |
 | 2 | `setup` | optional | — | Entity-graph enrichment from data tables: `graph_override`, `graph_append`, `graph_exclude` |
-| 3 | `events` | required | required | Predicates on event variables, placeholder assignments, function calls. Lines are joined by an implicit `and`. |
+| 3 | `events` | required | required, except in a stage or root query that reads only earlier stages (`$stage.field`), which may hold only `match`, `outcome`, and the later sections | Predicates on event variables, placeholder assignments, function calls. Lines are joined by an implicit `and`. A search may join two stages with `cross join $a, $b`. |
 | 4 | `match` | optional; required with two or more event variables (`yaral_multi_event_match`) | optional | `<placeholders> over <window>`, `by <window>`, or `over <window> before\|after $pivot` |
 | 5 | `outcome` | optional | optional | `$name = <expression>` assignments, at most 20 (`yaral_outcome_limit`) |
 | 6 | `condition` | required | optional | Boolean expression over event variables, placeholders (`#name` counts), and outcome variables |
@@ -134,7 +134,7 @@ A section label is its name followed by `:`, case-insensitive like every keyword
 | Token | Syntax |
 |-------|--------|
 | Comment | `// …` to end of line; `/* … */`, not nested |
-| Keyword | case-insensitive (the engine recognises lower, UPPER, and Title case; a mixed-case keyword such as `aNd` is `yaral_parse_error`): `rule`, the section names, `and`, `or`, `not`, `nocase`, `in`, `regex`, `cidr`, `any`, `all`, `over`, `by`, `before`, `after`, `if`, `of`, `true`, `false`, and in search `asc`, `desc`. YARA-L has no `null` and no `is null`: a missing field is its zero value (`""`, `0`, `false`, the first enum value). |
+| Keyword | case-insensitive, in any mix of cases (`and`, `AND`, `aNd`): `rule`, the section names, `and`, `or`, `not`, `nocase`, `in`, `regex`, `cidr`, `any`, `all`, `over`, `by`, `before`, `after`, `if`, `of`, `true`, `false`, and in search `asc`, `desc`. YARA-L has no `null` and no `is null`: a missing field is its zero value (`""`, `0`, `false`, the first enum value). |
 | Identifier | `[A-Za-z_][A-Za-z0-9_]*`. A keyword is not an identifier (`yaral_reserved_identifier`). |
 | Event or placeholder variable | `$` identifier: `$e`, `$user`. `$window_start` and `$window_end` are reserved (`yaral_reserved_identifier`). |
 | Outcome variable | `$` identifier assigned in `outcome` |
@@ -142,10 +142,10 @@ A section label is its name followed by `:`, case-insensitive like every keyword
 | Reference list | `%` identifier |
 | Data table column | `%` identifier `.` identifier |
 | Window bound | `window_start`, `window_end` (bare) in `outcome`, `condition`, and `order`, with a `match` window |
-| String | `"…"` with the escapes `\\`, `\"`, `\n`, `\r`, `\t`; `` `…` `` raw, no escapes. An unknown escape is `yaral_string_escape`. |
+| String | `"…"` with the escapes `\\`, `\"`, `\n`, `\r`, `\t`; `` `…` `` raw, no escapes. Any other escape is the warning `yaral_string_escape`: Google documents only these, yet its own examples and community rules use `\.`, `\T`, and `\L`, so the compiler's verdict is not known offline. |
 | Regular expression | `/…/`, optionally followed by `nocase`. RE2 syntax (`yaral_regex`). `\/` is a literal slash. |
 | Integer, float | non-negative decimal: `5`, `3.5`. A sign is the unary operator. |
-| Duration | integer then `m`, `h`, or `d`, no space: `10m`, `1h`, `2d`. A search also takes `w` and `mo`, and the unit words `minute`, `hour`, `day`, `week`, `month` with an optional count (`by day`, `over every 2 hour`), as Google's statistics and multi-stage pages write them; a search window in `w`, `mo`, or a unit word is not bound-checked. |
+| Duration | integer then `m`, `h`, or `d`, no space: `10m`, `1h`, `2d`. A search also takes `w` (7 days) and `mo` (30 days), and the unit words `minute`, `hour`, `day`, `week`, `month` with an optional count (`by day`, `over every 2 hour`), as Google's statistics and multi-stage pages write them; every unit is bound-checked by its length in minutes. |
 | Operators | `=`, `!=`, `<`, `<=`, `>`, `>=`, `+`, `-`, `*`, `/`; `[ ]` for map and array index; `.` for field paths and function namespaces |
 
 Precedence from highest: `not` (and `!`), `and`, `or`. In `events`, lines are joined by an implicit `and`, which binds after any explicit `or` on a line.
@@ -166,22 +166,22 @@ Precedence from highest: `not` (and `!`), `and`, `or`. In `events`, lines are jo
 | Form | Window | Bounds |
 |------|--------|--------|
 | `$a, $b over <d>` | hop | rule: `1m` ≤ d ≤ `14d`; search: `1m` ≤ d ≤ `48h` |
-| `$a, $b over <d> before $pivot` / `after $pivot` | sliding, anchored on an event variable; rules only | `1m` ≤ d ≤ `14d` |
-| `$a, $b by <d>` | tumbling (Google: pre-GA) | `1m` ≤ d ≤ `72h` |
+| `$a, $b over <d> before $pivot` / `after $pivot` | sliding, anchored on a UDM event variable (never an entity) | rule: `1m` ≤ d ≤ `14d`; search: `1m` ≤ d ≤ `48h` |
+| `$a, $b by <d>` | tumbling (Google: pre-GA) | rule: `1m` ≤ d ≤ `72h`; search: `1m` ≤ d ≤ `30d` without joins, `48h` with |
 
-Google's pages disagree on the hop bound: `match` syntax says 48 hours, while the run-frequency reference (`DAILY` for windows over 2 days) and composite detections allow 14 days. The engine follows the rules engine: 14 days for a rule, 48 hours for a search ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md#unresolved-questions)).
+Google's pages disagree on the hop bound: `match` syntax says 48 hours, while the run-frequency reference (`DAILY` for windows over 2 days) and composite detections allow 14 days. The engine follows the rules engine: 14 days for a rule, 48 hours for a search ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md#resolved-questions)).
 
-A window outside its bounds, or with a unit other than `m`, `h`, or `d`, is `yaral_match_window`. Under `rule`, every name before `over` or `by` MUST be a placeholder bound in `events` (`yaral_match_variable`). Under `search`, a bare UDM path (`principal.ip`) also groups, and the window is optional. In a search, predicates name fields without an event variable (`metadata.event_type = "USER_LOGIN"`); `$e.`-prefixed paths are also accepted. Google drops zero values of match placeholders unless `options: allow_zero_values = true`; the engine reports nothing for this.
+A window outside its bounds, or with a unit other than `m`, `h`, or `d`, is `yaral_match_window`. Under `rule`, every name before `over` or `by` MUST be a placeholder bound in `events` (`yaral_match_variable`). Under `search`, a bare UDM path (`principal.ip`) also groups, and the window is optional. In a search, predicates name fields without an event variable (`metadata.event_type = "USER_LOGIN"`); `$e.`-prefixed paths are also accepted, and so are the grouped fields of Google's [search syntax reference](https://cloud.google.com/chronicle/docs/investigation/search-syntax-reference) (`ip`, `hostname`, `user`, `hash`, …), `raw = /…/` for raw-log search, and top-level maps (`labels["k"]`). Google drops zero values of match placeholders unless `options: allow_zero_values = true`; the engine reports nothing for this.
 
 ### `outcome`
 
-At most 20 outcome variables. With a `match` section, an outcome that reads an event field MUST wrap it in an aggregation (`yaral_outcome_aggregation`). Under `rule` the aggregations are `count`, `count_distinct`, `sum`, `max`, `min`, `array`, and `array_distinct`, plus the `window.*` functions (`window.avg`, `window.stddev`, `window.first`, …); `array` and `array_distinct` keep at most 25 values. Under `search`, `avg`, `stddev`, `earliest`, and `latest` are also aggregations, and arrays keep 1,000 values. A bare `avg` in a rule is `yaral_function_unavailable`. An outcome variable used in another outcome is not aggregated again (`yaral_outcome_aggregation`). An outcome MUST NOT introduce a placeholder or an event variable that `events` does not define (`yaral_undefined_variable`).
+At most 20 outcome variables. With a `match` section, an outcome that reads an event field, or a placeholder that is not a `match` variable, MUST wrap it in an aggregation (`yaral_outcome_aggregation`). Under `rule` the aggregations are `count`, `count_distinct`, `sum`, `max`, `min`, `array`, and `array_distinct`, plus the `window.*` functions (`window.avg`, `window.stddev`, `window.first`, …); `array` and `array_distinct` keep at most 25 values. Under `search`, `avg`, `stddev`, `earliest`, and `latest` are also aggregations, and arrays keep 1,000 values. A bare `avg` in a rule is `yaral_function_unavailable`. An outcome variable used in another outcome is not aggregated again (`yaral_outcome_aggregation`). An outcome MUST NOT introduce a placeholder or an event variable that `events` does not define (`yaral_undefined_variable`).
 
 Outcome names with platform meaning:
 
 | Variable | Meaning |
 |----------|---------|
-| `$risk_score` | Integer or float, stored in `security_result.risk_score`. Google defaults it to 40 on an alerting rule and 15 otherwise. |
+| `$risk_score` | Integer or float, stored in `security_result.risk_score`. Without it Google uses the instance's default: 40 on an alerting rule and 15 otherwise, unless the instance's settings change them. |
 | `$risk_entity_to_score`, `$risk_entity_to_score_<suffix>` | The user or asset the risk score is attributed to |
 | `$suppression_key` | The key `options: suppression_window` suppresses on, for single-event rules |
 
@@ -210,10 +210,10 @@ Data tables (`%table.column`) replace reference lists, which Google retires in 2
 
 ### Function catalogue
 
-The engine ships Google's function list with each function's namespace, arity, argument and result types, and availability (rules, search, dashboards). Namespaces: `arrays`, `bytes`, `cast`, `hash`, `math`, `metrics`, `net`, `optimization`, `re`, `strings`, `timestamp`, `window`, plus the bare `group` and `if`. Two functions used on Google's syntax pages but missing from its functions page, `arrays.contains` and `cast.as_uint`, are in the catalogue with that evidence. Calls nest at most 20 deep (`yaral_nesting_depth`).
+The engine ships Google's function list with each function's namespace, arity, argument and result types, and availability (rules, search, dashboards). Namespaces: `arrays`, `bytes`, `cast`, `hash`, `math`, `metrics`, `net`, `optimization`, `re`, `strings`, `timestamp`, `window`, plus the bare `group` and `if`. Two functions used on Google's syntax pages but missing from its functions page, `arrays.contains` and `cast.as_uint`, are in the catalogue with that evidence. Every `metrics.*` function on Google's [metrics functions](https://cloud.google.com/chronicle/docs/detection/metrics-functions) page is catalogued, with its named arguments: `period:`, `window:`, `metric:`, `agg:`, and `filter:`, whose value is a boolean expression over the metric's own fields (`value_sum > 10 AND event_count_sum > 2`), and grouping arguments that take `*`. `math.round` takes one or two arguments.
 
 - An unknown namespace or function, or the wrong number of arguments, is `yaral_unknown_function`.
-- A function the profile does not offer is `yaral_function_unavailable`. Under `rule`, that is `group` and `math.round`; under `search`, `hash.fingerprint2011`, `hash.sha256`, `math.geo_distance`, `metrics.*`, `optimization.sample_rate`, and every `window.*` function except `window.range`.
+- A function the profile does not offer is `yaral_function_unavailable`. Under `rule`, that is `group` and `math.round`; under `search`, `hash.fingerprint2011`, `hash.sha256`, `math.geo_distance`, `metrics.*`, and `optimization.sample_rate`. The `window.*` functions are offered in both profiles: the functions page marks most of them rules-only, but Google's own multi-stage, dashboard, and SPL-transition searches use `window.avg`, `window.stddev`, `window.median`, `window.first`, and `window.last`.
 
 The catalogue is generated from [YARA-L functions](https://cloud.google.com/chronicle/docs/yara-l/functions) by a sync script in language-server (`catalogs/yaral/functions.toml`), as the GravityZone criteria are.
 
@@ -248,18 +248,18 @@ Field paths are checked against the Unified Data Model: the event model (`metada
 | `yaral_match_window` | A window outside the [bounds](#match) of its kind and profile, or with another unit |
 | `yaral_condition_shape` | `not` or a comma on event and placeholder terms, `or` across more event variables than the profile allows, `or` in an unbounded condition, or non-existence without a window and a bounded event |
 | `yaral_nocase_on_enum` | `nocase` on a comparison with an enumerated field |
-| `yaral_nesting_depth` | Function calls nested more than 20 deep |
 | `yaral_outcome_limit` | More than 20 outcome variables |
 | `yaral_outcome_aggregation` | An event field outside an aggregation in a rule with `match`, or an aggregation of an outcome variable |
 | `yaral_unknown_function` | Unknown function, or the wrong number of arguments |
 | `yaral_function_unavailable` | A function the profile does not offer |
 | `yaral_unknown_udm_field` | A field path the UDM catalogue does not have |
 | `yaral_enum_value` | A value outside an enumerated field's values |
-| `yaral_type` | An operator or function applied to the wrong type (`#e > "5"`, `any` on a map index, `nocase` on a number) |
+| `yaral_type` | An operator or function applied to the wrong type (`#e > "5"`, `any` or `all` on a map index, Label or Struct, `nocase` on a number) |
 | `yaral_regex` | An invalid RE2 expression in a regex literal or `re.*` argument |
-| `yaral_string_escape` | An unknown escape in a double-quoted string |
 | `yaral_reference_list_limit` | More `in` statements than the profile allows |
 | `yaral_option` | An unknown option, or a value of the wrong kind |
+| `yaral_export_value` | An `export` `write_row` value that is not an outcome variable (a placeholder, a match variable, or a field): Google exports outcome variables only |
+| `yaral_window_bound` | `window_start` or `window_end` in `events`, or in a text with no `match` window |
 
 #### Warnings
 
@@ -268,7 +268,12 @@ Field paths are checked against the Unified Data Model: the event model (`metada
 | `yaral_deprecated_field` | A UDM field the catalogue marks deprecated |
 | `yaral_unfiltered_event` | An event variable with no equality on `metadata.event_type`, `metadata.log_type`, or `metadata.product_name`: the rule scans every event ([best practices](https://cloud.google.com/chronicle/docs/detection/yara-l-best-practices)) |
 | `yaral_leading_wildcard_regex` | A regex that starts with `.*` and is not anchored: RE2 matches unanchored already, and the prefix only costs time |
+| `yaral_string_escape` | An escape other than `\\`, `\"`, `\n`, `\r`, `\t` in a double-quoted string |
 | `yaral_reference_list_deprecated` | A reference list (`%list` without a column). Google deprecates reference lists from May 2027 and migrates them to data tables by July 2027 ([deprecations](https://cloud.google.com/chronicle/docs/deprecations)) |
+
+#### Checked by the tenant only
+
+Google documents more compile errors than the engine reports. These pass offline and fail `verifyRuleText` (`--live`), which is the authority: an event variable joined to no other; arithmetic joins; a function-to-placeholder assignment over zero or two event variables; a placeholder used only with `!=`; entity-only rules and an entity as a sliding pivot; `any` on a scalar, in a join, in an assignment, or with a reference list, and index-with-`any` forms; `or` or `N of` with a tumbling window; conditions mixing UDM and non-UDM variables, or an unbounded `N of`; a string outcome compared with `<`; data-table `setup` limits (at most two operations, one per entity variable) and mixed `=`/`in` lookups; a parenthesised arithmetic expression at the start of a predicate and two `/` on one line; more than four stages, and a reference to an undefined stage; unsigned-integer arithmetic with an integer literal. The engine never reports one of these as another code.
 
 Codes are stable. The language server's `docs/YARAL.md` maps each one to the Google page it comes from and the test that proves it, as `docs/YARA.md` does for YARA.
 
@@ -383,5 +388,6 @@ Fixtures: [fixtures/platforms/google-secops.yaml](../../fixtures/platforms/googl
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-11-12 | From a conformance review that ran Google's 765 documented code blocks and 410 community rules through the engine: multi-stage searches (stages and roots that read earlier stages need no `events`, `cross join`, four stages), sliding windows and the `window.*` functions in search, search tumbling windows up to 30 days, `w` and `mo` bound-checked, search grouped fields, `raw`, and top-level maps, `meta` optional in a search, keywords case-insensitive in any mix, `metrics.*` with named arguments and `filter:`, `math.round` with one argument. `yaral_string_escape` is a warning; `yaral_nesting_depth` is removed (Google no longer documents the limit). New errors `yaral_export_value` and `yaral_window_bound`; `yaral_outcome_aggregation` covers non-match placeholders; `any`/`all` on a Struct map is `yaral_type`. A list of the compile errors only the tenant checks. |
 | 1.0 | 2026-11-12 | Clarifications from the language-server implementation, checked against Google's pages and the 410 community rules: `condition` may reference an event variable through a placeholder or outcome it binds; `yaral_undefined_variable` also covers `export`, `dedup`, and `order`; function names are `hash.fingerprint2011` and `optimization.sample_rate`, and `arrays.contains` and `cast.as_uint` are catalogued; search durations take unit words; mixed-case keywords are a parse error. No code is added or removed. |
 | 1.0 | 2026-11-11 | Initial language spec ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md)): `YaraLRule`, `YaraLSections` (section texts as keys, `match` and `options` as YAML objects), and `YaraLSearch`; the `rule` and `search` profiles; sections, lexical structure, expressions, and limits from Google's YARA-L pages; UDM and function catalogues; 28 error and 4 warning codes; HighlightSpec mapping with no new capture. |

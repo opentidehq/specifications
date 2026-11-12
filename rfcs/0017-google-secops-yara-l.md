@@ -16,7 +16,7 @@ Add an eleventh detection platform, `google_secops` (display name **Google Secur
 - The block holds the rule's **sections as keys**: `events`, `outcome`, and `condition` (and `setup`, `export`) as YARA-L text, and `match` and `options` as YAML objects. Deploy assembles the rule: `rule <derived name> {`, a generated `meta:` section (author, description, severity, priority, ATT&CK technique ids, `opentide_uuid`, `opentide_version`, extra keys), then each section under its label.
 - Deploy goes through the Chronicle API **v1**: `verifyRuleText`, `rules.create`, `rules.patch` (text), and `rules.updateDeployment` (enabled, alerting, run frequency, archive). The rule id (`ru_<uuid>`) lives in [deployment state](../specs/deployment-state.md).
 - `PREVIEW` deploys a running, **non-alerting** rule; `RELEASE` an alerting one. `DELETION` archives by default and never deletes detections.
-- `verifyRuleText` is a real tenant compile that creates nothing, so `google_secops` joins the `--live` allowlist. The analysis engine checks YARA-L offline with 28 error and 4 warning codes, from a UDM field catalogue and a function catalogue generated from Google's pages.
+- `verifyRuleText` is a real tenant compile that creates nothing, so `google_secops` joins the `--live` allowlist. The analysis engine checks YARA-L offline with 28 error and 5 warning codes, from a UDM field catalogue and a function catalogue generated from Google's pages.
 - YARA-L is highlighted with the existing HighlightSpec captures; no capture is added.
 - Hunts (`response.procedure.searches[]` with `system: google_secops`) are YARA-L searches, checked under a `search` profile and runnable with `opentide query` through `udmSearch`.
 

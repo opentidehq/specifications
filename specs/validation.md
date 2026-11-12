@@ -99,7 +99,7 @@ The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#a
 
 ### Language diagnostics
 
-A language spec MAY define diagnostics with stable codes. Its errors fail static validation like a constraint code. Its warnings are reported like advisories and never set `VALIDATION_ERROR_RAISED`. The YARA codes are in [yara-1.0](languages/yara-1.0.md#diagnostics): every `yara_*` error fails the rule, and the warnings are `yara_x_incompatible`, `yara_slow_pattern`, `yara_entrypoint_deprecated`, `yara_suspicious_expression`, `yara_module_unconfirmed`, and `yara_meta_missing`. The YARA-L codes are in [yara-l-1.0](languages/yara-l-1.0.md#diagnostics): every `yaral_*` error fails the rule, and the warnings are `yaral_deprecated_field`, `yaral_unfiltered_event`, `yaral_leading_wildcard_regex`, and `yaral_reference_list_deprecated`.
+A language spec MAY define diagnostics with stable codes. Its errors fail static validation like a constraint code. Its warnings are reported like advisories and never set `VALIDATION_ERROR_RAISED`. The YARA codes are in [yara-1.0](languages/yara-1.0.md#diagnostics): every `yara_*` error fails the rule, and the warnings are `yara_x_incompatible`, `yara_slow_pattern`, `yara_entrypoint_deprecated`, `yara_suspicious_expression`, `yara_module_unconfirmed`, and `yara_meta_missing`. The YARA-L codes are in [yara-l-1.0](languages/yara-l-1.0.md#diagnostics): every `yaral_*` error fails the rule, and the warnings are `yaral_deprecated_field`, `yaral_unfiltered_event`, `yaral_leading_wildcard_regex`, `yaral_reference_list_deprecated`, and `yaral_string_escape`.
 
 ### Query validation
 
