@@ -55,11 +55,11 @@ A query is in the **advanced form** when it starts with `SELECT`, `WHERE`, `FROM
 | Boolean | `true` and `false`, in any case. |
 | Null | `null`, in any case and unquoted. `field:null` matches a missing field; `field:"null"` is the string `null`. There is no `exists`. `NOT field:null` is the exists check. `NOT ip:[cidr]` keeps events whose `ip` is null; add `AND NOT ip:null` to drop them. |
 | IPv4 / IPv6 address | Unquoted (`10.0.0.1`). |
-| Datetime | `YYYY-MM-DDThh:mm:ss[.sss][Z|±hh:mm]` (UTC when no zone), or, on a [time field](#filter-semantics), epoch milliseconds (10 or more digits). Inside a range only. Datetimes compare as instants. |
+| Datetime | `YYYY-MM-DDThh:mm:ss[.sss][Z\|±hh:mm]` (UTC when no zone), or, on a [time field](#filter-semantics), epoch milliseconds (10 or more digits). Inside a range only. Datetimes compare as instants. |
 | Filter operators | `AND`, `OR`, `NOT`, `TO`, `IN`, in any case. Exabeam recommends upper case. None of them is ever free text: where a term should be, one is a missing operand (`exabeam_parse_error`). Quote it to search for the word. |
 | Filter functions | `RGX`, `RGXi`, `WLD`, `WLDi`, in any case (`rgx`, `Wld`). A word followed by `(`, with or without spaces between, is always a call: `failed (a OR b)` calls the unknown function `failed`. |
 | Clause keywords | `SELECT`, `DISTINCT`, `FROM`, `WHERE`, `AS`, `GROUP-BY`, `ORDER-BY`, `ASC`, `DESC`, `LIMIT`, `FOREACH`, and the names `COUNT`, `MIN`, `MAX`, `SUM`, `AVG`, `RGX_EXTRACT`. Each is written all upper case or all lower case. Mixed case is `exabeam_keyword_case`. `GROUP-BY` and `ORDER-BY` are one word. |
-| Punctuation | `( ) [ ] { } , . |` and the comparison symbols `: = == < > <= >=` |
+| Punctuation | `( ) [ ] { } , . \|` and the comparison symbols `: = == < > <= >=` |
 
 ### Filter grammar
 
@@ -173,7 +173,7 @@ Captures are from the language server's frozen HighlightSpec ([`highlights/spec.
 |-------|---------|
 | `AND`, `OR`, `NOT`, `TO`, `IN`, and every clause keyword | `keyword` |
 | `:`, `=`, `==`, `<`, `>`, `<=`, `>=`, `*` in `SELECT *` and `COUNT(*)` | `operator` |
-| `|` between statements | `operator.pipe` |
+| `\|` between statements | `operator.pipe` |
 | `RGX`, `RGXi`, `WLD`, `WLDi`, `COUNT`, `MIN`, `MAX`, `SUM`, `AVG`, `RGX_EXTRACT` | `function.builtin` |
 | A field name (left of an operator, in `SELECT`, `GROUP-BY`, `ORDER-BY`, `FOREACH`, an aggregation, or `RGX_EXTRACT`) | `property` |
 | A context table name and column after `IN`; a `FROM` or statement `AS` name | `type` |
@@ -196,7 +196,7 @@ Codes are stable, and the engine reports each with a range. Every code that need
 
 | Code | Condition |
 |------|-----------|
-| `exabeam_parse_error` | Syntax error: an unterminated string (including one a `\\"` closes early), an unbalanced bracket, a missing operand (`AND x:"a"`, `x:"a" AND OR y:"b"`, a lone `TO`), an empty `rule` query, an empty statement around `|`, a comparison with a non-number, a clause where none can follow (`SELECT user vendor:"x"`) |
+| `exabeam_parse_error` | Syntax error: an unterminated string (including one a `\\"` closes early), an unbalanced bracket, a missing operand (`AND x:"a"`, `x:"a" AND OR y:"b"`, a lone `TO`), an empty `rule` query, an empty statement around `\|`, a comparison with a non-number, a clause where none can follow (`SELECT user vendor:"x"`) |
 | `exabeam_implicit_operator` | `NOT` with no `AND` or `OR` before it, between two terms (`a NOT b`) |
 | `exabeam_not_equal` | `!=` in a filter |
 | `exabeam_bare_wildcard` | `*` alone as a term |
