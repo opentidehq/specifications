@@ -44,7 +44,7 @@ RULES = {
 }
 
 SEVERITY = {"Informational": "Info", "Low": "Low", "Medium": "Medium", "High": "High", "Critical": "Critical"}
-FREQUENCY_PREFERENCE = ["LIVE", "LIVE_CUSTOMIZABLE", "HOURLY_CUSTOMIZABLE", "DAILY"]
+ALL_FREQUENCIES = ["LIVE", "LIVE_CUSTOMIZABLE", "HOURLY_CUSTOMIZABLE", "DAILY"]
 CONSTRAINTS = [
     "google_secops_rule_name",
     "google_secops_severity",
@@ -213,8 +213,14 @@ def run_state(rule: dict[str, Any], strategy: str, allowed: list[str]) -> tuple[
     if strategy == "DISABLEMENT":
         return "enabled,alerting", {"enabled": False, "alerting": False}
     alerting = block.get("alerting", strategy != "PREVIEW")
-    frequency = block.get("run_frequency") or next(f for f in FREQUENCY_PREFERENCE if f in allowed)
-    body: dict[str, Any] = {"enabled": True, "alerting": alerting, "runFrequency": frequency}
+    body: dict[str, Any] = {"enabled": True, "alerting": alerting}
+    frequency = block.get("run_frequency")
+    if frequency is None:
+        # Without a block run_frequency deploy leaves the frequency to Google (1.2).
+        return "enabled,alerting", body
+    if frequency not in allowed:
+        raise ValueError("google_secops_run_frequency_not_allowed")
+    body["runFrequency"] = frequency
     schedule = block.get("schedule")
     if schedule:
         custom: dict[str, Any] = {}
@@ -231,8 +237,8 @@ def requests(rule: dict[str, Any], setup: dict[str, Any], strategy: str, stages:
     text = assemble(rule, stages)
     base = f"/v1/{instance(setup)}"
     rule_path = f"{base}/rules/{SAMPLE_RULE_ID}"
-    mask, state = run_state(rule, strategy, FREQUENCY_PREFERENCE)
-    off_mask, off = run_state(rule, "DISABLEMENT", FREQUENCY_PREFERENCE)
+    mask, state = run_state(rule, strategy, ALL_FREQUENCIES)
+    off_mask, off = run_state(rule, "DISABLEMENT", ALL_FREQUENCIES)
     return {
         "verify": {"method": "POST", "path": f"{base}:verifyRuleText", "body": {"ruleText": text}},
         "create": {"method": "POST", "path": f"{base}/rules", "body": {"text": text}},

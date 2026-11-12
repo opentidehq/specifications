@@ -1,6 +1,6 @@
 ---
 spec: platform-google-secops
-version: "1.1"
+version: "1.2"
 schema_id: platform::google_secops::1.0
 status: normative
 supersedes: null
@@ -32,7 +32,9 @@ Deploy:
 - Deploy MUST NOT find a rule by listing (`rules.list`), by name, or by a meta value. The `opentide_uuid` meta is for analysts and audits.
 - Deploy MUST call `verifyRuleText` with the assembled text before every create and every text update, and MUST NOT create or update a rule that does not verify (`google_secops_verify_failed`).
 - Deploy MUST NOT call `rules.create` unless the returned id can be kept (`deployment_state_ignored`, `deployment_state_unpersisted`), and MUST fail the rule with `google_secops_create_no_id` when the response `name` does not end in a rule id.
-- An update MUST send the text only when it differs from the remote text, so an unchanged rule keeps its revision and its daily detection budget.
+- An update MUST send the text only when it differs from the remote text. Every text change is a new rule revision, which Google re-initialises for about an hour and whose detections are counted afresh; an unchanged rule keeps its revision.
+- Under `DISABLEMENT`, deploy MUST disable a bound rule even when its verify or text update fails: the failure is reported and the rule still stops running.
+- Deploy MUST NOT resend `POST rules` after a 5xx or no answer ([Errors](#errors)).
 - Deploy MUST NOT delete detections. A `DELETION` archives the rule, or deletes it without `force` when the tenant asks ([Deletion](#deletion)).
 - Deploy MUST NOT write to the rule file.
 
@@ -103,9 +105,9 @@ Advisories are [warnings](../validation.md#platform-advisories): validation repo
 
 | Code | When | Why |
 |------|------|-----|
-| `google_secops_risk_score_missing` | `outcome` assigns no `$risk_score`. | Google scores every alert 40 and every non-alerting detection 15, whatever the rule detects. |
+| `google_secops_risk_score_missing` | `outcome` assigns no `$risk_score`. | Google gives every detection of the rule the instance's default score (40 for an alert and 15 otherwise, unless the instance's settings change them), whatever the rule detects. |
 | `google_secops_rule_id_literal` | `events` or `condition` compares `detection.detection.rule_id` with a literal `ru_…` id. | The id differs per tenant and changes when a rule is recreated. Match the producer with `detection.detection.rule_name`, which opentide derives the same way in every tenant. |
-| `google_secops_live_frequency_unavailable` | `run_frequency` is `LIVE` and the rule has two or more event variables. | Google maps it to `LIVE_CUSTOMIZABLE`; the stored value then differs from the block on every deploy. |
+| `google_secops_live_frequency_unavailable` | `run_frequency` is `LIVE` and the rule has two or more event variables. | Google allows `LIVE` for single-event rules only, so `verifyRuleText` does not list it and deploy refuses the rule with `google_secops_run_frequency_not_allowed`. Use `LIVE_CUSTOMIZABLE`. Google also counts a single event variable with `match` and a count or outcome condition as multi-event; the advisory does not try to decide that, and deploy still refuses. |
 
 ### Rule name
 
@@ -211,13 +213,13 @@ deletion = "archive"
 | `project` | string | yes | — | The Google Cloud project bound to the SecOps instance, id or number |
 | `location` | string | yes | — | The instance's region: `us`, `eu`, `europe`, or a Google Cloud region such as `europe-west2` |
 | `instance` | string | yes | — | The SecOps customer id (a UUID) |
-| `endpoint` | string | no | `https://<location>-chronicle.googleapis.com` | The regional service endpoint |
+| `endpoint` | string | no | `https://<location>-chronicle.googleapis.com` | The regional service endpoint. Google also serves each region as `https://chronicle.<location>.rep.googleapis.com`. |
 | `credentials` | string | no | Application Default Credentials | A `$ENV` reference to a service-account key, as a JSON document or a path to one. Without it, the client uses Application Default Credentials (workload identity, `gcloud auth`). |
-| `data_access_scope` | string | no | none | A data access scope id. Sent as `scope: <instance>/dataAccessScopes/<id>` on create and update. |
+| `data_access_scope` | string | no | none | A data access scope (Data RBAC), as its id or its full resource name (`projects/…/dataAccessScopes/<id>`, used as given). Sent as `scope` on create; an existing rule whose `scope` differs is updated alone (`updateMask=scope`), so a changed or removed scope reaches every rule. Without it a rule is global. |
 | `deletion` | string | no | `archive` | `archive` or `delete` ([Deletion](#deletion)) |
 | `ssl` | bool | yes | — | Shared tenant setup (TLS verification) |
 
-The instance resource is `projects/<project>/locations/<location>/instances/<instance>`. Requests carry an OAuth 2.0 access token for the scope `https://www.googleapis.com/auth/cloud-platform`. The principal needs these permissions on the instance: `chronicle.rules.verifyRuleText`, `chronicle.rules.create`, `chronicle.rules.get`, `chronicle.rules.update`, `chronicle.rules.delete`, `chronicle.ruleDeployments.get`, `chronicle.ruleDeployments.update`, and, for `opentide query`, `chronicle.events.udmSearch`.
+The instance resource is `projects/<project>/locations/<location>/instances/<instance>`. Requests carry an OAuth 2.0 access token for the scope `https://www.googleapis.com/auth/cloud-platform`, applied as google-auth applies it: user credentials from Application Default Credentials also send their quota project (`x-goog-user-project`), without which Google refuses them. A token that cannot be obtained stops the tenant before any rule call, as `google_secops_tenant_unauthorized`; no request was sent, so it is never an unanswered create. The principal needs these permissions on the instance: `chronicle.rules.verifyRuleText`, `chronicle.rules.create`, `chronicle.rules.get`, `chronicle.rules.update`, `chronicle.rules.delete`, `chronicle.ruleDeployments.get`, `chronicle.ruleDeployments.update`, and, for `opentide query`, `chronicle.events.udmSearch`.
 
 A tenant with an unknown setup key, a literal `credentials` value, or a `deletion` other than `archive` and `delete` fails configuration load.
 
@@ -230,7 +232,8 @@ Paths are relative to `<endpoint>/v1/<instance resource>`. The rule resource is 
 | verify | `POST :verifyRuleText` with `{"ruleText": <assembled>}` |
 | create | `POST rules` with `{"text": <assembled>}`, plus `scope` |
 | get | `GET rules/<id>?view=FULL` |
-| update text | `PATCH rules/<id>?updateMask=text` with `{"text": <assembled>, "etag": <etag from get>}`, plus `scope` (and `,scope` in the mask) |
+| update text | `PATCH rules/<id>?updateMask=text` with `{"text": <assembled>, "etag": <etag from get>}` |
+| update scope | `PATCH rules/<id>?updateMask=scope` with `{"scope": <scope>, "etag": <etag>}`; an empty `scope` makes the rule global |
 | get deployment | `GET rules/<id>/deployment` |
 | update deployment | `PATCH rules/<id>/deployment?updateMask=<fields>` with those fields |
 | delete | `DELETE rules/<id>` (never with `force=true`) |
@@ -241,28 +244,32 @@ Paths are relative to `<endpoint>/v1/<instance resource>`. The rule resource is 
 
 | Block status strategy | `enabled` | `alerting` | `runFrequency` |
 |-----------------------|-----------|------------|----------------|
-| `PREVIEW` | `true` | block `alerting`, else `false` | block `run_frequency`, else the first of `LIVE`, `LIVE_CUSTOMIZABLE`, `HOURLY_CUSTOMIZABLE`, `DAILY` in verify's `allowedRunFrequencies` |
+| `PREVIEW` | `true` | block `alerting`, else `false` | block `run_frequency`; not sent when the block names none |
 | `RELEASE`, `UNIVERSAL` | `true` | block `alerting`, else `true` | as above |
 | `DISABLEMENT` | `false` | `false` | not sent |
 
-A preview rule runs and records detections without raising alerts, so a staging rule is measured against live data before it pages anyone. `runFrequency` is sent with `scheduleCustomizations` when `schedule` is set. A `run_frequency` that verify does not allow fails the rule with `google_secops_run_frequency_not_allowed` before any write.
+A preview rule runs and records detections without raising alerts, so a staging rule is measured against live data before it pages anyone. Without a block `run_frequency`, deploy leaves the frequency to Google: a new rule gets Google's default for its shape, and an existing one keeps what it has. Google cannot revert a rule moved off a legacy schedule, so deploy never sets one unasked. A `run_frequency` that verify's `allowedRunFrequencies` does not list fails the rule with `google_secops_run_frequency_not_allowed` before any write.
+
+`runFrequency` is sent with `scheduleCustomizations` when `schedule` is set, and alone, which clears the customizations, when the block names a `run_frequency` but no `schedule` and the remote rule has some. Deploy compares the schedule as Google stores it: `ensureEnrichmentCompleteness` absent is `false`, and `lateArrivingDataAdjustment` is compared in seconds (`"1800s"` and `"1800.000s"` are equal), so an unchanged schedule is not sent again.
 
 | Situation | Calls |
 |-----------|-------|
 | `PREVIEW`, `RELEASE`, `UNIVERSAL`, no binding | verify, create, record the id at once, update deployment with `enabled,alerting,runFrequency` |
-| same, binding present | get; when the remote text differs, verify and update text. Get deployment; when `archived` is `true`, update deployment with `archived` (`false`) alone first. Update deployment with `enabled,alerting,runFrequency` when any differs |
-| `DISABLEMENT`, binding present | update deployment with `enabled,alerting` (both `false`). The text is updated as above, so a disabled rule still matches its file. |
+| same, binding present | get and get deployment. When `archived` is `true`, update deployment with `archived` (`false`) alone first. When the remote text differs, verify and update text; when the remote `scope` differs, update scope. Update deployment with the run-state fields that differ |
+| `DISABLEMENT`, binding present | update deployment with `enabled,alerting` (both `false`). The text is updated as above, so a disabled rule still matches its file; a failed verify or text update is reported and the rule is disabled all the same. An archived rule stays archived and its text is not updated. |
 | `DELETION`, binding present | [Deletion](#deletion) |
 | `DISABLEMENT` or `DELETION`, no binding | `external_id_missing` (warning), no call |
 
 A create whose deployment update then fails keeps its binding: the rule exists. The failure is `google_secops_deployment_failed`, and the next deploy repairs the run state.
+
+**Rule health.** The answers deploy already reads say whether Google runs the rule. `executionState` `LIMITED` or `PAUSED` on the deployment is the warning `google_secops_rule_execution_limited`, and `compilationState` `FAILED` on the rule (after a compiler change on Google's side) is the warning `google_secops_rule_compilation_failed`. Neither stops the deploy.
 
 #### Deletion
 
 | `deletion` | Calls | Binding |
 |------------|-------|---------|
 | `archive` (default) | update deployment with `enabled,alerting` (`false`), then with `archived` (`true`) | kept. A later deploy with another strategy unarchives the same rule. |
-| `delete` | `DELETE rules/<id>` | removed. When Google refuses because the rule has detections or retrohunts (`FAILED_PRECONDITION`), deploy archives instead, keeps the binding, and warns `google_secops_delete_refused`. |
+| `delete` | `DELETE rules/<id>` | removed. When Google refuses the delete (any 4xx but 401, 403, 404, and 429: Google does not document which status a rule with detections or retrohunts gets), deploy archives instead, keeps the binding, and warns `google_secops_delete_refused` with Google's message. |
 
 opentide never sends `force=true`: that deletes the rule's detections, which are the audit trail of what it found.
 
@@ -273,11 +280,15 @@ opentide never sends `force=true`: that deletes the rule's detections, which are
 | `get` or `update text` answers 404 | Create the rule again and replace the binding, with the `google_secops_rule_recreated` warning. Under `DISABLEMENT` or `DELETION`, create nothing, remove the binding, and warn `google_secops_rule_missing`. |
 | `DELETE` answers 404 | Success. The binding is removed. |
 | `update text` answers 409 (`ABORTED`, etag mismatch) | `google_secops_rule_conflict`: the rule changed between get and update. No retry in the same run. |
-| A create answers without a rule id in `name` | `google_secops_create_no_id` |
-| A create gets no answer (timeout, reset) | `google_secops_create_unconfirmed`. Deploy does not retry it: the rule may exist, and the operator binds or removes it. |
+| A create answers 2xx without a rule id in `name`, or with a body that is not JSON | `google_secops_create_no_id` |
+| A create gets no answer (timeout, reset) or a 5xx | `google_secops_create_unconfirmed`. Deploy does not resend it: the rule may exist, and the operator binds or removes it. |
 | 401 or 403 | `google_secops_tenant_unauthorized`: the tenant stops. |
-| 429 (`RESOURCE_EXHAUSTED`) or 503 | Wait `Retry-After`, else 2, 4, then 8 seconds, and resend the same request; then fail the rule. |
+| 429 (`RESOURCE_EXHAUSTED`), or 503 on any call but create | Wait `Retry-After` (at most 300 seconds), else the `RetryInfo.retryDelay` in `error.details`, else 5, 15, then 60 seconds; resend at most three times, then fail the rule. A 429 was not executed, so a create is resent after one too. |
 | Any other error | The rule fails with Google's `error.status` and `error.message`. |
+
+### Not managed
+
+Deploy manages custom rules (`ru_…`) and their deployment, and nothing else in the instance. These stay in the console or in other tools, and deploy never reads, changes, or removes them: curated rules and rule sets (`ur_…`), rule exclusions (findings refinements), reference lists and data tables (a rule that names a missing one fails `verifyRuleText`), retrohunts, rule tests, saved searches and dashboards, GoogleSQL rules, and alert and case handling in SOAR. [RFC 0017](../../rfcs/0017-google-secops-yara-l.md#resolved-questions) lists the ones planned as follow-ups.
 
 ### Query validation
 
@@ -320,7 +331,7 @@ A diagnostic's `position` (1-based lines and columns, end inclusive) is mapped i
 | `severity` | [Severity](#severity), else `Medium` |
 | `priority` | `severity` |
 | `alerting` | `false` under `PREVIEW`, `true` under `RELEASE` and `UNIVERSAL` |
-| `run_frequency` | The first allowed of `LIVE`, `LIVE_CUSTOMIZABLE`, `HOURLY_CUSTOMIZABLE`, `DAILY` |
+| `run_frequency` | Not sent: Google's default for a new rule, the current one for an existing rule |
 | `endpoint` | `https://<location>-chronicle.googleapis.com` |
 | `deletion` | `archive` |
 
@@ -402,5 +413,6 @@ Fixtures:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.2 | 2026-11-12 | From the conformance review against Google's API reference and detection pages: `DISABLEMENT` disables a rule even when its verify or text update fails; a create is never resent after a 5xx (`google_secops_create_unconfirmed`), a 2xx create without JSON is `google_secops_create_no_id`; 429 backs off with `Retry-After`, then `RetryInfo`, then 5, 15, 60 seconds; credentials are applied with their quota project, and a token failure stops the tenant; no `runFrequency` is sent unless the block names one; the schedule is compared as Google stores it, and cleared when removed; an archived rule is unarchived before its text is updated; the rule `scope` is compared and updated on its own, and `data_access_scope` takes an id or a full name; a refused delete is any 4xx but 401, 403, 404, 429; rule health warnings `google_secops_rule_execution_limited` and `google_secops_rule_compilation_failed`; a Not managed list; the regional `rep` endpoint; the reason an unchanged text is not resent (revisions, not the detection limit); the `$risk_score` default is the instance's. Schema id unchanged. |
 | 1.1 | 2026-11-12 | The derived meta no longer has `tactic`: Google documents a comma-separated list for `technique` only, and its coverage matrix derives tactics from techniques. `tactic` is no longer a reserved meta key, so a block may set one in `meta`. Schema id unchanged. |
 | 1.0 | 2026-11-11 | Initial field contract ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md)): YARA-L sections as keys (`events`, `outcome`, `condition`, `setup`, `export` as text; `match` and `options` as YAML objects) assembled into a rule with derived name and meta; severity, priority, alerting, run frequency, schedule customizations; Chronicle API v1 deploy with the rule id in deployment state; archive by default on `DELETION`, never a forced delete; live validation with `verifyRuleText`; `opentide query` through `udmSearch`. |

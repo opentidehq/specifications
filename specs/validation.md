@@ -90,9 +90,9 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `bitdefender_registry_full_hive` | warning | Bitdefender: a `Registry.Key` value starts with a full hive name, so the rule never triggers |
 | `bitdefender_contains_no_wildcard` | warning | Bitdefender: a `contains` value has neither `*` nor `?` |
 | `bitdefender_severity_collapsed` | warning | Bitdefender: `Critical` or `Informational` severity sent as GravityZone `High` or `Low` |
-| `google_secops_risk_score_missing` | warning | Google SecOps: the body assigns no `$risk_score`, so Google scores every alert 40 |
+| `google_secops_risk_score_missing` | warning | Google SecOps: `outcome` assigns no `$risk_score`, so every detection gets the instance's default score |
 | `google_secops_rule_id_literal` | warning | Google SecOps: the body matches a producer rule by a literal `ru_…` id, which differs per tenant |
-| `google_secops_live_frequency_unavailable` | warning | Google SecOps: `run_frequency: LIVE` on a multi-event rule, which Google stores as `LIVE_CUSTOMIZABLE` |
+| `google_secops_live_frequency_unavailable` | warning | Google SecOps: `run_frequency: LIVE` on a rule with two or more event variables, which deploy refuses (`LIVE` is for single-event rules) |
 | `harfanglab_yara_context` | warning | HarfangLab: a YARA rule's meta `context` is not a comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` |
 
 The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories), [sysdig-1.0](platforms/sysdig-1.0.md#advisories), [bitdefender-1.0](platforms/bitdefender-1.0.md#advisories), [google-secops-1.0](platforms/google-secops-1.0.md#advisories), and [harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile).
