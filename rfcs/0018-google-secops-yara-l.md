@@ -6,7 +6,7 @@
 - **Status:** accepted
 - **Created:** 2026-11-11
 - **Accepted:** 2026-11-12, after review moved the block to one key per section and the open questions below were resolved. The normative text is [specs/platforms/google-secops-1.0.md](../specs/platforms/google-secops-1.0.md) and [specs/languages/yara-l-1.0.md](../specs/languages/yara-l-1.0.md).
-- **Related:** [RFC 0010](0010-deployment-external-ids.md) (deployment state), [RFC 0015](0015-yara-language.md) (the language-spec pattern), [RFC 0007](0007-elastic-security-platform.md) (live validation and the ATT&CK tactic table)
+- **Related:** [RFC 0010](0010-deployment-external-ids.md) (deployment state), [RFC 0015](0015-yara-language.md) (the language-spec pattern), [RFC 0007](0007-elastic-security-platform.md) (live validation)
 - **Implementation:** opentidehq/opentide (the `google_secops` platform, `opentide query` runner); opentidehq/language-server (the `yaral` engine, grammar, catalogues, and highlighting); opentidehq/website (synced specs, the `yaral` grammar for code blocks)
 
 ## Summary
@@ -53,8 +53,8 @@ Sources are Google's documentation under `docs.cloud.google.com/chronicle/docs/`
 
 - `meta` is required, `key = "value"` pairs. Google extracts `author` and `severity` into `Rule.author` and `Rule.severity`; all keys appear in `Rule.metadata` and as detection labels ([meta syntax](https://cloud.google.com/chronicle/docs/yara-l/meta-syntax), [outcome syntax](https://cloud.google.com/chronicle/docs/yara-l/outcome-syntax)).
 - The MITRE ATT&CK coverage page reads meta `technique` as comma-separated ids (`technique = "T1548,T1134.001"`); `tactic` and `technique` become read-only `google.mitre.*` tags ([MITRE dashboard](https://cloud.google.com/chronicle/docs/detection/mitre-dashboard)).
-- The community style guide requires `author`, `description`, `severity` and `priority` (each `Info`, `Low`, `Medium`, `High`, or `Critical`), `tactic` and `technique` ids, and `.yaral` files. Severity values across the 948 community rules are Title-case.
-- `$risk_score` in `outcome` sets `security_result.risk_score`; without it Google uses 40 on an alerting rule and 15 otherwise.
+- The community style guide requires `author`, `description`, `severity` and `priority` (each `Info`, `Low`, `Medium`, `High`, or `Critical`), `tactic` and `technique` ids, and `.yaral` files. Severity values across the 948 community rules are Title-case. opentide derives `technique` but not `tactic`, which a technique already implies.
+- `$risk_score` in `outcome` sets `security_result.risk_score`; without it the instance's default applies (40 for an alerting rule and 15 otherwise, unless the instance's settings change them).
 
 ### YARA-L
 
@@ -63,7 +63,7 @@ The language pages ([getting started](https://cloud.google.com/chronicle/docs/ya
 - sections `meta`, `setup`, `events`, `match`, `outcome`, `condition`, `options`, `export` for rules; `dedup`, `order`, `limit`, `select`, `unselect`, and multi-stage `stage` blocks for search only;
 - case-insensitive keywords; `//` and `/* */` comments; `"…"` strings with escapes, `` `…` `` raw strings, `/…/` RE2 regex literals with `nocase`; non-negative numbers; `m`, `h`, `d` durations;
 - event variables (`$e.<UDM path>`, `$g.graph.<entity path>`, `$d.detection.<…>`), placeholders, `#` counts, `%list` reference lists and `%table.column` data tables;
-- limits: 20 outcome variables, arrays of 25 values in rules, 10/5/5 `in` statements (7/4/2 in search), function nesting 20, 10,000 detections per rule version per day, composite depth 10;
+- limits: 20 outcome variables, arrays of 25 values in rules, 10/5/5 `in` statements (7/4/2 in search), 10,000 detections per rule version per day, composite depth 10;
 - condition rules: `!` rather than `not` on event terms, `or` across at most 2 event variables in rules, non-existence needs a window and a bounded event;
 - `nocase` is refused on enumerated fields; `window_start` and `window_end` are reserved.
 
@@ -89,9 +89,9 @@ No YARA-L language server or linter exists.
 |------|---------|
 | `specs/languages/yara-l-1.0.md` (new) | Text forms (`YaraLRule`, `YaraLSearch`), the block form (`YaraLSections`, `YaraLMatch`, `YaraLOptions`), the `rule` and `search` profiles, sections, lexical structure, expressions, `match`/`outcome`/`condition`/`options` rules, limits, UDM and function catalogues, diagnostics, highlighting |
 | `specs/platforms/google-secops-1.0.md` (new) | Block, constraints, advisories, rule name, meta, severity, assembly, tenant setup, deploy, deletion, errors, query validation, `opentide query` |
-| `specs/platforms/index.md` 1.8 | Eleventh platform; `--live` allowlist; static-validation bar; external ids |
-| `specs/validation.md` 1.10 | `--live` row, advisories, language diagnostics, fixture checker |
-| `specs/deployment-state.md` 1.5 | `google_secops` is state-backed: `ru_<uuid>` |
+| `specs/platforms/index.md` 1.9 | Twelfth platform; `--live` allowlist; static-validation bar; external ids |
+| `specs/validation.md` 1.12 | `--live` row, advisories, language diagnostics, fixture checker |
+| `specs/deployment-state.md` 1.6 | `google_secops` is state-backed: `ru_<uuid>` |
 | `specs/objects/rule-1.0.md`, `rule-1.1.md` | `configurations.google_secops`; `system: google_secops` searches are YARA-L |
 
 ### 2. The block carries the sections, deploy assembles the rule
@@ -106,7 +106,7 @@ configurations:
     severity: High                # Info | Low | Medium | High | Critical; default from response.alert_severity
     priority: High                # default: severity
     alerting: null                # default: false under PREVIEW, true under RELEASE
-    run_frequency: LIVE_CUSTOMIZABLE  # LIVE | LIVE_CUSTOMIZABLE | HOURLY_CUSTOMIZABLE | DAILY; default: first allowed
+    run_frequency: LIVE_CUSTOMIZABLE  # LIVE | LIVE_CUSTOMIZABLE | HOURLY_CUSTOMIZABLE | DAILY; optional, not sent unless named
     schedule:                     # customizable frequencies only
       ensure_enrichment_completeness: true
       late_arriving_data_adjustment: 30m
@@ -145,7 +145,7 @@ Each section text is sent verbatim, indented four spaces under its label. A line
 | `DISABLEMENT` | `enabled: false`, `alerting: false`; the text is still kept current |
 | `DELETION` | archive (default), or delete without `force` |
 
-A staging rule therefore runs on live data and records detections, which is how Google itself recommends evaluating a rule, without raising alerts. `run_frequency` defaults to the first frequency `verifyRuleText` allows, in the order `LIVE`, `LIVE_CUSTOMIZABLE`, `HOURLY_CUSTOMIZABLE`, `DAILY`, so a block that names none gets the fastest one Google accepts for its shape.
+A staging rule therefore runs on live data and records detections, which is how Google itself recommends evaluating a rule, without raising alerts. `run_frequency` is sent only when the block names one: a new rule gets Google's default, and an existing rule keeps its own.
 
 ### 4. Identity and deployment state
 
@@ -185,7 +185,7 @@ The engine is an approximation of a closed compiler, so its error list is limite
 |------|--------|
 | Models | `GoogleSecopsConfig`, `GoogleSecopsSchedule`, tenant setup with `$ENV` credentials |
 | Client | `TenantSession` with Google OAuth (service-account JSON or ADC), regional endpoint, retry on 429/503 |
-| Compiler | Rule name, meta, severity, ATT&CK via the Elastic tactic table, assembly; golden tests on the fixtures |
+| Compiler | Rule name, meta, severity, ATT&CK technique union, assembly; golden tests on the fixtures |
 | Deployer | Deployment-state decisions; verify → create → bind → deployment; text diff before patch; archive/unarchive; delete without force |
 | Validators | `OFFLINE_QUERY_LANGUAGES["google_secops"] = ("yaral",)`; live validator on `verifyRuleText` with position mapping |
 | Runner | `opentide query --platform google_secops` on `udmSearch` |
@@ -232,7 +232,7 @@ Each question open at the first draft, with the evidence and the decision the sp
 
 | Question | Evidence | Decision |
 |----------|----------|----------|
-| Hop-window bound: 48 hours or 14 days? | `match` syntax says 48 hours. The run-frequency pages run multi-event rules with windows over 48 hours at window/10, `RunFrequency.DAILY` exists for windows over 2 days, and composite detections state "All detection rules have a maximum match window of 14 days". The 48-hour table is stale. | Rules: hop and sliding windows 1m–14d. Searches: 1m–48h. Tumbling (pre-GA): 1m–72h, as its own page says. `verifyRuleText` remains the authority for a tenant. |
+| Hop-window bound: 48 hours or 14 days? | `match` syntax says 48 hours. The run-frequency pages run multi-event rules with windows over 48 hours at window/10, `RunFrequency.DAILY` exists for windows over 2 days, and composite detections state "All detection rules have a maximum match window of 14 days". The 48-hour table is stale. | Rules: hop and sliding windows 1m–14d. Searches: 1m–48h, except tumbling windows up to 30 days without a join. Tumbling (pre-GA): 1m–72h, as its own page says. `verifyRuleText` remains the authority for a tenant. |
 | How does meta `severity` reach a detection, and what is `priority`? | `verifyRuleText` and `Rule` show `severity.displayName` extracted verbatim from meta. `SecurityResult.priority` is "not populated when the SecurityResult appears in a detection". No page maps the string to the detection severity enum. | opentide writes Google's community spelling (`Info`…`Critical`) and documents it as a label. Alert weight is `$risk_score`, which Google documents, and the `google_secops_risk_score_missing` advisory asks for it. `priority` is a label. |
 | May `export` precede `options`? | The data-tables page: writing to a data table "must be the final action of the query". No example shows both. | `export` is the last section. Deploy writes `options` then `export`; in a `.yaral` file, `export` before `options` is `yaral_section_order`. |
 | Rule-name length limit and uniqueness | No page documents either. Google's `content_manager` extracts `[A-Za-z0-9_]+` and treats names as case-insensitively unique. | No length check (none documented; `verifyRuleText` reports one if Google has it). `google_secops_name_duplicate` compares names case-insensitively. |

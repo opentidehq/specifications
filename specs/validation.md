@@ -94,7 +94,7 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `graylog_all_streams` | warning | Graylog: no streams or stream categories on the block or the tenant |
 | `graylog_title_duplicate` | warning | Graylog: two enabled blocks resolve to one event definition title |
 | `google_secops_risk_score_missing` | warning | Google SecOps: `outcome` assigns no `$risk_score`, so every detection gets the instance's default score |
-| `google_secops_rule_id_literal` | warning | Google SecOps: the body matches a producer rule by a literal `ru_…` id, which differs per tenant |
+| `google_secops_rule_id_literal` | warning | Google SecOps: `events` or `condition` compares `detection.detection.rule_id` with a literal `ru_…` id, which differs per tenant |
 | `google_secops_live_frequency_unavailable` | warning | Google SecOps: `run_frequency: LIVE` on a rule with two or more event variables, which deploy refuses (`LIVE` is for single-event rules) |
 | `harfanglab_yara_context` | warning | HarfangLab: a YARA rule's meta `context` is not a comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` |
 

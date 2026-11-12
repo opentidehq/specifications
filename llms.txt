@@ -33,7 +33,7 @@
 - specs/platforms/graylog-1.0.md (schema_id: platform::graylog::1.0)
 - specs/platforms/google-secops-1.0.md (schema_id: platform::google_secops::1.0)
 - specs/languages/yara-1.0.md (YARA language: YaraSignature, dialect, diagnostics, platform profiles)
-- specs/languages/yara-l-1.0.md (YARA-L 2.0 language: YaraLRule, YaraLBody, YaraLSearch, rule and search profiles, diagnostics, highlighting)
+- specs/languages/yara-l-1.0.md (YARA-L 2.0 language: YaraLRule, YaraLSections, YaraLMatch, YaraLOptions, YaraLSearch, rule and search profiles, diagnostics, highlighting)
 - specs/validation.md
 - specs/sharing.md
 - specs/sharing/misp-1.0.md (schema_id: sharing::misp::1.0)

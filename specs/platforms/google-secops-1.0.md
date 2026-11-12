@@ -12,7 +12,7 @@ supersedes: null
 
 `configurations.google_secops` is one Google Security Operations (Google SecOps, formerly Chronicle) **custom detection rule**, written in [YARA-L 2.0](../languages/yara-l-1.0.md). The block carries the rule's sections as keys ([`YaraLSections`](../languages/yara-l-1.0.md#yaralsections)): `events`, `outcome`, and `condition` (and `setup`, `export`) as YARA-L text, and `match` and `options` as YAML objects. Deploy assembles the whole rule from them, `rule <name> {`, a generated `meta:` section, then each section under its label, and manages it through the Chronicle API v1: `rules` for the text and `rules/{rule}/deployment` for its run state.
 
-Google assigns each rule an id (`ru_<uuid>`) at create time. That id is kept in [deployment state](../deployment-state.md), never on the rule. Google SecOps is the first platform since Elastic with a real tenant compile: `verifyRuleText` compiles a rule without creating it, so `google_secops` is in the `--live` allowlist. The analysis engine also checks YARA-L offline.
+Google assigns each rule an id (`ru_<uuid>`) at create time. That id is kept in [deployment state](../deployment-state.md), never on the rule. Like Elastic and Graylog, Google SecOps has a tenant-side check: `verifyRuleText` compiles a rule without creating it, so `google_secops` is in the `--live` allowlist. The analysis engine also checks YARA-L offline.
 
 Shared fields are defined in [platforms](index.md#shared-platform-block). The design and its alternatives are in [RFC 0018](../../rfcs/0018-google-secops-yara-l.md).
 
@@ -41,7 +41,7 @@ Deploy:
 Query validation:
 
 - `opentide validate query --platform google_secops --live` MUST compile each rule's assembled text with `verifyRuleText` and report Google's diagnostics. It MUST NOT create, update, or run a rule.
-- Without `--live`, `validate query` checks YARA-L offline, as `opentide validate` does: a block's sections, or a `.yaral` file.
+- Without `--live`, `validate query` checks YARA-L offline, as `opentide validate` does: a block's sections, or a `.yaral` or `.yl2` file.
 
 ## Definition
 
@@ -59,7 +59,7 @@ Query validation:
 | `severity` | string | optional | [derived](#severity) | `Info`, `Low`, `Medium`, `High`, or `Critical`. Written as meta `severity`. |
 | `priority` | string | optional | `severity` | Same values. Written as meta `priority`. |
 | `alerting` | boolean | optional | [by strategy](#deploy) | Whether detections become alerts (`RuleDeployment.alerting`) |
-| `run_frequency` | string | optional | the first one Google allows | `LIVE`, `LIVE_CUSTOMIZABLE`, `HOURLY_CUSTOMIZABLE`, or `DAILY` |
+| `run_frequency` | string | optional | not sent: Google's default for a new rule, an existing rule keeps its own | `LIVE`, `LIVE_CUSTOMIZABLE`, `HOURLY_CUSTOMIZABLE`, or `DAILY` |
 | `schedule` | [GoogleSecopsSchedule](#schedule-googlesecopsschedule) | optional | null | Schedule customizations, for `LIVE_CUSTOMIZABLE` and `HOURLY_CUSTOMIZABLE` only |
 | `meta` | map[string, string] | optional | null | Extra meta keys, written after the [derived meta](#meta) in the order given |
 
@@ -233,7 +233,7 @@ Paths are relative to `<endpoint>/v1/<instance resource>`. The rule resource is 
 | create | `POST rules` with `{"text": <assembled>}`, plus `scope` |
 | get | `GET rules/<id>?view=FULL` |
 | update text | `PATCH rules/<id>?updateMask=text` with `{"text": <assembled>, "etag": <etag from get>}` |
-| update scope | `PATCH rules/<id>?updateMask=scope` with `{"scope": <scope>, "etag": <etag>}`; an empty `scope` makes the rule global |
+| update scope | `PATCH rules/<id>?updateMask=scope` with `{"scope": <scope>, "etag": <etag>}`, the etag of the latest get or update answer (a text update changes it); an empty `scope` makes the rule global |
 | get deployment | `GET rules/<id>/deployment` |
 | update deployment | `PATCH rules/<id>/deployment?updateMask=<fields>` with those fields |
 | delete | `DELETE rules/<id>` (never with `force=true`) |
@@ -254,9 +254,9 @@ A preview rule runs and records detections without raising alerts, so a staging 
 
 | Situation | Calls |
 |-----------|-------|
-| `PREVIEW`, `RELEASE`, `UNIVERSAL`, no binding | verify, create, record the id at once, update deployment with `enabled,alerting,runFrequency` |
+| `PREVIEW`, `RELEASE`, `UNIVERSAL`, no binding | verify, create, record the id at once, update deployment with `enabled,alerting`, plus `runFrequency` when the block names one |
 | same, binding present | get and get deployment. When `archived` is `true`, update deployment with `archived` (`false`) alone first. When the remote text differs, verify and update text; when the remote `scope` differs, update scope. Update deployment with the run-state fields that differ |
-| `DISABLEMENT`, binding present | update deployment with `enabled,alerting` (both `false`). The text is updated as above, so a disabled rule still matches its file; a failed verify or text update is reported and the rule is disabled all the same. An archived rule stays archived and its text is not updated. |
+| `DISABLEMENT`, binding present | get and get deployment. An archived rule is left as it is: no call. Otherwise the text is updated as above, so a disabled rule still matches its file, and the deployment is updated with `enabled,alerting` (both `false`) when either is `true`; a failed verify or text update is reported and the rule is disabled all the same. |
 | `DELETION`, binding present | [Deletion](#deletion) |
 | `DISABLEMENT` or `DELETION`, no binding | `external_id_missing` (warning), no call |
 
@@ -268,7 +268,7 @@ A create whose deployment update then fails keeps its binding: the rule exists. 
 
 | `deletion` | Calls | Binding |
 |------------|-------|---------|
-| `archive` (default) | update deployment with `enabled,alerting` (`false`), then with `archived` (`true`) | kept. A later deploy with another strategy unarchives the same rule. |
+| `archive` (default) | get deployment; when `archived` is already `true`, nothing. Otherwise update deployment with `enabled,alerting` (`false`) when either is `true`, then with `archived` (`true`) | kept. A later deploy with another strategy unarchives the same rule. |
 | `delete` | `DELETE rules/<id>` | removed. When Google refuses the delete (any 4xx but 401, 403, 404, and 429: Google does not document which status a rule with detections or retrohunts gets), deploy archives instead, keeps the binding, and warns `google_secops_delete_refused` with Google's message. |
 
 opentide never sends `force=true`: that deletes the rule's detections, which are the audit trail of what it found.
@@ -277,9 +277,9 @@ opentide never sends `force=true`: that deletes the rule's detections, which are
 
 | Situation | Behaviour |
 |-----------|-----------|
-| `get` or `update text` answers 404 | Create the rule again and replace the binding, with the `google_secops_rule_recreated` warning. Under `DISABLEMENT` or `DELETION`, create nothing, remove the binding, and warn `google_secops_rule_missing`. |
+| `get`, `get deployment`, `update text`, `update scope`, or `update deployment` answers 404 | Create the rule again and replace the binding, with the `google_secops_rule_recreated` warning. Under `DISABLEMENT` or `DELETION`, create nothing, remove the binding, and warn `google_secops_rule_missing`. |
 | `DELETE` answers 404 | Success. The binding is removed. |
-| `update text` answers 409 (`ABORTED`, etag mismatch) | `google_secops_rule_conflict`: the rule changed between get and update. No retry in the same run. |
+| `update text` or `update scope` answers 409 (`ABORTED`, etag mismatch) | `google_secops_rule_conflict`: the rule changed between get and update. No retry in the same run. |
 | A create answers 2xx without a rule id in `name`, or with a body that is not JSON | `google_secops_create_no_id` |
 | A create gets no answer (timeout, reset) or a 5xx | `google_secops_create_unconfirmed`. Deploy does not resend it: the rule may exist, and the operator binds or removes it. |
 | 401 or 403 | `google_secops_tenant_unauthorized`: the tenant stops. |
@@ -295,7 +295,7 @@ Deploy manages custom rules (`ru_…`) and their deployment, and nothing else in
 | Check | Google SecOps |
 |-------|---------------|
 | `opentide validate` (offline) | yes: the constraints and the YARA-L language, `rule` profile |
-| `opentide validate query` (offline) | YARA-L: a block's sections, and a `.yaral` file |
+| `opentide validate query` (offline) | YARA-L: a block's sections, and a `.yaral` or `.yl2` file |
 | `opentide validate query --live` | yes: `verifyRuleText` on the assembled text |
 | `opentide query` | yes: a YARA-L search through `udmSearch` (v1, `queryDialect=YL2`) |
 
@@ -318,7 +318,7 @@ A diagnostic's `position` (1-based lines and columns, end inclusive) is mapped i
 - [yara-l-1.0](../languages/yara-l-1.0.md): `YaraLSections`, `YaraLMatch`, `YaraLOptions`, the YARA-L language, the `rule` and `search` profiles
 - [deployment-state.md](../deployment-state.md): the rule id
 - [deployment.md](../deployment.md): status strategies
-- [elastic-1.0](elastic-1.0.md#attck): the ATT&CK technique union and the tactic table
+- [elastic-1.0](elastic-1.0.md#attck): the ATT&CK technique union
 - [rule-1.0.md](../objects/rule-1.0.md): `response.alert_severity`, `techniques`, `detection_model`, `description`
 - [validation.md](../validation.md): static validation, advisories, query validation
 - [RFC 0018](../../rfcs/0018-google-secops-yara-l.md): design, research, and alternatives
@@ -413,6 +413,6 @@ Fixtures:
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.2 | 2026-11-12 | From the conformance review against Google's API reference and detection pages: `DISABLEMENT` disables a rule even when its verify or text update fails; a create is never resent after a 5xx (`google_secops_create_unconfirmed`), a 2xx create without JSON is `google_secops_create_no_id`; 429 backs off with `Retry-After`, then `RetryInfo`, then 5, 15, 60 seconds; credentials are applied with their quota project, and a token failure stops the tenant; no `runFrequency` is sent unless the block names one; the schedule is compared as Google stores it, and cleared when removed; an archived rule is unarchived before its text is updated; the rule `scope` is compared and updated on its own, and `data_access_scope` takes an id or a full name; a refused delete is any 4xx but 401, 403, 404, 429; rule health warnings `google_secops_rule_execution_limited` and `google_secops_rule_compilation_failed`; a Not managed list; the regional `rep` endpoint; the reason an unchanged text is not resent (revisions, not the detection limit); the `$risk_score` default is the instance's. Schema id unchanged. |
+| 1.2 | 2026-11-12 | From the conformance review against Google's API reference and detection pages: `DISABLEMENT` disables a rule even when its verify or text update fails; a create is never resent after a 5xx (`google_secops_create_unconfirmed`), a 2xx create without JSON is `google_secops_create_no_id`; 429 backs off with `Retry-After`, then `RetryInfo`, then 5, 15, 60 seconds; credentials are applied with their quota project, and a token failure stops the tenant; no `runFrequency` is sent unless the block names one; the schedule is compared as Google stores it, and cleared when removed; an archived rule is unarchived before its text is updated; the rule `scope` is compared and updated on its own, and `data_access_scope` takes an id or a full name; a refused delete is any 4xx but 401, 403, 404, 429; rule health warnings `google_secops_rule_execution_limited` and `google_secops_rule_compilation_failed`; a Not managed list; the regional `rep` endpoint; the reason an unchanged text is not resent (revisions, not the detection limit); the `$risk_score` default is the instance's. Schema id unchanged. (Settled in review: the scope update carries the etag of the latest answer and its 409 is a conflict; a 404 on any rule or deployment call follows the 404 row; `DISABLEMENT` and the archive path read the deployment first and send nothing to an archived rule, and only the fields that differ otherwise.) |
 | 1.1 | 2026-11-12 | The derived meta no longer has `tactic`: Google documents a comma-separated list for `technique` only, and its coverage matrix derives tactics from techniques. `tactic` is no longer a reserved meta key, so a block may set one in `meta`. Schema id unchanged. |
 | 1.0 | 2026-11-11 | Initial field contract ([RFC 0018](../../rfcs/0018-google-secops-yara-l.md)): YARA-L sections as keys (`events`, `outcome`, `condition`, `setup`, `export` as text; `match` and `options` as YAML objects) assembled into a rule with derived name and meta; severity, priority, alerting, run frequency, schedule customizations; Chronicle API v1 deploy with the rule id in deployment state; archive by default on `DELETION`, never a forced delete; live validation with `verifyRuleText`; `opentide query` through `udmSearch`. |

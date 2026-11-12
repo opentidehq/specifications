@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-Microsoft Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig Secure, Bitdefender GravityZone, and Graylog give every rule opentide creates an id of their own. The next deploy has to update, disable, or delete the remote rule by that id, and the id is per tenant. opentide keeps it in one committed JSON file per rule, `.opentide/states/deployment/<uuid>.json` (`deployment.state::1.0`). It never stores it on the rule.
+Microsoft Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig Secure, Bitdefender GravityZone, Graylog, and Google Security Operations give every rule opentide creates an id of their own. The next deploy has to update, disable, or delete the remote rule by that id, and the id is per tenant. opentide keeps it in one committed JSON file per rule, `.opentide/states/deployment/<uuid>.json` (`deployment.state::1.0`). It never stores it on the rule.
 
 A platform block that still carries `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>` is invalid, and deploy refuses the rule. `opentide deploy migrate-state` moves the ids of an existing catalogue into shards once. Losing a shard, or never committing it, loses the only handle on the remote rule: the next deploy creates a second live rule beside the first. Every requirement below exists to prevent that.
 
@@ -21,7 +21,7 @@ This spec is the normative text of accepted [RFC 0010](../rfcs/0010-deployment-e
 - Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig, Bitdefender, Graylog, and Google SecOps vendor identifiers MUST be stored only in `.opentide/states/deployment/<uuid>.json`. A platform block MUST NOT contain `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>`.
 - `<uuid>` MUST be the lowercase canonical form of the rule's `metadata.uuid`, and `object_uuid` MUST equal the filename stem exactly.
 - Tenant keys MUST be non-empty and MUST equal the configured tenant `name` with surrounding whitespace removed. A stored key with leading or trailing whitespace is invalid.
-- External identifiers MUST be JSON strings. Defender, SentinelOne, and Sysdig identifiers MUST match `0|[1-9][0-9]*`. Bitdefender and Graylog identifiers MUST match `[0-9a-f]{24}` (lower case; a writer lower-cases the id the vendor returns). CrowdStrike identifiers MUST contain a non-whitespace character and are otherwise stored verbatim.
+- External identifiers MUST be JSON strings. Defender, SentinelOne, and Sysdig identifiers MUST match `0|[1-9][0-9]*`. Bitdefender and Graylog identifiers MUST match `[0-9a-f]{24}` (lower case; a writer lower-cases the id the vendor returns). CrowdStrike identifiers MUST contain a non-whitespace character and are otherwise stored verbatim. Google SecOps identifiers MUST match `ru_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`.
 - Writers MUST preserve unknown root keys, change only the addressed platform-and-tenant binding, sort keys at every level, use two-space JSON indentation, and write one trailing newline.
 - Writers MUST remove an empty platform map and MUST delete a shard that holds no binding. A successful delete MUST remove the tenant binding, then an empty platform map, then the file when no binding remains. Readers MAY treat an empty `platforms` object and an empty platform map as no bindings.
 - `.opentide/states/deployment/` MUST be committed. Implementations MUST NOT gitignore it, and MUST NOT gitignore the whole `.opentide/states/` directory.
