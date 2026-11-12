@@ -51,6 +51,19 @@ class SpecShapeTests(unittest.TestCase):
         self.assertIn("status: normative", text)
         self.assertEqual(re.findall(r"^## (.+)$", text, flags=re.MULTILINE), SECTIONS)
 
+    def test_table_code_spans_escape_pipes(self) -> None:
+        """A `|` in a code span still splits a GFM table cell; the docs site's MDX then fails."""
+        for path in (SPEC, ROOT / "specs" / "platforms" / "exabeam-1.0.md"):
+            in_code = False
+            for number, line in enumerate(_read(path).splitlines(), 1):
+                if line.startswith("```"):
+                    in_code = not in_code
+                if in_code or not line.startswith("|"):
+                    continue
+                for span in re.finditer(r"(`+)(.+?)\1", line):
+                    with self.subTest(path=path.name, line=number):
+                        self.assertNotRegex(span.group(2), r"(?<!\\)\|")
+
     def test_diagnostic_tables_match_the_checker(self) -> None:
         text = _read(SPEC)
         errors = _table_codes(text, "#### Errors", "#### Warnings")
