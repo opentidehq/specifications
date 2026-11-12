@@ -52,6 +52,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## rule 1.1
 
 - `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](rfcs/0018-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.1`.
+- `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md)) is added ([RFC 0019](rfcs/0019-google-secops-yara-l.md)). A hunt with `system: google_secops` is a YARA-L search. Additive; `schema_id` stays `rule::1.1`. New fixture `fixtures/valid/rule-google-secops-spray-1.0.yaml`.
 - `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md)) is added ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.1`.
@@ -66,6 +67,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## rule 1.0
 
 - `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](rfcs/0018-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.0`.
+- `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md)) is added ([RFC 0019](rfcs/0019-google-secops-yara-l.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md)) is added ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.0`.
@@ -141,6 +143,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
 
+## deployment-state 1.7
+
+- `google_secops` is state-backed: the Google SecOps rule id, `ru_` and a lower-case UUID, under `platforms.google_secops.<tenant>` ([RFC 0019](rfcs/0019-google-secops-yara-l.md)). The shard JSON Schema gains `$defs/secopsRuleTenants`; schema id unchanged. New invalid fixtures `google-secops-bare-uuid.json` and `google-secops-revision-id.json`.
+
 ## deployment-state 1.6
 
 - `exabeam` is state-backed: the Exabeam correlation rule id, a lower-case canonical UUID, under `platforms.exabeam.<tenant>` ([RFC 0018](rfcs/0018-exabeam-platform.md)). The shard JSON Schema gains `$defs/uuidTenants`; schema id unchanged. New invalid fixtures `exabeam-bad-id.json` and `exabeam-uppercase-id.json`.
@@ -180,6 +186,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## metaschema-keywords 1.0
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
+
+## platforms 1.10
+
+- Google Security Operations joins the matrix as the thirteenth platform ([specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md), [RFC 0019](rfcs/0019-google-secops-yara-l.md)): YARA-L 2.0 rules through the Chronicle API v1. It is in the `--live` allowlist (`verifyRuleText`), and the analysis engine checks YARA-L offline. The rule id lives in deployment state.
 
 ## platforms 1.9
 
@@ -316,6 +326,26 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial field contract for `platform::sysdig::1.0` ([RFC 0014](rfcs/0014-sysdig-falco-platform.md), [specifications#8](https://github.com/opentidehq/specifications/issues/8)): a Falco condition with exceptions and private macros and lists, expanded at deploy; or a tuning of an existing rule (`append_to_rule`). Derived name, `desc`, `priority`, tags, and output. Deployed through the Sysdig Secure API only. The Falco language, exception rules, and list expansion follow libsinsp and Falco's rule loader exactly. Nine constraint codes and one advisory, `sysdig_list_self_reference`; list definition order follows Falco (a list may name a later list). Fixtures under `fixtures/platforms/sysdig/` (the API bodies) and `fixtures/valid/rule-sysdig-*.yaml`.
 
+## platform-google-secops 1.2
+
+- Conformance review against Google's API reference and detection pages. `DISABLEMENT` disables a rule even when its verify or text update fails. A create is never resent after a 5xx (`google_secops_create_unconfirmed`); 429 backs off with `Retry-After`, then `RetryInfo`, then 5, 15, 60 seconds. Credentials are applied with their quota project; a token failure stops the tenant. No `runFrequency` is sent unless the block names one (Google cannot revert a rule moved off a legacy schedule). The schedule is compared as Google stores it, and cleared when removed. An archived rule is unarchived before its text is updated. The rule `scope` is compared and updated on its own. A refused delete falls back to archive on any 4xx but 401, 403, 404, 429. New warnings `google_secops_rule_execution_limited` and `google_secops_rule_compilation_failed`. A Not managed list, the regional `rep` endpoint, and corrected reasons for not resending text and for the `$risk_score` default. Schema id unchanged.
+
+## platform-google-secops 1.1
+
+- The derived meta no longer has `tactic`. Google documents a comma-separated list for `technique` only (its MITRE ATT&CK coverage matrix reads it and places each technique under its tactics), and its community rules carry one `tactic` value at most. `tactic` is no longer reserved, so a block may set one in `meta`. Goldens regenerated; schema id unchanged.
+
+## platform-google-secops 1.0
+
+- Initial field contract for `platform::google_secops::1.0` ([RFC 0019](rfcs/0019-google-secops-yara-l.md)): the rule's YARA-L sections as keys (`events`, `outcome`, `condition`, `setup`, `export` as text; `match` and `options` as YAML objects), assembled into a rule with a derived name and meta (author, description, severity, priority, ATT&CK `tactic` and `technique`, `opentide_uuid`, `opentide_version`); `severity`, `priority`, `alerting`, `run_frequency`, `schedule`, and extra `meta`; six constraint codes and three advisories. Deploy uses the Chronicle API v1 (`verifyRuleText`, `rules`, `rules/{rule}/deployment`): `PREVIEW` runs without alerting, `RELEASE` alerts, `DELETION` archives by default and never forces a delete. Live validation with `verifyRuleText`; `opentide query` through `udmSearch`. Goldens under `fixtures/platforms/google-secops/` (assembled `.yaral` text and request bodies), derived by `scripts/test_platform_google_secops.py`.
+
+## language-yara-l 1.1
+
+- Conformance review against Google's YARA-L pages (765 code blocks) and its 410 community rules. Search: multi-stage stages and roots that read earlier stages need no `events`, `cross join`, at most four stages; sliding windows; tumbling windows up to 30 days without joins; `w` and `mo` bound-checked; grouped fields, `raw`, and top-level maps; `meta` optional; the `window.*` functions. Both profiles: keywords case-insensitive in any mix. Rules: every `metrics.*` function with named arguments and `filter:`. Search: `math.round` with one argument. `yaral_string_escape` is a warning (Google's own rules use undocumented escapes); `yaral_nesting_depth` is removed. New errors `yaral_export_value` and `yaral_window_bound`; `yaral_outcome_aggregation` covers non-match placeholders, and `any`/`all` on a Struct map is `yaral_type`. A list of the compile errors only `verifyRuleText` checks.
+
+## language-yara-l 1.0
+
+- Initial language spec for YARA-L 2.0 ([specs/languages/yara-l-1.0.md](specs/languages/yara-l-1.0.md), [RFC 0019](rfcs/0019-google-secops-yara-l.md)): the `YaraLRule` and `YaraLSearch` text forms and the `YaraLSections` block form (`YaraLMatch`, `YaraLOptions`); `rule` and `search` profiles; sections (including `setup` and `export`), lexical structure, expressions, window bounds, outcome and condition rules, and limits from Google's pages; UDM and function catalogues; 28 error and 4 warning codes; a HighlightSpec mapping that adds no capture.
+
 ## language-yara 1.5
 
 - `yara_rule_identifier_conflict` also covers a rule whose name matches a rule wildcard an earlier condition uses (libyara: "matches previously used wildcard rule set"). No code added or removed.
@@ -401,6 +431,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.13
+
+- `google_secops` joins the `--live` allowlist: `verifyRuleText` compiles the assembled rule and creates nothing ([RFC 0019](rfcs/0019-google-secops-yara-l.md)). YARA-L (`.yaral`) is checked offline, and the `yaral_*` codes join language diagnostics. Advisories `google_secops_risk_score_missing`, `google_secops_rule_id_literal`, and `google_secops_live_frequency_unavailable`. The fixture checker applies five Google SecOps constraint codes and seven YARA-L codes; six invalid rule fixtures.
 
 ## validation 1.12
 

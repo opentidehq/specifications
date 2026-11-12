@@ -1,0 +1,9 @@
+{
+  "object_uuid": "00000000-0000-4000-8003-000000000010",
+  "platforms": {
+    "google_secops": {
+      "secops-eu": "cfc80c6b-f918-42ed-8d5c-9518c13586c1"
+    }
+  },
+  "schema": "deployment.state::1.0"
+}

@@ -1,6 +1,6 @@
 ---
 spec: deployment-state
-version: "1.6"
+version: "1.7"
 schema_id: deployment.state::1.0
 status: normative
 supersedes: null
@@ -10,7 +10,7 @@ supersedes: null
 
 ## Summary
 
-Microsoft Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig Secure, Bitdefender GravityZone, Graylog, and Exabeam give every rule opentide creates an id of their own. The next deploy has to update, disable, or delete the remote rule by that id, and the id is per tenant. opentide keeps it in one committed JSON file per rule, `.opentide/states/deployment/<uuid>.json` (`deployment.state::1.0`). It never stores it on the rule.
+Microsoft Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig Secure, Bitdefender GravityZone, Graylog, Exabeam, and Google Security Operations give every rule opentide creates an id of their own. The next deploy has to update, disable, or delete the remote rule by that id, and the id is per tenant. opentide keeps it in one committed JSON file per rule, `.opentide/states/deployment/<uuid>.json` (`deployment.state::1.0`). It never stores it on the rule.
 
 A platform block that still carries `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>` is invalid, and deploy refuses the rule. `opentide deploy migrate-state` moves the ids of an existing catalogue into shards once. Losing a shard, or never committing it, loses the only handle on the remote rule: the next deploy creates a second live rule beside the first. Every requirement below exists to prevent that.
 
@@ -18,10 +18,10 @@ This spec is the normative text of accepted [RFC 0010](../rfcs/0010-deployment-e
 
 ## Requirements
 
-- Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig, Bitdefender, Graylog, and Exabeam vendor identifiers MUST be stored only in `.opentide/states/deployment/<uuid>.json`. A platform block MUST NOT contain `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>`.
+- Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig, Bitdefender, Graylog, Exabeam, and Google SecOps vendor identifiers MUST be stored only in `.opentide/states/deployment/<uuid>.json`. A platform block MUST NOT contain `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>`.
 - `<uuid>` MUST be the lowercase canonical form of the rule's `metadata.uuid`, and `object_uuid` MUST equal the filename stem exactly.
 - Tenant keys MUST be non-empty and MUST equal the configured tenant `name` with surrounding whitespace removed. A stored key with leading or trailing whitespace is invalid.
-- External identifiers MUST be JSON strings. Defender, SentinelOne, and Sysdig identifiers MUST match `0|[1-9][0-9]*`. Bitdefender and Graylog identifiers MUST match `[0-9a-f]{24}` (lower case; a writer lower-cases the id the vendor returns). Exabeam identifiers MUST be a canonical lower-case UUID, `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}` (a writer lower-cases the id Exabeam returns). CrowdStrike identifiers MUST contain a non-whitespace character and are otherwise stored verbatim.
+- External identifiers MUST be JSON strings. Defender, SentinelOne, and Sysdig identifiers MUST match `0|[1-9][0-9]*`. Bitdefender and Graylog identifiers MUST match `[0-9a-f]{24}` (lower case; a writer lower-cases the id the vendor returns). Exabeam identifiers MUST be a canonical lower-case UUID, `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}` (a writer lower-cases the id Exabeam returns). CrowdStrike identifiers MUST contain a non-whitespace character and are otherwise stored verbatim. Google SecOps identifiers MUST match `ru_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`.
 - Writers MUST preserve unknown root keys, change only the addressed platform-and-tenant binding, sort keys at every level, use two-space JSON indentation, and write one trailing newline.
 - Writers MUST remove an empty platform map and MUST delete a shard that holds no binding. A successful delete MUST remove the tenant binding, then an empty platform map, then the file when no binding remains. Readers MAY treat an empty `platforms` object and an empty platform map as no bindings.
 - `.opentide/states/deployment/` MUST be committed. Implementations MUST NOT gitignore it, and MUST NOT gitignore the whole `.opentide/states/` directory.
@@ -49,6 +49,7 @@ A **state-backed platform** is one whose deployer addresses the remote rule by a
 | `bitdefender` ([bitdefender-1.0](platforms/bitdefender-1.0.md)) | Custom rule id returned by `createCustomRule` with `returnRuleId: true` | **Shard** |
 | `graylog` ([graylog-1.0](platforms/graylog-1.0.md)) | Event definition `id` returned by `POST /api/events/definitions` | **Shard** |
 | `exabeam` ([exabeam-1.0](platforms/exabeam-1.0.md)) | Correlation rule `id` returned by `POST /correlation-rules/v2/rules` | **Shard** |
+| `google_secops` ([google-secops-1.0](platforms/google-secops-1.0.md)) | Rule id, the last segment of the `name` returned by `rules.create` | **Shard** |
 | `sentinel` | Analytics rule id is `metadata.uuid` | None |
 | `splunk` | The saved search; no vendor-assigned id | None |
 | `harfanglab` | Sigma id and YARA meta `id` are `metadata.uuid` | None |
@@ -90,6 +91,7 @@ Inside `platforms`:
 | `bitdefender` | 24 lower-case hex digits as a string (`"6372b7a3897aaa77ee021642"`). |
 | `graylog` | 24 lower-case hex digits as a string (`"65f1c0de2a3b4c5d6e7f8091"`). |
 | `exabeam` | A lower-case canonical UUID as a string (`"016dbc1d-a727-43df-a143-9546dcc81a5a"`). |
+| `google_secops` | `ru_` and a lower-case canonical UUID, as a string (`"ru_cfc80c6b-f918-42ed-8d5c-9518c13586c1"`). Never a revision (`…@v_…`) and never the full resource name: the instance comes from the tenant. |
 
 A platform key outside this table fails `deployment_state_platform`. A tenant key that is empty, or that has leading or trailing whitespace, fails `deployment_state_shape`. A non-string id, or an id that breaks its platform's pattern, fails `deployment_state_shape`. There is one binding per platform-and-tenant pair.
 
@@ -119,7 +121,7 @@ A writer MUST read the file, change one binding, and write the rest back unchang
 
 ### Deploy decisions
 
-For `defender_for_endpoint`, `sentinel_one`, `crowdstrike`, `sysdig`, `bitdefender`, `graylog`, and `exabeam`, per rule and per tenant the run selected, deploy MUST decide in this order. "Create" means a strategy other than `DELETION` or `DISABLEMENT` with no binding. `DISABLEMENT` with a binding is an update that sets the vendor's disabled state. It keeps the binding.
+For `defender_for_endpoint`, `sentinel_one`, `crowdstrike`, `sysdig`, `bitdefender`, `graylog`, `exabeam`, and `google_secops`, per rule and per tenant the run selected, deploy MUST decide in this order. "Create" means a strategy other than `DELETION` or `DISABLEMENT` with no binding. `DISABLEMENT` with a binding is an update that sets the vendor's disabled state. It keeps the binding.
 
 | # | Situation | Code | Level | Result |
 |---|-----------|------|-------|--------|
@@ -284,6 +286,9 @@ A rule bound on every state-backed platform, `.opentide/states/deployment/000000
     "exabeam": {
       "exabeam-eu": "016dbc1d-a727-43df-a143-9546dcc81a5a"
     },
+    "google_secops": {
+      "secops-eu": "ru_cfc80c6b-f918-42ed-8d5c-9518c13586c1"
+    },
     "graylog": {
       "graylog-prod": "65f1c0de2a3b4c5d6e7f8091"
     },
@@ -316,6 +321,7 @@ Fixtures: [fixtures/deployment/valid/](../fixtures/deployment/valid/) and [fixtu
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.7 | 2026-11-12 | `google_secops` is state-backed: the Google SecOps rule id, `ru_` and a lower-case UUID, under `platforms.google_secops.<tenant>` ([google-secops-1.0](platforms/google-secops-1.0.md), [RFC 0019](../rfcs/0019-google-secops-yara-l.md)). The shard JSON Schema gains `secopsRuleTenants`. Schema id unchanged. |
 | 1.6 | 2026-11-12 | `exabeam` is state-backed: the Exabeam correlation rule id, a lower-case canonical UUID, under `platforms.exabeam.<tenant>` ([exabeam-1.0](platforms/exabeam-1.0.md), [RFC 0018](../rfcs/0018-exabeam-platform.md)). The shard JSON Schema gains `uuidTenants`. Schema id unchanged. |
 | 1.5 | 2026-11-11 | `graylog` is state-backed: the Graylog event definition id, 24 lower-case hex digits, under `platforms.graylog.<tenant>` ([graylog-1.0](platforms/graylog-1.0.md), [RFC 0017](../rfcs/0017-graylog-platform.md)). The shard JSON Schema maps `graylog` to `objectIdTenants`. Schema id unchanged. |
 | 1.4 | 2026-11-10 | `bitdefender` is state-backed: the GravityZone custom rule id, 24 lower-case hex digits, under `platforms.bitdefender.<tenant>` ([bitdefender-1.0](platforms/bitdefender-1.0.md), [RFC 0016](../rfcs/0016-bitdefender-gravityzone-platform.md)). The shard JSON Schema gains `objectIdTenants`. Schema id unchanged. |

@@ -338,7 +338,7 @@ class GoldenTests(unittest.TestCase):
 class ListingTests(unittest.TestCase):
     def test_platform_index(self) -> None:
         text = _read(INDEX)
-        self.assertIn("opentide ships twelve detection platform integrations.", text)
+        self.assertIn("opentide ships thirteen detection platform integrations.", text)
         self.assertIn("| `exabeam` | `platform::exabeam::1.0` | [exabeam-1.0.md](exabeam-1.0.md) |", text)
         self.assertIn("| `exabeam` | Exabeam New-Scale SIEM | yes* | yes‖‖ | Exabeam Query Language |", text)
 

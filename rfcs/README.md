@@ -33,6 +33,7 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0016](0016-bitdefender-gravityzone-platform.md) | Bitdefender GravityZone detection platform | accepted |
 | [0017](0017-graylog-platform.md) | Graylog detection platform (native event definitions) | accepted |
 | [0018](0018-exabeam-platform.md) | Exabeam New-Scale SIEM and the Exabeam Query Language | accepted |
+| [0019](0019-google-secops-yara-l.md) | Google Security Operations and the YARA-L language | accepted |
 
 ## Numbering
 

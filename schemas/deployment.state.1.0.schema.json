@@ -25,6 +25,7 @@
         "crowdstrike": { "$ref": "#/$defs/verbatimTenants" },
         "sysdig": { "$ref": "#/$defs/decimalTenants" },
         "bitdefender": { "$ref": "#/$defs/objectIdTenants" },
+        "google_secops": { "$ref": "#/$defs/secopsRuleTenants" },
         "graylog": { "$ref": "#/$defs/objectIdTenants" },
         "exabeam": { "$ref": "#/$defs/uuidTenants" }
       }
@@ -52,6 +53,15 @@
       "additionalProperties": {
         "type": "string",
         "pattern": "^[0-9a-f]{24}$"
+      }
+    },
+    "secopsRuleTenants": {
+      "type": "object",
+      "description": "Tenant name to a Google SecOps rule id: ru_ followed by a lower-case canonical UUID, as a string.",
+      "propertyNames": { "$ref": "#/$defs/tenantName" },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^ru_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       }
     },
     "uuidTenants": {
