@@ -36,11 +36,11 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Elastic Security platform | 1.1 | `platform::elastic::1.0` | normative | [specs/platforms/elastic-1.0.md](specs/platforms/elastic-1.0.md) |
 | Sysdig Secure platform | 1.1 | `platform::sysdig::1.0` | normative | [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md) |
 | Bitdefender GravityZone platform | 1.4 | `platform::bitdefender::1.0` | normative | [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md) |
-| Graylog platform | 1.0 | `platform::graylog::1.0` | normative | [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md) |
+| Graylog platform | 1.1 | `platform::graylog::1.0` | normative | [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md) |
 | Exabeam New-Scale SIEM platform | 1.0 | `platform::exabeam::1.0` | normative | [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md) |
 | YARA language | 1.5 | — | normative | [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) |
 | Exabeam Query Language | 1.0 | — | normative | [specs/languages/exabeam-1.0.md](specs/languages/exabeam-1.0.md) |
-| Validation | 1.11 | — | normative | [specs/validation.md](specs/validation.md) |
+| Validation | 1.12 | — | normative | [specs/validation.md](specs/validation.md) |
 | Sharing | 1.3 | — | normative | [specs/sharing.md](specs/sharing.md) |
 | MISP connector | 1.0 | `sharing::misp::1.0` | normative | [specs/sharing/misp-1.0.md](specs/sharing/misp-1.0.md) |
 

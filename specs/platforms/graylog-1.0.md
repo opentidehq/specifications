@@ -1,6 +1,6 @@
 ---
 spec: platform-graylog
-version: "1.0"
+version: "1.1"
 schema_id: platform::graylog::1.0
 status: normative
 supersedes: null
@@ -38,7 +38,7 @@ Deploy:
 - Deploy MUST NOT send `id` on create. Graylog echoes a client id and stores nothing.
 - Deploy MUST NOT find a definition by listing (`GET /api/events/definitions/paginated`), by title, or by tag.
 - Deploy MUST NOT create a definition unless the returned id can be kept (`deployment_state_ignored`, `deployment_state_unpersisted`).
-- Before every create and update, deploy MUST send the query to `POST /api/search/validate` and MUST NOT save a definition whose query Graylog reports as `ERROR`. Graylog stores an unparseable query without complaint.
+- Before every create and every update other than a `DISABLEMENT`, deploy MUST send the query to `POST /api/search/validate` and MUST NOT save a definition whose query Graylog reports as `ERROR`. Graylog stores an unparseable query without complaint. A `DISABLEMENT` skips the check: an unscheduled definition never runs its query, and a rule MUST stay disableable after Graylog starts refusing it.
 - Every `PUT` MUST carry `?schedule=true` or `?schedule=false`. Without it, Graylog re-enables a disabled definition.
 - Every request body MUST carry `_scope: DEFAULT`, and MUST NOT carry `state`, `storage`, `scheduler`, `updated_at`, `matched_at`, or `_entity_source`.
 - Every `POST`, `PUT`, and `DELETE` MUST send the `X-Requested-By` header.
@@ -115,7 +115,7 @@ number     = ["-"] 1*DIGIT ["." 1*DIGIT]
 field      = 1*( ALPHA / DIGIT / "_" / "." / "@" / "-" )
 ```
 
-Operators are upper case. Whitespace between tokens is free. Arguments:
+Operators are upper case. Whitespace between tokens is free. Parentheses and `NOT` nest at most 32 deep: a condition that nests deeper is `graylog_aggregation`, so no checker recurses without bound. Arguments:
 
 - `count` takes no field or one field.
 - `percentile` takes a field and a percentile `p`, `0 < p ≤ 100`.
@@ -163,7 +163,7 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `graylog_list_shape` | Each [list field](#list-fields) is a string or a list of non-blank strings, with no item repeated. |
 | `graylog_schedule` | Exactly one of `schedule.every` and `schedule.cron`, unless both are omitted. Every duration follows the grammar and is greater than zero. `cron` has 6 or 7 fields and parses as a Quartz expression. `timezone` is an IANA zone name. `window` is set when `cron` is. |
 | `graylog_event_limit` | `event_limit` is an integer from 1 to 1,000, and is not set together with `aggregation`. |
-| `graylog_aggregation` | `aggregation.condition` parses under the [condition grammar](#condition-grammar), and every call has the arguments its function takes. |
+| `graylog_aggregation` | `aggregation.condition` parses under the [condition grammar](#condition-grammar), nests at most 32 deep, and every call has the arguments its function takes. |
 | `graylog_event_field` | Each `event_fields` name matches `[A-Za-z0-9_.@-]+`, and each value is one of the [value forms](#event-field-values). |
 | `graylog_event_key` | Each `event_key` item is an `event_fields` name. |
 | `graylog_priority` | `priority` is `Informational`, `Low`, `Medium`, `High`, or `Critical`. |
@@ -210,9 +210,10 @@ The engine's Lucene codes apply unchanged. For example, `lucene_parse_error` (er
 | Code | Severity | When | Why |
 |------|----------|------|-----|
 | `graylog_leading_wildcard` | error | A term starts with `*` or `?`, and a targeted tenant does not set `allow_leading_wildcard`. Offline, with no tenant, it is an error. | Graylog refuses the query ("'*' or '?' not allowed as first character"). A regex with a leading `.*` is the portable form. |
-| `graylog_regex_unsupported` | error | A regex uses an inline flag such as `(?i)`, `\b`, `\B`, lookahead or lookbehind, or a backreference. | Lucene's regex engine accepts none of them, and Graylog matches nothing without saying so. |
-| `graylog_regex_operator` | warning | A regex holds an unescaped `#`, `&`, `<`, `>`, or `~`, other than a numeric interval `<n-m>`. | Lucene reads them as regex operators, and Graylog's validator still says OK. |
-| `graylog_regex_quote` | warning | A regex holds an unescaped `"`. | The regex matches nothing. |
+| `graylog_regex_unsupported` | error | A regex has a `(?…)` group (an inline flag such as `(?i)`, a non-capturing `(?:…)` or named group, lookahead or lookbehind), `\b`, `\B`, or a backreference. | Lucene's regex engine has none of them. Graylog refuses `\b` and `\B`, and matches nothing for the others without saying so. |
+| `graylog_regex_operator` | warning | A regex holds an unescaped `#`, `&`, `@`, `<`, `>`, or `~`, other than a numeric interval `<n-m>`. | Lucene reads them as regex operators, and Graylog's validator still says OK. |
+| `graylog_regex_quote` | warning | A regex holds a pair of unescaped `"`. | Lucene reads the quoted part as a literal string and drops the quote characters. An unpaired `"` does not parse: that is `lucene_regexp` (error). |
+| `graylog_open_range` | error | A range has `*` as a bound (`[1 TO *]`, `{* TO 5}`). | Graylog's validator refuses it, so deploy cannot save the definition. Write `field:>=1` or `field:<5`. |
 | `graylog_double_backslash` | warning | The query holds four backslashes in a row. | `\\` is one literal backslash in a Graylog query, so `\\\\` matches two. |
 | `graylog_analyzed_field` | warning | A regex, wildcard, or range applies to `message` or `full_message`. | Those fields are tokenised: a regex or wildcard matches single tokens, never the whole value. |
 
@@ -360,14 +361,14 @@ Every request goes to `<url>/api/...` with `Accept: application/json`, `X-Reques
 | `notification_settings` | `{"grace_period_ms": <grace_period in ms>, "backlog_size": <backlog>}` |
 | `notifications` | `[{"notification_id": <id>}]` for each `notifications` alias |
 
-**Before every create and update**, deploy sends the query:
+**Before every create and every update but a `DISABLEMENT`**, deploy sends the query:
 
 ```http
 POST /api/search/validate
 {"query": <query>, "streams": [<ids>], "stream_categories": [...], "timerange": {"type": "relative", "range": <window in seconds>}}
 ```
 
-- `status: ERROR` fails the rule with `graylog_query_invalid` and Graylog's explanations, and nothing is saved.
+- `status: ERROR` fails the rule with `graylog_query_invalid` and Graylog's explanations, and nothing is saved. The validator refuses some queries OpenSearch would run: an open range (`graylog_open_range` offline), and `*` or `*:*`. For every message in the streams, write `_exists_:source`.
 - Explanations of type `UNKNOWN_FIELD` are `graylog_unknown_field` (warning). `INVALID_VALUE_TYPE` explanations are `graylog_value_type` (warning). Every other `WARNING` or `INFO` explanation is `graylog_query_warning` (warning).
 
 | Block status strategy | Binding in deployment state | Graylog calls |
@@ -391,6 +392,9 @@ Deploy never reads `state` from a create response: it may say `DISABLED` while t
 | A stream or notification alias the tenant does not define | `graylog_alias_unknown`, before any call for that rule |
 | A create gets no answer (timeout, connection reset) | `graylog_create_unconfirmed`. Not retried: titles are not unique, so a retry may create a second definition. The failure names the title (and, on 7.2, the `opentide.<uuid>` tag). |
 | `GET /api/system` reports a version below 6.3, or no version | `graylog_version_unsupported`: the tenant stops |
+| Any request other than a create gets no answer | `graylog_tenant_unreachable`: the tenant stops |
+| A create answers 2xx without an `id` | `graylog_create_unconfirmed`, as above |
+| Any other non-2xx answer | `graylog_request_failed`, with the status and Graylog's message: the rule fails |
 
 ### Query validation
 
@@ -479,3 +483,4 @@ Fixtures:
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-11-11 | Initial field contract ([RFC 0017](../../rfcs/0017-graylog-platform.md)): one `aggregation-v1` event definition per block. Query, aggregation condition grammar, event-field value forms, and string-or-list fields. Graylog 6.3, 7.0, 7.1, and 7.2, each request built for the detected version. The event definition id in deployment state; `--live` through `/api/search/validate`. |
+| 1.1 | 2026-11-11 | Clarifications from the engine's oracle run against Graylog 7.2.2 and 6.3.5: Graylog refuses `\b` and `\B` (`graylog_regex_unsupported`); `graylog_regex_quote` is a paired quote, an unpaired one being `lucene_regexp`; new `graylog_open_range` (error) for an open range bound, which Graylog's validator refuses; the failure table names `graylog_tenant_unreachable`, `graylog_request_failed`, and a create answered without an `id`; conditions nest at most 32 deep; `@` is a regex operator (`graylog_regex_operator`); `graylog_regex_unsupported` names every `(?…)` group; a `DISABLEMENT` skips the pre-save query check; `_exists_:source` for every message, since the validator refuses `*` and `*:*`. Schema id unchanged. |
