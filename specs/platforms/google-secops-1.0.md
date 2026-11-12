@@ -14,7 +14,7 @@ supersedes: null
 
 Google assigns each rule an id (`ru_<uuid>`) at create time. That id is kept in [deployment state](../deployment-state.md), never on the rule. Google SecOps is the first platform since Elastic with a real tenant compile: `verifyRuleText` compiles a rule without creating it, so `google_secops` is in the `--live` allowlist. The analysis engine also checks YARA-L offline.
 
-Shared fields are defined in [platforms](index.md#shared-platform-block). The design and its alternatives are in [RFC 0017](../../rfcs/0017-google-secops-yara-l.md).
+Shared fields are defined in [platforms](index.md#shared-platform-block). The design and its alternatives are in [RFC 0018](../../rfcs/0018-google-secops-yara-l.md).
 
 ## Requirements
 
@@ -288,7 +288,7 @@ opentide never sends `force=true`: that deletes the rule's detections, which are
 
 ### Not managed
 
-Deploy manages custom rules (`ru_…`) and their deployment, and nothing else in the instance. These stay in the console or in other tools, and deploy never reads, changes, or removes them: curated rules and rule sets (`ur_…`), rule exclusions (findings refinements), reference lists and data tables (a rule that names a missing one fails `verifyRuleText`), retrohunts, rule tests, saved searches and dashboards, GoogleSQL rules, and alert and case handling in SOAR. [RFC 0017](../../rfcs/0017-google-secops-yara-l.md#resolved-questions) lists the ones planned as follow-ups.
+Deploy manages custom rules (`ru_…`) and their deployment, and nothing else in the instance. These stay in the console or in other tools, and deploy never reads, changes, or removes them: curated rules and rule sets (`ur_…`), rule exclusions (findings refinements), reference lists and data tables (a rule that names a missing one fails `verifyRuleText`), retrohunts, rule tests, saved searches and dashboards, GoogleSQL rules, and alert and case handling in SOAR. [RFC 0018](../../rfcs/0018-google-secops-yara-l.md#resolved-questions) lists the ones planned as follow-ups.
 
 ### Query validation
 
@@ -321,7 +321,7 @@ A diagnostic's `position` (1-based lines and columns, end inclusive) is mapped i
 - [elastic-1.0](elastic-1.0.md#attck): the ATT&CK technique union and the tactic table
 - [rule-1.0.md](../objects/rule-1.0.md): `response.alert_severity`, `techniques`, `detection_model`, `description`
 - [validation.md](../validation.md): static validation, advisories, query validation
-- [RFC 0017](../../rfcs/0017-google-secops-yara-l.md): design, research, and alternatives
+- [RFC 0018](../../rfcs/0018-google-secops-yara-l.md): design, research, and alternatives
 
 ## Defaults & overrides
 
@@ -415,4 +415,4 @@ Fixtures:
 |---------|------|-------|
 | 1.2 | 2026-11-12 | From the conformance review against Google's API reference and detection pages: `DISABLEMENT` disables a rule even when its verify or text update fails; a create is never resent after a 5xx (`google_secops_create_unconfirmed`), a 2xx create without JSON is `google_secops_create_no_id`; 429 backs off with `Retry-After`, then `RetryInfo`, then 5, 15, 60 seconds; credentials are applied with their quota project, and a token failure stops the tenant; no `runFrequency` is sent unless the block names one; the schedule is compared as Google stores it, and cleared when removed; an archived rule is unarchived before its text is updated; the rule `scope` is compared and updated on its own, and `data_access_scope` takes an id or a full name; a refused delete is any 4xx but 401, 403, 404, 429; rule health warnings `google_secops_rule_execution_limited` and `google_secops_rule_compilation_failed`; a Not managed list; the regional `rep` endpoint; the reason an unchanged text is not resent (revisions, not the detection limit); the `$risk_score` default is the instance's. Schema id unchanged. |
 | 1.1 | 2026-11-12 | The derived meta no longer has `tactic`: Google documents a comma-separated list for `technique` only, and its coverage matrix derives tactics from techniques. `tactic` is no longer a reserved meta key, so a block may set one in `meta`. Schema id unchanged. |
-| 1.0 | 2026-11-11 | Initial field contract ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md)): YARA-L sections as keys (`events`, `outcome`, `condition`, `setup`, `export` as text; `match` and `options` as YAML objects) assembled into a rule with derived name and meta; severity, priority, alerting, run frequency, schedule customizations; Chronicle API v1 deploy with the rule id in deployment state; archive by default on `DELETION`, never a forced delete; live validation with `verifyRuleText`; `opentide query` through `udmSearch`. |
+| 1.0 | 2026-11-11 | Initial field contract ([RFC 0018](../../rfcs/0018-google-secops-yara-l.md)): YARA-L sections as keys (`events`, `outcome`, `condition`, `setup`, `export` as text; `match` and `options` as YAML objects) assembled into a rule with derived name and meta; severity, priority, alerting, run frequency, schedule customizations; Chronicle API v1 deploy with the rule id in deployment state; archive by default on `DELETION`, never a forced delete; live validation with `verifyRuleText`; `opentide query` through `udmSearch`. |

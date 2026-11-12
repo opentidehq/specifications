@@ -1,0 +1,9 @@
+{
+  "object_uuid": "00000000-0000-4000-8003-000000000010",
+  "platforms": {
+    "graylog": {
+      "graylog-prod": "65F1C0DE2A3B4C5D6E7F8091"
+    }
+  },
+  "schema": "deployment.state::1.0"
+}

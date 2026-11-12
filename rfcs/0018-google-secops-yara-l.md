@@ -1,6 +1,6 @@
-# RFC 0017: Google Security Operations and the YARA-L language
+# RFC 0018: Google Security Operations and the YARA-L language
 
-- **RFC:** 0017
+- **RFC:** 0018
 - **Title:** Google Security Operations (SIEM) detection platform and the YARA-L 2.0 language
 - **Author:** opentide maintainers
 - **Status:** accepted
@@ -11,7 +11,7 @@
 
 ## Summary
 
-Add an eleventh detection platform, `google_secops` (display name **Google Security Operations (SIEM)**, schema `platform::google_secops::1.0`), and a language spec for **YARA-L 2.0** (`language-yara-l` 1.0).
+Add a twelfth detection platform, `google_secops` (display name **Google Security Operations (SIEM)**, schema `platform::google_secops::1.0`), and a language spec for **YARA-L 2.0** (`language-yara-l` 1.0).
 
 - The block holds the rule's **sections as keys**: `events`, `outcome`, and `condition` (and `setup`, `export`) as YARA-L text, and `match` and `options` as YAML objects. Deploy assembles the rule: `rule <derived name> {`, a generated `meta:` section (author, description, severity, priority, ATT&CK technique ids, `opentide_uuid`, `opentide_version`, extra keys), then each section under its label.
 - Deploy goes through the Chronicle API **v1**: `verifyRuleText`, `rules.create`, `rules.patch` (text), and `rules.updateDeployment` (enabled, alerting, run frequency, archive). The rule id (`ru_<uuid>`) lives in [deployment state](../specs/deployment-state.md).

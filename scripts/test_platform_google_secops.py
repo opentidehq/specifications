@@ -378,10 +378,10 @@ class GoldenTests(unittest.TestCase):
 class ListingTests(unittest.TestCase):
     def test_platform_index(self) -> None:
         text = _read(INDEX)
-        self.assertIn("opentide ships eleven detection platform integrations.", text)
+        self.assertIn("opentide ships twelve detection platform integrations.", text)
         self.assertIn("| `google_secops` | `platform::google_secops::1.0` | [google-secops-1.0.md](google-secops-1.0.md) |", text)
-        self.assertIn("| `google_secops` | Google Security Operations (SIEM) | yes* | yes‖ | YARA-L 2.0 |", text)
-        self.assertIn("`carbon_black_cloud`, `elastic`, `google_secops`\n", text)
+        self.assertIn("| `google_secops` | Google Security Operations (SIEM) | yes* | yes†† | YARA-L 2.0 |", text)
+        self.assertIn("`carbon_black_cloud`, `elastic`, `graylog`, `google_secops`\n", text)
         self.assertIn("| `google_secops` | yes:", _read(ROOT / "specs" / "validation.md"))
 
     def test_spec_index_and_llms(self) -> None:
@@ -390,7 +390,7 @@ class ListingTests(unittest.TestCase):
         self.assertIn("[specs/languages/yara-l-1.0.md](specs/languages/yara-l-1.0.md)", specs)
         self.assertIn("specs/platforms/google-secops-1.0.md (schema_id: platform::google_secops::1.0)", llms)
         self.assertIn("specs/languages/yara-l-1.0.md", llms)
-        self.assertIn("[0017](0017-google-secops-yara-l.md)", _read(ROOT / "rfcs" / "README.md"))
+        self.assertIn("[0018](0018-google-secops-yara-l.md)", _read(ROOT / "rfcs" / "README.md"))
 
     def test_rule_specs_list_the_block(self) -> None:
         for name in ("rule-1.0.md", "rule-1.1.md"):

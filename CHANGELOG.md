@@ -51,7 +51,8 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
-- `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md)) is added ([RFC 0017](rfcs/0017-google-secops-yara-l.md)). A hunt with `system: google_secops` is a YARA-L search. Additive; `schema_id` stays `rule::1.1`. New fixture `fixtures/valid/rule-google-secops-spray-1.0.yaml`.
+- `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md)) is added ([RFC 0018](rfcs/0018-google-secops-yara-l.md)). A hunt with `system: google_secops` is a YARA-L search. Additive; `schema_id` stays `rule::1.1`. New fixture `fixtures/valid/rule-google-secops-spray-1.0.yaml`.
+- `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md)) is added ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.1`. New fixtures `fixtures/valid/rule-1.1-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
@@ -64,7 +65,8 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.0
 
-- `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md)) is added ([RFC 0017](rfcs/0017-google-secops-yara-l.md)). Additive; `schema_id` stays `rule::1.0`.
+- `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md)) is added ([RFC 0018](rfcs/0018-google-secops-yara-l.md)). Additive; `schema_id` stays `rule::1.0`.
+- `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md)) is added ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.0`. New fixtures `fixtures/valid/rule-1.0-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
@@ -139,9 +141,13 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
 
+## deployment-state 1.6
+
+- `google_secops` is state-backed: the Google SecOps rule id, `ru_` and a lower-case UUID, under `platforms.google_secops.<tenant>` ([RFC 0018](rfcs/0018-google-secops-yara-l.md)). The shard JSON Schema gains `$defs/secopsRuleTenants`; schema id unchanged. New invalid fixtures `google-secops-bare-uuid.json` and `google-secops-revision-id.json`.
+
 ## deployment-state 1.5
 
-- `google_secops` is state-backed: the Google SecOps rule id, `ru_` and a lower-case UUID, under `platforms.google_secops.<tenant>` ([RFC 0017](rfcs/0017-google-secops-yara-l.md)). The shard JSON Schema gains `$defs/secopsRuleTenants`; schema id unchanged. New invalid fixtures `google-secops-bare-uuid.json` and `google-secops-revision-id.json`.
+- `graylog` is state-backed: the Graylog event definition id, 24 lower-case hex digits, under `platforms.graylog.<tenant>` ([RFC 0017](rfcs/0017-graylog-platform.md)). The shard JSON Schema maps `graylog` to `$defs/objectIdTenants`; schema id unchanged. New invalid fixture `graylog-bad-id.json`.
 
 ## deployment-state 1.4
 
@@ -175,9 +181,13 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
 
+## platforms 1.9
+
+- Google Security Operations joins the matrix as the twelfth platform ([specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md), [RFC 0018](rfcs/0018-google-secops-yara-l.md)): YARA-L 2.0 rules through the Chronicle API v1. It is in the `--live` allowlist (`verifyRuleText`), and the analysis engine checks YARA-L offline. The rule id lives in deployment state.
+
 ## platforms 1.8
 
-- Google Security Operations joins the matrix as the eleventh platform ([specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md), [RFC 0017](rfcs/0017-google-secops-yara-l.md)): YARA-L 2.0 rules through the Chronicle API v1. It is in the `--live` allowlist (`verifyRuleText`), and the analysis engine checks YARA-L offline. The rule id lives in deployment state.
+- Graylog joins the matrix as the eleventh platform ([specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md), [RFC 0017](rfcs/0017-graylog-platform.md)): native event definitions on Graylog 6.3 to 7.2. It is in the `--live` allowlist through `POST /api/search/validate`, and its event definition id lives in deployment state.
 
 ## platforms 1.7
 
@@ -316,7 +326,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-google-secops 1.0
 
-- Initial field contract for `platform::google_secops::1.0` ([RFC 0017](rfcs/0017-google-secops-yara-l.md)): the rule's YARA-L sections as keys (`events`, `outcome`, `condition`, `setup`, `export` as text; `match` and `options` as YAML objects), assembled into a rule with a derived name and meta (author, description, severity, priority, ATT&CK `tactic` and `technique`, `opentide_uuid`, `opentide_version`); `severity`, `priority`, `alerting`, `run_frequency`, `schedule`, and extra `meta`; six constraint codes and three advisories. Deploy uses the Chronicle API v1 (`verifyRuleText`, `rules`, `rules/{rule}/deployment`): `PREVIEW` runs without alerting, `RELEASE` alerts, `DELETION` archives by default and never forces a delete. Live validation with `verifyRuleText`; `opentide query` through `udmSearch`. Goldens under `fixtures/platforms/google-secops/` (assembled `.yaral` text and request bodies), derived by `scripts/test_platform_google_secops.py`.
+- Initial field contract for `platform::google_secops::1.0` ([RFC 0018](rfcs/0018-google-secops-yara-l.md)): the rule's YARA-L sections as keys (`events`, `outcome`, `condition`, `setup`, `export` as text; `match` and `options` as YAML objects), assembled into a rule with a derived name and meta (author, description, severity, priority, ATT&CK `tactic` and `technique`, `opentide_uuid`, `opentide_version`); `severity`, `priority`, `alerting`, `run_frequency`, `schedule`, and extra `meta`; six constraint codes and three advisories. Deploy uses the Chronicle API v1 (`verifyRuleText`, `rules`, `rules/{rule}/deployment`): `PREVIEW` runs without alerting, `RELEASE` alerts, `DELETION` archives by default and never forces a delete. Live validation with `verifyRuleText`; `opentide query` through `udmSearch`. Goldens under `fixtures/platforms/google-secops/` (assembled `.yaral` text and request bodies), derived by `scripts/test_platform_google_secops.py`.
 
 ## language-yara-l 1.1
 
@@ -324,7 +334,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## language-yara-l 1.0
 
-- Initial language spec for YARA-L 2.0 ([specs/languages/yara-l-1.0.md](specs/languages/yara-l-1.0.md), [RFC 0017](rfcs/0017-google-secops-yara-l.md)): the `YaraLRule` and `YaraLSearch` text forms and the `YaraLSections` block form (`YaraLMatch`, `YaraLOptions`); `rule` and `search` profiles; sections (including `setup` and `export`), lexical structure, expressions, window bounds, outcome and condition rules, and limits from Google's pages; UDM and function catalogues; 28 error and 4 warning codes; a HighlightSpec mapping that adds no capture.
+- Initial language spec for YARA-L 2.0 ([specs/languages/yara-l-1.0.md](specs/languages/yara-l-1.0.md), [RFC 0018](rfcs/0018-google-secops-yara-l.md)): the `YaraLRule` and `YaraLSearch` text forms and the `YaraLSections` block form (`YaraLMatch`, `YaraLOptions`); `rule` and `search` profiles; sections (including `setup` and `export`), lexical structure, expressions, window bounds, outcome and condition rules, and limits from Google's pages; UDM and function catalogues; 28 error and 4 warning codes; a HighlightSpec mapping that adds no capture.
 
 ## language-yara 1.5
 
@@ -349,6 +359,14 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## language-yara 1.0
 
 - First language spec, [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) ([RFC 0015](rfcs/0015-yara-language.md)): `YaraSignature`, the libyara 4.5 dialect with YARA-X as warnings, stable `yara_*` diagnostics, and the `bitdefender` and `harfanglab` profiles. Answers the YARA questions of [specifications#68](https://github.com/opentidehq/specifications/issues/68).
+
+## platform-graylog 1.1
+
+- Clarifications from the engine's oracle run against Graylog 7.2.2 and 6.3.5. Graylog refuses `\b` and `\B` (`graylog_regex_unsupported`). `graylog_regex_quote` is a paired quote; an unpaired one does not parse (`lucene_regexp`). New `graylog_open_range` (error): Graylog's validator refuses an open range bound, so deploy cannot save it. `_exists_:source` matches every message, since the validator refuses `*` and `*:*`. The failure table names `graylog_tenant_unreachable`, `graylog_request_failed`, and a create answered 2xx without an `id` (`graylog_create_unconfirmed`). A condition nests at most 32 deep. `@` is a regex operator: `/.*@contoso\.com/` also matches `alicecontoso.com` (Graylog 7.2.2 and 6.3.5). `graylog_regex_unsupported` names every `(?…)` group, `(?:…)` included, which Graylog accepts and matches nothing with. A `DISABLEMENT` skips the pre-save query check, so a rule stays disableable after Graylog starts refusing its query. The fixture checker's condition parser requires commas between arguments. Schema id unchanged.
+
+## platform-graylog 1.0
+
+- Initial field contract ([RFC 0017](rfcs/0017-graylog-platform.md)): one `aggregation-v1` event definition per block. The query is in Graylog's search syntax, with an optional aggregation (`group_by` and a condition grammar compiled to Graylog's series and condition tree). Also streams, schedule, event fields (a bare field name, a template, `{template}`, or `{lookup}`), notifications, summary, and remediation. String-or-list fields. Graylog 6.3, 7.0, 7.1, and 7.2, with each request built for the detected version; the event definition id in deployment state; `--live` through `/api/search/validate`. Fixtures, a fixture tenant, and per-version request goldens under `fixtures/platforms/graylog/`.
 
 ## platform-bitdefender 1.4
 
@@ -396,9 +414,17 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
 
+## validation 1.12
+
+- `google_secops` joins the `--live` allowlist: `verifyRuleText` compiles the assembled rule and creates nothing ([RFC 0018](rfcs/0018-google-secops-yara-l.md)). YARA-L (`.yaral`) is checked offline, and the `yaral_*` codes join language diagnostics. Advisories `google_secops_risk_score_missing`, `google_secops_rule_id_literal`, and `google_secops_live_frequency_unavailable`. The fixture checker applies five Google SecOps constraint codes and seven YARA-L codes; six invalid rule fixtures.
+
+## validation 1.11
+
+- `graylog_open_range` joins the Graylog dialect errors ([graylog-1.1](specs/platforms/graylog-1.0.md#query-diagnostics)).
+
 ## validation 1.10
 
-- `google_secops` joins the `--live` allowlist: `verifyRuleText` compiles the assembled rule and creates nothing ([RFC 0017](rfcs/0017-google-secops-yara-l.md)). YARA-L (`.yaral`) is checked offline, and the `yaral_*` codes join language diagnostics. Advisories `google_secops_risk_score_missing`, `google_secops_rule_id_literal`, and `google_secops_live_frequency_unavailable`. The fixture checker applies five Google SecOps constraint codes and seven YARA-L codes; six invalid rule fixtures.
+- `graylog` is in the `--live` allowlist through `POST /api/search/validate`, and Graylog queries (Lucene, Graylog dialect) are checked offline ([RFC 0017](rfcs/0017-graylog-platform.md)). Advisories `graylog_overlapping_window`, `graylog_all_streams`, and `graylog_title_duplicate`; Graylog dialect codes `graylog_leading_wildcard`, `graylog_regex_unsupported`, `graylog_regex_operator`, `graylog_regex_quote`, `graylog_double_backslash`, and `graylog_analyzed_field`. The fixture checker applies nine Graylog constraint codes; four new invalid fixtures.
 
 ## validation 1.9
 

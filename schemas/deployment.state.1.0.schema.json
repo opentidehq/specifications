@@ -25,7 +25,8 @@
         "crowdstrike": { "$ref": "#/$defs/verbatimTenants" },
         "sysdig": { "$ref": "#/$defs/decimalTenants" },
         "bitdefender": { "$ref": "#/$defs/objectIdTenants" },
-        "google_secops": { "$ref": "#/$defs/secopsRuleTenants" }
+        "google_secops": { "$ref": "#/$defs/secopsRuleTenants" },
+        "graylog": { "$ref": "#/$defs/objectIdTenants" }
       }
     }
   },
@@ -46,7 +47,7 @@
     },
     "objectIdTenants": {
       "type": "object",
-      "description": "Tenant name to a 24 lower-case hex digit id (a GravityZone custom rule id), as a string.",
+      "description": "Tenant name to a 24 lower-case hex digit id (a GravityZone custom rule id or a Graylog event definition id), as a string.",
       "propertyNames": { "$ref": "#/$defs/tenantName" },
       "additionalProperties": {
         "type": "string",

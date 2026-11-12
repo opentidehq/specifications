@@ -14,6 +14,9 @@
     "google_secops": {
       "secops-eu": "ru_cfc80c6b-f918-42ed-8d5c-9518c13586c1"
     },
+    "graylog": {
+      "graylog-prod": "65f1c0de2a3b4c5d6e7f8091"
+    },
     "sentinel_one": {
       "s1-prod": "4242"
     },

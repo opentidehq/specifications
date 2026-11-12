@@ -23,9 +23,9 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Vocabulary format | 1.0 | — | normative | [specs/vocabularies/format.md](specs/vocabularies/format.md) |
 | Vocabulary catalog | 1.0 | — | normative | [specs/vocabularies/catalog.md](specs/vocabularies/catalog.md) |
 | Deployment lifecycle | 1.3 | — | normative | [specs/deployment.md](specs/deployment.md) |
-| Deployment state | 1.5 | `deployment.state::1.0` | normative | [specs/deployment-state.md](specs/deployment-state.md) |
+| Deployment state | 1.6 | `deployment.state::1.0` | normative | [specs/deployment-state.md](specs/deployment-state.md) |
 | Metaschema keywords | 1.2 | — | normative | [specs/metaschema-keywords.md](specs/metaschema-keywords.md) |
-| Platforms | 1.8 | — | normative | [specs/platforms/index.md](specs/platforms/index.md) |
+| Platforms | 1.9 | — | normative | [specs/platforms/index.md](specs/platforms/index.md) |
 | Sentinel platform | 1.2 | `platform::sentinel::1.0` | normative | [specs/platforms/sentinel-1.0.md](specs/platforms/sentinel-1.0.md) |
 | Defender for Endpoint platform | 1.1 | `platform::defender_for_endpoint::1.0` | normative | [specs/platforms/defender-for-endpoint-1.0.md](specs/platforms/defender-for-endpoint-1.0.md) |
 | Splunk platform | 1.0 | `platform::splunk::1.0` | normative | [specs/platforms/splunk-1.0.md](specs/platforms/splunk-1.0.md) |
@@ -36,10 +36,11 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Elastic Security platform | 1.1 | `platform::elastic::1.0` | normative | [specs/platforms/elastic-1.0.md](specs/platforms/elastic-1.0.md) |
 | Sysdig Secure platform | 1.1 | `platform::sysdig::1.0` | normative | [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md) |
 | Bitdefender GravityZone platform | 1.4 | `platform::bitdefender::1.0` | normative | [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md) |
+| Graylog platform | 1.1 | `platform::graylog::1.0` | normative | [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md) |
 | Google Security Operations platform | 1.2 | `platform::google_secops::1.0` | normative | [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md) |
 | YARA language | 1.5 | — | normative | [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) |
 | YARA-L language | 1.1 | — | normative | [specs/languages/yara-l-1.0.md](specs/languages/yara-l-1.0.md) |
-| Validation | 1.10 | — | normative | [specs/validation.md](specs/validation.md) |
+| Validation | 1.12 | — | normative | [specs/validation.md](specs/validation.md) |
 | Sharing | 1.3 | — | normative | [specs/sharing.md](specs/sharing.md) |
 | MISP connector | 1.0 | `sharing::misp::1.0` | normative | [specs/sharing/misp-1.0.md](specs/sharing/misp-1.0.md) |
 

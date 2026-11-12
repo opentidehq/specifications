@@ -101,7 +101,7 @@ class SpecShapeTests(unittest.TestCase):
 class ListingTests(unittest.TestCase):
     def test_platform_index(self) -> None:
         text = _read(INDEX)
-        self.assertIn("opentide ships eleven detection platform integrations.", text)
+        self.assertIn("opentide ships twelve detection platform integrations.", text)
         self.assertIn("| `sysdig` | `platform::sysdig::1.0` | [sysdig-1.0.md](sysdig-1.0.md) |", text)
         self.assertIn("| `sysdig` | Sysdig Secure | yes* | **no**‡ | Falco condition |", text)
         self.assertIn("Excluded from `--live`: `crowdstrike`, `harfanglab`, `sysdig`, `bitdefender`.", text)
