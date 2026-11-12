@@ -155,7 +155,7 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `exabeam_severity` | `severity` is `none`, `low`, `medium`, `high`, or `critical` |
 | `exabeam_outcome` | `outcome` is `alert`, `case`, or `none` |
 | `exabeam_email` | `email.recipients` is a non-empty list of distinct addresses (`local@domain`); `subject` is non-blank when set |
-| `exabeam_schedule` | Each recurrence has a known `every`, `from` and `to` matching `^([01]?[0-9]|2[0-3]):[0-5][0-9]Z$`, and exactly the day keys its `every` takes, with valid weekday names and day numbers |
+| `exabeam_schedule` | Each recurrence has a known `every`, `from` and `to` matching `^([01]?[0-9]\|2[0-3]):[0-5][0-9]Z$`, and exactly the day keys its `every` takes, with valid weekday names and day numbers |
 | `exabeam_name_length` | The Exabeam rule name (shared `name`, else the rule `name`) is at most 128 characters |
 | `exabeam_context_table_trigger` | A sequence whose query uses a context table (`IN "…"`) has no `threshold`. Exabeam requires "Trigger on first match" with a context table lookup. |
 | `exabeam_name_duplicate` | Workspace check: two enabled blocks resolve to the same Exabeam rule name, compared case-insensitively. Exabeam's import refuses a rule whose name exists, and the [name check](#deploy) would refuse the second create. |
