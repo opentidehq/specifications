@@ -1,6 +1,6 @@
 ---
 spec: platform-google-secops
-version: "1.2"
+version: "1.3"
 schema_id: platform::google_secops::1.0
 status: normative
 supersedes: null
@@ -111,7 +111,7 @@ Advisories are [warnings](../validation.md#platform-advisories): validation repo
 
 ### Rule name
 
-The shared `name` when set. Otherwise the opentide rule `name`, lower-cased, with every run of characters outside `[a-z0-9]` replaced by one `_`, and `_` trimmed at both ends. A result that starts with a digit gets the prefix `r_`. An empty result is `opentide_` followed by `metadata.uuid` with `-` replaced by `_`.
+The shared `name` when set. Otherwise the opentide rule `name`, lower-cased, with every run of characters outside `[a-z0-9]` replaced by one `_`, and `_` trimmed at both ends. A result that starts with a digit, or is a YARA-L keyword ([yara-l-1.0](../languages/yara-l-1.0.md#lexical-structure), case-insensitive), gets the prefix `r_`: a rule named `Any` is `r_any`. An empty result is `opentide_` followed by `metadata.uuid` with `-` replaced by `_`.
 
 `Office application spawns encoded PowerShell` → `office_application_spawns_encoded_powershell`.
 
@@ -414,5 +414,6 @@ Fixtures:
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.2 | 2026-11-12 | From the conformance review against Google's API reference and detection pages: `DISABLEMENT` disables a rule even when its verify or text update fails; a create is never resent after a 5xx (`google_secops_create_unconfirmed`), a 2xx create without JSON is `google_secops_create_no_id`; 429 backs off with `Retry-After`, then `RetryInfo`, then 5, 15, 60 seconds; credentials are applied with their quota project, and a token failure stops the tenant; no `runFrequency` is sent unless the block names one; the schedule is compared as Google stores it, and cleared when removed; an archived rule is unarchived before its text is updated; the rule `scope` is compared and updated on its own, and `data_access_scope` takes an id or a full name; a refused delete is any 4xx but 401, 403, 404, 429; rule health warnings `google_secops_rule_execution_limited` and `google_secops_rule_compilation_failed`; a Not managed list; the regional `rep` endpoint; the reason an unchanged text is not resent (revisions, not the detection limit); the `$risk_score` default is the instance's. Schema id unchanged. (Settled in review: the scope update carries the etag of the latest answer and its 409 is a conflict; a 404 on any rule or deployment call follows the 404 row; `DISABLEMENT` and the archive path read the deployment first and send nothing to an archived rule, and only the fields that differ otherwise.) |
+| 1.3 | 2026-11-12 | A derived rule name that is a YARA-L keyword gets the prefix `r_`, as one that starts with a digit does: `rule any {` does not compile. |
 | 1.1 | 2026-11-12 | The derived meta no longer has `tactic`: Google documents a comma-separated list for `technique` only, and its coverage matrix derives tactics from techniques. `tactic` is no longer a reserved meta key, so a block may set one in `meta`. Schema id unchanged. |
 | 1.0 | 2026-11-11 | Initial field contract ([RFC 0019](../../rfcs/0019-google-secops-yara-l.md)): YARA-L sections as keys (`events`, `outcome`, `condition`, `setup`, `export` as text; `match` and `options` as YAML objects) assembled into a rule with derived name and meta; severity, priority, alerting, run frequency, schedule customizations; Chronicle API v1 deploy with the rule id in deployment state; archive by default on `DELETION`, never a forced delete; live validation with `verifyRuleText`; `opentide query` through `udmSearch`. |
