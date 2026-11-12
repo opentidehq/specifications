@@ -57,6 +57,7 @@ DIALECT_CODES = {
     "graylog_regex_unsupported": "error",
     "graylog_regex_operator": "warning",
     "graylog_regex_quote": "warning",
+    "graylog_open_range": "error",
     "graylog_double_backslash": "warning",
     "graylog_analyzed_field": "warning",
 }
@@ -312,6 +313,10 @@ class ConditionTests(unittest.TestCase):
         self.assertEqual(tree["left"]["left"]["expr"], "!")
         self.assertEqual(tree["right"]["right"], {"expr": "number", "value": 2.5})
 
+    def test_nesting_up_to_the_limit(self) -> None:
+        parse_graylog_condition("(" * 32 + "count() > 1" + ")" * 32)
+        parse_graylog_condition("NOT " * 16 + "(" * 16 + "count() > 1" + ")" * 16)
+
     def test_refusals(self) -> None:
         for text in (
             "",
@@ -324,6 +329,12 @@ class ConditionTests(unittest.TestCase):
             "count() >= ",
             "(count() > 1",
             "count() = 1",
+            "percentile(bytes 95) > 1",
+            "count(a,) > 1",
+            "max(,a) > 1",
+            "(" * 33 + "count() > 1" + ")" * 33,
+            "NOT " * 33 + "count() > 1",
+            "(" * 5000 + "count() > 1" + ")" * 5000,
         ):
             with self.subTest(text=text), self.assertRaises(GraylogConditionError):
                 parse_graylog_condition(text)

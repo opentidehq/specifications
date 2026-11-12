@@ -330,6 +330,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - First language spec, [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) ([RFC 0015](rfcs/0015-yara-language.md)): `YaraSignature`, the libyara 4.5 dialect with YARA-X as warnings, stable `yara_*` diagnostics, and the `bitdefender` and `harfanglab` profiles. Answers the YARA questions of [specifications#68](https://github.com/opentidehq/specifications/issues/68).
 
+## platform-graylog 1.1
+
+- Clarifications from the engine's oracle run against Graylog 7.2.2 and 6.3.5. Graylog refuses `\b` and `\B` (`graylog_regex_unsupported`). `graylog_regex_quote` is a paired quote; an unpaired one does not parse (`lucene_regexp`). New `graylog_open_range` (error): Graylog's validator refuses an open range bound, so deploy cannot save it. `_exists_:source` matches every message, since the validator refuses `*` and `*:*`. The failure table names `graylog_tenant_unreachable`, `graylog_request_failed`, and a create answered 2xx without an `id` (`graylog_create_unconfirmed`). A condition nests at most 32 deep. `@` is a regex operator: `/.*@contoso\.com/` also matches `alicecontoso.com` (Graylog 7.2.2 and 6.3.5). `graylog_regex_unsupported` names every `(?…)` group, `(?:…)` included, which Graylog accepts and matches nothing with. A `DISABLEMENT` skips the pre-save query check, so a rule stays disableable after Graylog starts refusing its query. The fixture checker's condition parser requires commas between arguments. Schema id unchanged.
+
 ## platform-graylog 1.0
 
 - Initial field contract ([RFC 0017](rfcs/0017-graylog-platform.md)): one `aggregation-v1` event definition per block. The query is in Graylog's search syntax, with an optional aggregation (`group_by` and a condition grammar compiled to Graylog's series and condition tree). Also streams, schedule, event fields (a bare field name, a template, `{template}`, or `{lookup}`), notifications, summary, and remediation. String-or-list fields. Graylog 6.3, 7.0, 7.1, and 7.2, with each request built for the detected version; the event definition id in deployment state; `--live` through `/api/search/validate`. Fixtures, a fixture tenant, and per-version request goldens under `fixtures/platforms/graylog/`.
@@ -379,6 +383,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.11
+
+- `graylog_open_range` joins the Graylog dialect errors ([graylog-1.1](specs/platforms/graylog-1.0.md#query-diagnostics)).
 
 ## validation 1.10
 

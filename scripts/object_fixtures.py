@@ -1002,6 +1002,9 @@ class GraylogConditionError(ValueError):
     """The aggregation condition does not parse, or a call has the wrong arguments."""
 
 
+GRAYLOG_MAX_NESTING = 32
+
+
 def parse_graylog_condition(text: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Parse specs/platforms/graylog-1.0.md#condition-grammar into (condition tree, series).
 
@@ -1042,10 +1045,11 @@ def parse_graylog_condition(text: str) -> tuple[dict[str, Any], list[dict[str, A
             raise GraylogConditionError(f"{function!r} is not an aggregation function")
         take("(")
         args: list[str] = []
-        while peek() != ")":
+        if peek() != ")":
             args.append(take())
-            if peek() == ",":
+            while peek() == ",":
                 take(",")
+                args.append(take())
         take(")")
         field_name = args[0] if args else None
         if field_name is not None and not GRAYLOG_FIELD.fullmatch(field_name):
@@ -1071,11 +1075,22 @@ def parse_graylog_condition(text: str) -> tuple[dict[str, Any], list[dict[str, A
             series.append(entry)
         return series_id
 
+    depth = 0
+
+    def nest() -> None:
+        nonlocal depth
+        depth += 1
+        if depth > GRAYLOG_MAX_NESTING:
+            raise GraylogConditionError(f"the condition nests deeper than {GRAYLOG_MAX_NESTING}")
+
     def primary() -> dict[str, Any]:
+        nonlocal depth
         if peek() == "(":
             take("(")
+            nest()
             node = or_expr()
             take(")")
+            depth -= 1
             return node
         ref = call()
         op = take()
@@ -1084,9 +1099,13 @@ def parse_graylog_condition(text: str) -> tuple[dict[str, Any], list[dict[str, A
         return {"expr": op, "left": {"expr": "number-ref", "ref": ref}, "right": {"expr": "number", "value": number(take())}}
 
     def not_expr() -> dict[str, Any]:
+        nonlocal depth
         if peek() == "NOT":
             take("NOT")
-            return {"expr": "!", "left": not_expr()}
+            nest()
+            node = {"expr": "!", "left": not_expr()}
+            depth -= 1
+            return node
         return primary()
 
     def and_expr() -> dict[str, Any]:
