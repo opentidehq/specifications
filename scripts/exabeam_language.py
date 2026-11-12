@@ -70,7 +70,6 @@ ERRORS = {
     "exabeam_parse_error",
     "exabeam_implicit_operator",
     "exabeam_not_equal",
-    "exabeam_single_group",
     "exabeam_bare_wildcard",
     "exabeam_leading_slash",
     "exabeam_free_text_special",
@@ -99,6 +98,7 @@ WARNINGS = {
     "exabeam_single_value_list",
     "exabeam_unquoted_value",
     "exabeam_legacy_regex",
+    "exabeam_single_group",
     "exabeam_unknown_field",
     "exabeam_string_field_number",
 }
@@ -145,6 +145,8 @@ class ParseError(Exception):
 
 
 IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*")
+# A field name may hold `-` (Exabeam tokenizes `first-name` as one token; its content uses `c-uri`).
+FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*")
 HYPHEN_WORD = re.compile(r"(?i)(group|order)-by\b")
 NUMBER = re.compile(r"[+-]?\d+(?:\.\d+)?\Z")
 DATETIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})?\Z")
@@ -391,13 +393,13 @@ class Parser:
             return items[0]
         return Node("and", items, start, self.pos)
 
-    def unary(self, stop: tuple[str, ...]) -> Node:
+    def unary(self, stop: tuple[str, ...], negated: bool = False) -> Node:
         start = self.pos
         if self.take_keyword("NOT"):
-            return Node("not", [self.unary(stop)], start, self.pos)
-        return self.primary(stop)
+            return Node("not", [self.unary(stop, negated=True)], start, self.pos)
+        return self.primary(stop, negated=negated)
 
-    def primary(self, stop: tuple[str, ...]) -> Node:
+    def primary(self, stop: tuple[str, ...], negated: bool = False) -> Node:
         self.ws()
         start = self.pos
         if self.peek() == "(":
@@ -405,10 +407,10 @@ class Parser:
             inner = self.or_expr(())
             self.expect(")")
             node = Node("group", [inner], start, self.pos)
-            if inner.kind in ("term", "context", "not", "group"):
+            if inner.kind in ("term", "context", "not", "group") and not negated:
                 self.diag(
                     "exabeam_single_group",
-                    "parentheses around a single expression are an error in Exabeam Search",
+                    "parentheses around a single expression: Exabeam's guide calls it an error; drop them",
                     start,
                     self.pos,
                 )
@@ -430,6 +432,11 @@ class Parser:
             self.tok(self.pos, self.pos + 1, "error")
             self.pos += 1
             return Node("term", [], start, self.pos)
+        fm = FIELD.match(self.text, self.pos)
+        if fm and "-" in fm.group(0):
+            after = self.text[fm.end() :].lstrip()
+            if after[:2] in ("==", "!=", "<=", ">=") or after[:1] in (":", "=", "<", ">"):
+                return self.field_term(fm.group(0), fm.start(), fm.end())
         w = self.word_at()
         if w:
             name, ws_, we = w
