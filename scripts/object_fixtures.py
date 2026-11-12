@@ -979,7 +979,7 @@ SECOPS_SEVERITIES = frozenset({"Info", "Low", "Medium", "High", "Critical"})
 SECOPS_RUN_FREQUENCIES = frozenset({"LIVE", "LIVE_CUSTOMIZABLE", "HOURLY_CUSTOMIZABLE", "DAILY"})
 SECOPS_CUSTOMIZABLE = frozenset({"LIVE_CUSTOMIZABLE", "HOURLY_CUSTOMIZABLE"})
 SECOPS_DERIVED_META = frozenset(
-    {"author", "description", "severity", "priority", "tactic", "technique", "opentide_uuid", "opentide_version"}
+    {"author", "description", "severity", "priority", "technique", "opentide_uuid", "opentide_version"}
 )
 SECOPS_DURATION = re.compile(r"^[1-9][0-9]*[smhd]$")
 

@@ -1,6 +1,6 @@
 ---
 spec: platform-google-secops
-version: "1.0"
+version: "1.1"
 schema_id: platform::google_secops::1.0
 status: normative
 supersedes: null
@@ -123,12 +123,11 @@ Deploy writes these keys, in this order, then the block `meta` keys in the order
 | `description` | The opentide `description`, whitespace runs collapsed to one space, trimmed | always |
 | `severity` | [Severity](#severity) | always |
 | `priority` | `priority`, else the severity | always |
-| `tactic` | ATT&CK tactic ids, comma-joined without spaces, in the [tactic table](elastic-1.0.md#attck) order | when there is at least one |
 | `technique` | ATT&CK technique ids, sorted, comma-joined without spaces | when there is at least one |
 | `opentide_uuid` | `metadata.uuid` | always |
 | `opentide_version` | `metadata.version` | always |
 
-The techniques are the rule's `techniques` plus those inherited through `detection_model`, the union [elastic-1.0](elastic-1.0.md#attck) uses. Each technique contributes the tactics of its `tide.vocab.stages`, mapped and renamed as there. `technique` is the key Google's MITRE ATT&CK coverage page reads ([MITRE dashboard](https://cloud.google.com/chronicle/docs/detection/mitre-dashboard)); `tactic` follows Google's community rule style.
+The techniques are the rule's `techniques` plus those inherited through `detection_model`, the union [elastic-1.0](elastic-1.0.md#attck) uses. `technique` is the key Google's MITRE ATT&CK coverage page reads, as "a valid MITRE ATT&CK technique ID or multiple IDs as a comma-separated string" ([MITRE dashboard](https://cloud.google.com/chronicle/docs/detection/mitre-dashboard)); the matrix places each technique under its tactics itself. Deploy writes no `tactic`: Google documents no list form for it, and its community rules carry one value at most. A block that wants one writes it in `meta`.
 
 Each value is written as a YARA-L double-quoted string: `\` becomes `\\`, `"` becomes `\"`, and every other control character, line breaks included, becomes a space. Google reads `author` and `severity` from the meta into `Rule.author` and `Rule.severity.displayName`, verbatim. Every other key, `priority` included, is a rule label on the detection. Google does not document how the meta `severity` string maps to a detection's severity; opentide writes Google's community spelling (`Info`, `Low`, `Medium`, `High`, `Critical`) and expresses alert weight through `$risk_score`, which Google does document.
 
@@ -403,4 +402,5 @@ Fixtures:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-11-12 | The derived meta no longer has `tactic`: Google documents a comma-separated list for `technique` only, and its coverage matrix derives tactics from techniques. `tactic` is no longer a reserved meta key, so a block may set one in `meta`. Schema id unchanged. |
 | 1.0 | 2026-11-11 | Initial field contract ([RFC 0017](../../rfcs/0017-google-secops-yara-l.md)): YARA-L sections as keys (`events`, `outcome`, `condition`, `setup`, `export` as text; `match` and `options` as YAML objects) assembled into a rule with derived name and meta; severity, priority, alerting, run frequency, schedule customizations; Chronicle API v1 deploy with the rule id in deployment state; archive by default on `DELETION`, never a forced delete; live validation with `verifyRuleText`; `opentide query` through `udmSearch`. |

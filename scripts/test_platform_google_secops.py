@@ -45,25 +45,6 @@ RULES = {
 
 SEVERITY = {"Informational": "Info", "Low": "Low", "Medium": "Medium", "High": "High", "Critical": "Critical"}
 FREQUENCY_PREFERENCE = ["LIVE", "LIVE_CUSTOMIZABLE", "HOURLY_CUSTOMIZABLE", "DAILY"]
-# specs/platforms/elastic-1.0.md#attck: stage -> tactic id, in table order; legacy stages renamed first.
-TACTICS = {
-    "Reconnaissance": "TA0043",
-    "Resource Development": "TA0042",
-    "Initial Access": "TA0001",
-    "Execution": "TA0002",
-    "Persistence": "TA0003",
-    "Privilege Escalation": "TA0004",
-    "Stealth": "TA0005",
-    "Defense Impairment": "TA0112",
-    "Credential Access": "TA0006",
-    "Discovery": "TA0007",
-    "Lateral Movement": "TA0008",
-    "Collection": "TA0009",
-    "Command and Control": "TA0011",
-    "Exfiltration": "TA0010",
-    "Impact": "TA0040",
-}
-LEGACY_STAGES = {"Defense Evasion": "Stealth"}
 CONSTRAINTS = [
     "google_secops_rule_name",
     "google_secops_severity",
@@ -170,10 +151,6 @@ def meta(rule: dict[str, Any], stages: dict[str, list[str]]) -> list[tuple[str, 
         ("priority", block.get("priority") or sev),
     ]
     techniques = sorted(set(rule.get("techniques") or []))
-    tactic_stages = {LEGACY_STAGES.get(stage, stage) for t in techniques for stage in stages.get(t, [])}
-    tactics = [tactic for stage, tactic in TACTICS.items() if stage in tactic_stages]
-    if tactics:
-        entries.append(("tactic", ",".join(tactics)))
     if techniques:
         entries.append(("technique", ",".join(techniques)))
     entries.append(("opentide_uuid", rule["metadata"]["uuid"]))
@@ -351,11 +328,12 @@ class GoldenTests(unittest.TestCase):
         process = _load("rule-google-secops-process-1.0")
         self.assertEqual(rule_name(process), "office_application_spawns_encoded_powershell")
         self.assertEqual(rule_name({**process, "name": "2FA bypass!", "configurations": {"google_secops": {}}}), "r_2fa_bypass")
-        self.assertEqual(dict(meta(process, self.stages))["tactic"], "TA0001,TA0002")
+        self.assertNotIn("tactic", dict(meta(process, self.stages)))
+        self.assertEqual(dict(meta(process, self.stages))["technique"], "T1059.001,T1566.001")
         self.assertEqual(dict(meta(process, self.stages))["author"], "Detection Engineering, Threat Hunting")
         spray = _load("rule-google-secops-spray-1.0")
         self.assertEqual(rule_name(spray), "password_spray_then_success")
-        self.assertEqual(dict(meta(spray, self.stages))["tactic"], "TA0001,TA0003,TA0004,TA0005,TA0006")
+        self.assertEqual(dict(meta(spray, self.stages))["technique"], "T1078,T1110.003")
         self.assertEqual(meta_value('a "b"\\c\nd'), '"a \\"b\\"\\\\c d"')
 
     def test_section_line_mapping(self) -> None:
