@@ -26,7 +26,8 @@
         "sysdig": { "$ref": "#/$defs/decimalTenants" },
         "bitdefender": { "$ref": "#/$defs/objectIdTenants" },
         "google_secops": { "$ref": "#/$defs/secopsRuleTenants" },
-        "graylog": { "$ref": "#/$defs/objectIdTenants" }
+        "graylog": { "$ref": "#/$defs/objectIdTenants" },
+        "exabeam": { "$ref": "#/$defs/uuidTenants" }
       }
     }
   },
@@ -61,6 +62,15 @@
       "additionalProperties": {
         "type": "string",
         "pattern": "^ru_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      }
+    },
+    "uuidTenants": {
+      "type": "object",
+      "description": "Tenant name to a lower-case canonical UUID (an Exabeam correlation rule id), as a string.",
+      "propertyNames": { "$ref": "#/$defs/tenantName" },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       }
     },
     "verbatimTenants": {

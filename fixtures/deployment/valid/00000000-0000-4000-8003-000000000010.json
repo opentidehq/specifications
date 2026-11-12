@@ -11,6 +11,9 @@
       "contoso": "12345",
       "fabrikam": "67890"
     },
+    "exabeam": {
+      "exabeam-eu": "016dbc1d-a727-43df-a143-9546dcc81a5a"
+    },
     "google_secops": {
       "secops-eu": "ru_cfc80c6b-f918-42ed-8d5c-9518c13586c1"
     },

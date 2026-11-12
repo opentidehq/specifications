@@ -274,6 +274,15 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "platforms" / "graylog" / "tenant.toml",
         FIXTURES / "valid" / "rule-graylog-aggregation-1.0.yaml",
         FIXTURES / "valid" / "rule-graylog-filter-1.1.yaml",
+        FIXTURES / "platforms" / "exabeam.yaml",
+        FIXTURES / "platforms" / "exabeam" / "tenant.toml",
+        FIXTURES / "platforms" / "exabeam" / "rule-exabeam-threshold-1.0.create.api.json",
+        FIXTURES / "platforms" / "exabeam" / "rule-exabeam-threshold-1.0.update.api.json",
+        FIXTURES / "platforms" / "exabeam" / "rule-exabeam-threshold-1.0.disable.api.json",
+        FIXTURES / "platforms" / "exabeam" / "rule-exabeam-threshold-1.0.validate.api.json",
+        FIXTURES / "platforms" / "exabeam" / "rule-exabeam-sequence-1.0.create.api.json",
+        FIXTURES / "valid" / "rule-exabeam-threshold-1.0.yaml",
+        FIXTURES / "valid" / "rule-exabeam-sequence-1.0.yaml",
     ]
     for path in required:
         if not path.is_file():

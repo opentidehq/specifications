@@ -93,7 +93,7 @@ A `reviewed` instant equal to `T − W` or later is not unreviewed. `W` is not a
 | `query` | string | yes | Query text |
 | `language` | string | no | Query language, for a `system` with more than one. Omitted with `system: elastic`: unknown. |
 
-`language` names the query language when `system` alone does not. With `system: elastic` it MUST be one of the names [elastic-1.0](../platforms/elastic-1.0.md) uses: `kuery` (KQL), `lucene`, `eql`, or `esql` (ES\|QL). `language` MUST NOT be set with any other `system`, because the system alone names the language: `sentinel` and `defender_for_endpoint` are KQL, `splunk` is SPL, `google_secops` is a [YARA-L search](../languages/yara-l-1.0.md#text-forms), and no other system has a language in this revision. With `system: elastic`, an omitted `language` (or an empty one, YAML `null`) means the language is unknown and the query is not analysed, as before the field existed.
+`language` names the query language when `system` alone does not. With `system: elastic` it MUST be one of the names [elastic-1.0](../platforms/elastic-1.0.md) uses: `kuery` (KQL), `lucene`, `eql`, or `esql` (ES\|QL). `language` MUST NOT be set with any other `system`, because the system alone names the language: `sentinel` and `defender_for_endpoint` are KQL, `splunk` is SPL, `exabeam` is the Exabeam Query Language ([exabeam-1.0](../languages/exabeam-1.0.md), profile `search`), `google_secops` is a [YARA-L search](../languages/yara-l-1.0.md#text-forms), and no other system has a language in this revision. With `system: elastic`, an omitted `language` (or an empty one, YAML `null`) means the language is unknown and the query is not analysed, as before the field existed.
 
 ### Platform block (PlatformConfigBase)
 
@@ -126,6 +126,7 @@ Typed optional blocks keyed by platform identifier:
 | `sysdig` | SysdigConfig | `platform::sysdig::1.0` | [sysdig-1.0.md](../platforms/sysdig-1.0.md) |
 | `bitdefender` | BitdefenderConfig | `platform::bitdefender::1.0` | [bitdefender-1.0.md](../platforms/bitdefender-1.0.md) |
 | `graylog` | GraylogConfig | `platform::graylog::1.0` | [graylog-1.0.md](../platforms/graylog-1.0.md) |
+| `exabeam` | ExabeamConfig | `platform::exabeam::1.0` | [exabeam-1.0.md](../platforms/exabeam-1.0.md) |
 | `google_secops` | GoogleSecopsConfig | `platform::google_secops::1.0` | [google-secops-1.0.md](../platforms/google-secops-1.0.md) |
 
 Shared block fields and the capability matrix are in [platforms/index.md](../platforms/index.md). Each link above is the field contract for that block.
@@ -214,7 +215,8 @@ configurations:
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.1 | 2026-11-11 | `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [google-secops-1.0.md](../platforms/google-secops-1.0.md)) is added ([RFC 0018](../../rfcs/0018-google-secops-yara-l.md)). A `response.procedure.searches[]` entry with `system: google_secops` is a YARA-L search ([yara-l-1.0](../languages/yara-l-1.0.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.1`. |
+| 1.1 | 2026-11-12 | `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [exabeam-1.0.md](../platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](../../rfcs/0018-exabeam-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.1`. |
+| 1.1 | 2026-11-11 | `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [google-secops-1.0.md](../platforms/google-secops-1.0.md)) is added ([RFC 0019](../../rfcs/0019-google-secops-yara-l.md)). A `response.procedure.searches[]` entry with `system: google_secops` is a YARA-L search ([yara-l-1.0](../languages/yara-l-1.0.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.1`. |
 | 1.1 | 2026-11-11 | `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [graylog-1.0.md](../platforms/graylog-1.0.md)) is added ([RFC 0017](../../rfcs/0017-graylog-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.1`. |
 | 1.1 | 2026-11-10 | `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [bitdefender-1.0.md](../platforms/bitdefender-1.0.md)) is added ([RFC 0016](../../rfcs/0016-bitdefender-gravityzone-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.1`. |
 | 1.1 | 2026-11-02 | `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [sysdig-1.0.md](../platforms/sysdig-1.0.md)) is added ([RFC 0014](../../rfcs/0014-sysdig-falco-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.1`. |

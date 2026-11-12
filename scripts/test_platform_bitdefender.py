@@ -282,7 +282,7 @@ class GoldenTests(unittest.TestCase):
 class ListingTests(unittest.TestCase):
     def test_platform_index(self) -> None:
         text = _read(INDEX)
-        self.assertIn("opentide ships twelve detection platform integrations.", text)
+        self.assertIn("opentide ships thirteen detection platform integrations.", text)
         self.assertIn("| `bitdefender` | `platform::bitdefender::1.0` | [bitdefender-1.0.md](bitdefender-1.0.md) |", text)
         self.assertIn("| `bitdefender` | Bitdefender GravityZone | yes* | **no**¶ | GravityZone criteria or YARA |", text)
         self.assertIn("Excluded from `--live`: `crowdstrike`, `harfanglab`, `sysdig`, `bitdefender`.", text)

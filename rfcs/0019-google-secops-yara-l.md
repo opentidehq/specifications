@@ -1,6 +1,6 @@
-# RFC 0018: Google Security Operations and the YARA-L language
+# RFC 0019: Google Security Operations and the YARA-L language
 
-- **RFC:** 0018
+- **RFC:** 0019
 - **Title:** Google Security Operations (SIEM) detection platform and the YARA-L 2.0 language
 - **Author:** opentide maintainers
 - **Status:** accepted
@@ -11,7 +11,7 @@
 
 ## Summary
 
-Add a twelfth detection platform, `google_secops` (display name **Google Security Operations (SIEM)**, schema `platform::google_secops::1.0`), and a language spec for **YARA-L 2.0** (`language-yara-l` 1.0).
+Add a thirteenth detection platform, `google_secops` (display name **Google Security Operations (SIEM)**, schema `platform::google_secops::1.0`), and a language spec for **YARA-L 2.0** (`language-yara-l` 1.0).
 
 - The block holds the rule's **sections as keys**: `events`, `outcome`, and `condition` (and `setup`, `export`) as YARA-L text, and `match` and `options` as YAML objects. Deploy assembles the rule: `rule <derived name> {`, a generated `meta:` section (author, description, severity, priority, ATT&CK technique ids, `opentide_uuid`, `opentide_version`, extra keys), then each section under its label.
 - Deploy goes through the Chronicle API **v1**: `verifyRuleText`, `rules.create`, `rules.patch` (text), and `rules.updateDeployment` (enabled, alerting, run frequency, archive). The rule id (`ru_<uuid>`) lives in [deployment state](../specs/deployment-state.md).
@@ -89,9 +89,9 @@ No YARA-L language server or linter exists.
 |------|---------|
 | `specs/languages/yara-l-1.0.md` (new) | Text forms (`YaraLRule`, `YaraLSearch`), the block form (`YaraLSections`, `YaraLMatch`, `YaraLOptions`), the `rule` and `search` profiles, sections, lexical structure, expressions, `match`/`outcome`/`condition`/`options` rules, limits, UDM and function catalogues, diagnostics, highlighting |
 | `specs/platforms/google-secops-1.0.md` (new) | Block, constraints, advisories, rule name, meta, severity, assembly, tenant setup, deploy, deletion, errors, query validation, `opentide query` |
-| `specs/platforms/index.md` 1.9 | Twelfth platform; `--live` allowlist; static-validation bar; external ids |
-| `specs/validation.md` 1.12 | `--live` row, advisories, language diagnostics, fixture checker |
-| `specs/deployment-state.md` 1.6 | `google_secops` is state-backed: `ru_<uuid>` |
+| `specs/platforms/index.md` 1.10 | Thirteenth platform; `--live` allowlist; static-validation bar; external ids |
+| `specs/validation.md` 1.13 | `--live` row, advisories, language diagnostics, fixture checker |
+| `specs/deployment-state.md` 1.7 | `google_secops` is state-backed: `ru_<uuid>` |
 | `specs/objects/rule-1.0.md`, `rule-1.1.md` | `configurations.google_secops`; `system: google_secops` searches are YARA-L |
 
 ### 2. The block carries the sections, deploy assembles the rule
