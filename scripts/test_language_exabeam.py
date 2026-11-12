@@ -48,7 +48,7 @@ class SpecShapeTests(unittest.TestCase):
     def test_frontmatter_and_sections(self) -> None:
         text = _read(SPEC)
         self.assertIn("spec: language-exabeam", text)
-        self.assertIn("status: draft", text)
+        self.assertIn("status: normative", text)
         self.assertEqual(re.findall(r"^## (.+)$", text, flags=re.MULTILINE), SECTIONS)
 
     def test_diagnostic_tables_match_the_checker(self) -> None:

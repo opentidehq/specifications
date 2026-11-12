@@ -2,7 +2,7 @@
 spec: platform-exabeam
 version: "1.0"
 schema_id: platform::exabeam::1.0
-status: draft
+status: normative
 supersedes: null
 ---
 
@@ -16,7 +16,7 @@ A correlation rule is one or more **sequences**. Each sequence is a filter in th
 
 Exabeam assigns every rule a UUID at create time. That id is kept in [deployment state](../deployment-state.md).
 
-Shared fields are defined in [platforms](index.md#shared-platform-block). Research, sources, and alternatives are in [RFC 0018](../../rfcs/0018-exabeam-platform.md). This spec is a **draft**: it follows Exabeam's published API reference, and the [RFC's unresolved questions](../../rfcs/0018-exabeam-platform.md#unresolved-questions) need a tenant to settle before it becomes normative.
+Shared fields are defined in [platforms](index.md#shared-platform-block). Research, sources, and alternatives are in [RFC 0018](../../rfcs/0018-exabeam-platform.md). It follows Exabeam's published API reference and the 2,371 correlation rules Exabeam publishes. Where neither settles a behaviour, the spec takes the reading that cannot lose or duplicate a rule, and the [RFC](../../rfcs/0018-exabeam-platform.md#unresolved-questions) records it.
 
 ## Requirements
 
@@ -32,7 +32,7 @@ Static validation (`opentide validate`) and registry load:
 
 Deploy:
 
-- Exabeam is state-backed. Deploy MUST follow the [deploy decisions](../deployment-state.md#deploy-decisions) of deployment state, storing the rule id under `platforms.exabeam.<tenant>`. Deploy MUST NOT find a rule by listing (`GET /correlation-rules/v2/rules`), by `nameContains`, or by the `opentide:<uuid>` marker in the description.
+- Exabeam is state-backed. Deploy MUST follow the [deploy decisions](../deployment-state.md#deploy-decisions) of deployment state, storing the rule id under `platforms.exabeam.<tenant>`. Deploy MUST NOT bind a rule it finds by listing (`GET /correlation-rules/v2/rules`), by `nameContains`, or by the `opentide:<uuid>` marker in the description. The one listing call it makes, the [name check](#deploy) before a create, can only refuse a create.
 - Every update MUST send the whole rule (`PUT`, which replaces the rule), whatever the console changed in between.
 - Deploy MUST NOT use the import or export endpoints.
 - Deploy MUST NOT create, change, or delete a context table.
@@ -75,18 +75,18 @@ The shared `name` is the Exabeam rule name. Empty means the opentide rule `name`
 |-------|------|----------|---------|-------------|
 | `function` | string | yes | — | `count`, `unique_count`, `value`, `max`, `min`, `sum`, or `average` |
 | `field` | string | conditional | null | The field the function reads. Required except for `count`. `count` without a field counts events. |
-| `operator` | string | yes | — | `more_than`, `less_than`, `between`, `in`, `not_in`, or `changed` |
+| `operator` | string | yes | — | `more_than`, `less_than`, `in`, or `not_in` |
 | `value` | number, list, or absent | conditional | — | See the table below |
 | `within` | duration | yes | — | The window: whole `m`, `h`, or `d` |
 
 | `function` | `operator` | `value` |
 |------------|------------|---------|
 | `count`, `unique_count`, `max`, `min`, `sum`, `average` | `more_than`, `less_than` | a number (`count` and `unique_count`: a non-negative integer) |
-| the same | `between` | a list of two numbers, low then high |
 | `value` | `in`, `not_in` | a non-empty list of strings or numbers |
-| `value` | `changed` | absent |
 
 An absence rule is a threshold with `less_than` (`count less_than 1 within 24h`).
+
+The API also lists the operators `between` and `changed`. Neither Exabeam's reference nor any rule it publishes shows how their `value` is written, so this revision leaves them out. Adding them later is additive.
 
 ### `correlation` (ExabeamCorrelation)
 
@@ -95,7 +95,7 @@ An absence rule is a threshold with `less_than` (`count less_than 1 within 24h`)
 | `within` | duration | yes | — | The window every sequence's condition must be met in: whole `m`, `h`, or `d` |
 | `group_by` | list[string] | optional | `[]` | Up to three fields every sequence shares (the API's limit; the console allows more) |
 
-The sequences are evaluated in any order. The API's create and update calls have no ordering setting ([RFC 0018](../../rfcs/0018-exabeam-platform.md#unresolved-questions)).
+The sequences are evaluated in the order they are listed. The create and update calls have no ordering setting, and every rule Exabeam exports or publishes has `sequencesExecution: CREATION_ORDER`, the order of creation ([RFC 0018](../../rfcs/0018-exabeam-platform.md#research-round-2)). Write the sequences in the order the events happen.
 
 ### `suppression` (ExabeamSuppression)
 
@@ -156,6 +156,7 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `exabeam_schedule` | Each recurrence has a known `every`, `from` and `to` matching `^([01]?[0-9]|2[0-3]):[0-5][0-9]Z$`, and exactly the day keys its `every` takes, with valid weekday names and day numbers |
 | `exabeam_name_length` | The Exabeam rule name (shared `name`, else the rule `name`) is at most 128 characters |
 | `exabeam_context_table_trigger` | A sequence whose query uses a context table (`IN "…"`) has no `threshold`. Exabeam requires "Trigger on first match" with a context table lookup. |
+| `exabeam_name_duplicate` | Workspace check: two enabled blocks resolve to the same Exabeam rule name, compared case-insensitively. Exabeam's import refuses a rule whose name exists, and Search links rules by name. |
 
 Every implementation reports each code at the path in this table:
 
@@ -170,6 +171,7 @@ Every implementation reports each code at the path in this table:
 | `exabeam_schedule` | `schedule.<N>`, or `schedule` when it is not a non-empty list |
 | `exabeam_name_length` | `name` |
 | `exabeam_context_table_trigger` | `sequences.<N>.threshold` |
+| `exabeam_name_duplicate` | `name` |
 | language codes ([exabeam-1.0](../languages/exabeam-1.0.md#diagnostics)) | `sequences.<N>.query` |
 
 ### Advisories
@@ -180,7 +182,6 @@ Validation reports these as warnings ([validation](../validation.md#platform-adv
 |------|------|
 | `exabeam_outcome_silent` | `outcome` is `none` and there is no `email`. The rule only writes a `rule-trigger` event. |
 | `exabeam_correlation_window` | `correlation.within` is shorter than the longest `threshold.within`. Exabeam's guide asks for at least the longest sequence window. |
-| `exabeam_name_duplicate` | Two enabled blocks in the workspace resolve to the same Exabeam rule name. Exabeam does not document whether names are unique, and its import refuses a rule whose name exists. |
 
 ### Name and description
 
@@ -223,7 +224,7 @@ The body of `POST /correlation-rules/v2/rules` (create) and `PUT /correlation-ru
 | `delayConfig` | `{delay: true, delayTimeInMinutes}`, else `{delay: false}` |
 | `scheduleConfig` | `{recurrences: […]}` when `schedule` is set, else left out |
 
-`value` is sent as a string, as the API takes it: a number in its shortest decimal form (`3`, `2.5`), a list joined by `,` with no spaces (`0.0.0.0,1.1.1.1`, and `low,high` for `between`), and `""` for `changed`.
+`value` is sent as a string, as the API takes it: a number in its shortest decimal form (`3`, `2.5`), and a list joined by `,` with no spaces (`0.0.0.0,1.1.1.1`). `triggerOnAnyMatch` is always sent, `false` on a threshold, as the rules Exabeam returns carry it.
 
 A recurrence is sent as `{recurrenceType, startTime, endTime, …}`: `day` → `DAILY`; `week` → `WEEKLY` with `daysOfWeek` (upper case); `month` → `MONTHLY` with `daysInMonth` and `lastDayOfMonth`; `days` → `CUSTOM` with `dayFrom` and `dayTo` (upper case).
 
@@ -277,13 +278,15 @@ Exabeam is **state-backed**, like Defender for Endpoint, SentinelOne, CrowdStrik
 
 | Block status strategy | Binding | Exabeam calls |
 |-----------------------|---------|---------------|
-| `PREVIEW`, `RELEASE`, `UNIVERSAL` | none | `POST /correlation-rules/v2/rules` with the [compiled body](#compiled-body); `201` returns the rule, whose `id` is recorded |
+| `PREVIEW`, `RELEASE`, `UNIVERSAL` | none | The [name check](#deploy), then `POST /correlation-rules/v2/rules` with the [compiled body](#compiled-body); `201` returns the rule, whose `id` is recorded |
 | `PREVIEW`, `RELEASE`, `UNIVERSAL` | present | `PUT /correlation-rules/v2/rules/{id}` with the whole compiled body |
 | `DISABLEMENT` | present | `PUT` with the whole compiled body and `enabled: false` |
 | `DELETION` | present | `DELETE /correlation-rules/v2/rules/{id}`, then the binding is removed |
 | `DISABLEMENT`, `DELETION` | none | `external_id_missing` (warning), no call |
 
 A `PUT` sets `enabled` too, so deploy never calls `/enable` or `/disable` separately.
+
+**Name check.** Before a create, deploy calls `GET /correlation-rules/v2/rules?nameContains=<name>` and compares the names it returns with the rule name, case-insensitively and exactly (`nameContains` matches substrings). A match fails the rule with `exabeam_name_conflict`, naming the existing rule's `id`. Deploy MUST NOT adopt that rule or record its id: the operator renames one of the two, or deletes the old rule. The check runs only on a create.
 
 Failure handling:
 
@@ -293,6 +296,7 @@ Failure handling:
 - **Rejected.** A `400` fails the rule with `exabeam_request_rejected` and Exabeam's `errors[].code`, `message`, and `fields`, and the `traceId`.
 - **Not licensed.** A `409` ("Feature is not enabled for subscription") stops the tenant with `exabeam_feature_unavailable`.
 - **Unauthorized.** A `401` after the retry, or a `403`, stops the tenant with `exabeam_tenant_unauthorized`.
+- **Schedule kept.** The rule a `PUT` returns is the stored rule. When it still has a `scheduleConfig` the block no longer sets, deploy warns `exabeam_schedule_retained`: Exabeam does not document whether a `PUT` without `scheduleConfig` clears it. The operator clears it in the console.
 - **Auto-disabled.** When the rule a `PUT` returns has `autoDisabled: true`, deploy warns `exabeam_rule_auto_disabled`. Exabeam stops a rule that matches more than 500 times or triggers more than 50 times in five minutes, or whose query or context table is broken.
 
 ### Query validation
@@ -395,4 +399,4 @@ Invalid fixtures: [rule-exabeam-correlation-single.yaml](../../fixtures/invalid/
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-11-11 | Draft ([RFC 0018](../../rfcs/0018-exabeam-platform.md)): one correlation rule per block; sequences with any-match or threshold conditions, correlation, suppression, delay, schedule, outcomes; derived name, description (with ATT&CK), and severity; whole-body `PUT`; the rule UUID in deployment state; `--live` filter checks and hunts through Search. |
+| 1.0 | 2026-11-12 | Initial normative contract ([RFC 0018](../../rfcs/0018-exabeam-platform.md)): one correlation rule per block; sequences with any-match or threshold (`more_than`, `less_than`, `in`, `not_in`) conditions, in creation order; correlation, suppression, delay, schedule, outcomes; derived name, description (with ATT&CK), and severity; unique names (`exabeam_name_duplicate`) and a name check before create; whole-body `PUT`; the rule UUID in deployment state; `--live` filter checks and hunts through Search. |

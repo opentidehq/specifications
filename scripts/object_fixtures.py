@@ -1234,8 +1234,8 @@ EXABEAM_BLOCK_KEYS = frozenset(
     }
 )
 EXABEAM_FUNCTIONS = ("count", "unique_count", "value", "max", "min", "sum", "average")
-EXABEAM_NUMERIC_OPERATORS = ("more_than", "less_than", "between")
-EXABEAM_VALUE_OPERATORS = ("in", "not_in", "changed")
+EXABEAM_NUMERIC_OPERATORS = ("more_than", "less_than")
+EXABEAM_VALUE_OPERATORS = ("in", "not_in")
 EXABEAM_SEVERITIES = ("none", "low", "medium", "high", "critical")
 EXABEAM_OUTCOMES = ("alert", "case", "none")
 EXABEAM_WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
@@ -1291,14 +1291,10 @@ def _exabeam_threshold_errors(threshold: Any, path: str) -> list[CheckError]:
 
     if operator in ("more_than", "less_than"):
         ok = number_ok(value)
-    elif operator == "between":
-        ok = isinstance(value, list) and len(value) == 2 and all(number_ok(v) for v in value) and value[0] <= value[1]
-    elif operator in ("in", "not_in"):
+    else:  # in, not_in
         ok = isinstance(value, list) and bool(value) and all(
             (isinstance(v, str) and v.strip() and "," not in v) or _is_number(v) for v in value
         )
-    else:  # changed
-        ok = "value" not in threshold
     if not ok:
         errors.append(CheckError("exabeam_threshold_value", f"value does not fit {operator}", path))
     if exabeam_duration(threshold.get("within"), "mhd") is None:

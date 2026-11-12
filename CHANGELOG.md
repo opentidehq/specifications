@@ -400,7 +400,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## validation 1.11
 
-- `exabeam` joins the `--live` allowlist for its filters, through Exabeam Search, and is checked offline against the Exabeam Query Language. Advisories `exabeam_outcome_silent`, `exabeam_correlation_window`, `exabeam_name_duplicate`; the language's diagnostics. The fixture checker applies the Exabeam constraint codes ([RFC 0018](rfcs/0018-exabeam-platform.md)).
+- `exabeam` joins the `--live` allowlist for its filters, through Exabeam Search, and is checked offline against the Exabeam Query Language. Advisories `exabeam_outcome_silent` and `exabeam_correlation_window`; the language's diagnostics. The fixture checker applies the Exabeam constraint codes ([RFC 0018](rfcs/0018-exabeam-platform.md)).
 
 ## validation 1.10
 

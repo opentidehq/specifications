@@ -53,8 +53,9 @@ CONSTRAINTS = [
     "exabeam_schedule",
     "exabeam_name_length",
     "exabeam_context_table_trigger",
+    "exabeam_name_duplicate",
 ]
-ADVISORIES = ["exabeam_outcome_silent", "exabeam_correlation_window", "exabeam_name_duplicate"]
+ADVISORIES = ["exabeam_outcome_silent", "exabeam_correlation_window"]
 
 
 def _read(path: Path) -> str:
@@ -268,7 +269,7 @@ class SpecShapeTests(unittest.TestCase):
     def test_frontmatter_and_sections(self) -> None:
         text = _read(SPEC)
         self.assertIn("schema_id: platform::exabeam::1.0", text)
-        self.assertIn("status: draft", text)
+        self.assertIn("status: normative", text)
         self.assertEqual(re.findall(r"^## (.+)$", text, flags=re.MULTILINE), SECTIONS)
 
     def test_constraint_and_advisory_tables(self) -> None:
@@ -415,14 +416,10 @@ class CheckerTests(unittest.TestCase):
             codes(sequences=threshold(function="value", field="dest_ip", operator="not_in", value=["1.1.1.1"])), set()
         )
         self.assertEqual(
-            codes(sequences=threshold(function="value", field="user", operator="changed", value=None)), set()
-        )
-        self.assertEqual(
-            codes(sequences=threshold(function="value", field="user", operator="changed", value="x")), {"exabeam_threshold_value"}
+            codes(sequences=threshold(function="value", field="user", operator="changed", value=None)), {"exabeam_threshold_operator"}
         )
         self.assertEqual(codes(sequences=threshold(value=2.5)), {"exabeam_threshold_value"})
-        self.assertEqual(codes(sequences=threshold(operator="between", value=[10, 2])), {"exabeam_threshold_value"})
-        self.assertEqual(codes(sequences=threshold(operator="between", value=[2, 10])), set())
+        self.assertEqual(codes(sequences=threshold(operator="between", value=[2, 10])), {"exabeam_threshold_operator"})
         self.assertEqual(codes(sequences=threshold(within="1w")), {"exabeam_duration"})
         self.assertEqual(
             codes(sequences=[{"query": 'vendor:"a"', "group_by": ["a", "b", "c", "d"]}]), {"exabeam_group_by"}

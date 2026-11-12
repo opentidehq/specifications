@@ -1,1 +1,1 @@
-vendor:"a" AS t1 | from t1 WHERE vendor:"a" AS t2 | from t2 WHERE vendor:"a" AS t3 | from t3 WHERE vendor:"a" AS t4 | from t4 WHERE vendor:"a" AS t5 | from t5 WHERE vendor:"a" AS t6 | from t6 WHERE vendor:"a"
+SELECT user AS t1 WHERE vendor:"a" | SELECT t1 AS t2 WHERE t1:"x" | SELECT t2 AS t3 WHERE t2:"x" | SELECT t3 AS t4 WHERE t3:"x" | SELECT t4 AS t5 WHERE t4:"x" | SELECT t5 AS t6 WHERE t5:"x" | SELECT t6 WHERE t6:"x"

@@ -3,10 +3,11 @@
 - **RFC:** 0018
 - **Title:** Exabeam New-Scale SIEM and the Exabeam Query Language
 - **Author:** opentide maintainers
-- **Status:** draft
+- **Status:** accepted
 - **Created:** 2026-11-11
-- **Issue:** none yet. A spec-change issue is to be opened before this RFC is accepted.
-- **Normative text (draft):** [specs/platforms/exabeam-1.0.md](../specs/platforms/exabeam-1.0.md), [specs/languages/exabeam-1.0.md](../specs/languages/exabeam-1.0.md)
+- **Accepted:** 2026-11-12, after a second research round ([Research round 2](#research-round-2)), with the normative text below
+- **Issue:** [opentidehq/specifications#87](https://github.com/opentidehq/specifications/issues/87)
+- **Normative text:** [specs/platforms/exabeam-1.0.md](../specs/platforms/exabeam-1.0.md), [specs/languages/exabeam-1.0.md](../specs/languages/exabeam-1.0.md)
 - **Implementation:** opentidehq/opentide (the `exabeam` platform, deployer, `--live`, query runner); opentidehq/language-server (the `exabeam` language: grammar, CIM catalogue, diagnostics, highlighting)
 
 ## Summary
@@ -116,19 +117,53 @@ subject: "endpoint" | FOREACH dest_host [ select src_host WHERE src_host: @dest_
 | Topic | Contradiction | Chosen |
 |-------|---------------|--------|
 | Advanced operators in a rule | Undocumented; "Convert to Rule" is disabled for one of them; no published rule uses them | Error under `rule` (`exabeam_advanced_in_rule`) |
-| Precedence of `AND`/`OR` | Undocumented | `AND` binds tighter; mixing them unparenthesised is the warning `exabeam_mixed_boolean` |
-| A one-value list | QFV: "also works for a single value"; MIG: "will result in an error" | Warning `exabeam_single_value_list` |
+| Precedence of `AND`/`OR` | Undocumented | `NOT`, then `AND`, then `OR` (the BigQuery order; [round 2](#research-round-2)); mixing them unparenthesised is the warning `exabeam_mixed_boolean` |
+| A one-value list | QFV: "also works for a single value"; MIG: "will result in an error" | Valid: QFV is current, MIG is stale, and Exabeam's 2026 rules use it |
 | Value case | QS/FTS: case-insensitive; one QFV table: "not case-insensitive" | Not checked; documented as case-insensitive |
-| Regex form | `RGX("…")` throughout Search; MIG and QFV also show `"/…/"` | `RGX` is the form; `"/…/"` is the warning `exabeam_legacy_regex` |
+| Regex form | `RGX("…")` throughout Search; MIG and one QFV note show `"/…/"`; Exabeam's 2026 rules write `"/tmp/"` as a path | `RGX` is the form; a value between slashes is the warning `exabeam_legacy_regex`, which names both readings |
+| A single group `(a) AND b` | QS: "results in an error", on a Data Lake field; 164 published rules contain one, 3 of them hand-written in 2026 | Warning `exabeam_single_group`; `NOT (a)` is never one |
+| Adjacent terms | KI: `a NOT b` is invalid; FTS and BP: `web application` is an implicit `AND` | `a NOT b` is an error; adjacent free text is valid; other adjacent terms are the warning `exabeam_implicit_and` |
+| Empty query | QS: an empty search bar queries all logs | Valid under `search`, an error under `rule` |
 | Unquoted values | MIG: strings "always enclosed"; real rules use unquoted numbers, IPs, `null` | Numbers, booleans, `null`, IPs unquoted; any other bare value is the warning `exabeam_unquoted_value` |
 | Delay maximum | Docs: 360 minutes; API: `maximum: 180` | 180 (the API is what deploy calls) |
 | Common group-by | UI: "up to 10 fields"; API: `maxItems: 3` | 3 |
 | Time units | API: `minutes`/`hours`; exported files: `m`/`h` | The API spelling |
 | `daysOfWeek` | Schema `daysOfWeek`; the schema's own example `daysOfWeeks` | The schema |
 
+### Research round 2
+
+A second round (2026-11-12) answered the open questions with the strongest evidence available without a tenant. Sources: every page linked from the Search guide's contents (54 pages), the platform release notes for January 2025 to October 2026, the known-issues page, 28 Threat Detection Management pages, the full developers.exabeam.com reference (111 operations, OpenAPI parsed) and its changelog, and clones of `ExabeamLabs/new-scale-content-hub` (`4ef758d`) and `ExabeamLabs/CIMLibrary` (`e72bfa2`).
+
+**Exabeam's published rules.** The content hub holds 2,371 correlation rules: 75 written by Exabeam (the Linux rules were added in March 2026) and 2,296 converted from Sigma (October 2025). Every rule has one sequence, `sequencesExecution: CREATION_ORDER`, and a unique name. 2,350 sequences trigger on any match. The 21 thresholds use `count` or `unique_count` with `more_than` or `less_than`, and no rule uses `between`, `changed`, `in`, or `not_in`. No query uses the advanced operators, though the same repository's saved searches do. The reference checker run over every query under the `rule` profile gives this:
+
+| Rules | With an error | Warnings |
+|-------|---------------|----------|
+| 75 written by Exabeam | 0 | 14: `exabeam_legacy_regex` (paths such as `"/var/log/"`), `exabeam_single_group`, `exabeam_mixed_boolean` |
+| 2,296 converted from Sigma | 76 (3.3%) | `exabeam_single_group`, `exabeam_legacy_regex`, `exabeam_mixed_boolean` |
+
+Each of the 76 errors traced is a defect in the converted rule: a `\\"` that closes a string early (`RGX(".*\\"arn\\:aws…")`), an unescaped `"` inside `RGX`, which the regex page calls an error, or a regex RE2 refuses (`.**`, `[^ \]`). The content hub's licence forbids redistribution, so the language server measures it and does not vendor it.
+
+| Question | Conclusion | Confidence | Spec |
+|----------|------------|------------|------|
+| Advanced operators in a rule | Not supported: no published rule uses them, "Convert to Rule" is disabled for `RGX_EXTRACT`, and the 1,000-a-month pipe quota cannot carry a rule that runs every four minutes | high, inferred | `exabeam_advanced_in_rule` stays an error |
+| Unique names | Import refuses a name that exists. Create and update document no duplicate error (the only `409` is licensing). Renames are normal: the August 2026 fix ENG-102035 links trigger events by rule id because names change | high for import; unknown for create | Names are unique per workspace (`exabeam_name_duplicate`, an error); deploy checks the name before a create and never adopts (`exabeam_name_conflict`) |
+| Server-side query check | No: the February 2026 notes say a rule "may be stopped because of incorrect query syntax", so a bad query is saved | medium | Offline checks and `--live` through Search |
+| `between`, `changed` | Two values, inclusive, for `between`; no source shows how either `value` is written, and no rule uses them | low | Left out of 1.0 |
+| `PUT` without `scheduleConfig` | Undocumented | low | `PUT` returns the stored rule; a kept schedule is the warning `exabeam_schedule_retained` |
+| Extra properties on create/update | No `additionalProperties: false`, and no changelog entry since 2025-12-08 adds `mitre`, `useCase`, `tags`, or `sequencesExecution` | high | ATT&CK stays in the description |
+| Sequence order | `RuleDetail` carries no order; every export and published rule is `CREATION_ORDER` | medium | Sequences run in listed order |
+| `triggerOnAnyMatch: false` | Rules Exabeam returns carry it on thresholds | high | Always sent |
+| Rate-limit breach | Undocumented beyond the per-IP limits | — | Wait out `Retry-After`, else 60 seconds |
+| `"/…/"`, one-value list | Slash regex is neither defined nor withdrawn by the current guide; a one-value list is valid | low; medium-high | Warning with both readings; no finding |
+| Precedence | Not stated. The advanced layer's reserved words are 95 of BigQuery's 97 and its default column name is `f0_`: GoogleSQL, where `NOT` > `AND` > `OR`. Exabeam's Sigma conversions read correctly only under it | medium | `NOT` > `AND` > `OR`, plus the warning |
+| Adjacent terms, empty query | `web application` and `Okta john` are documented implicit `AND`s; an empty search queries all logs | high | See the contradictions table |
+| New syntax in 2025–2026 | None: no `NOT IN`, IPv6 ranges, `contains`, or array operators. The notes add context-table columns, a pipe guardrail, and a null fix under `NOT` with CIDR | high | `exabeam_pipe_misuse`; the null note |
+| Search cancel, async search, validate endpoint | None of the 111 operations | high | Unchanged |
+| Query length, sequences per rule | No limit documented; Exabeam publishes a 360,987-character query; 200 enabled sequences per tenant by default | medium | No limit in the specs |
+
 ## Detailed design
 
-The normative text is in the two draft specs. This section gives the reasons.
+The normative text is in the two specs. This section gives the reasons.
 
 ### 1. Two specs, one language
 
@@ -167,7 +202,7 @@ Highlighting maps every token class onto existing HighlightSpec captures (`keywo
 | L1 | `LanguageId::Exabeam` (`exabeam`, `.exabeam`), codes, tree-sitter grammar `tree-sitter-opentide-exabeam` (filter and advanced), corpus gate | language-server | 4–5 |
 | L2 | `catalogs/exabeam/` from CIMLibrary (`cim.json`, `Fields_Descriptions.md`) with a sync script pinned by commit; hover and completion for fields, `activity_type`, `subject`, `outcome` | language-server | 2–3 |
 | L3 | `opentide-exabeam` checks (every code in the language spec), RE2 via the `regex` crate's syntax parser, profiles, YAML injection | language-server | 4–5 |
-| L4 | `highlights/queries/exabeam/highlights.scm` on existing captures; external corpus from new-scale-content-hub (licence permitting) with `.broken.` twins; no oracle (closed source), recorded in `scripts/oracles/README.md` | language-server | 2–3 |
+| L4 | `highlights/queries/exabeam/highlights.scm` on existing captures; an opentide-written corpus with `.broken.` twins; a measurement (not vendored) over new-scale-content-hub; no oracle (closed source), recorded in `scripts/oracles/README.md` | language-server | 2–3 |
 | O1 | `exabeam` models (block, sequence, threshold, correlation, suppression, email, schedule) and tenant setup | opentide | 2 |
 | O2 | Client: token cache and refresh, 100/min limiter, error mapping | opentide | 2 |
 | O3 | Compiler and goldens against `fixtures/platforms/exabeam/` | opentide | 2 |
@@ -176,12 +211,12 @@ Highlighting maps every token class onto existing HighlightSpec captures (`keywo
 | O6 | Tests: model, compile, deployer against a fake API, live, query, CLI E2E | opentide | 4 |
 | E1 | Engine pin bump once L1–L4 ship; catalog gate | opentide | <1 |
 
-About 28–34 person-days. A tenant is needed before the specs become normative ([Unresolved questions](#unresolved-questions)).
+About 28–34 person-days. The content hub's licence forbids vendoring, so L4's external corpus is measured from a local clone, as the CQL engine measures CrowdStrike's community content, and the in-repository corpus is written for opentide.
 
 ## Drawbacks
 
 - **No MITRE through the API.** The mapping lives in the description, not in Exabeam's MITRE field, so Exabeam's MITRE views will not show opentide rules.
-- **No ordered sequences.** The API cannot set `sequencesExecution`, so multi-sequence rules are evaluated in Exabeam's default order.
+- **Order is implicit.** The API cannot set `sequencesExecution`. Multi-sequence rules run in creation order, the order Exabeam exports and publishes, so a rule cannot ask for any order.
 - **No grammar from the vendor.** The language spec is reverse-engineered from guides that contradict each other in places. Some verdicts are deliberately warnings.
 - **Rate limit by source IP.** 100 requests a minute is shared by everything a CI runner's IP does against Exabeam.
 
@@ -197,19 +232,13 @@ About 28–34 person-days. A tenant is needed before the specs become normative 
 
 ## Unresolved questions
 
-To settle on a tenant before the specs become normative:
+Settled by [Research round 2](#research-round-2), with the readings the specs take. These stay open and can only move the specs additively:
 
-1. Whether the advanced operators are accepted in a sequence `query`.
-2. Whether rule names must be unique, and what a duplicate returns.
-3. Whether create/update syntax-checks `query` (a `400`), or a bad query is only found when the rule stops.
-4. The `value` string for `between` (assumed `low,high`) and for `changed` (assumed `""`).
-5. Whether a `PUT` without `scheduleConfig` clears a schedule.
-6. Whether `PUT` accepts `mitre`, `useCase`, or `sequencesExecution` (undocumented extra properties), which would remove the description workaround and the ordering drawback.
-7. The default sequence order without `sequencesExecution`.
-8. Whether `triggerOnAnyMatch: false` is required on a threshold condition (the schema says so; the examples omit it). The compiler always sends it.
-9. The response to a rate-limit breach (status, `Retry-After`).
-10. Whether `"/…/"` is still a regex in Search, and whether a one-value list is accepted.
-11. Whether a Search request a client abandons keeps running on the tenant.
+1. How `value` is written for `between` and `changed`. Both operators can join `threshold` once a tenant or Exabeam's reference shows it.
+2. Whether create and update refuse a duplicate name, and with what status. Deploy's name check makes the answer harmless.
+3. Whether a `PUT` without `scheduleConfig` clears a schedule. `exabeam_schedule_retained` reports it when it does not.
+4. Whether `PUT` accepts `mitre`, `useCase`, or `sequencesExecution` as undocumented properties. If it does, a later revision moves ATT&CK out of the description and adds an order setting.
+5. Whether a Search request a client abandons keeps running on the tenant.
 
 ## References
 

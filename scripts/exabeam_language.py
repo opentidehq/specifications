@@ -91,11 +91,13 @@ ERRORS = {
     "exabeam_group_by_column",
     "exabeam_foreach_clause",
     "exabeam_foreach_reference",
+    "exabeam_foreach_position",
 }
 WARNINGS = {
     "exabeam_mixed_boolean",
+    "exabeam_implicit_and",
+    "exabeam_pipe_misuse",
     "exabeam_wildcard_in_phrase",
-    "exabeam_single_value_list",
     "exabeam_unquoted_value",
     "exabeam_legacy_regex",
     "exabeam_single_group",
@@ -152,7 +154,7 @@ NUMBER = re.compile(r"[+-]?\d+(?:\.\d+)?\Z")
 DATETIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})?\Z")
 # A bare value runs to whitespace or a delimiter. `:` is allowed so a datetime range bound lexes whole.
 BARE = re.compile(r"[^\s()\[\]{},\"'|=<>!]+")
-FREE_TEXT_OK = re.compile(r"[A-Za-z0-9_\-*?]+\Z")
+FREE_TEXT_OK = re.compile(r"[A-Za-z0-9_*?]+\Z")
 
 
 def _re2_check(pattern: str) -> str | None:
@@ -192,6 +194,16 @@ def _is_ip(text: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
         return ipaddress.ip_address(text)
     except ValueError:
         return None
+
+
+@dataclass
+class Statement:
+    """What one advanced statement selects and uses, for the pipe guardrail."""
+
+    foreach: bool = False
+    star: bool = False
+    select: set[str] = field(default_factory=set)
+    fields: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -288,7 +300,9 @@ class Parser:
     def parse(self) -> Result:
         try:
             if self.at_end():
-                raise ParseError("empty query", 0)
+                if self.profile == "search":
+                    return self.result  # an empty search queries every log
+                raise ParseError("a sequence query cannot be empty", 0)
             if self.text.lstrip().startswith("/"):
                 start = len(self.text) - len(self.text.lstrip())
                 self.diag("exabeam_leading_slash", "a query cannot start with `/`", start, start + 1)
@@ -369,7 +383,7 @@ class Parser:
         if any(b.kind == "and" for b in branches):
             self.diag(
                 "exabeam_mixed_boolean",
-                "AND and OR at one level: Exabeam does not document their precedence; add parentheses",
+                "AND and OR at one level: AND binds tighter, but Exabeam does not document it; add parentheses",
                 start,
                 self.pos,
             )
@@ -385,10 +399,24 @@ class Parser:
             if self.at_stop(stop) or self.keyword_at("OR"):
                 break
             here = self.pos
-            nxt = self.keyword_at("NOT")
-            what = "NOT without AND or OR" if nxt else "two terms with no AND or OR"
-            self.diag("exabeam_implicit_operator", f"{what}: write AND, OR, AND NOT, or OR NOT", here, here + 3)
-            items.append(self.unary(stop))
+            if self.keyword_at("NOT"):
+                self.diag(
+                    "exabeam_implicit_operator",
+                    "NOT without AND or OR: Exabeam calls it invalid; write AND NOT or OR NOT",
+                    here,
+                    here + 3,
+                )
+                items.append(self.unary(stop))
+                continue
+            nxt = self.unary(stop)
+            if not (items[-1].kind == "text" and nxt.kind == "text"):
+                self.diag(
+                    "exabeam_implicit_and",
+                    "two terms with no operator are read as AND: write AND",
+                    here,
+                    nxt.end,
+                )
+            items.append(nxt)
         if len(items) == 1:
             return items[0]
         return Node("and", items, start, self.pos)
@@ -407,7 +435,7 @@ class Parser:
             inner = self.or_expr(())
             self.expect(")")
             node = Node("group", [inner], start, self.pos)
-            if inner.kind in ("term", "context", "not", "group") and not negated:
+            if inner.kind in ("term", "text", "context", "not", "group") and not negated:
                 self.diag(
                     "exabeam_single_group",
                     "parentheses around a single expression: Exabeam's guide calls it an error; drop them",
@@ -426,7 +454,7 @@ class Parser:
         if ch in "\"'":
             body, s, e = self.string()
             self.check_phrase(body, s, e, free_text=True)
-            return Node("term", [], s, e)
+            return Node("text", [], s, e)
         if ch == "*" and (self.pos + 1 >= len(self.text) or self.text[self.pos + 1].isspace() or self.text[self.pos + 1] == ")"):
             self.diag("exabeam_bare_wildcard", "`*` alone is not a query", self.pos, self.pos + 1)
             self.tok(self.pos, self.pos + 1, "error")
@@ -462,7 +490,7 @@ class Parser:
             )
         self.tok(m.start(), m.end(), "string")
         self.pos = m.end()
-        return Node("term", [], start, self.pos)
+        return Node("text", [], start, self.pos)
 
     def field_term(self, name: str, s: int, e: int) -> Node:
         self.tok(s, e, "property")
@@ -594,13 +622,6 @@ class Parser:
                 continue
             break
         self.expect(")")
-        if count == 1:
-            self.diag(
-                "exabeam_single_value_list",
-                "a list of one value: Exabeam's guides disagree on whether it is valid; drop the parentheses",
-                start,
-                self.pos,
-            )
 
     def range_value(self, field_name: str) -> None:
         self.ws()
@@ -725,9 +746,14 @@ class Parser:
         value = _unescape(body)
         inner = value.strip("`")
         if len(value) > 2 and value.startswith("/") and value.endswith("/"):
-            self.diag("exabeam_legacy_regex", "\"/…/\" is the Data Lake regex form: write RGX(\"…\")", s, e)
+            self.diag(
+                "exabeam_legacy_regex",
+                "a value between slashes may be read as a regular expression: write RGX(\"…\") for a pattern, or drop the slashes for a path",
+                s,
+                e,
+            )
             return
-        if re.search(r"(?<!\\)[*?]", inner) and re.search(r"\s", inner.strip()):
+        if re.search(r"(?<!\\)[*?]", inner) and re.search(r"(?<!\\)\s", body.strip()):
             self.diag("exabeam_wildcard_in_phrase", "wildcards do not work inside a quoted phrase", s, e)
 
     def check_tree(self, node: Node, under_or: bool) -> None:
@@ -744,19 +770,40 @@ class Parser:
     # -- advanced (Search only) -------------------------------------------------------------
     def advanced(self) -> None:
         pipes = 0
-        self.statement()
+        if (fw := self.keyword_at("FOREACH")) is not None:
+            self.diag("exabeam_foreach_position", "FOREACH runs on the result of a preceding query: put a query and | before it", fw[1], fw[2])
+        previous = self.statement()
         while self.peek() == "|":
             ps = self.pos
             self.expect("|", "operator.pipe")
             pipes += 1
             if pipes == MAX_PIPES + 1:
                 self.diag("exabeam_pipe_limit", f"at most {MAX_PIPES} pipes", ps, ps + 1)
-            self.statement()
+            current = self.statement()
+            if not current.foreach:
+                if not previous.select:
+                    self.diag(
+                        "exabeam_pipe_misuse",
+                        "the query before a pipe has no SELECT: write one query with AND or WHERE",
+                        ps,
+                        ps + 1,
+                    )
+                elif not previous.star and not (current.fields & previous.select):
+                    self.diag(
+                        "exabeam_pipe_misuse",
+                        "the query after a pipe uses no column the query before it selects: write one query with AND or WHERE",
+                        ps,
+                        ps + 1,
+                    )
+            previous = current
 
-    def statement(self) -> None:
+    def statement(self) -> "Statement":
+        fields_before = len(self.result.tokens)
+        info = Statement()
         if self.keyword_at("FOREACH"):
-            self.foreach()
-            return
+            info = self.foreach()
+            info.foreach = True
+            return info
         order = ["SELECT", "FROM", "WHERE", "AS", "GROUP-BY", "ORDER-BY", "LIMIT"]
         seen: list[str] = []
         select_items: list[tuple[str, bool]] = []
@@ -811,8 +858,17 @@ class Parser:
             for col, aggregated in select_items:
                 if not aggregated and col not in group_by:
                     self.diag("exabeam_group_by_column", f"{col} is selected but neither grouped nor aggregated", 0, self.pos)
+        new = self.result.tokens[fields_before:]
+        info.fields = {self.text[t.start : t.end].lower() for t in new if t.capture in ("property", "type")}
+        info.star = select_star
+        if "SELECT" in seen:
+            info.select = {c.lower() for c, _ in select_items} | {
+                self.text[t.start : t.end].lower() for t in new if t.capture == "variable"
+            }
+            info.select.add("*") if select_star else None
+        return info
 
-    def foreach(self) -> None:
+    def foreach(self) -> "Statement":
         self.take_keyword("FOREACH", clause=True)
         w = self.word_at()
         if not w:
@@ -821,9 +877,17 @@ class Parser:
         self.pos = w[2]
         self.expect("[")
         self.in_foreach += 1
-        self.statement()
+        inner = self.statement()
         self.in_foreach -= 1
         self.expect("]")
+        if self.take_keyword("LIMIT", clause=True):
+            self.ws()
+            m = re.compile(r"\d+").match(self.text, self.pos)
+            if not m or int(m.group(0)) < 1:
+                raise ParseError("LIMIT takes a positive integer", self.pos)
+            self.tok(m.start(), m.end(), "number")
+            self.pos = m.end()
+        return inner
 
     def select_list(self) -> tuple[bool, list[tuple[str, bool]]]:
         star = False
@@ -885,6 +949,8 @@ class Parser:
             elif (why := _re2_check(_unescape(pattern[0]))) is not None:
                 self.diag("exabeam_regex", f"invalid RE2 pattern: {why}", pattern[1], pattern[2])
             return
+        if upper in AGGREGATES and not (name.isupper() or name.islower()):
+            self.diag("exabeam_keyword_case", f"{name!r}: write {upper} or {upper.lower()}", s, e)
         if upper not in AGGREGATES:
             self.tok(s, e, "error")
             self.diag("exabeam_unknown_function", f"{name}() is not an Exabeam aggregation (COUNT, MIN, MAX, SUM, AVG, RGX_EXTRACT)", s, e)
