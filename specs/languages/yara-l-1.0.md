@@ -119,13 +119,13 @@ Sections appear at most once, in this order. A section out of order or repeated 
 | 5 | `outcome` | optional | optional | `$name = <expression>` assignments, at most 20 (`yaral_outcome_limit`) |
 | 6 | `condition` | required | optional | Boolean expression over event variables, placeholders (`#name` counts), and outcome variables |
 | 7 | `options` | optional | — | `allow_zero_values = true\|false`, `suppression_window = <duration>` |
-| 7 | `export` | optional | — | `%table.write_row(column: $value, …)`: write a data-table row per detection |
-| 8 | `dedup` | — | optional | Placeholders or field paths |
-| 9 | `order` | — | optional | `<expr> asc\|desc`, comma-separated |
-| 10 | `limit` | — | optional | A positive integer |
-| 11 | `select`, `unselect` | — | optional | Field paths |
+| 8 | `export` | optional | optional | `%table.write_row(column: $value, …)`: write a data-table row per detection or result; only outcome variables |
+| 9 | `dedup` | — | optional | Placeholders or field paths |
+| 10 | `order` | — | optional | `<expr> asc\|desc`, comma-separated |
+| 11 | `limit` | — | optional | A positive integer |
+| 12 | `select`, `unselect` | — | optional | Field paths |
 
-`options` and `export` share a rank: Google documents each as the last section and never shows both, so either order is accepted.
+`export` is the last section of a rule: Google states that writing to a data table "must be the final action of the query" ([data tables](https://cloud.google.com/chronicle/docs/investigation/data-tables)). `export` before `options` is `yaral_section_order`.
 
 A section label is its name followed by `:`, case-insensitive like every keyword.
 

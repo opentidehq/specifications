@@ -5,7 +5,7 @@
 - **Author:** opentide maintainers
 - **Status:** accepted
 - **Created:** 2026-11-11
-- **Accepted:** 2026-11-11, with the normative text in [specs/platforms/google-secops-1.0.md](../specs/platforms/google-secops-1.0.md) and [specs/languages/yara-l-1.0.md](../specs/languages/yara-l-1.0.md)
+- **Accepted:** 2026-11-12, after review moved the block to one key per section and the open questions below were resolved. The normative text is [specs/platforms/google-secops-1.0.md](../specs/platforms/google-secops-1.0.md) and [specs/languages/yara-l-1.0.md](../specs/languages/yara-l-1.0.md).
 - **Related:** [RFC 0010](0010-deployment-external-ids.md) (deployment state), [RFC 0015](0015-yara-language.md) (the language-spec pattern), [RFC 0007](0007-elastic-security-platform.md) (live validation and the ATT&CK tactic table)
 - **Implementation:** opentidehq/opentide (the `google_secops` platform, `opentide query` runner); opentidehq/language-server (the `yaral` engine, grammar, catalogues, and highlighting); opentidehq/website (synced specs, the `yaral` grammar for code blocks)
 
@@ -34,7 +34,7 @@ Sources are Google's documentation under `docs.cloud.google.com/chronicle/docs/`
 
 | Item | Fact | Source |
 |------|------|--------|
-| Version | Rules and deployments are GA in **v1**. `verifyRuleText` moved to v1 on 2026-05-28. Test runs (`legacy:legacyRunTestRule`) and `udmSearch` exist only in `v1alpha`. | [REST reference](https://cloud.google.com/chronicle/docs/reference/rest) |
+| Version | Rules and deployments are GA in **v1**. `verifyRuleText` moved to v1 on 2026-05-28. `udmSearch`, `:search`, and `validateQuery` are in v1 too. Test runs (`legacy:legacyRunTestRule`) exist only in `v1alpha`. | [REST reference](https://cloud.google.com/chronicle/docs/reference/rest) |
 | Endpoint | `https://<location>-chronicle.googleapis.com` (`us`, `eu`, `europe`, and Google Cloud regions such as `europe-west2`) | same |
 | Resource | `projects/{project}/locations/{location}/instances/{customer id}` | same |
 | Auth | OAuth 2.0, scope `https://www.googleapis.com/auth/cloud-platform` or `…/auth/chronicle`; service account or workload identity. IAM permissions per method (`chronicle.rules.create`, `chronicle.rules.verifyRuleText`, `chronicle.ruleDeployments.update`, …). | each method page |
@@ -45,7 +45,7 @@ Sources are Google's documentation under `docs.cloud.google.com/chronicle/docs/`
 | `RuleDeployment` | `…/rules/{rule}/deployment`: `enabled`, `alerting`, `archived` (only with `enabled: false`; while archived, nothing else changes), `runFrequency`, `scheduleCustomizations` (`ensureEnrichmentCompleteness`, `lateArrivingDataAdjustment`, sent under the `runFrequency` mask), and output-only `executionState`, `producerRules`, `consumerRules`. Updates are not atomic. | [RuleDeployment](https://cloud.google.com/chronicle/docs/reference/rest/v1/RuleDeployment), [updateDeployment](https://cloud.google.com/chronicle/docs/reference/rest/v1/projects.locations.instances.rules/updateDeployment) |
 | `RunFrequency` | `LIVE` (single-event, including windowed), `LIVE_CUSTOMIZABLE` (every 10 minutes, multi-event windows under 1 hour), `HOURLY_CUSTOMIZABLE` (windows up to 2 days), `DAILY` (window/10, windows over 2 days), legacy `HOURLY`. Google remaps a value a rule cannot use. | [Rule](https://cloud.google.com/chronicle/docs/reference/rest/v1/projects.locations.instances.rules#RunFrequency) |
 | `verifyRuleText` | `POST {instance}:verifyRuleText` with `{ruleText}` → `{success, compilationDiagnostics[{message, position{startLine, startColumn, endLine, endColumn}}, severity WARNING\|ERROR, uri], allowedRunFrequencies, nearRealTimeLiveRuleEligible, inputsUsed}`. A refused rule is HTTP 200 without `success`. Positions are 1-based and may be empty. | [verifyRuleText](https://cloud.google.com/chronicle/docs/reference/rest/v1/projects.locations.instances/verifyRuleText), `content_manager` README |
-| `udmSearch` | `GET {instance}:udmSearch` with `query`, `timeRange`, `limit` (≤ 10,000), `queryDialect` (YARA-L or SQL); read-only | [udmSearch](https://cloud.google.com/chronicle/docs/reference/rest/v1alpha/projects.locations.instances/udmSearch) |
+| `udmSearch` | `GET {instance}:udmSearch` with `query`, `timeRange`, `limit` (≤ 10,000), `queryDialect` (`YL2` — the default — or `SQL`); returns `events`, `moreDataAvailable`, and `stats`; read-only | [udmSearch](https://cloud.google.com/chronicle/docs/reference/rest/v1/projects.locations.instances/udmSearch) |
 | Legacy API | The Backstory Detection Engine API (`/v2/detect/rules`, `:verifyRule`) is deprecated; it is discontinued on 2027-07-20 | [Detection Engine API](https://cloud.google.com/chronicle/docs/reference/detection-engine-api) |
 | Quotas | Per-method quotas are shown in the Cloud console only. Google's `content_manager` sleeps 60 s on HTTP 429. | `content_manager` |
 
@@ -214,7 +214,6 @@ About 30–40 person-days. The platform can ship before the engine with structur
 - **The offline engine approximates a closed compiler.** Google can accept or refuse what the engine does not, and pages disagree (window bounds, `in` limits). `--live` is the authority, and CI should run it.
 - **Copy-paste from Google's console needs a split.** A community rule must lose its header and `meta`, and each section moves under its own key, with `match` and `options` rewritten as YAML. An import command can do that mechanically (unresolved).
 - **UDM catalogue drift.** A field Google adds is an error until the sync script runs.
-- **`udmSearch` is v1alpha.** `opentide query` can break when Google changes it.
 
 ## Alternatives
 
@@ -227,16 +226,22 @@ About 30–40 person-days. The platform can ship before the engine with structur
 - **Vendoring `MXfive/tree-sitter-yaral` or Google's TextMate grammar.** Rejected: both miss current syntax, and neither has the node structure the checks need.
 - **GoogleSQL rules** (`ruleLanguage: GOOGLE_SQL`, preview). Deferred: a second language in the same block is an additive `language` key once it is GA.
 
-## Unresolved questions
+## Resolved questions
 
-- The hop-window bound: 48 hours in `match` syntax, 14 days in run-frequency and composite pages. The spec takes 14 days for rules. Confirm with `verifyRuleText`.
-- How meta `severity` maps to the detection severity enum, and whether Google uses `priority` beyond a label.
-- Whether `export` may precede `options`, or only follow it.
-- A rule-name length limit; none is documented.
-- The exact `queryDialect` value for YARA-L in `udmSearch`, and whether `opentide query --rule` can run a rule's `events` as a search.
-- An `opentide import` that turns a `.yaral` file into a rule with a block, splitting the header and meta.
-- Retrohunts (`rules/{rule}/retrohunts`) as an `opentide hunt` command; they write detections, so they are not `opentide query`.
-- Curated rule sets (`ur_…`) and findings refinements (exclusions) are console objects and stay out of scope.
+Each question open at the first draft, with the evidence and the decision the specs now carry.
+
+| Question | Evidence | Decision |
+|----------|----------|----------|
+| Hop-window bound: 48 hours or 14 days? | `match` syntax says 48 hours. The run-frequency pages run multi-event rules with windows over 48 hours at window/10, `RunFrequency.DAILY` exists for windows over 2 days, and composite detections state "All detection rules have a maximum match window of 14 days". The 48-hour table is stale. | Rules: hop and sliding windows 1m–14d. Searches: 1m–48h. Tumbling (pre-GA): 1m–72h, as its own page says. `verifyRuleText` remains the authority for a tenant. |
+| How does meta `severity` reach a detection, and what is `priority`? | `verifyRuleText` and `Rule` show `severity.displayName` extracted verbatim from meta. `SecurityResult.priority` is "not populated when the SecurityResult appears in a detection". No page maps the string to the detection severity enum. | opentide writes Google's community spelling (`Info`…`Critical`) and documents it as a label. Alert weight is `$risk_score`, which Google documents, and the `google_secops_risk_score_missing` advisory asks for it. `priority` is a label. |
+| May `export` precede `options`? | The data-tables page: writing to a data table "must be the final action of the query". No example shows both. | `export` is the last section. Deploy writes `options` then `export`; in a `.yaral` file, `export` before `options` is `yaral_section_order`. |
+| Rule-name length limit and uniqueness | No page documents either. Google's `content_manager` extracts `[A-Za-z0-9_]+` and treats names as case-insensitively unique. | No length check (none documented; `verifyRuleText` reports one if Google has it). `google_secops_name_duplicate` compares names case-insensitively. |
+| `udmSearch` version and dialect; `opentide query --rule` | `udmSearch` is in v1 with `queryDialect` `YL2` (default) or `SQL`. A rule differs from a search in repeated-field semantics (unnested in rules, implicit `any` in search) and sliding windows (rules only). | `opentide query` uses v1 `udmSearch` with `queryDialect=YL2`. `--rule` is not supported: running a rule's sections as a search would return different results from the rule. Hunts are the search form. |
+| `opentide import` for `.yaral` files | Mechanical: split header, meta, and sections; render `match`/`options` back to YAML. | Follow-up, not part of 1.0: it adds a command, not a field, so it needs no change to these specs. |
+| Retrohunts | `POST /v1/{rule}/retrohunts` is a long-running operation that writes detections. | Follow-up command (`opentide hunt`), outside `deploy` and `query`. |
+| Hunt validation against a tenant | `GET /v1/{instance}:validateQuery` validates search text. | Follow-up: hunts are checked offline under the `search` profile in 1.0. |
+| Curated rules (`ur_…`) and findings refinements | Console objects with no opentide counterpart. | Out of scope. |
+| GoogleSQL rules (`ruleLanguage: GOOGLE_SQL`) | Preview since 2026-09. | Deferred: an additive `language` key once GA. |
 
 ## References
 

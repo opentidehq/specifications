@@ -81,7 +81,7 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `google_secops_run_frequency` | `run_frequency` is `LIVE`, `LIVE_CUSTOMIZABLE`, `HOURLY_CUSTOMIZABLE`, or `DAILY`. Google's legacy `HOURLY` is refused. |
 | `google_secops_schedule` | `schedule` is set only with `run_frequency` `LIVE_CUSTOMIZABLE` or `HOURLY_CUSTOMIZABLE`, and `late_arriving_data_adjustment` is a positive duration with unit `s`, `m`, `h`, or `d`. |
 | `google_secops_meta_key` | Each `meta` key is an identifier, not a keyword, and not a [derived key](#meta); each value is a string. |
-| `google_secops_name_duplicate` | Workspace check: no two enabled `google_secops` blocks resolve to one rule name. A composite rule that names one would match both. |
+| `google_secops_name_duplicate` | Workspace check: no two enabled `google_secops` blocks resolve to one rule name, compared case-insensitively. A composite rule that names one would match both, and Google's own `content_manager` treats names as case-insensitively unique. |
 
 The [YARA-L codes](../languages/yara-l-1.0.md#diagnostics) apply to the sections.
 
@@ -130,7 +130,7 @@ Deploy writes these keys, in this order, then the block `meta` keys in the order
 
 The techniques are the rule's `techniques` plus those inherited through `detection_model`, the union [elastic-1.0](elastic-1.0.md#attck) uses. Each technique contributes the tactics of its `tide.vocab.stages`, mapped and renamed as there. `technique` is the key Google's MITRE ATT&CK coverage page reads ([MITRE dashboard](https://cloud.google.com/chronicle/docs/detection/mitre-dashboard)); `tactic` follows Google's community rule style.
 
-Each value is written as a YARA-L double-quoted string: `\` becomes `\\`, `"` becomes `\"`, and every other control character, line breaks included, becomes a space. Google reads `author` and `severity` from the meta into `Rule.author` and `Rule.severity`.
+Each value is written as a YARA-L double-quoted string: `\` becomes `\\`, `"` becomes `\"`, and every other control character, line breaks included, becomes a space. Google reads `author` and `severity` from the meta into `Rule.author` and `Rule.severity.displayName`, verbatim. Every other key, `priority` included, is a rule label on the detection. Google does not document how the meta `severity` string maps to a detection's severity; opentide writes Google's community spelling (`Info`, `Low`, `Medium`, `High`, `Critical`) and expresses alert weight through `$risk_score`, which Google does document.
 
 ### Severity
 
@@ -287,7 +287,7 @@ opentide never sends `force=true`: that deletes the rule's detections, which are
 | `opentide validate` (offline) | yes: the constraints and the YARA-L language, `rule` profile |
 | `opentide validate query` (offline) | YARA-L: a block's sections, and a `.yaral` file |
 | `opentide validate query --live` | yes: `verifyRuleText` on the assembled text |
-| `opentide query` | yes: a YARA-L search through `udmSearch` |
+| `opentide query` | yes: a YARA-L search through `udmSearch` (v1, `queryDialect=YL2`) |
 
 **Live.** Each rule's assembled text is sent to `verifyRuleText`.
 
@@ -300,7 +300,7 @@ opentide never sends `force=true`: that deletes the rule's detections, which are
 
 A diagnostic's `position` (1-based lines and columns, end inclusive) is mapped into the section key it falls in ([Assembled rule](#assembled-rule)). A position inside the generated header or meta, or no position, is reported on the block. `verifyRuleText` resolves the tenant's reference lists and data tables, which the offline check cannot.
 
-**Query.** `opentide query --platform google_secops` sends a [`YaraLSearch`](../languages/yara-l-1.0.md#text-forms) to `GET <endpoint>/v1alpha/<instance resource>:udmSearch` with `query`, `timeRange.startTime`, `timeRange.endTime`, and `limit` (at most 10,000). The method is read-only and saves nothing. It is `v1alpha`: Google has no `v1` search method yet. `opentide query --rule` is not supported for `google_secops`: a rule runs in the detection engine, and a retrohunt writes detections.
+**Query.** `opentide query --platform google_secops` sends a [`YaraLSearch`](../languages/yara-l-1.0.md#text-forms) to `GET <endpoint>/v1/<instance resource>:udmSearch` with `query`, `queryDialect=YL2`, `timeRange.startTime`, `timeRange.endTime`, and `limit` (at most 10,000; Google coerces more to 10,000). The method is read-only and saves nothing. It returns matched `events` for a filter search and `stats` for a search with `match` or `outcome`; `moreDataAvailable` or `stats.tooManyResults` is reported as a warning that the result is truncated. `opentide query --rule` is not supported for `google_secops`: a rule runs in the detection engine, and a retrohunt writes detections.
 
 ## Relationships
 
