@@ -26,9 +26,9 @@ Static validation (`opentide validate`) and registry load:
 - `sequences` MUST be a non-empty list. Every sequence MUST have a non-blank `query`.
 - Every `query` MUST be checked against the [Exabeam Query Language](../languages/exabeam-1.0.md) under the `rule` profile. Its errors fail the rule, and its warnings are reported.
 - A block MUST satisfy every [constraint](#constraints). A violation MUST be reported with its constraint code.
-- Unknown keys MUST fail, at the block root and inside every object in the field tables.
+- Unknown keys MUST fail with `unknown_field` at the key's path, at the block root and inside every object in the field tables (`sequences.0.thresold`, `suppression.unit`). A key set to `null` is the same as an absent key, at every level.
 - Legacy external-id keys (`rule_id`, `rule_id_bundle`, `rule_id::<tenant>`) MUST fail with `external_id_in_rule` ([External rule ids](index.md#external-rule-ids)).
-- Field names in `group_by`, `threshold.field`, and `suppression.group_by` name fields in the tenant's data. They MUST NOT be checked against a closed list. A field the CIM catalogue does not have is the warning `exabeam_unknown_field`.
+- Field names in `sequences[].group_by`, `threshold.field`, `correlation.group_by`, and `suppression.group_by` name fields in the tenant's data. They MUST NOT be checked against a closed list. An implementation MAY report a field the CIM catalogue does not have as the warning `exabeam_unknown_field`, at that field's path.
 
 Deploy:
 
@@ -67,7 +67,7 @@ The shared `name` is the Exabeam rule name. Empty means the opentide rule `name`
 | `query` | string | yes | — | A filter in the [Exabeam Query Language](../languages/exabeam-1.0.md), profile `rule`. Multiline in YAML. |
 | `name` | string | optional | null | Sequence name, shown in the console |
 | `threshold` | [ExabeamThreshold](#threshold-exabeamthreshold) | optional | null | The condition. Without it, the sequence triggers on any matching event. |
-| `group_by` | list[string] | optional | null | One to three fields. A threshold counts per value; any match triggers once per value. |
+| `group_by` | list[string] | optional | null | One to three fields. A threshold is evaluated per value. With any match, the rule still triggers on every matching event; to trigger once per value, also set `suppression.group_by` to these fields (Exabeam's granular suppression). |
 
 ### `threshold` (ExabeamThreshold)
 
@@ -82,7 +82,7 @@ The shared `name` is the Exabeam rule name. Empty means the opentide rule `name`
 | `function` | `operator` | `value` |
 |------------|------------|---------|
 | `count`, `unique_count`, `max`, `min`, `sum`, `average` | `more_than`, `less_than` | a number (`count` and `unique_count`: a non-negative integer) |
-| `value` | `in`, `not_in` | a non-empty list of strings or numbers |
+| `value` | `in`, `not_in` | a non-empty list of strings or numbers. No string is blank or holds a `,`: the list is sent joined by `,`. |
 
 An absence rule is a threshold with `less_than` (`count less_than 1 within 24h`).
 
@@ -96,6 +96,8 @@ The API also lists the operators `between` and `changed`. Neither Exabeam's refe
 | `group_by` | list[string] | optional | `[]` | Up to three fields every sequence shares (the API's limit; the console allows more) |
 
 The sequences are evaluated in the order they are listed. The create and update calls have no ordering setting, and every rule Exabeam exports or publishes has `sequencesExecution: CREATION_ORDER`, the order of creation ([RFC 0018](../../rfcs/0018-exabeam-platform.md#research-round-2)). Write the sequences in the order the events happen.
+
+Exabeam evaluates ordered sequences one after another: it waits one minute before it evaluates the next sequence, and an any-match sequence after the first evaluates events for one minute only. So `correlation.within` has to be more than the sum of the sequence windows (`threshold.within`, one minute for an any-match sequence) plus one minute for each sequence after the first. For a 3-minute and a 5-minute sequence, Exabeam's guide asks for more than nine minutes ([`exabeam_correlation_window`](#advisories)).
 
 ### `suppression` (ExabeamSuppression)
 
@@ -117,8 +119,8 @@ The sequences are evaluated in the order they are listed. The create and update 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `every` | string | yes | — | `day`, `week`, `month`, or `days` (a range of weekdays) |
-| `from` | string | yes | — | Start time, UTC, `HH:MMZ` (`08:00Z`) |
-| `to` | string | yes | — | End time, UTC, `HH:MMZ` |
+| `from` | string | yes | — | Start time, UTC, `H:MMZ` or `HH:MMZ` (`8:00Z`, `08:00Z`) |
+| `to` | string | yes | — | End time, UTC, `H:MMZ` or `HH:MMZ` |
 | `days` | list | conditional | — | `week`: one or more weekday names (`monday` … `sunday`). `month`: day numbers 1–31. Not allowed otherwise. |
 | `last_day` | boolean | optional | `false` | `month` only: also the last day of the month. A `month` recurrence has `days`, `last_day: true`, or both. |
 | `first` | string | conditional | — | `days` only: the first weekday of the range |
@@ -143,11 +145,11 @@ Static validation MUST reject a block that breaks any of these, and report the c
 
 | Code | Constraint |
 |------|------------|
-| `exabeam_sequences` | `sequences` is a non-empty list, and every sequence has a non-blank `query` |
+| `exabeam_sequences` | `sequences` is a non-empty list of objects, and every sequence has a non-blank `query` |
 | `exabeam_correlation` | `correlation` is set when there are two or more sequences, and not set when there is one. Its `within` is a duration. |
 | `exabeam_threshold_function` | `threshold.function` is one of the seven functions. `field` is a non-blank string, and is set unless the function is `count`. |
 | `exabeam_threshold_operator` | `threshold.operator` is allowed with the function ([threshold](#threshold-exabeamthreshold)) |
-| `exabeam_threshold_value` | `threshold.value` has the shape its operator takes, and `count` and `unique_count` compare with integers |
+| `exabeam_threshold_value` | `threshold.value` has the shape its operator takes, and `count` and `unique_count` compare with integers. An `in` or `not_in` item is not blank and holds no `,`. |
 | `exabeam_group_by` | Every `group_by` (sequence, correlation, suppression) is a list of one to three distinct non-blank strings. `correlation.group_by` may be empty. |
 | `exabeam_duration` | Every duration is a [duration](#durations) with a unit its field allows; `delay` is 7 to 180 minutes |
 | `exabeam_severity` | `severity` is `none`, `low`, `medium`, `high`, or `critical` |
@@ -156,23 +158,25 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `exabeam_schedule` | Each recurrence has a known `every`, `from` and `to` matching `^([01]?[0-9]|2[0-3]):[0-5][0-9]Z$`, and exactly the day keys its `every` takes, with valid weekday names and day numbers |
 | `exabeam_name_length` | The Exabeam rule name (shared `name`, else the rule `name`) is at most 128 characters |
 | `exabeam_context_table_trigger` | A sequence whose query uses a context table (`IN "…"`) has no `threshold`. Exabeam requires "Trigger on first match" with a context table lookup. |
-| `exabeam_name_duplicate` | Workspace check: two enabled blocks resolve to the same Exabeam rule name, compared case-insensitively. Exabeam's import refuses a rule whose name exists, and Search links rules by name. |
+| `exabeam_name_duplicate` | Workspace check: two enabled blocks resolve to the same Exabeam rule name, compared case-insensitively. Exabeam's import refuses a rule whose name exists, and the [name check](#deploy) would refuse the second create. |
 
 Every implementation reports each code at the path in this table:
 
 | Code | Field path |
 |------|------------|
-| `exabeam_sequences` | `sequences`, or `sequences.<N>.query` |
+| `unknown_field` | The unknown key's path (`sequences.<N>.<key>`, `sequences.<N>.threshold.<key>`, `correlation.<key>`, `suppression.<key>`, `email.<key>`, `schedule.<N>.<key>`, or `<key>` at the root) |
+| `exabeam_sequences` | `sequences`; `sequences.<N>` when a sequence is not an object; `sequences.<N>.query` |
 | `exabeam_correlation` | `correlation` |
 | `exabeam_threshold_function`, `exabeam_threshold_operator`, `exabeam_threshold_value` | `sequences.<N>.threshold` |
 | `exabeam_group_by` | `sequences.<N>.group_by`, `correlation.group_by`, or `suppression.group_by` |
-| `exabeam_duration` | `sequences.<N>.threshold.within`, `correlation.within`, `suppression.for`, or `delay` |
+| `exabeam_duration` | `sequences.<N>.threshold.within`, `correlation.within`, `suppression.for` (also when `suppression` is not an object or has no `for`), or `delay` |
 | `exabeam_severity`, `exabeam_outcome`, `exabeam_email` | `severity`, `outcome`, `email` |
 | `exabeam_schedule` | `schedule.<N>`, or `schedule` when it is not a non-empty list |
 | `exabeam_name_length` | `name` |
 | `exabeam_context_table_trigger` | `sequences.<N>.threshold` |
 | `exabeam_name_duplicate` | `name` |
 | language codes ([exabeam-1.0](../languages/exabeam-1.0.md#diagnostics)) | `sequences.<N>.query` |
+| `exabeam_unknown_field` (warning) | The field's path: `sequences.<N>.group_by`, `sequences.<N>.threshold.field`, `correlation.group_by`, `suppression.group_by`, or `sequences.<N>.query` for a field in a query |
 
 ### Advisories
 
@@ -181,7 +185,7 @@ Validation reports these as warnings ([validation](../validation.md#platform-adv
 | Code | When |
 |------|------|
 | `exabeam_outcome_silent` | `outcome` is `none` and there is no `email`. The rule only writes a `rule-trigger` event. |
-| `exabeam_correlation_window` | `correlation.within` is shorter than the longest `threshold.within`. Exabeam's guide asks for at least the longest sequence window. |
+| `exabeam_correlation_window` | Two or more sequences, and `correlation.within` is not more than the sum of the sequence windows (`threshold.within`, one minute for an any-match sequence) plus one minute for each sequence after the first ([correlation](#correlation-exabeamcorrelation)). Reported at `correlation.within`. |
 
 ### Name and description
 
@@ -272,9 +276,9 @@ Exabeam is **state-backed**, like Defender for Endpoint, SentinelOne, CrowdStrik
 - **No orphan creates.** Deploy MUST NOT create a rule unless the returned id can be kept (`deployment_state_ignored`, `deployment_state_unpersisted`), as on every state-backed platform.
 - **Writes.** The binding is written as soon as the create returns, and removed after a successful `DELETE`, a `404` on delete, or the `DISABLEMENT`-on-missing path below.
 
-**Authentication.** Deploy gets a token with `POST /auth/v1/token` (`{"client_id", "client_secret", "grant_type": "client_credentials"}`) and sends `Authorization: Bearer <token>`. It requests one token per tenant per run and reuses it. A `401` whose body says the token expired gets one new token and one retry. Exabeam allows 50 token requests per 5 minutes per source IP and asks clients to keep to a few tokens a day.
+**Authentication.** Deploy gets a token with `POST /auth/v1/token` (`{"client_id", "client_secret", "grant_type": "client_credentials"}`) and sends `Authorization: Bearer <token>`. It requests one token per tenant per run and reuses it. A `401` whose body says the token expired gets one new token and one retry. Exabeam allows 50 token requests per 5 minutes per source IP and asks clients to keep to a few tokens a day. A key the token endpoint refuses (`400`, `401`, `403`) stops the tenant with `exabeam_tenant_unauthorized`. A token that cannot be had otherwise (no answer, another error, an answer with no `access_token`) stops the tenant with `exabeam_tenant_unreachable`: the request that needed it was never sent, so a create that needed it is not unconfirmed.
 
-**Rate limit.** Exabeam allows 100 API requests per minute per source IP. The client MUST space its requests to at most 100 per rolling minute across every Exabeam tenant of the run. A `429` waits out `Retry-After` (60 seconds when absent) and retries the same request.
+**Rate limit.** Exabeam allows 100 API requests per minute per source IP. The client MUST space its requests to at most 100 per rolling minute across every Exabeam tenant of the run. A `429` waits out `Retry-After`, given in seconds or as an HTTP date (60 seconds when absent or unreadable, none when the date has passed), and retries the same request. A `Retry-After` of more than 5 minutes is not waited out: the request fails as a `429`.
 
 | Block status strategy | Binding | Exabeam calls |
 |-----------------------|---------|---------------|
@@ -286,16 +290,17 @@ Exabeam is **state-backed**, like Defender for Endpoint, SentinelOne, CrowdStrik
 
 A `PUT` sets `enabled` too, so deploy never calls `/enable` or `/disable` separately.
 
-**Name check.** Before a create, deploy calls `GET /correlation-rules/v2/rules?nameContains=<name>` and compares the names it returns with the rule name, case-insensitively and exactly (`nameContains` matches substrings). A match fails the rule with `exabeam_name_conflict`, naming the existing rule's `id`. Deploy MUST NOT adopt that rule or record its id: the operator renames one of the two, or deletes the old rule. The check runs only on a create.
+**Name check.** Before every create, deploy calls `GET /correlation-rules/v2/rules?nameContains=<name>` and compares the names it returns with the rule name, case-insensitively and exactly (`nameContains` matches substrings). A match fails the rule with `exabeam_name_conflict`, naming the existing rule's `id`. Deploy MUST NOT adopt that rule or record its id: the operator renames one of the two, or deletes the old rule. An answer that is not a list of rules (or one object holding exactly one such list under `rules` or `items`) is never read as "no rule has this name": the create is refused with `exabeam_request_failed`. An update, disable, or delete makes no name check.
 
 Failure handling:
 
-- **Rule gone.** A `PUT` answered `404` creates the rule again and replaces the binding, with the warning `exabeam_rule_recreated`. Under `DISABLEMENT` it creates nothing, removes the binding, and warns `exabeam_rule_missing`. A `DELETE` answered `404` succeeds and removes the binding.
-- **No id.** A `201` whose `id` is not a UUID fails the rule with `exabeam_create_no_id`, naming the rule `name` so the operator can remove it in the console.
+- **Rule gone.** A `PUT` answered `404` warns `exabeam_rule_recreated` and creates the rule again. That create is a create in every respect: the no-orphan refusals, the name check, and the unconfirmed-create and no-id handling below all apply. The stale binding stays until the new create returns an id, which replaces it; when the create is refused or unconfirmed, the stale binding is kept, and the next run's `PUT` gets `404` again and repeats the name check, so it cannot create a second rule. Under `DISABLEMENT` it creates nothing, removes the binding, and warns `exabeam_rule_missing`. A `DELETE` answered `404` succeeds and removes the binding.
+- **No id.** A `2xx` create answer whose `id` is not a UUID, or that is not a rule at all, fails the rule with `exabeam_create_no_id`, naming the rule `name` so the operator can remove it in the console.
 - **Unconfirmed create.** A create with no answer (timeout, connection reset) or a `5xx` answer MUST NOT be retried. It fails the rule with `exabeam_create_unconfirmed`, naming the rule. Exabeam may have created the rule, and deploy never lists rules to find it.
 - **Rejected.** A `400` fails the rule with `exabeam_request_rejected` and Exabeam's `errors[].code`, `message`, and `fields`, and the `traceId`.
 - **Not licensed.** A `409` ("Feature is not enabled for subscription") stops the tenant with `exabeam_feature_unavailable`.
 - **Unauthorized.** A `401` after the retry, or a `403`, stops the tenant with `exabeam_tenant_unauthorized`.
+- **Other answers.** Any other non-`2xx` answer to a name check, update, or delete (a `404` on create, a `5xx` on update, a `429` past the wait) fails the rule with `exabeam_request_failed`, with the status and Exabeam's message. A request other than a create that gets no answer stops the tenant with `exabeam_tenant_unreachable`.
 - **Schedule kept.** The rule a `PUT` returns is the stored rule. When it still has a `scheduleConfig` the block no longer sets, deploy warns `exabeam_schedule_retained`: Exabeam does not document whether a `PUT` without `scheduleConfig` clears it. The operator clears it in the console.
 - **Auto-disabled.** When the rule a `PUT` returns has `autoDisabled: true`, deploy warns `exabeam_rule_auto_disabled`. Exabeam stops a rule that matches more than 500 times or triggers more than 50 times in five minutes, or whose query or context table is broken.
 
@@ -310,7 +315,7 @@ Failure handling:
 
 **`--live`** sends each query as `POST /search/v2/events` with `filter` set to the query, `fields: ["*"]`, `limit: 1`, and the last 15 minutes (`startTime`, `endTime`), the window the console's "Test Last 15 mins" uses. A `200` means the tenant accepted the filter and is reported as valid, with the row count as information only. A `400` is invalid, with Exabeam's message. Any other answer is an error, never a pass. The condition, windows, grouping, outcomes, and the rule as a whole are not checked: no API previews a rule, and `testMode` creates one.
 
-**`opentide query`** sends the hunt as the `filter` of `POST /search/v2/events`, with `fields: ["*"]` unless the query selects columns, the run's time range, and `limit` at most 3,000 (the API's default and the most it returns). The search is synchronous and has no job id. A runner that stops waiting closes the connection; the API has no cancel. Nothing is saved on the tenant.
+**`opentide query`** sends the hunt as the `filter` of `POST /search/v2/events`, with `fields` set to the columns the query's leading `SELECT` names (each by its `AS` name when it has one, else as written), or `["*"]` when the query has no leading `SELECT` or selects `*`, the run's time range, and `limit` at most 3,000 (the API's default and the most it returns). The search is synchronous and has no job id. A runner that stops waiting closes the connection; the API has no cancel. Nothing is saved on the tenant.
 
 ## Relationships
 

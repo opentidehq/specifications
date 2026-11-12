@@ -92,8 +92,10 @@ Exabeam's Search guide is the only reference. Key pages: [query syntax](https://
 | Lists `user:("joe","jane")`; ranges `[a TO b]` inclusive, `{a TO b}` exclusive, `*` open; IP ranges and CIDR `[10.0.0.0/8]`, IPv4 only | QFV, QS |
 | `field:null`, `NOT field:null` (no `_exists_`) | QFV, MIG |
 | `RGX`/`RGXi` (RE2, "back-references are unsupported") and `WLD`/`WLDi`, one quoted argument each; `*`/`?` in quoted values; "You cannot use wildcards inside of phrases"; `*` alone is not allowed | regex, wildcards, QS |
-| Context tables: `field IN "table"` or `"table"."column"`; at most two per query; "The OR operator is not allowed with a context table" | context tables |
-| Unquoted free text with special characters is not supported; a query cannot start with `/` | free text |
+| Context tables: `field IN "table"` or `"table"."column"`; at most two per query | context tables |
+| "The OR operator is not allowed with a context table" | [Query by Context Table](https://docs.exabeam.com/en/search/all/search-guide/query-search/query-by-context-table.html) |
+| Unquoted free text with special characters is not supported | free text |
+| A search string cannot start with `/` (the File Path row) | QFV |
 | No comment syntax, no `!=`, and no `contains()`, `startswith()`, `cidr()`, `exists()` appear in any Search page | QS, QFV (absence) |
 | Advanced form: `[SELECT] [WHERE] [GROUP-BY] [ORDER-BY] [LIMIT]`, `AS`, pipes (≤ 5), `FOREACH f [ … @f … ]`, `COUNT/MIN/MAX/SUM/AVG`, `RGX_EXTRACT` (≤ 3); keywords all lower or all upper case; a reserved-word list for aliases | AQL, DFE |
 | "The Convert to Rule functionality is disabled when using dynamic field extraction." Every published correlation rule uses a filter only. | DFE; new-scale-content-hub |
@@ -121,7 +123,10 @@ subject: "endpoint" | FOREACH dest_host [ select src_host WHERE src_host: @dest_
 | A one-value list | QFV: "also works for a single value"; MIG: "will result in an error" | Valid: QFV is current, MIG is stale, and Exabeam's 2026 rules use it |
 | Value case | QS/FTS: case-insensitive; one QFV table: "not case-insensitive" | Not checked; documented as case-insensitive |
 | Regex form | `RGX("…")` throughout Search; MIG and one QFV note show `"/…/"`; Exabeam's 2026 rules write `"/tmp/"` as a path | `RGX` is the form; a value between slashes is the warning `exabeam_legacy_regex`, which names both readings |
-| A single group `(a) AND b` | QS: "results in an error", on a Data Lake field; 164 published rules contain one, 3 of them hand-written in 2026 | Warning `exabeam_single_group`; `NOT (a)` is never one |
+| A single group `(a) AND b` | QS: "results in an error", on a Data Lake field; 16 published rules contain one, 3 of them written by Exabeam in 2026 | Warning `exabeam_single_group`; `NOT (a)` is never one |
+| Backslashes in a pattern | The regex page: `RGX("back\\slash")` "will match back\slash", so RE2 would receive the string as written. Exabeam's rules rely on the string's value instead: the 2026 Linux rules write `"\\.ssh"` and `"\\/etc"` for a literal `.` and `/`, and the Sigma conversions write `"\\("`; read as written, those would match a backslash, and 44 more converted rules would be errors (119 against 75). Its hand-written Windows rules use `\.`, `\S`, `\/`, which mean the same under both readings | RE2 receives the string's value (`\\` is one backslash). The specs' examples and fixtures use the single-backslash form, which both readings agree on, and the `exabeam_regex` fixture (`(?=x)`) is invalid under both. A tenant test settles it ([unresolved question 6](#unresolved-questions)) |
+| Correlation window | The rule creator's guide: ordered sequences need more than the sum of their windows plus one minute between sequences ("more than nine minutes" for 3 and 5); unordered ones need the longest window | Sequences are ordered (`CREATION_ORDER`), so `exabeam_correlation_window` uses the ordered rule, with one minute for an any-match sequence |
+| Grouping an any-match sequence | The rule creator's guide: "to ensure the correlation rule triggers on the first match only, you must also configure granular suppression" | `group_by` alone does not trigger once per value; the spec points to `suppression.group_by` |
 | Adjacent terms | KI: `a NOT b` is invalid; FTS and BP: `web application` is an implicit `AND` | `a NOT b` is an error; adjacent free text is valid; other adjacent terms are the warning `exabeam_implicit_and` |
 | Empty query | QS: an empty search bar queries all logs | Valid under `search`, an error under `rule` |
 | Unquoted values | MIG: strings "always enclosed"; real rules use unquoted numbers, IPs, `null` | Numbers, booleans, `null`, IPs unquoted; any other bare value is the warning `exabeam_unquoted_value` |
@@ -138,8 +143,10 @@ A second round (2026-11-12) answered the open questions with the strongest evide
 
 | Rules | With an error | Warnings |
 |-------|---------------|----------|
-| 77 written by Exabeam | 0 | 14: `exabeam_legacy_regex` (paths such as `"/var/log/"`), `exabeam_single_group`, `exabeam_mixed_boolean` |
-| 2,294 converted from Sigma | 75 (3.3%) under RE2; 76 with the reference checker, whose regex check is Python's `re` (it refuses `$?`, which RE2 accepts, and accepts an escaped non-breaking space, which RE2 refuses) | `exabeam_single_group`, `exabeam_legacy_regex`, `exabeam_mixed_boolean` |
+| 77 written by Exabeam | 0 | 14 in 8 rules: `exabeam_legacy_regex` (4 rules, paths such as `"/var/log/"`), `exabeam_single_group` (3), `exabeam_mixed_boolean` (1) |
+| 2,294 converted from Sigma | 75 (3.3%), under RE2 and with the reference checker alike | `exabeam_single_group` (13 rules), `exabeam_mixed_boolean` (3) |
+
+The reference checker approximates RE2 with Python's `re` after refusing or rewriting the syntax the two disagree on (`\Z`, `\pL`, `\z`, `\x{…}`, `\Q…\E`, `(?<n>…)`, the `U` flag, repeat counts over 1000, a repeated assertion such as `$?`, an escaped non-ASCII character); the engine parses RE2 syntax itself.
 
 Each error traced is a defect in the converted rule: a `\\"` that closes a string early (`RGX(".*\\"arn\\:aws…")`), an unescaped `"` inside `RGX`, which the regex page calls an error, or a regex RE2 refuses (`.**`, `[^ \]`). The content hub's licence forbids redistribution, so the language server measures it and does not vendor it.
 
@@ -239,6 +246,7 @@ Settled by [Research round 2](#research-round-2), with the readings the specs ta
 3. Whether a `PUT` without `scheduleConfig` clears a schedule. `exabeam_schedule_retained` reports it when it does not.
 4. Whether `PUT` accepts `mitre`, `useCase`, or `sequencesExecution` as undocumented properties. If it does, a later revision moves ATT&CK out of the description and adds an order setting.
 5. Whether a Search request a client abandons keeps running on the tenant.
+6. Whether RE2 receives a pattern's string value (`\\` is one backslash), as Exabeam's rules assume, or the string as written, as the regex page's `back\\slash` example says. The single-backslash form is the same under both, so only patterns with `\\` depend on the answer.
 
 ## References
 

@@ -163,10 +163,38 @@ class SemanticsTests(unittest.TestCase):
         for pattern, ok in (
             ("^a+b$", True),
             ("(?i)admin", True),
-            ("(a)\\\\1", False),
+            ("(a)\\1", False),
             ("foo(?=bar)", False),
             ("a{2,", True),
             ("[a-", False),
+            # RE2 receives the body as written: `\\s` is a literal backslash then `s`.
+            ("back\\\\slash", True),
+            ("\\(Microsoft\\)", True),
+            ("\\pL+", True),
+            ("\\p{Greek}", True),
+            ("end\\z", True),
+            ("\\x{263a}", True),
+            ("\\Q.*\\E", True),
+            ("(?<n>a)", True),
+            ("(?P<n>a)", True),
+            ("[a?+]", True),
+            ("[*+]", True),
+            ("a(?i)b", True),
+            ("(?U)a+", True),
+            ("[[:alpha:]]+", True),
+            ("end\\Z", False),
+            ("a{1001}", False),
+            ("a{2,1001}", False),
+            ("a*+", False),
+            ("a{2}+", False),
+            ("(?>a)", False),
+            ("(?P=n)", False),
+            ("(?#note)a", False),
+            ("(?x)a", False),
+            ("a$?", True),
+            ("^*a", True),
+            ("\\\\b+", True),
+            ("a\\\u00a0b", False),
         ):
             with self.subTest(pattern=pattern):
                 codes = analyze(f'process_name:RGX("{pattern}")', "rule").codes
@@ -190,6 +218,71 @@ class SemanticsTests(unittest.TestCase):
     def test_time_fields_take_ranges(self) -> None:
         self.assertEqual(analyze("approxLogTime:[1730000000000 TO *]", "rule").codes, [])
         self.assertEqual(analyze('approxLogTime:"1730000000000"', "rule").codes, ["exabeam_time_exact"])
+
+    def test_time_fields_take_instants(self) -> None:
+        cases = {
+            "time:1700000000000": ["exabeam_time_exact"],
+            "time:2024-01-01T00:00:00Z": ["exabeam_time_exact"],
+            "time:null": [],
+            "time:[1800000000000 TO 2024-01-01T00:00:00Z]": ["exabeam_range"],
+            "time:[1700000000000 TO 2024-01-01T00:00:00Z]": [],
+            "time:[2024-01-01T10:00:00+05:00 TO 2024-01-01T06:00:00Z]": [],
+            "time:[2024-01-01T10:00:00Z TO 2024-01-01T06:00:00Z]": ["exabeam_range"],
+            "bytes:[1700000000000 TO 1800000000000]": [],
+        }
+        for query, codes in cases.items():
+            with self.subTest(query=query):
+                self.assertEqual(analyze(query, "rule").codes, codes)
+
+    def test_operator_words_are_never_operands(self) -> None:
+        for query in ('AND x:"a"', 'OR x:"a"', 'x:"a" AND AND y:"b"', 'x:"a" AND OR y:"b"', 'NOT AND x:"a"', 'x:"a" IN', "TO", 'x:"a" and'):
+            with self.subTest(query=query):
+                self.assertIn("exabeam_parse_error", analyze(query, "rule").codes)
+
+    def test_clause_order_after_a_filter(self) -> None:
+        for query in ('WHERE vendor:"x" SELECT user', 'WHERE vendor:"x" FROM t'):
+            with self.subTest(query=query):
+                self.assertEqual(analyze(query, "search").codes, ["exabeam_clause_order"])
+        self.assertEqual(
+            analyze('SELECT user WHERE a:"b" WHERE c:"d"', "search").codes, ["exabeam_clause_order"]
+        )
+
+    def test_review_round_grammar(self) -> None:
+        """The cases the spec review found where the grammar and the checker disagreed."""
+        search = {
+            'c-table IN "Admins"': [],
+            'a.b-c IN "T"': [],
+            'SELECT first-name WHERE vendor:"x"': [],
+            'SELECT c-uri, COUNT(*) GROUP-BY c-uri': [],
+            'SELECT User, COUNT(*) GROUP-BY user': [],
+            'SELECT user As u': ["exabeam_keyword_case"],
+            'vendor:"x" AS t': [],
+            'vendor:"x" |': ["exabeam_parse_error"],
+            '| SELECT user': ["exabeam_parse_error"],
+            'SELECT user | | SELECT user': ["exabeam_parse_error"],
+            'SELECT user vendor:"x"': ["exabeam_parse_error"],
+        }
+        for query, codes in search.items():
+            with self.subTest(query=query):
+                self.assertEqual(analyze(query, "search").codes, codes)
+        self.assertTrue(analyze('vendor:"x" AS t', "search").advanced)
+        rule = {
+            'c-group-by:"x"': [],
+            'c-order-by:"x"': [],
+            "x:rgx(\"a\")": [],
+            "x:Wld(\"a\")": [],
+            "user:'bob'": [],
+            "user IN 'Admins'": [],
+            'bytes > "100"': [],
+            'bytes > "abc"': ["exabeam_parse_error"],
+        }
+        for query, codes in rule.items():
+            with self.subTest(query=query):
+                self.assertEqual(analyze(query, "rule").codes, codes)
+
+    def test_context_tables_are_reported(self) -> None:
+        self.assertEqual(len(analyze('user IN "A" AND src_ip IN "B"."IP"', "rule").context_tables), 2)
+        self.assertEqual(analyze('message:"user signed in \'admin\'"', "rule").context_tables, [])
 
     def test_foreach_scope(self) -> None:
         ok = 'vendor:"a" | FOREACH host [ SELECT user WHERE src_host: @host ]'

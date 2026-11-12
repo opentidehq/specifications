@@ -94,7 +94,7 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `graylog_all_streams` | warning | Graylog: no streams or stream categories on the block or the tenant |
 | `graylog_title_duplicate` | warning | Graylog: two enabled blocks resolve to one event definition title |
 | `exabeam_outcome_silent` | warning | Exabeam: `outcome: none` and no `email`, so the rule only writes a `rule-trigger` event |
-| `exabeam_correlation_window` | warning | Exabeam: `correlation.within` is shorter than the longest sequence `threshold.within` |
+| `exabeam_correlation_window` | warning | Exabeam: two or more sequences, and `correlation.within` is not more than the time the ordered sequences need (the sum of their windows plus one minute per sequence after the first) |
 | `harfanglab_yara_context` | warning | HarfangLab: a YARA rule's meta `context` is not a comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` |
 
 The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories), [sysdig-1.0](platforms/sysdig-1.0.md#advisories), [bitdefender-1.0](platforms/bitdefender-1.0.md#advisories), [graylog-1.0](platforms/graylog-1.0.md#advisories), and [harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile).
@@ -214,7 +214,7 @@ On a rule's `configurations.bitdefender` block the checker applies the [Bitdefen
 
 On a rule's `configurations.graylog` block the checker applies the [Graylog constraint codes](platforms/graylog-1.0.md#constraints) that need no query parser: `graylog_query_blank`, `graylog_list_shape`, `graylog_schedule` (a cron expression's field count only), `graylog_event_limit`, `graylog_aggregation` (the full condition grammar), `graylog_event_field`, `graylog_event_key`, `graylog_priority`, and `graylog_field_name`. The query's codes need the Graylog dialect and are left to the analysis engine.
 
-On a rule's `configurations.exabeam` block the checker applies every [Exabeam constraint code](platforms/exabeam-1.0.md#constraints) and, on each sequence `query` (profile `rule`) and each `system: exabeam` hunt (profile `search`), the [Exabeam Query Language](languages/exabeam-1.0.md#diagnostics) errors that need no field catalogue, through the reference checker `scripts/exabeam_language.py`.
+On a rule's `configurations.exabeam` block the checker applies every [Exabeam constraint code](platforms/exabeam-1.0.md#constraints) but the workspace check `exabeam_name_duplicate`, reports `unknown_field` at the unknown key's path, and, on each sequence `query` (profile `rule`) and each `system: exabeam` hunt (profile `search`), the [Exabeam Query Language](languages/exabeam-1.0.md#diagnostics) errors that need no field catalogue, through the reference checker `scripts/exabeam_language.py`.
 
 On a rule's `configurations.harfanglab` block the checker applies `harfanglab_rule_kind`, `harfanglab_yara_form`, and `harfanglab_yara_section_header`. On any `yara.signature` it applies the [YARA codes](languages/yara-1.0.md#diagnostics) that need no YARA parser: `yara_signature_alias`, `yara_include`, `yara_empty_signature`, and `yara_duplicate_rule`. The other YARA codes are left to the analysis engine.
 

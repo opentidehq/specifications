@@ -1239,17 +1239,30 @@ EXABEAM_VALUE_OPERATORS = ("in", "not_in")
 EXABEAM_SEVERITIES = ("none", "low", "medium", "high", "critical")
 EXABEAM_OUTCOMES = ("alert", "case", "none")
 EXABEAM_WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
-_EXABEAM_DURATION = re.compile(r"^([1-9][0-9]*)([mhdw])$")
-_EXABEAM_TIME = re.compile(r"^([01]?[0-9]|2[0-3]):[0-5][0-9]Z$")
-_EXABEAM_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-_EXABEAM_CONTEXT_TABLE = re.compile(r"(?i)\bIN\s+[\"']")
+_EXABEAM_DURATION = re.compile(r"([1-9][0-9]*)([mhdw])")
+_EXABEAM_TIME = re.compile(r"([01]?[0-9]|2[0-3]):[0-5][0-9]Z")
+_EXABEAM_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+EXABEAM_SEQUENCE_KEYS = frozenset({"query", "name", "threshold", "group_by"})
+EXABEAM_THRESHOLD_KEYS = frozenset({"function", "field", "operator", "value", "within"})
+
+
+def _present(mapping: dict[str, Any]) -> dict[str, Any]:
+    """`mapping` without its null keys: specs/platforms/exabeam-1.0.md treats null as absent at every level."""
+    return {k: v for k, v in mapping.items() if v is not None}
+
+
+def _unknown_keys(mapping: dict[str, Any], allowed: frozenset[str] | set[str], path: str) -> list[CheckError]:
+    return [
+        CheckError("unknown_field", f"{key!r} is not a key here", f"{path}.{key}")
+        for key in sorted(set(mapping) - set(allowed), key=str)
+    ]
 
 
 def exabeam_duration(value: Any, units: str) -> tuple[int, str] | None:
     """(number, unit letter) for a specs/platforms/exabeam-1.0.md#durations value whose unit is in `units`."""
     if not isinstance(value, str):
         return None
-    m = _EXABEAM_DURATION.match(value)
+    m = _EXABEAM_DURATION.fullmatch(value)
     if not m or m.group(2) not in units:
         return None
     return int(m.group(1)), m.group(2)
@@ -1266,9 +1279,10 @@ def _is_number(value: Any) -> bool:
 
 
 def _exabeam_threshold_errors(threshold: Any, path: str) -> list[CheckError]:
-    if not isinstance(threshold, dict) or set(threshold) - {"function", "field", "operator", "value", "within"}:
+    if not isinstance(threshold, dict):
         return [CheckError("exabeam_threshold_function", "threshold has function, field, operator, value, within", path)]
-    errors: list[CheckError] = []
+    errors = _unknown_keys(threshold, EXABEAM_THRESHOLD_KEYS, path)
+    threshold = _present(threshold)
     function = threshold.get("function")
     field_name = threshold.get("field")
     if function not in EXABEAM_FUNCTIONS:
@@ -1309,12 +1323,17 @@ def _exabeam_schedule_errors(schedule: Any, base: str) -> list[CheckError]:
     day_keys = {"day": set(), "week": {"days"}, "month": {"days", "last_day"}, "days": {"first", "last"}}
     for index, rec in enumerate(schedule):
         path = f"{base}.schedule.{index}"
-        if not isinstance(rec, dict) or rec.get("every") not in day_keys:
+        if not isinstance(rec, dict):
+            errors.append(CheckError("exabeam_schedule", "a recurrence is an object", path))
+            continue
+        errors.extend(_unknown_keys(rec, {"every", "from", "to", "days", "last_day", "first", "last"}, path))
+        rec = _present(rec)
+        if rec.get("every") not in day_keys:
             errors.append(CheckError("exabeam_schedule", "every is day, week, month, or days", path))
             continue
         every = rec["every"]
-        extra = set(rec) - {"every", "from", "to"} - day_keys[every]
-        times = all(isinstance(rec.get(k), str) and _EXABEAM_TIME.match(rec[k]) for k in ("from", "to"))
+        extra = set(rec) & {"days", "last_day", "first", "last"} - day_keys[every]
+        times = all(isinstance(rec.get(k), str) and _EXABEAM_TIME.fullmatch(rec[k]) for k in ("from", "to"))
         ok = times and not extra
         if every == "week":
             days = rec.get("days")
@@ -1337,8 +1356,8 @@ def _exabeam_schedule_errors(schedule: Any, base: str) -> list[CheckError]:
 def validate_exabeam_block(block: dict[str, Any], rule_name: Any = None) -> list[CheckError]:
     """The platform::exabeam::1.0 constraint codes, plus the language's errors on every sequence query.
 
-    specs/platforms/exabeam-1.0.md#constraints. Advisories and the workspace check
-    `exabeam_name_duplicate` are left to opentide.
+    specs/platforms/exabeam-1.0.md#constraints. Every constraint code is applied but the workspace
+    check `exabeam_name_duplicate`; advisories (`exabeam_advisories`) are separate warnings.
     """
     from exabeam_language import analyze  # local import: the checker lives beside this module
 
@@ -1349,26 +1368,31 @@ def validate_exabeam_block(block: dict[str, Any], rule_name: Any = None) -> list
             errors.append(CheckError("external_id_in_rule", "the Exabeam rule id lives in deployment state", f"{base}.{key}"))
         else:
             errors.append(CheckError("unknown_field", f"{key!r} is not a platform::exabeam::1.0 key", f"{base}.{key}"))
+    block = _present(block)
     sequences = block.get("sequences")
     if not isinstance(sequences, list) or not sequences:
         errors.append(CheckError("exabeam_sequences", "sequences is a non-empty list", f"{base}.sequences"))
         sequences = []
     for index, seq in enumerate(sequences):
         path = f"{base}.sequences.{index}"
-        if not isinstance(seq, dict) or set(seq) - {"query", "name", "threshold", "group_by"}:
-            errors.append(CheckError("exabeam_sequences", "a sequence has query, name, threshold, group_by", path))
+        if not isinstance(seq, dict):
+            errors.append(CheckError("exabeam_sequences", "a sequence is an object with query, name, threshold, group_by", path))
             continue
+        errors.extend(_unknown_keys(seq, EXABEAM_SEQUENCE_KEYS, path))
+        seq = _present(seq)
         query = seq.get("query")
+        analysis = None
         if not isinstance(query, str) or not query.strip():
             errors.append(CheckError("exabeam_sequences", "query is a non-blank string", f"{path}.query"))
         else:
-            for diag in analyze(query, "rule").errors:
+            analysis = analyze(query, "rule")
+            for diag in analysis.errors:
                 errors.append(CheckError(diag.code, diag.message, f"{path}.query"))
         if "group_by" in seq and not _exabeam_group_by(seq["group_by"], allow_empty=False):
             errors.append(CheckError("exabeam_group_by", "one to three distinct non-blank fields", f"{path}.group_by"))
         if "threshold" in seq:
             errors.extend(_exabeam_threshold_errors(seq["threshold"], f"{path}.threshold"))
-            if isinstance(query, str) and _EXABEAM_CONTEXT_TABLE.search(query):
+            if analysis is not None and analysis.context_tables:
                 errors.append(
                     CheckError("exabeam_context_table_trigger", "a context table lookup triggers on any match", f"{path}.threshold")
                 )
@@ -1378,9 +1402,11 @@ def validate_exabeam_block(block: dict[str, Any], rule_name: Any = None) -> list
     elif len(sequences) == 1 and correlation is not None:
         errors.append(CheckError("exabeam_correlation", "one sequence has no correlation", f"{base}.correlation"))
     elif correlation is not None:
-        if not isinstance(correlation, dict) or set(correlation) - {"within", "group_by"}:
+        if not isinstance(correlation, dict):
             errors.append(CheckError("exabeam_correlation", "correlation has within and group_by", f"{base}.correlation"))
         else:
+            errors.extend(_unknown_keys(correlation, {"within", "group_by"}, f"{base}.correlation"))
+            correlation = _present(correlation)
             if exabeam_duration(correlation.get("within"), "mhd") is None:
                 errors.append(CheckError("exabeam_duration", "within is a whole number of m, h, or d", f"{base}.correlation.within"))
             if "group_by" in correlation and not _exabeam_group_by(correlation["group_by"], allow_empty=True):
@@ -1392,40 +1418,79 @@ def validate_exabeam_block(block: dict[str, Any], rule_name: Any = None) -> list
     if outcome is not None and outcome not in EXABEAM_OUTCOMES:
         errors.append(CheckError("exabeam_outcome", f"{outcome!r} is not alert, case, or none", f"{base}.outcome"))
     email = block.get("email")
+    if isinstance(email, dict):
+        errors.extend(_unknown_keys(email, {"recipients", "subject", "attach_csv"}, f"{base}.email"))
+        email = _present(email)
     if email is not None:
         recipients = email.get("recipients") if isinstance(email, dict) else None
         subject = email.get("subject") if isinstance(email, dict) else None
         if (
             not isinstance(email, dict)
-            or set(email) - {"recipients", "subject", "attach_csv"}
             or not isinstance(recipients, list)
             or not recipients
             or len(set(map(str, recipients))) != len(recipients)
-            or not all(isinstance(r, str) and _EXABEAM_EMAIL.match(r) for r in recipients)
+            or not all(isinstance(r, str) and _EXABEAM_EMAIL.fullmatch(r) for r in recipients)
             or (subject is not None and not (isinstance(subject, str) and subject.strip()))
             or not isinstance(email.get("attach_csv", False), bool)
         ):
             errors.append(CheckError("exabeam_email", "recipients is a non-empty list of distinct addresses", f"{base}.email"))
     suppression = block.get("suppression")
     if suppression is not None:
-        if not isinstance(suppression, dict) or set(suppression) - {"for", "group_by"}:
-            errors.append(CheckError("exabeam_duration", "suppression has for and group_by", f"{base}.suppression"))
+        if not isinstance(suppression, dict):
+            errors.append(CheckError("exabeam_duration", "suppression has for and group_by", f"{base}.suppression.for"))
         else:
+            errors.extend(_unknown_keys(suppression, {"for", "group_by"}, f"{base}.suppression"))
+            suppression = _present(suppression)
             if exabeam_duration(suppression.get("for"), "mhdw") is None:
                 errors.append(CheckError("exabeam_duration", "for is a whole number of m, h, d, or w", f"{base}.suppression.for"))
             if "group_by" in suppression and not _exabeam_group_by(suppression["group_by"], allow_empty=False):
                 errors.append(CheckError("exabeam_group_by", "one to three distinct non-blank fields", f"{base}.suppression.group_by"))
-    if "delay" in block and block["delay"] is not None:
+    if "delay" in block:
         parsed = exabeam_duration(block["delay"], "mh")
         minutes = parsed[0] * (60 if parsed[1] == "h" else 1) if parsed else 0
         if not 7 <= minutes <= 180:
             errors.append(CheckError("exabeam_duration", "delay is 7 to 180 minutes", f"{base}.delay"))
-    if "schedule" in block and block["schedule"] is not None:
+    if "schedule" in block:
         errors.extend(_exabeam_schedule_errors(block["schedule"], base))
     name = block.get("name") or rule_name
     if isinstance(name, str) and len(name) > 128:
         errors.append(CheckError("exabeam_name_length", "the Exabeam rule name is at most 128 characters", f"{base}.name"))
     return errors
+
+
+_EXABEAM_MINUTES = {"m": 1, "h": 60, "d": 1440}
+
+
+def exabeam_advisories(block: dict[str, Any]) -> list[CheckError]:
+    """specs/platforms/exabeam-1.0.md#advisories: warnings that never reject a block."""
+    found: list[CheckError] = []
+    base = "configurations.exabeam"
+    block = _present(block)
+    if block.get("outcome") == "none" and "email" not in block:
+        found.append(CheckError("exabeam_outcome_silent", "outcome none and no email", f"{base}.outcome"))
+    correlation = block.get("correlation")
+    sequences = block.get("sequences")
+    if isinstance(correlation, dict) and isinstance(sequences, list) and len(sequences) >= 2:
+        window = exabeam_duration(correlation.get("within"), "mhd")
+        needed = len(sequences) - 1  # one minute between consecutive sequences
+        for seq in sequences:
+            threshold = seq.get("threshold") if isinstance(seq, dict) else None
+            if threshold is None:
+                needed += 1  # an any-match sequence evaluates for one minute
+                continue
+            within = exabeam_duration(threshold.get("within"), "mhd") if isinstance(threshold, dict) else None
+            if within is None:
+                return found  # a constraint error; no advisory on top of it
+            needed += within[0] * _EXABEAM_MINUTES[within[1]]
+        if window is not None and window[0] * _EXABEAM_MINUTES[window[1]] <= needed:
+            found.append(
+                CheckError(
+                    "exabeam_correlation_window",
+                    f"correlation.within is not more than the {needed} minutes the ordered sequences need",
+                    f"{base}.correlation.within",
+                )
+            )
+    return found
 
 
 def validate_exabeam_searches(doc: dict[str, Any]) -> list[CheckError]:

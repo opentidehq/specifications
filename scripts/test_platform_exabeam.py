@@ -21,6 +21,7 @@ import yaml
 
 from object_fixtures import (
     EXPECTED_INVALID_CODES,
+    exabeam_advisories,
     exabeam_duration,
     load_vocabularies,
     validate_exabeam_block,
@@ -306,6 +307,8 @@ class GoldenTests(unittest.TestCase):
         for golden, expected in expected_goldens().items():
             with self.subTest(golden=golden):
                 self.assertEqual(json.loads(_read(GOLDEN / golden)), expected)
+                # "Keys are sent in the order of this table": dict equality ignores order.
+                self.assertEqual(json.dumps(json.loads(_read(GOLDEN / golden))), json.dumps(expected))
 
     def test_golden_set_is_complete(self) -> None:
         self.assertEqual(sorted(p.name for p in GOLDEN.glob("*.api.json")), sorted(expected_goldens()))
@@ -440,6 +443,75 @@ class CheckerTests(unittest.TestCase):
         self.assertEqual(codes(sequences=[{"query": 'user != "SYSTEM"'}]), {"exabeam_not_equal"})
         self.assertEqual(codes(rule_id="016dbc1d-a727-43df-a143-9546dcc81a5a"), {"external_id_in_rule"})
         self.assertEqual(codes(tags=["x"]), {"unknown_field"})
+
+    def test_review_round_block_codes(self) -> None:
+        """Nested unknown keys, null as absent, and the context table found by the parser."""
+
+        def check(**keys: Any) -> list[tuple[str, str]]:
+            base: dict[str, Any] = {"enabled": True, "schema": "platform::exabeam::1.0", "status": "STAGING"}
+            base["sequences"] = [{"query": 'activity_type:"app-login"'}]
+            return [(e.code, e.path) for e in validate_exabeam_block({**base, **keys})]
+
+        b = "configurations.exabeam"
+        any_match = {"query": 'vendor:"a"'}
+        counted = {"query": 'vendor:"a"', "threshold": {"function": "count", "operator": "more_than", "value": 1, "within": "5m"}}
+        self.assertEqual(check(sequences=[{**any_match, "extra": 1}]), [("unknown_field", f"{b}.sequences.0.extra")])
+        self.assertEqual(
+            check(sequences=[{**counted, "threshold": {**counted["threshold"], "extra": 1}}]),
+            [("unknown_field", f"{b}.sequences.0.threshold.extra")],
+        )
+        self.assertEqual(check(suppression={"for": "1h", "unit": "h"}), [("unknown_field", f"{b}.suppression.unit")])
+        self.assertEqual(check(suppression={"group_by": ["user"]}), [("exabeam_duration", f"{b}.suppression.for")])
+        self.assertEqual(check(suppression="1h"), [("exabeam_duration", f"{b}.suppression.for")])
+        two = [any_match, any_match]
+        self.assertEqual(
+            check(sequences=two, correlation={"within": "15m", "extra": 1}), [("unknown_field", f"{b}.correlation.extra")]
+        )
+        self.assertEqual(check(email={"recipients": ["a@b.co"], "cc": []}), [("unknown_field", f"{b}.email.cc")])
+        self.assertEqual(
+            check(schedule=[{"every": "day", "from": "8:00Z", "to": "18:00Z", "tz": "UTC"}]),
+            [("unknown_field", f"{b}.schedule.0.tz")],
+        )
+        self.assertEqual(check(sequences=["vendor:\"a\""]), [("exabeam_sequences", f"{b}.sequences.0")])
+        # null is absent, at every level
+        self.assertEqual(check(severity=None, suppression=None, delay=None, schedule=None, email=None), [])
+        self.assertEqual(check(sequences=[{**any_match, "threshold": None, "group_by": None, "name": None}]), [])
+        self.assertEqual(check(email={"recipients": ["a@b.co"], "subject": None, "attach_csv": None}), [])
+        # anchored patterns: no trailing newline sneaks through
+        self.assertEqual(check(delay="15m\n"), [("exabeam_duration", f"{b}.delay")])
+        # a quoted " in " is not a context table
+        quoted = {**counted, "query": 'message:"user signed in \'admin\'"'}
+        self.assertEqual(check(sequences=[quoted]), [])
+        table = {**counted, "query": 'user IN "Admins"'}
+        self.assertEqual(check(sequences=[table]), [("exabeam_context_table_trigger", f"{b}.sequences.0.threshold")])
+        # in / not_in items hold no comma and are not blank
+        value = {"function": "value", "field": "dest_ip", "operator": "in", "within": "5m"}
+        for bad in (["a,b"], [" "], []):
+            with self.subTest(value=bad):
+                seq = {"query": 'vendor:"a"', "threshold": {**value, "value": bad}}
+                self.assertEqual(check(sequences=[seq]), [("exabeam_threshold_value", f"{b}.sequences.0.threshold")])
+
+    def test_correlation_window_advisory(self) -> None:
+        def seq(within: str | None) -> dict[str, Any]:
+            if within is None:
+                return {"query": 'vendor:"a"'}
+            return {"query": 'vendor:"a"', "threshold": {"function": "count", "operator": "more_than", "value": 1, "within": within}}
+
+        def advised(within: str, *windows: str | None) -> list[str]:
+            block = {"sequences": [seq(w) for w in windows], "correlation": {"within": within}}
+            return [e.code for e in exabeam_advisories(block)]
+
+        # Exabeam's guide: 3- and 5-minute ordered sequences need "more than nine minutes".
+        self.assertEqual(advised("9m", "3m", "5m"), ["exabeam_correlation_window"])
+        self.assertEqual(advised("10m", "3m", "5m"), [])
+        self.assertEqual(advised("5m", "3m", "5m"), ["exabeam_correlation_window"])
+        self.assertEqual(advised("3m", None, None), ["exabeam_correlation_window"])
+        self.assertEqual(advised("4m", None, None), [])
+        self.assertEqual(advised("1h", "1h", None), ["exabeam_correlation_window"])
+        self.assertEqual(advised("1h", "30m"), [])  # one sequence: no correlation window
+        self.assertEqual(advised("15m", None, "10m"), [])  # the sequence fixture: 1 + 10 + 1 = 12
+        self.assertEqual(exabeam_advisories({"outcome": "none", "sequences": []})[0].code, "exabeam_outcome_silent")
+        self.assertEqual(exabeam_advisories({"outcome": "none", "email": {"recipients": ["a@b.co"]}}), [])
 
 
 if __name__ == "__main__":

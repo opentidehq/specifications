@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference checker for specs/languages/exabeam-1.0.md (the Exabeam Query Language).
+r"""Reference checker for specs/languages/exabeam-1.0.md (the Exabeam Query Language).
 
 This is conformance tooling, as object_fixtures.py is: it proves that the grammar in the
 spec is coherent, that every example in the spec parses, that every diagnostic code has a
@@ -8,10 +8,13 @@ lists. It is not opentide's engine. The analysis engine (language-server) implem
 spec in Rust with a tree-sitter grammar and the CIM field catalogue; this checker has no
 catalogue, so it reports neither `exabeam_unknown_field` nor `exabeam_string_field_number`.
 
-Regular expressions are checked against RE2 the way the spec describes: Python `re` compiles
-the pattern after the RE2-only refusals (back-references, look-around, atomic groups,
-possessive quantifiers) are applied. That approximates RE2; the engine uses an RE2-syntax
-parser.
+Regular expressions are checked against RE2 the way the spec describes: the pattern is the
+string's value (`\\` and `\"` lose a backslash, other escapes stay). `_re2_check` walks it once, refuses
+what RE2 refuses and Python accepts (back-references, look-around, atomic groups, possessive
+quantifiers, `\Z`, an escaped non-ASCII character, comments, the `x` flag, repeat counts over 1000), rewrites what RE2 accepts
+and Python spells differently (`\pL`, `\p{Greek}`, `\z`, `\x{263a}`, `\Q…\E`, `(?<name>…)`,
+the `U` flag, a flag group after the start, a repeated assertion such as `$?`), and compiles the result with Python `re`. That
+approximates RE2; the engine uses an RE2-syntax parser.
 
 Usage: python scripts/exabeam_language.py [--profile rule|search] [--tokens] FILE
 """
@@ -23,7 +26,9 @@ import ipaddress
 import json
 import re
 import sys
+import warnings
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 PROFILES = ("rule", "search")
@@ -130,6 +135,8 @@ class Result:
     diagnostics: list[Diagnostic] = field(default_factory=list)
     tokens: list[Token] = field(default_factory=list)
     advanced: bool = False
+    #: (start, end) of each context table lookup, in source order.
+    context_tables: list[tuple[int, int]] = field(default_factory=list)
 
     @property
     def codes(self) -> list[str]:
@@ -155,20 +162,141 @@ DATETIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+
 # A bare value runs to whitespace or a delimiter. `:` is allowed so a datetime range bound lexes whole.
 BARE = re.compile(r"[^\s()\[\]{},\"'|=<>!]+")
 FREE_TEXT_OK = re.compile(r"[A-Za-z0-9_*?]+\Z")
+# Filter operators are never a bare word: a term where one stands is a missing operand.
+OPERATOR_WORDS = {"AND", "OR", "NOT", "TO", "IN"}
+EPOCH_MS = re.compile(r"\d{10,}\Z")
+RE2_MAX_REPEAT = 1000
+# `AS name` closing a statement: before the end, a pipe, GROUP-BY, ORDER-BY, or LIMIT.
+STATEMENT_ALIAS = re.compile(r"(?i)as\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:\||\Z|(?:group|order)-by\b|limit\b)")
+RE2_FLAGS = set("imsU")
 
 
 def _re2_check(pattern: str) -> str | None:
-    """Why RE2 refuses `pattern`, or None. RE2 has no back-references, look-around, or atomic groups."""
-    if re.search(r"(?<!\\)(?:\\\\)*\\[1-9]", pattern):
-        return "back-references are not RE2"
-    if re.search(r"\(\?(?:=|!|<=|<!)", pattern):
-        return "look-around is not RE2"
-    if "(?>" in pattern:
-        return "atomic groups are not RE2"
-    if re.search(r"(?<!\\)[*+?}][+]", pattern):
-        return "possessive quantifiers are not RE2"
+    """Why RE2 refuses `pattern` (the string body as written), or None."""
+    out: list[str] = []
+    i = 0
+    n = len(pattern)
+    in_class = False
+    while i < n:
+        ch = pattern[i]
+        if ch == "\\":
+            if i + 1 >= n:
+                return "trailing backslash"
+            nx = pattern[i + 1]
+            if not nx.isascii():
+                return f"\\{nx} is not an RE2 escape: only ASCII punctuation is escaped"
+            if nx in "bBAz" and not in_class and pattern[i + 2 : i + 3] in ("*", "+", "?", "{"):
+                out.append("(?:" + ("\\Z" if nx == "z" else pattern[i : i + 2]) + ")")  # RE2 repeats an assertion
+                i += 2
+                continue
+            if nx in "123456789" and not in_class:
+                return "back-references are not RE2"
+            if nx == "Z":
+                return "\\Z is not RE2: write \\z or $"
+            if nx == "z" and not in_class:
+                out.append("\\Z")
+                i += 2
+                continue
+            if nx in "pP":
+                m = re.compile(r"\\[pP](?:\{\^?[A-Za-z_]+\}|[A-Za-z])").match(pattern, i)
+                if not m:
+                    return "invalid Unicode class escape"
+                out.append("a")
+                i = m.end()
+                continue
+            if nx == "x" and pattern[i + 2 : i + 3] == "{":
+                m = re.compile(r"\\x\{([0-9A-Fa-f]{1,8})\}").match(pattern, i)
+                if not m or int(m.group(1), 16) > 0x10FFFF:
+                    return "invalid \\x{…} escape"
+                out.append(re.escape(chr(int(m.group(1), 16))))
+                i = m.end()
+                continue
+            if nx == "Q":
+                end = pattern.find("\\E", i + 2)
+                literal = pattern[i + 2 :] if end < 0 else pattern[i + 2 : end]
+                out.append(re.escape(literal))
+                i = n if end < 0 else end + 2
+                continue
+            out.append(pattern[i : i + 2])
+            i += 2
+            continue
+        if in_class:
+            if ch == "]":
+                in_class = False
+            elif ch == "[" and pattern.startswith("[:", i):
+                m = re.compile(r"\[:\^?([a-z]+):\]").match(pattern, i)
+                if m:  # an ASCII class such as [:alpha:]; Python reads it as a set
+                    out.append("a")
+                    i = m.end()
+                    continue
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "[":
+            in_class = True
+            out.append(ch)
+            i += 1
+            if pattern[i : i + 1] == "^":
+                out.append("^")
+                i += 1
+            if pattern[i : i + 1] == "]":  # a `]` right after `[` or `[^` is a literal
+                out.append("\\]")
+                i += 1
+            continue
+        if ch == "(" and pattern.startswith("(?", i):
+            rest = pattern[i + 2 :]
+            if rest[:1] in ("=", "!") or rest[:2] in ("<=", "<!"):
+                return "look-around is not RE2"
+            if rest[:1] == ">":
+                return "atomic groups are not RE2"
+            if rest[:2] == "P=" or rest[:2] == "P>":
+                return "back-references are not RE2"
+            if rest[:1] == "#":
+                return "comments are not RE2"
+            if rest[:1] == "<":
+                out.append("(?P<")
+                i += 3
+                continue
+            if rest[:2] == "P<":
+                out.append("(?P<")
+                i += 4
+                continue
+            m = re.compile(r"\(\?([A-Za-z]*)(?:-([A-Za-z]*))?([:)])").match(pattern, i)
+            if m:
+                letters = set(m.group(1) + (m.group(2) or ""))
+                if not letters <= RE2_FLAGS:
+                    return f"flags {''.join(sorted(letters - RE2_FLAGS))} are not RE2 (RE2 has i, m, s, U)"
+                on = "".join(c for c in m.group(1) if c != "U")
+                off = "".join(c for c in (m.group(2) or "") if c != "U")
+                if m.group(3) == ")":
+                    i = m.end()  # a flag group sets flags from here on; validity is all that matters
+                    continue
+                out.append("(?" + on + ("-" + off if off else "") + ":" if on or off else "(?:")
+                i = m.end()
+                continue
+        if ch == "{":
+            m = re.compile(r"\{(\d+)(?:,(\d*))?\}").match(pattern, i)
+            if m:
+                counts = [int(g) for g in m.groups() if g]
+                if any(c > RE2_MAX_REPEAT for c in counts):
+                    return f"repeat counts above {RE2_MAX_REPEAT} are not RE2"
+                if pattern[m.end() : m.end() + 1] == "+":
+                    return "possessive quantifiers are not RE2"
+                out.append(m.group(0))
+                i = m.end()
+                continue
+        if ch in "*+?" and pattern[i + 1 : i + 2] == "+":
+            return "possessive quantifiers are not RE2"
+        if ch in "^$" and pattern[i + 1 : i + 2] in ("*", "+", "?", "{"):
+            out.append(f"(?:{ch})")  # RE2 repeats an assertion; Python calls it nothing to repeat
+            i += 1
+            continue
+        out.append(ch)
+        i += 1
     try:
-        re.compile(pattern)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            re.compile("".join(out))
     except re.error as exc:
         return str(exc)
     return None
@@ -187,6 +315,12 @@ def _unescape(body: str) -> str:
         out.append(ch)
         i += 1
     return "".join(out)
+
+
+def _instant(text: str) -> datetime:
+    """A range datetime as an aware instant; no zone is UTC."""
+    moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
 def _is_ip(text: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
@@ -249,6 +383,16 @@ class Parser:
         """The identifier-like word at the cursor (GROUP-BY and ORDER-BY are one word)."""
         self.ws()
         m = HYPHEN_WORD.match(self.text, self.pos) or IDENT.match(self.text, self.pos)
+        if not m:
+            return None
+        return m.group(0), m.start(), m.end()
+
+    def column_at(self) -> tuple[str, int, int] | None:
+        """A field name at the cursor, `-` included (`c-uri`); GROUP-BY and ORDER-BY stay keywords."""
+        self.ws()
+        if HYPHEN_WORD.match(self.text, self.pos):
+            return None
+        m = FIELD.match(self.text, self.pos)
         if not m:
             return None
         return m.group(0), m.start(), m.end()
@@ -328,11 +472,13 @@ class Parser:
         except ParseError as exc:
             self.diag("exabeam_parse_error", str(exc), exc.pos, exc.pos + 1)
         self.check_context_tables()
+        self.result.context_tables = list(self.context_tables)
         self.result.tokens.sort(key=lambda t: (t.start, t.end))
         return self.result
 
     def looks_advanced(self) -> bool:
-        """Advanced form: it opens with SELECT, WHERE, FROM, or FOREACH, or has a pipe or clause keyword outside strings and brackets."""
+        """Advanced form: it opens with SELECT, WHERE, FROM, or FOREACH, or has a pipe, GROUP-BY, ORDER-BY, a statement
+        `AS name`, or a trailing `LIMIT n` outside strings and brackets."""
         if self.keyword_at("SELECT", "WHERE", "FROM", "FOREACH"):
             return True
         depth = 0
@@ -352,8 +498,12 @@ class Parser:
                 depth -= 1
             elif depth == 0 and ch == "|":
                 return True
-            elif depth == 0 and (i == 0 or not (text[i - 1].isalnum() or text[i - 1] in "_.")):
-                m = HYPHEN_WORD.match(text, i) or re.match(r"(?i)limit\s+\d+\s*\Z", text[i:])
+            elif depth == 0 and (i == 0 or not (text[i - 1].isalnum() or text[i - 1] in "_.-")):
+                m = (
+                    HYPHEN_WORD.match(text, i)
+                    or re.match(r"(?i)limit\s+\d+\s*\Z", text[i:])
+                    or (i > 0 and STATEMENT_ALIAS.match(text, i))
+                )
                 if m:
                     return True
             i += 1
@@ -465,6 +615,8 @@ class Parser:
             after = self.text[fm.end() :].lstrip()
             if after[:2] in ("==", "!=", "<=", ">=") or after[:1] in (":", "=", "<", ">"):
                 return self.field_term(fm.group(0), fm.start(), fm.end())
+            if re.match(r"(?i)in\s*[\"']", after):
+                return self.context_term(fm.group(0), fm.start(), fm.end())
         w = self.word_at()
         if w:
             name, ws_, we = w
@@ -481,6 +633,8 @@ class Parser:
         if not m:
             raise ParseError(f"unexpected {ch!r}", self.pos)
         word = m.group(0)
+        if word.upper() in OPERATOR_WORDS:
+            raise ParseError(f"{word!r} is an operator, not a term: an operand is missing", m.start())
         if not FREE_TEXT_OK.match(word):
             self.diag(
                 "exabeam_free_text_special",
@@ -566,6 +720,13 @@ class Parser:
         if w and self.text[w[2] :].lstrip().startswith("("):
             self.call(w[0], w[1], w[2], filter_position=False)
             return
+        if field_name.lower() in TIME_FIELDS:
+            m = BARE.match(self.text, self.pos)
+            if m and m.group(0).lower() != "null":
+                self.diag("exabeam_time_exact", f"{field_name} takes a range, not an exact value", m.start(), m.end())
+                self.tok(m.start(), m.end(), "number" if NUMBER.match(m.group(0)) else "constant")
+                self.pos = m.end()
+                return
         self.scalar(field_name, comparison=False)
 
     def scalar(self, field_name: str, comparison: bool) -> None:
@@ -676,16 +837,17 @@ class Parser:
         return word, m.start(), m.end()
 
     def check_range(self, lo: str, hi: str, s: int, e: int, field_name: str) -> None:
-        kinds = []
+        time_field = field_name.lower() in TIME_FIELDS
+        kinds: list[tuple[str, object]] = []
         for b in (lo, hi):
             if b == "*":
                 kinds.append(("open", None))
+            elif time_field and EPOCH_MS.match(b):
+                kinds.append(("datetime", datetime.fromtimestamp(int(b) / 1000, timezone.utc)))
             elif NUMBER.match(b):
                 kinds.append(("number", float(b)))
             elif DATETIME.match(b):
-                kinds.append(("datetime", b))
-            elif re.fullmatch(r"\d{10,}", b):
-                kinds.append(("datetime", b))
+                kinds.append(("datetime", _instant(b)))
             elif _is_ip(b):
                 kinds.append(("ip", _is_ip(b)))
             else:
@@ -696,7 +858,7 @@ class Parser:
             return
         closed = [k for k in kinds if k[0] != "open"]
         if len({k for k, _ in closed}) > 1:
-            self.diag("exabeam_range", "both bounds are of one kind", s, e)
+            self.diag("exabeam_range", "the bounds are of different kinds: both numbers, IPv4 addresses, or datetimes", s, e)
             return
         if closed[0][0] == "ip":
             if any(v.version == 6 for _, v in closed):
@@ -809,8 +971,10 @@ class Parser:
         select_items: list[tuple[str, bool]] = []
         select_star = False
         group_by: list[str] = []
-        stop = ("GROUP-BY", "ORDER-BY", "LIMIT", "AS")
+        stop = ("SELECT", "FROM", "WHERE", "AS", "GROUP-BY", "ORDER-BY", "LIMIT", "FOREACH")
         first = True
+        if self.at_end() or self.peek() in ("|", "]"):
+            raise ParseError("an empty statement: a pipe joins two statements", self.pos)
         while not self.at_end() and self.peek() not in ("|", "]"):
             kw = self.keyword_at(*order)
             if kw is None:
@@ -855,8 +1019,9 @@ class Parser:
         if group_by:
             if select_star:
                 self.diag("exabeam_group_by_select_star", "GROUP-BY does not combine with SELECT *", 0, self.pos)
+            grouped = {g.lower() for g in group_by}
             for col, aggregated in select_items:
-                if not aggregated and col not in group_by:
+                if not aggregated and col.lower() not in grouped:
                     self.diag("exabeam_group_by_column", f"{col} is selected but neither grouped nor aggregated", 0, self.pos)
         new = self.result.tokens[fields_before:]
         info.fields = {self.text[t.start : t.end].lower() for t in new if t.capture in ("property", "type")}
@@ -870,7 +1035,7 @@ class Parser:
 
     def foreach(self) -> "Statement":
         self.take_keyword("FOREACH", clause=True)
-        w = self.word_at()
+        w = self.column_at()
         if not w:
             raise ParseError("FOREACH names a field", self.pos)
         self.tok(w[1], w[2], "property")
@@ -900,7 +1065,7 @@ class Parser:
                 self.pos += 1
                 star = True
             else:
-                w = self.word_at()
+                w = self.column_at()
                 if not w:
                     raise ParseError("expected a column", self.pos)
                 name, s, e = w
@@ -911,7 +1076,7 @@ class Parser:
                     self.tok(s, e, "property")
                     self.pos = e
                     items.append((name, False))
-            if self.take_keyword("AS"):
+            if self.take_keyword("AS", clause=True):
                 self.alias(capture="variable")
             if self.peek() == ",":
                 self.expect(",", "punctuation.delimiter")
@@ -935,7 +1100,7 @@ class Parser:
                 if self.peek() in ("\"", "'"):
                     pattern = self.string()
                 else:
-                    w = self.word_at()
+                    w = self.column_at()
                     if not w:
                         raise ParseError("expected a field or a pattern", self.pos)
                     self.tok(w[1], w[2], "property")
@@ -964,7 +1129,7 @@ class Parser:
             self.tok(self.pos, self.pos + 1, "operator")
             self.pos += 1
         else:
-            w = self.word_at()
+            w = self.column_at()
             if not w:
                 raise ParseError("an aggregation takes one field", self.pos)
             self.tok(w[1], w[2], "property")
@@ -988,7 +1153,7 @@ class Parser:
     def name_list(self, order_by: bool) -> list[str]:
         names: list[str] = []
         while True:
-            w = self.word_at()
+            w = self.column_at()
             if not w:
                 raise ParseError("expected a column", self.pos)
             self.tok(w[1], w[2], "property")
