@@ -1,6 +1,6 @@
 name: Password spraying from outside the network
 metadata:
-  uuid: 00000000-0000-4000-8003-000000000061
+  uuid: 00000000-0000-4000-8003-000000000071
   schema: rule::1.0
   version: 1
   created: "2026-01-01"

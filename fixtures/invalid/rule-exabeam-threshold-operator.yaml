@@ -2,7 +2,7 @@
 # Expected constraint code: exabeam_threshold_operator.
 name: Exabeam count compared with a list
 metadata:
-  uuid: 00000000-0000-4000-8003-000000000064
+  uuid: 00000000-0000-4000-8003-000000000074
   schema: rule::1.0
   version: 1
   created: "2026-01-01"

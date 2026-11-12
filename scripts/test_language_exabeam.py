@@ -2,7 +2,7 @@
 """Conformance tests for specs/languages/exabeam-1.0.md.
 
 The reference checker (exabeam_language.py) runs every conformance query, the spec's own
-examples, and the published Exabeam queries quoted in RFC 0017. The tests also tie the
+examples, and the published Exabeam queries quoted in RFC 0018. The tests also tie the
 spec's diagnostic and highlight tables to the checker, so neither can drift from the other.
 """
 
@@ -17,7 +17,7 @@ from exabeam_language import CAPTURES, ERRORS, WARNINGS, analyze
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "specs" / "languages" / "exabeam-1.0.md"
-RFC = ROOT / "rfcs" / "0017-exabeam-platform.md"
+RFC = ROOT / "rfcs" / "0018-exabeam-platform.md"
 LANG = ROOT / "fixtures" / "languages" / "exabeam"
 SECTIONS = ["Summary", "Requirements", "Definition", "Relationships", "Defaults & overrides", "Examples", "History"]
 CATALOGUE_CODES = {"exabeam_unknown_field", "exabeam_string_field_number"}
@@ -136,7 +136,7 @@ class ConformanceTests(unittest.TestCase):
                 self.assertEqual(analyze(query, "rule").codes, codes)
 
     def test_published_exabeam_queries_parse(self) -> None:
-        """The queries RFC 0017 quotes from Exabeam's own content are clean under their profile."""
+        """The queries RFC 0018 quotes from Exabeam's own content are clean under their profile."""
         text = _read(RFC)
         block = text.split("**Real content.**", 1)[1].split("```text\n", 1)[1].split("\n```", 1)[0]
         lines = block.splitlines()

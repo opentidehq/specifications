@@ -2,7 +2,7 @@
 # Expected constraint code: exabeam_advanced_in_rule.
 name: Exabeam rule with a Search query
 metadata:
-  uuid: 00000000-0000-4000-8003-000000000067
+  uuid: 00000000-0000-4000-8003-000000000077
   schema: rule::1.0
   version: 1
   created: "2026-01-01"

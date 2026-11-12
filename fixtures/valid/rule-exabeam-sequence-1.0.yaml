@@ -1,6 +1,6 @@
 name: Office document drops encoded PowerShell that calls out
 metadata:
-  uuid: 00000000-0000-4000-8003-000000000062
+  uuid: 00000000-0000-4000-8003-000000000072
   schema: rule::1.1
   version: 1
   created: "2026-01-01"

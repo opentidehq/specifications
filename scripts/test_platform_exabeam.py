@@ -312,7 +312,7 @@ class GoldenTests(unittest.TestCase):
     def test_derivations(self) -> None:
         threshold = _rule("rule-exabeam-threshold-1.0.yaml")
         self.assertEqual(exa_severity(threshold), "high")
-        self.assertIn("\n\nATT&CK: T1110.003\nopentide: 00000000-0000-4000-8003-000000000061", exa_description(threshold))
+        self.assertIn("\n\nATT&CK: T1110.003\nopentide: 00000000-0000-4000-8003-000000000071", exa_description(threshold))
         sequence = _rule("rule-exabeam-sequence-1.0.yaml")
         self.assertEqual(exa_severity(sequence), "critical")
         body = build_body(sequence, _tenant_setup())
@@ -334,18 +334,18 @@ class GoldenTests(unittest.TestCase):
 class ListingTests(unittest.TestCase):
     def test_platform_index(self) -> None:
         text = _read(INDEX)
-        self.assertIn("opentide ships eleven detection platform integrations.", text)
-        self.assertIn("| `exabeam` | `platform::exabeam::1.0` | [exabeam-1.0.md](exabeam-1.0.md) (draft) |", text)
-        self.assertIn("| `exabeam` | Exabeam New-Scale SIEM | yes* | yes‖ | Exabeam Query Language |", text)
+        self.assertIn("opentide ships twelve detection platform integrations.", text)
+        self.assertIn("| `exabeam` | `platform::exabeam::1.0` | [exabeam-1.0.md](exabeam-1.0.md) |", text)
+        self.assertIn("| `exabeam` | Exabeam New-Scale SIEM | yes* | yes‖‖ | Exabeam Query Language |", text)
 
     def test_spec_index_and_llms(self) -> None:
         specs = _read(ROOT / "SPECS.md")
         self.assertIn("[specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)", specs)
         self.assertIn("[specs/languages/exabeam-1.0.md](specs/languages/exabeam-1.0.md)", specs)
         llms = _read(ROOT / "llms.txt")
-        self.assertIn("specs/platforms/exabeam-1.0.md (schema_id: platform::exabeam::1.0; draft)", llms)
+        self.assertIn("specs/platforms/exabeam-1.0.md (schema_id: platform::exabeam::1.0)", llms)
         self.assertIn("specs/languages/exabeam-1.0.md", llms)
-        self.assertIn("[0017](0017-exabeam-platform.md)", _read(ROOT / "rfcs" / "README.md"))
+        self.assertIn("[0018](0018-exabeam-platform.md)", _read(ROOT / "rfcs" / "README.md"))
 
     def test_rule_specs_list_the_block_and_the_hunt_system(self) -> None:
         for name in ("rule-1.0.md", "rule-1.1.md"):

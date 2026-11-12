@@ -2,7 +2,7 @@
 # Expected constraint code: exabeam_duration.
 name: Exabeam delay below seven minutes
 metadata:
-  uuid: 00000000-0000-4000-8003-000000000066
+  uuid: 00000000-0000-4000-8003-000000000076
   schema: rule::1.0
   version: 1
   created: "2026-01-01"

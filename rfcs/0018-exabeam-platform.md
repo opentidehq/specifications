@@ -1,6 +1,6 @@
-# RFC 0017: Exabeam New-Scale SIEM and the Exabeam Query Language
+# RFC 0018: Exabeam New-Scale SIEM and the Exabeam Query Language
 
-- **RFC:** 0017
+- **RFC:** 0018
 - **Title:** Exabeam New-Scale SIEM and the Exabeam Query Language
 - **Author:** opentide maintainers
 - **Status:** draft
@@ -11,7 +11,7 @@
 
 ## Summary
 
-Add an eleventh detection platform, `exabeam` (display name **Exabeam New-Scale SIEM**, schema `platform::exabeam::1.0`), and a second language spec, the **Exabeam Query Language** (language id `exabeam`).
+Add a twelfth detection platform, `exabeam` (display name **Exabeam New-Scale SIEM**, schema `platform::exabeam::1.0`), and a second language spec, the **Exabeam Query Language** (language id `exabeam`).
 
 A `configurations.exabeam` block is one Exabeam **correlation rule**: one or more sequences, each a filter query and a condition (any match, or a threshold over a window), correlated within a common window when there are several. Deploy goes through the Correlation Rules API (`/correlation-rules/v2/rules`) with full-body `PUT` updates. Exabeam assigns each rule a UUID, kept in [deployment state](../specs/deployment-state.md).
 

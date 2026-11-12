@@ -3,7 +3,7 @@
   "path": "/correlation-rules/v2/rules/016dbc1d-a727-43df-a143-9546dcc81a5a",
   "body": {
     "name": "Password spraying from outside the network",
-    "description": "One external source address fails to log in as more than three different users within thirty minutes.\n\nATT&CK: T1110.003\nopentide: 00000000-0000-4000-8003-000000000061",
+    "description": "One external source address fails to log in as more than three different users within thirty minutes.\n\nATT&CK: T1110.003\nopentide: 00000000-0000-4000-8003-000000000071",
     "severity": "high",
     "enabled": false,
     "testMode": false,

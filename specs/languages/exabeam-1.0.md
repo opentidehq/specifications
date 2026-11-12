@@ -19,7 +19,7 @@ The language has two layers:
 
 A correlation rule's sequence holds a filter ([exabeam-1.0 platform](../platforms/exabeam-1.0.md)). A hunt search (`response.procedure.searches[]` with `system: exabeam`) may use both layers. This spec defines the language once, with one [profile](#profiles) for each use. It is the contract for the analysis engine (language-server), which reports the [diagnostics](#diagnostics) in `opentide validate` and in editors, and for the [highlighting](#highlighting) editors show.
 
-Exabeam publishes no grammar and no reference parser. The contract is Exabeam's Search guide and the correlation-rule API reference as fetched on 2026-11-11, checked against Exabeam's own published rules. Where the guides contradict each other, this spec picks one reading and says so. Research, sources, and the contradictions are in [RFC 0017](../../rfcs/0017-exabeam-platform.md).
+Exabeam publishes no grammar and no reference parser. The contract is Exabeam's Search guide and the correlation-rule API reference as fetched on 2026-11-11, checked against Exabeam's own published rules. Where the guides contradict each other, this spec picks one reading and says so. Research, sources, and the contradictions are in [RFC 0018](../../rfcs/0018-exabeam-platform.md).
 
 ## Requirements
 
@@ -228,7 +228,7 @@ Tenant limits are not language checks: a piped query's 7-day range and 1,000-a-m
 - [rule-1.0](../objects/rule-1.0.md) and [rule-1.1](../objects/rule-1.1.md): `searches[]` with `system: exabeam` use the `search` profile
 - [validation](../validation.md#language-diagnostics): how language errors and warnings are reported
 - [elastic-1.0](../platforms/elastic-1.0.md): `eql` there is Elastic EQL, a different language
-- [RFC 0017](../../rfcs/0017-exabeam-platform.md): research, sources, and the readings this spec chose
+- [RFC 0018](../../rfcs/0018-exabeam-platform.md): research, sources, and the readings this spec chose
 
 ## Defaults & overrides
 
@@ -280,4 +280,4 @@ Fixtures: [fixtures/languages/exabeam/valid/](../../fixtures/languages/exabeam/v
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-11-11 | Draft ([RFC 0017](../../rfcs/0017-exabeam-platform.md)): language id `exabeam`, the filter and advanced grammars, `rule` and `search` profiles, CIM field catalogue, highlighting on the existing HighlightSpec, stable `exabeam_*` diagnostics. |
+| 1.0 | 2026-11-11 | Draft ([RFC 0018](../../rfcs/0018-exabeam-platform.md)): language id `exabeam`, the filter and advanced grammars, `rule` and `search` profiles, CIM field catalogue, highlighting on the existing HighlightSpec, stable `exabeam_*` diagnostics. |

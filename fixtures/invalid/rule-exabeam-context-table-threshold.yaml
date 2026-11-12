@@ -2,7 +2,7 @@
 # Expected constraint code: exabeam_context_table_trigger.
 name: Exabeam context table with a threshold
 metadata:
-  uuid: 00000000-0000-4000-8003-000000000065
+  uuid: 00000000-0000-4000-8003-000000000075
   schema: rule::1.0
   version: 1
   created: "2026-01-01"

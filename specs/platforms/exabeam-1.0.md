@@ -16,7 +16,7 @@ A correlation rule is one or more **sequences**. Each sequence is a filter in th
 
 Exabeam assigns every rule a UUID at create time. That id is kept in [deployment state](../deployment-state.md).
 
-Shared fields are defined in [platforms](index.md#shared-platform-block). Research, sources, and alternatives are in [RFC 0017](../../rfcs/0017-exabeam-platform.md). This spec is a **draft**: it follows Exabeam's published API reference, and the [RFC's unresolved questions](../../rfcs/0017-exabeam-platform.md#unresolved-questions) need a tenant to settle before it becomes normative.
+Shared fields are defined in [platforms](index.md#shared-platform-block). Research, sources, and alternatives are in [RFC 0018](../../rfcs/0018-exabeam-platform.md). This spec is a **draft**: it follows Exabeam's published API reference, and the [RFC's unresolved questions](../../rfcs/0018-exabeam-platform.md#unresolved-questions) need a tenant to settle before it becomes normative.
 
 ## Requirements
 
@@ -95,7 +95,7 @@ An absence rule is a threshold with `less_than` (`count less_than 1 within 24h`)
 | `within` | duration | yes | — | The window every sequence's condition must be met in: whole `m`, `h`, or `d` |
 | `group_by` | list[string] | optional | `[]` | Up to three fields every sequence shares (the API's limit; the console allows more) |
 
-The sequences are evaluated in any order. The API's create and update calls have no ordering setting ([RFC 0017](../../rfcs/0017-exabeam-platform.md#unresolved-questions)).
+The sequences are evaluated in any order. The API's create and update calls have no ordering setting ([RFC 0018](../../rfcs/0018-exabeam-platform.md#unresolved-questions)).
 
 ### `suppression` (ExabeamSuppression)
 
@@ -316,7 +316,7 @@ Failure handling:
 - [deployment.md](../deployment.md) — status strategies
 - [validation.md](../validation.md) — advisories, language diagnostics, query validation
 - [rule-1.0.md](../objects/rule-1.0.md), [rule-1.1.md](../objects/rule-1.1.md) — `configurations.exabeam`, `searches[]` with `system: exabeam`
-- [RFC 0017](../../rfcs/0017-exabeam-platform.md) — research and design
+- [RFC 0018](../../rfcs/0018-exabeam-platform.md) — research and design
 
 ## Defaults & overrides
 
@@ -395,4 +395,4 @@ Invalid fixtures: [rule-exabeam-correlation-single.yaml](../../fixtures/invalid/
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-11-11 | Draft ([RFC 0017](../../rfcs/0017-exabeam-platform.md)): one correlation rule per block; sequences with any-match or threshold conditions, correlation, suppression, delay, schedule, outcomes; derived name, description (with ATT&CK), and severity; whole-body `PUT`; the rule UUID in deployment state; `--live` filter checks and hunts through Search. |
+| 1.0 | 2026-11-11 | Draft ([RFC 0018](../../rfcs/0018-exabeam-platform.md)): one correlation rule per block; sequences with any-match or threshold conditions, correlation, suppression, delay, schedule, outcomes; derived name, description (with ATT&CK), and severity; whole-body `PUT`; the rule UUID in deployment state; `--live` filter checks and hunts through Search. |

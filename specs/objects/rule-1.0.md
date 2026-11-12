@@ -111,7 +111,8 @@ Typed optional blocks keyed by platform identifier:
 | `elastic` | ElasticConfig | `platform::elastic::1.0` | [elastic-1.0.md](../platforms/elastic-1.0.md) |
 | `sysdig` | SysdigConfig | `platform::sysdig::1.0` | [sysdig-1.0.md](../platforms/sysdig-1.0.md) |
 | `bitdefender` | BitdefenderConfig | `platform::bitdefender::1.0` | [bitdefender-1.0.md](../platforms/bitdefender-1.0.md) |
-| `exabeam` | ExabeamConfig | `platform::exabeam::1.0` | [exabeam-1.0.md](../platforms/exabeam-1.0.md) (draft) |
+| `graylog` | GraylogConfig | `platform::graylog::1.0` | [graylog-1.0.md](../platforms/graylog-1.0.md) |
+| `exabeam` | ExabeamConfig | `platform::exabeam::1.0` | [exabeam-1.0.md](../platforms/exabeam-1.0.md) |
 
 Shared block fields and the capability matrix are in [platforms/index.md](../platforms/index.md). Each link above is the field contract for that block.
 
@@ -195,7 +196,8 @@ configurations:
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-11-11 | `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, draft, [exabeam-1.0.md](../platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0017](../../rfcs/0017-exabeam-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
+| 1.0 | 2026-11-12 | `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [exabeam-1.0.md](../platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](../../rfcs/0018-exabeam-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
+| 1.0 | 2026-11-11 | `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [graylog-1.0.md](../platforms/graylog-1.0.md)) is added ([RFC 0017](../../rfcs/0017-graylog-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-11-10 | `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [bitdefender-1.0.md](../platforms/bitdefender-1.0.md)) is added ([RFC 0016](../../rfcs/0016-bitdefender-gravityzone-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-11-02 | `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [sysdig-1.0.md](../platforms/sysdig-1.0.md)) is added ([RFC 0014](../../rfcs/0014-sysdig-falco-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-10-23 | Optional `response.procedure.searches[].language`: `kuery`, `lucene`, `eql`, or `esql` with `system: elastic`, and not set with any other system. Omitted means unknown, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |

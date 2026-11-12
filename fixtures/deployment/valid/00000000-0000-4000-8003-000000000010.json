@@ -14,6 +14,9 @@
     "exabeam": {
       "exabeam-eu": "016dbc1d-a727-43df-a143-9546dcc81a5a"
     },
+    "graylog": {
+      "graylog-prod": "65f1c0de2a3b4c5d6e7f8091"
+    },
     "sentinel_one": {
       "s1-prod": "4242"
     },

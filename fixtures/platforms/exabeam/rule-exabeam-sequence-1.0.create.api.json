@@ -3,7 +3,7 @@
   "path": "/correlation-rules/v2/rules",
   "body": {
     "name": "Office document drops encoded PowerShell that calls out",
-    "description": "An Office application starts PowerShell with an encoded command, and the same host then opens a network connection from PowerShell within fifteen minutes.\n\nATT&CK: T1059.001, T1566.001\nopentide: 00000000-0000-4000-8003-000000000062",
+    "description": "An Office application starts PowerShell with an encoded command, and the same host then opens a network connection from PowerShell within fifteen minutes.\n\nATT&CK: T1059.001, T1566.001\nopentide: 00000000-0000-4000-8003-000000000072",
     "severity": "critical",
     "enabled": true,
     "testMode": false,

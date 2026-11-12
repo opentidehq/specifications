@@ -956,6 +956,277 @@ def validate_bitdefender_block(block: dict[str, Any]) -> list[CheckError]:
     return errors
 
 
+# --- platform::graylog::1.0 (specs/platforms/graylog-1.0.md) -------------------------------------
+
+GRAYLOG_FIELD = re.compile(r"[A-Za-z0-9_.@-]+")
+GRAYLOG_LIST_FIELDS = ("tags", "streams", "stream_categories", "event_key", "notifications")
+GRAYLOG_PRIORITIES = ("Informational", "Low", "Medium", "High", "Critical")
+GRAYLOG_FUNCTIONS = frozenset(
+    {"avg", "card", "count", "latest", "max", "min", "percentage", "percentile", "stddev", "sum", "sumofsquares", "variance"}
+)
+_DURATION_SHORTHAND = re.compile(r"(?:(\d+)d)?(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?")
+_DURATION_ISO = re.compile(r"P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?")
+_CONDITION_TOKEN = re.compile(r"\s*(?:(>=|<=|==|>|<|\(|\)|,)|([A-Za-z0-9_.@-]+))")
+
+
+def duration_seconds(value: Any) -> int | None:
+    """Seconds in a duration of specs/platforms/elastic-1.0.md#durations, or None when it is not one."""
+    if not isinstance(value, str) or not value:
+        return None
+    match = _DURATION_SHORTHAND.fullmatch(value)
+    if match is None or not any(match.groups()):
+        match = _DURATION_ISO.fullmatch(value)
+        if match is None or not any(match.groups()) or value.endswith("T"):
+            return None
+    days, hours, minutes, seconds = (int(part or 0) for part in match.groups())
+    return ((days * 24 + hours) * 60 + minutes) * 60 + seconds
+
+
+def graylog_list(value: Any) -> list[Any] | None:
+    """A string-or-list field as a list (specs/platforms/graylog-1.0.md#list-fields); None when absent."""
+    if value is None:
+        return None
+    return [value] if isinstance(value, str) else value
+
+
+def _graylog_list_ok(value: Any) -> bool:
+    items = graylog_list(value)
+    if items is None:
+        return True
+    if not isinstance(items, list) or not all(isinstance(item, str) and item.strip() for item in items):
+        return False
+    return len(set(items)) == len(items)
+
+
+class GraylogConditionError(ValueError):
+    """The aggregation condition does not parse, or a call has the wrong arguments."""
+
+
+def parse_graylog_condition(text: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Parse specs/platforms/graylog-1.0.md#condition-grammar into (condition tree, series).
+
+    Series are in order of first appearance, one per distinct call. Raises GraylogConditionError.
+    """
+    tokens: list[str] = []
+    position = 0
+    while position < len(text):
+        if text[position:].strip() == "":
+            break
+        match = _CONDITION_TOKEN.match(text, position)
+        if match is None or match.end() == position:
+            raise GraylogConditionError(f"unexpected {text[position:].strip()[:12]!r}")
+        tokens.append(match.group(1) or match.group(2))
+        position = match.end()
+    series: list[dict[str, Any]] = []
+    index = 0
+
+    def peek() -> str | None:
+        return tokens[index] if index < len(tokens) else None
+
+    def take(expected: str | None = None) -> str:
+        nonlocal index
+        token = peek()
+        if token is None or (expected is not None and token != expected):
+            raise GraylogConditionError(f"expected {expected or 'more'}, got {token!r}")
+        index += 1
+        return token
+
+    def number(token: str) -> int | float:
+        if not re.fullmatch(r"-?\d+(?:\.\d+)?", token):
+            raise GraylogConditionError(f"{token!r} is not a number")
+        return float(token) if "." in token else int(token)
+
+    def call() -> str:
+        function = take()
+        if function not in GRAYLOG_FUNCTIONS:
+            raise GraylogConditionError(f"{function!r} is not an aggregation function")
+        take("(")
+        args: list[str] = []
+        while peek() != ")":
+            args.append(take())
+            if peek() == ",":
+                take(",")
+        take(")")
+        field_name = args[0] if args else None
+        if field_name is not None and not GRAYLOG_FIELD.fullmatch(field_name):
+            raise GraylogConditionError(f"{field_name!r} is not a field name")
+        if function == "count" and len(args) > 1:
+            raise GraylogConditionError("count takes no field or one field")
+        if function == "percentile":
+            if len(args) != 2:
+                raise GraylogConditionError("percentile takes a field and a percentile")
+            p = number(args[1])
+            if not 0 < p <= 100:
+                raise GraylogConditionError("percentile is greater than 0 and at most 100")
+        elif function != "count" and len(args) != 1:
+            raise GraylogConditionError(f"{function} takes one field")
+        parts = [function, *([field_name] if field_name else [""])] + ([args[1]] if function == "percentile" else [])
+        series_id = "-".join(parts)
+        if not any(entry["id"] == series_id for entry in series):
+            entry: dict[str, Any] = {"id": series_id, "type": function}
+            if field_name:
+                entry["field"] = field_name
+            if function == "percentile":
+                entry["percentile"] = float(number(args[1]))
+            series.append(entry)
+        return series_id
+
+    def primary() -> dict[str, Any]:
+        if peek() == "(":
+            take("(")
+            node = or_expr()
+            take(")")
+            return node
+        ref = call()
+        op = take()
+        if op not in (">=", ">", "<=", "<", "=="):
+            raise GraylogConditionError(f"{op!r} is not a comparison")
+        return {"expr": op, "left": {"expr": "number-ref", "ref": ref}, "right": {"expr": "number", "value": number(take())}}
+
+    def not_expr() -> dict[str, Any]:
+        if peek() == "NOT":
+            take("NOT")
+            return {"expr": "!", "left": not_expr()}
+        return primary()
+
+    def and_expr() -> dict[str, Any]:
+        node = not_expr()
+        while peek() == "AND":
+            take("AND")
+            node = {"expr": "&&", "left": node, "right": not_expr()}
+        return node
+
+    def or_expr() -> dict[str, Any]:
+        node = and_expr()
+        while peek() == "OR":
+            take("OR")
+            node = {"expr": "||", "left": node, "right": and_expr()}
+        return node
+
+    if not tokens:
+        raise GraylogConditionError("the condition is empty")
+    tree = or_expr()
+    if index != len(tokens):
+        raise GraylogConditionError(f"unexpected {tokens[index]!r}")
+    return tree, series
+
+
+def graylog_event_field_kind(value: Any) -> str | None:
+    """`field`, `template`, or `lookup` for a valid event field value; None otherwise."""
+    if isinstance(value, str):
+        if "${" in value:
+            return "template"
+        return "field" if GRAYLOG_FIELD.fullmatch(value) else None
+    if isinstance(value, dict) and set(value) == {"template"}:
+        return "template" if isinstance(value["template"], str) and value["template"].strip() else None
+    if isinstance(value, dict) and set(value) == {"lookup"}:
+        lookup = value["lookup"]
+        if isinstance(lookup, dict) and set(lookup) == {"table", "key_field"}:
+            if all(isinstance(lookup[key], str) and lookup[key].strip() for key in ("table", "key_field")):
+                return "lookup"
+    return None
+
+
+def _graylog_cron_ok(cron: Any) -> bool:
+    """6 or 7 Quartz fields. The full Quartz parse is left to opentide and the engine."""
+    return isinstance(cron, str) and len(cron.split()) in (6, 7)
+
+
+def validate_graylog_block(block: dict[str, Any]) -> list[CheckError]:
+    """The platform::graylog::1.0 constraint codes that need no query parser.
+
+    specs/platforms/graylog-1.0.md#constraints. `graylog_query_syntax`, `graylog_leading_wildcard`, and
+    `graylog_regex_unsupported` need the Graylog dialect and are left to the analysis engine. Cron
+    expressions are checked for their field count only.
+    """
+    errors: list[CheckError] = []
+    base = "configurations.graylog"
+    query = block.get("query")
+    if not isinstance(query, str) or not query.strip():
+        errors.append(CheckError("graylog_query_blank", "query is a non-blank string", f"{base}.query"))
+    for key in GRAYLOG_LIST_FIELDS:
+        if not _graylog_list_ok(block.get(key)):
+            errors.append(CheckError("graylog_list_shape", f"{key} is a string or a list of distinct non-blank strings", f"{base}.{key}"))
+    schedule = block.get("schedule")
+    if schedule is not None:
+        errors.extend(_graylog_schedule(schedule, f"{base}.schedule"))
+    aggregation = block.get("aggregation")
+    limit = block.get("event_limit")
+    if limit is not None and (
+        isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000 or aggregation is not None
+    ):
+        errors.append(CheckError("graylog_event_limit", "event_limit is 1-1000, on a filter only", f"{base}.event_limit"))
+    if aggregation is not None:
+        errors.extend(_graylog_aggregation(aggregation, f"{base}.aggregation"))
+    fields = block.get("event_fields")
+    names: set[str] = set()
+    if fields is not None:
+        if not isinstance(fields, dict):
+            errors.append(CheckError("graylog_event_field", "event_fields is a map", f"{base}.event_fields"))
+        else:
+            for name, value in fields.items():
+                path = f"{base}.event_fields.{name}"
+                if not isinstance(name, str) or not GRAYLOG_FIELD.fullmatch(name):
+                    errors.append(CheckError("graylog_event_field", f"{name!r} is not a field name", path))
+                elif graylog_event_field_kind(value) is None:
+                    errors.append(CheckError("graylog_event_field", "a field name, a ${...} template, {template}, or {lookup}", path))
+                else:
+                    names.add(name)
+    key = graylog_list(block.get("event_key"))
+    if isinstance(key, list) and _graylog_list_ok(key):
+        missing = [item for item in key if item not in names]
+        if missing:
+            errors.append(CheckError("graylog_event_key", f"not event fields: {', '.join(missing)}", f"{base}.event_key"))
+    priority = block.get("priority")
+    if priority is not None and priority not in GRAYLOG_PRIORITIES:
+        errors.append(CheckError("graylog_priority", f"{priority!r} is not one of {', '.join(GRAYLOG_PRIORITIES)}", f"{base}.priority"))
+    return errors
+
+
+def _graylog_schedule(schedule: Any, path: str) -> list[CheckError]:
+    if not isinstance(schedule, dict):
+        return [CheckError("graylog_schedule", "schedule is a map", path)]
+    errors: list[CheckError] = []
+    every, cron = schedule.get("every"), schedule.get("cron")
+    if every is not None and cron is not None:
+        errors.append(CheckError("graylog_schedule", "every and cron are exclusive", path))
+    for key in ("every", "window"):
+        if schedule.get(key) is not None and not duration_seconds(schedule[key]):
+            errors.append(CheckError("graylog_schedule", f"{key} is a duration greater than zero", f"{path}.{key}"))
+    if cron is not None:
+        if not _graylog_cron_ok(cron):
+            errors.append(CheckError("graylog_schedule", "cron is a Quartz expression of 6 or 7 fields", f"{path}.cron"))
+        if schedule.get("window") is None:
+            errors.append(CheckError("graylog_schedule", "window is required with cron", f"{path}.window"))
+    timezone = schedule.get("timezone")
+    if timezone is not None:
+        try:
+            from zoneinfo import ZoneInfo
+
+            ZoneInfo(timezone)
+        except Exception:  # noqa: BLE001 - any failure means not an IANA zone name
+            errors.append(CheckError("graylog_schedule", f"{timezone!r} is not an IANA time zone", f"{path}.timezone"))
+    return errors
+
+
+def _graylog_aggregation(aggregation: Any, path: str) -> list[CheckError]:
+    if not isinstance(aggregation, dict) or not isinstance(aggregation.get("condition"), str):
+        return [CheckError("graylog_aggregation", "aggregation needs a condition", path)]
+    errors: list[CheckError] = []
+    group_by = aggregation.get("group_by")
+    if not _graylog_list_ok(group_by):
+        errors.append(CheckError("graylog_list_shape", "group_by is a string or a list of distinct non-blank strings", f"{path}.group_by"))
+    else:
+        bad = [item for item in graylog_list(group_by) or [] if not GRAYLOG_FIELD.fullmatch(item)]
+        if bad:
+            errors.append(CheckError("graylog_field_name", f"not field names: {', '.join(bad)}", f"{path}.group_by"))
+    try:
+        parse_graylog_condition(aggregation["condition"])
+    except GraylogConditionError as exc:
+        errors.append(CheckError("graylog_aggregation", str(exc), f"{path}.condition"))
+    return errors
+
+
 EXABEAM_BLOCK_KEYS = frozenset(
     {
         "enabled", "name", "schema", "status", "flags", "tenants", "contributors",
@@ -1258,6 +1529,8 @@ def validate_rule(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[CheckEr
         errors.extend(validate_harfanglab_block(configurations["harfanglab"]))
     if isinstance(configurations, dict) and isinstance(configurations.get("bitdefender"), dict):
         errors.extend(validate_bitdefender_block(configurations["bitdefender"]))
+    if isinstance(configurations, dict) and isinstance(configurations.get("graylog"), dict):
+        errors.extend(validate_graylog_block(configurations["graylog"]))
     if isinstance(configurations, dict) and isinstance(configurations.get("exabeam"), dict):
         errors.extend(validate_exabeam_block(configurations["exabeam"], doc.get("name")))
     errors.extend(validate_searches(doc))
@@ -1332,6 +1605,10 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "rule-bitdefender-criterion-field.yaml": "bitdefender_criterion_field",
     "rule-bitdefender-exclusion.yaml": "bitdefender_rule_kind",
     "rule-bitdefender-kill-on-yara.yaml": "bitdefender_action_scope",
+    "rule-graylog-condition.yaml": "graylog_aggregation",
+    "rule-graylog-event-field.yaml": "graylog_event_field",
+    "rule-graylog-event-key.yaml": "graylog_event_key",
+    "rule-graylog-schedule.yaml": "graylog_schedule",
     "rule-exabeam-correlation-single.yaml": "exabeam_correlation",
     "rule-exabeam-threshold-operator.yaml": "exabeam_threshold_operator",
     "rule-exabeam-context-table-threshold.yaml": "exabeam_context_table_trigger",

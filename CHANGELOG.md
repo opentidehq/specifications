@@ -51,7 +51,8 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
-- `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, draft, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0017](rfcs/0017-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.1`.
+- `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](rfcs/0018-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.1`.
+- `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md)) is added ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.1`. New fixtures `fixtures/valid/rule-1.1-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
@@ -64,7 +65,8 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.0
 
-- `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, draft, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0017](rfcs/0017-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.0`.
+- `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](rfcs/0018-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.0`.
+- `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.bitdefender` (`BitdefenderConfig`, `platform::bitdefender::1.0`, [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md)) is added ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.sysdig` (`SysdigConfig`, `platform::sysdig::1.0`, [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md)) is added ([RFC 0014](rfcs/0014-sysdig-falco-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - Optional `response.procedure.searches[].language`, so an Elastic hunt can say which language its `query` is in: `kuery`, `lucene`, `eql`, or `esql`, the names elastic-1.0 uses. It is set only with `system: elastic`; every other system implies its language. Omitted means unknown and not analysed, as before ([specifications#58](https://github.com/opentidehq/specifications/issues/58)). Additive; `schema_id` stays `rule::1.0`. New fixtures `fixtures/valid/rule-1.0-search-language.yaml` (an ES|QL hunt) and `fixtures/invalid/rule-search-language.yaml`.
@@ -139,9 +141,13 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
 
+## deployment-state 1.6
+
+- `exabeam` is state-backed: the Exabeam correlation rule id, a lower-case canonical UUID, under `platforms.exabeam.<tenant>` ([RFC 0018](rfcs/0018-exabeam-platform.md)). The shard JSON Schema gains `$defs/uuidTenants`; schema id unchanged. New invalid fixtures `exabeam-bad-id.json` and `exabeam-uppercase-id.json`.
+
 ## deployment-state 1.5
 
-- `exabeam` is state-backed: the Exabeam correlation rule id, a lower-case canonical UUID, under `platforms.exabeam.<tenant>` ([RFC 0017](rfcs/0017-exabeam-platform.md)). The shard JSON Schema gains `$defs/uuidTenants`; schema id unchanged. New invalid fixtures `exabeam-bad-id.json` and `exabeam-uppercase-id.json`.
+- `graylog` is state-backed: the Graylog event definition id, 24 lower-case hex digits, under `platforms.graylog.<tenant>` ([RFC 0017](rfcs/0017-graylog-platform.md)). The shard JSON Schema maps `graylog` to `$defs/objectIdTenants`; schema id unchanged. New invalid fixture `graylog-bad-id.json`.
 
 ## deployment-state 1.4
 
@@ -175,9 +181,13 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
 
+## platforms 1.9
+
+- Exabeam New-Scale SIEM joins the matrix as the twelfth platform ([specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md), [RFC 0018](rfcs/0018-exabeam-platform.md)): correlation rules through the Correlation Rules API; in the `--live` allowlist for each sequence filter, through Exabeam Search; the rule UUID lives in deployment state.
+
 ## platforms 1.8
 
-- Exabeam New-Scale SIEM joins the matrix as the eleventh platform, in draft ([specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md), [RFC 0017](rfcs/0017-exabeam-platform.md)): correlation rules through the Correlation Rules API; `--live` checks each sequence filter through Exabeam Search; the rule UUID lives in deployment state.
+- Graylog joins the matrix as the eleventh platform ([specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md), [RFC 0017](rfcs/0017-graylog-platform.md)): native event definitions on Graylog 6.3 to 7.2. It is in the `--live` allowlist through `POST /api/search/validate`, and its event definition id lives in deployment state.
 
 ## platforms 1.7
 
@@ -330,6 +340,18 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - First language spec, [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) ([RFC 0015](rfcs/0015-yara-language.md)): `YaraSignature`, the libyara 4.5 dialect with YARA-X as warnings, stable `yara_*` diagnostics, and the `bitdefender` and `harfanglab` profiles. Answers the YARA questions of [specifications#68](https://github.com/opentidehq/specifications/issues/68).
 
+## platform-exabeam 1.0
+
+- Initial field contract ([RFC 0018](rfcs/0018-exabeam-platform.md)): sequences with any-match or threshold conditions, correlation, suppression, delay, schedule, and outcomes; derived name, description (with ATT&CK), and severity; whole-body `PUT`; the rule UUID in deployment state; `--live` filter checks and hunts through Search. Fixtures, a fixture tenant, and request goldens under `fixtures/platforms/exabeam/`.
+
+## language-exabeam 1.0
+
+- First language spec for a SIEM search language, [specs/languages/exabeam-1.0.md](specs/languages/exabeam-1.0.md) ([RFC 0018](rfcs/0018-exabeam-platform.md)): the Exabeam Query Language (language id `exabeam`, never `eql`, which is Elastic EQL), its filter and advanced grammars, `rule` and `search` profiles, the CIM field catalogue, highlighting on the existing HighlightSpec captures, and stable `exabeam_*` diagnostics. Conformance queries and highlight goldens under `fixtures/languages/exabeam/`, checked by `scripts/exabeam_language.py`.
+
+## platform-graylog 1.0
+
+- Initial field contract ([RFC 0017](rfcs/0017-graylog-platform.md)): one `aggregation-v1` event definition per block. The query is in Graylog's search syntax, with an optional aggregation (`group_by` and a condition grammar compiled to Graylog's series and condition tree). Also streams, schedule, event fields (a bare field name, a template, `{template}`, or `{lookup}`), notifications, summary, and remediation. String-or-list fields. Graylog 6.3, 7.0, 7.1, and 7.2, with each request built for the detected version; the event definition id in deployment state; `--live` through `/api/search/validate`. Fixtures, a fixture tenant, and per-version request goldens under `fixtures/platforms/graylog/`.
+
 ## platform-bitdefender 1.4
 
 - `targets`, block and tenant default: exactly one of `endpoint_tags` and `companies` when present, a non-empty list with no blank alias (`bitdefender_targets_shape`). A tenant `targets` that breaks it fails configuration load and never means the whole company. Schema id unchanged.
@@ -349,14 +371,6 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## platform-bitdefender 1.0
 
 - Initial field contract ([RFC 0016](rfcs/0016-bitdefender-gravityzone-platform.md)): `detection` (GravityZone Basic criteria) and `yara` (`YaraSignature` plus `on_access`) kinds; severity, tags, targets, and automatic actions; derived name, description, severity, and tags; whole-payload updates; the GravityZone id in deployment state; no exclusion rules. Fixtures, a fixture tenant, and JSON-RPC goldens under `fixtures/platforms/bitdefender/`.
-
-## platform-exabeam 1.0
-
-- Draft field contract ([RFC 0017](rfcs/0017-exabeam-platform.md)): sequences with any-match or threshold conditions, correlation, suppression, delay, schedule, and outcomes; derived name, description (with ATT&CK), and severity; whole-body `PUT`; the rule UUID in deployment state; `--live` filter checks and hunts through Search. Fixtures, a fixture tenant, and request goldens under `fixtures/platforms/exabeam/`.
-
-## language-exabeam 1.0
-
-- Draft language spec, [specs/languages/exabeam-1.0.md](specs/languages/exabeam-1.0.md) ([RFC 0017](rfcs/0017-exabeam-platform.md)): the Exabeam Query Language (language id `exabeam`, never `eql`), its filter and advanced grammars, `rule` and `search` profiles, the CIM field catalogue, highlighting on the existing HighlightSpec captures, and stable `exabeam_*` diagnostics. Conformance queries and highlight goldens under `fixtures/languages/exabeam/`, checked by `scripts/exabeam_language.py`.
 
 ## sharing 1.3
 
@@ -384,9 +398,13 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
 
+## validation 1.11
+
+- `exabeam` joins the `--live` allowlist for its filters, through Exabeam Search, and is checked offline against the Exabeam Query Language. Advisories `exabeam_outcome_silent`, `exabeam_correlation_window`, `exabeam_name_duplicate`; the language's diagnostics. The fixture checker applies the Exabeam constraint codes ([RFC 0018](rfcs/0018-exabeam-platform.md)).
+
 ## validation 1.10
 
-- `exabeam` (draft) joins the `--live` allowlist for its filters, through Exabeam Search, and is checked offline against the Exabeam Query Language. Advisories `exabeam_outcome_silent`, `exabeam_correlation_window`, `exabeam_name_duplicate`; the language's diagnostics. The fixture checker applies the Exabeam constraint codes ([RFC 0017](rfcs/0017-exabeam-platform.md)).
+- `graylog` is in the `--live` allowlist through `POST /api/search/validate`, and Graylog queries (Lucene, Graylog dialect) are checked offline ([RFC 0017](rfcs/0017-graylog-platform.md)). Advisories `graylog_overlapping_window`, `graylog_all_streams`, and `graylog_title_duplicate`; Graylog dialect codes `graylog_leading_wildcard`, `graylog_regex_unsupported`, `graylog_regex_operator`, `graylog_regex_quote`, `graylog_double_backslash`, and `graylog_analyzed_field`. The fixture checker applies nine Graylog constraint codes; four new invalid fixtures.
 
 ## validation 1.9
 
