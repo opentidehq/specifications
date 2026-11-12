@@ -38,7 +38,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Bitdefender GravityZone platform | 1.4 | `platform::bitdefender::1.0` | normative | [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md) |
 | Graylog platform | 1.1 | `platform::graylog::1.0` | normative | [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md) |
 | Exabeam New-Scale SIEM platform | 1.0 | `platform::exabeam::1.0` | normative | [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md) |
-| Google Security Operations platform | 1.2 | `platform::google_secops::1.0` | normative | [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md) |
+| Google Security Operations platform | 1.3 | `platform::google_secops::1.0` | normative | [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md) |
 | YARA language | 1.5 | — | normative | [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) |
 | Exabeam Query Language | 1.0 | — | normative | [specs/languages/exabeam-1.0.md](specs/languages/exabeam-1.0.md) |
 | YARA-L language | 1.1 | — | normative | [specs/languages/yara-l-1.0.md](specs/languages/yara-l-1.0.md) |

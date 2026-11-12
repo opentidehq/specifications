@@ -326,6 +326,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial field contract for `platform::sysdig::1.0` ([RFC 0014](rfcs/0014-sysdig-falco-platform.md), [specifications#8](https://github.com/opentidehq/specifications/issues/8)): a Falco condition with exceptions and private macros and lists, expanded at deploy; or a tuning of an existing rule (`append_to_rule`). Derived name, `desc`, `priority`, tags, and output. Deployed through the Sysdig Secure API only. The Falco language, exception rules, and list expansion follow libsinsp and Falco's rule loader exactly. Nine constraint codes and one advisory, `sysdig_list_self_reference`; list definition order follows Falco (a list may name a later list). Fixtures under `fixtures/platforms/sysdig/` (the API bodies) and `fixtures/valid/rule-sysdig-*.yaml`.
 
+## platform-google-secops 1.3
+
+- A derived rule name that is a YARA-L keyword gets the prefix `r_` (a rule named `Any` is `r_any`).
+
 ## platform-google-secops 1.2
 
 - Conformance review against Google's API reference and detection pages. `DISABLEMENT` disables a rule even when its verify or text update fails. A create is never resent after a 5xx (`google_secops_create_unconfirmed`); 429 backs off with `Retry-After`, then `RetryInfo`, then 5, 15, 60 seconds. Credentials are applied with their quota project; a token failure stops the tenant. No `runFrequency` is sent unless the block names one (Google cannot revert a rule moved off a legacy schedule). The schedule is compared as Google stores it, and cleared when removed. An archived rule is unarchived before its text is updated. The rule `scope` is compared and updated on its own. A refused delete falls back to archive on any 4xx but 401, 403, 404, 429. New warnings `google_secops_rule_execution_limited` and `google_secops_rule_compilation_failed`. A Not managed list, the regional `rep` endpoint, and corrected reasons for not resending text and for the `$risk_score` default. Schema id unchanged.
