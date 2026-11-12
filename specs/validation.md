@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.11"
+version: "1.12"
 schema_id: null
 status: normative
 supersedes: null
@@ -93,19 +93,21 @@ A platform spec MAY list advisories: conditions that validation SHOULD report as
 | `graylog_overlapping_window` | warning | Graylog: a filter's `schedule.window` is longer than `schedule.every`, so each message alerts once per overlapping run |
 | `graylog_all_streams` | warning | Graylog: no streams or stream categories on the block or the tenant |
 | `graylog_title_duplicate` | warning | Graylog: two enabled blocks resolve to one event definition title |
+| `exabeam_outcome_silent` | warning | Exabeam: `outcome: none` and no `email`, so the rule only writes a `rule-trigger` event |
+| `exabeam_correlation_window` | warning | Exabeam: two or more sequences, and `correlation.within` is not more than the time the ordered sequences need (the sum of their windows plus one minute per sequence after the first) |
 | `harfanglab_yara_context` | warning | HarfangLab: a YARA rule's meta `context` is not a comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` |
 
 The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#advisories), [sysdig-1.0](platforms/sysdig-1.0.md#advisories), [bitdefender-1.0](platforms/bitdefender-1.0.md#advisories), [graylog-1.0](platforms/graylog-1.0.md#advisories), and [harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile).
 
 ### Language diagnostics
 
-A language spec MAY define diagnostics with stable codes. Its errors fail static validation like a constraint code. Its warnings are reported like advisories and never set `VALIDATION_ERROR_RAISED`. The Graylog dialect of the Lucene engine adds `graylog_leading_wildcard`, `graylog_regex_unsupported`, and `graylog_open_range` (errors) and `graylog_regex_operator`, `graylog_regex_quote`, `graylog_double_backslash`, and `graylog_analyzed_field` (warnings) ([graylog-1.0](platforms/graylog-1.0.md#query-diagnostics)). The YARA codes are in [yara-1.0](languages/yara-1.0.md#diagnostics): every `yara_*` error fails the rule, and the warnings are `yara_x_incompatible`, `yara_slow_pattern`, `yara_entrypoint_deprecated`, `yara_suspicious_expression`, `yara_module_unconfirmed`, and `yara_meta_missing`.
+A language spec MAY define diagnostics with stable codes. Its errors fail static validation like a constraint code. Its warnings are reported like advisories and never set `VALIDATION_ERROR_RAISED`. The Graylog dialect of the Lucene engine adds `graylog_leading_wildcard`, `graylog_regex_unsupported`, and `graylog_open_range` (errors) and `graylog_regex_operator`, `graylog_regex_quote`, `graylog_double_backslash`, and `graylog_analyzed_field` (warnings) ([graylog-1.0](platforms/graylog-1.0.md#query-diagnostics)). The YARA codes are in [yara-1.0](languages/yara-1.0.md#diagnostics): every `yara_*` error fails the rule, and the warnings are `yara_x_incompatible`, `yara_slow_pattern`, `yara_entrypoint_deprecated`, `yara_suspicious_expression`, `yara_module_unconfirmed`, and `yara_meta_missing`. The Exabeam Query Language codes are in [exabeam-1.0](languages/exabeam-1.0.md#diagnostics): every `exabeam_*` language error fails the rule, and its warnings are `exabeam_mixed_boolean`, `exabeam_implicit_and`, `exabeam_single_group`, `exabeam_pipe_misuse`, `exabeam_wildcard_in_phrase`, `exabeam_unquoted_value`, `exabeam_legacy_regex`, `exabeam_unknown_field`, and `exabeam_string_field_number`.
 
 ### Query validation
 
 Commands: `opentide validate query` (offline, the default) and `opentide validate query --platform <id> --live` (the tenant check).
 
-**Offline**, the analysis engine parses each query in its platform's language, with no tenant, credentials, or network. It is the `queries` check of `opentide validate` on its own, and it also takes a query file (`.kql`, `.spl`, `.yar`, ...). A platform with no offline parser (`sentinel_one`) refuses offline and names `--live`. HarfangLab and Bitdefender YARA (`.yar`, `.yara`), the Sysdig Falco condition, and Graylog queries (`.lucene` under `--platform graylog`, the Graylog dialect) are checked offline.
+**Offline**, the analysis engine parses each query in its platform's language, with no tenant, credentials, or network. It is the `queries` check of `opentide validate` on its own, and it also takes a query file (`.kql`, `.spl`, `.yar`, ...). A platform with no offline parser (`sentinel_one`) refuses offline and names `--live`. HarfangLab and Bitdefender YARA (`.yar`, `.yara`), the Sysdig Falco condition, Graylog queries (`.lucene` under `--platform graylog`, the Graylog dialect), and the Exabeam Query Language (sequence queries, `system: exabeam` hunts, `.exabeam` files) are checked offline.
 
 **`--live`** sends a platform's rule queries to its tenants. The table is the `--live` allowlist:
 
@@ -122,6 +124,7 @@ Commands: `opentide validate query` (offline, the default) and `opentide validat
 | `sysdig` | no. The Falco condition is checked offline ([sysdig-1.0](platforms/sysdig-1.0.md#query-validation)) |
 | `bitdefender` | no. Constraints, criteria, and YARA are checked offline by `opentide validate` ([bitdefender-1.0](platforms/bitdefender-1.0.md#query-validation)) |
 | `graylog` | yes: `POST /api/search/validate`, on Graylog 6.3 to 7.2 ([graylog-1.0](platforms/graylog-1.0.md#query-validation)) |
+| `exabeam` | yes, the filter only: Exabeam Search over the last 15 minutes; the rule's condition is checked offline ([exabeam-1.0](platforms/exabeam-1.0.md#query-validation)) |
 
 `--live` requires platform credentials and enabled configuration, and validates deployed or planned rule queries against the live platform API. `crowdstrike`, `harfanglab`, `sysdig`, and `bitdefender` report `supported: false` for `--live` ([platforms](platforms/index.md#query-validation-platforms)) and MUST NOT report a pass. An offline check MUST NOT be reported as a tenant check. Elastic's query language (KQL, Lucene, EQL, or ES|QL) comes from each rule's block: its `type`, and `language` for the types that take one.
 
@@ -168,6 +171,11 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/invalid/rule-graylog-event-field.yaml](../fixtures/invalid/rule-graylog-event-field.yaml) | `graylog_event_field` |
 | [fixtures/invalid/rule-graylog-event-key.yaml](../fixtures/invalid/rule-graylog-event-key.yaml) | `graylog_event_key` |
 | [fixtures/invalid/rule-graylog-schedule.yaml](../fixtures/invalid/rule-graylog-schedule.yaml) | `graylog_schedule` |
+| [fixtures/invalid/rule-exabeam-correlation-single.yaml](../fixtures/invalid/rule-exabeam-correlation-single.yaml) | `exabeam_correlation` |
+| [fixtures/invalid/rule-exabeam-threshold-operator.yaml](../fixtures/invalid/rule-exabeam-threshold-operator.yaml) | `exabeam_threshold_operator` |
+| [fixtures/invalid/rule-exabeam-context-table-threshold.yaml](../fixtures/invalid/rule-exabeam-context-table-threshold.yaml) | `exabeam_context_table_trigger` |
+| [fixtures/invalid/rule-exabeam-delay.yaml](../fixtures/invalid/rule-exabeam-delay.yaml) | `exabeam_duration` |
+| [fixtures/invalid/rule-exabeam-advanced-query.yaml](../fixtures/invalid/rule-exabeam-advanced-query.yaml) | `exabeam_advanced_in_rule` (a language code) |
 | [fixtures/sharing/invalid/unknown-distribution.toml](../fixtures/sharing/invalid/unknown-distribution.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/legacy-targets-table.toml](../fixtures/sharing/invalid/legacy-targets-table.toml) | `unknown_key` |
 | [fixtures/sharing/invalid/duplicate-name.toml](../fixtures/sharing/invalid/duplicate-name.toml) | `duplicate_name` |
@@ -188,6 +196,8 @@ This repository’s CI (`scripts/object_fixtures.py`) is **not** `opentide valid
 | [fixtures/deployment/invalid/bitdefender-bad-id.json](../fixtures/deployment/invalid/bitdefender-bad-id.json) | `deployment_state_shape` |
 | [fixtures/deployment/invalid/bitdefender-uppercase-id.json](../fixtures/deployment/invalid/bitdefender-uppercase-id.json) | `deployment_state_shape` |
 | [fixtures/deployment/invalid/graylog-bad-id.json](../fixtures/deployment/invalid/graylog-bad-id.json) | `deployment_state_shape` |
+| [fixtures/deployment/invalid/exabeam-bad-id.json](../fixtures/deployment/invalid/exabeam-bad-id.json) | `deployment_state_shape` |
+| [fixtures/deployment/invalid/exabeam-uppercase-id.json](../fixtures/deployment/invalid/exabeam-uppercase-id.json) | `deployment_state_shape` |
 | [fixtures/deployment/invalid/rule-with-rule-id.yaml](../fixtures/deployment/invalid/rule-with-rule-id.yaml) | `external_id_in_rule` |
 | [fixtures/deployment/invalid/rule-with-rule-id-tenant.yaml](../fixtures/deployment/invalid/rule-with-rule-id-tenant.yaml) | `external_id_in_rule` |
 | [fixtures/deployment/invalid/rule-with-rule-id-bundle.yaml](../fixtures/deployment/invalid/rule-with-rule-id-bundle.yaml) | `external_id_in_rule` |
@@ -203,6 +213,8 @@ On a rule's `configurations.sysdig` block the checker applies the [Sysdig constr
 On a rule's `configurations.bitdefender` block the checker applies the [Bitdefender constraint codes](platforms/bitdefender-1.0.md#constraints) that need only the spec's EDR field table: `bitdefender_rule_kind`, `bitdefender_target`, `bitdefender_criterion_shape`, `bitdefender_criterion_field` (for `process`, `file`, `connection`, and `registry`), `bitdefender_criterion_relation`, `bitdefender_criterion_value`, `bitdefender_action_scope`, `bitdefender_targets_shape`, `bitdefender_severity`, `bitdefender_yara_ascii`, and `bitdefender_yara_size`, plus the parser-free YARA codes on `yara.signature`. `bitdefender_criteria_combination` and the workspace check `bitdefender_name_duplicate` are left to opentide.
 
 On a rule's `configurations.graylog` block the checker applies the [Graylog constraint codes](platforms/graylog-1.0.md#constraints) that need no query parser: `graylog_query_blank`, `graylog_list_shape`, `graylog_schedule` (a cron expression's field count only), `graylog_event_limit`, `graylog_aggregation` (the full condition grammar), `graylog_event_field`, `graylog_event_key`, `graylog_priority`, and `graylog_field_name`. The query's codes need the Graylog dialect and are left to the analysis engine.
+
+On a rule's `configurations.exabeam` block the checker applies every [Exabeam constraint code](platforms/exabeam-1.0.md#constraints) but the workspace check `exabeam_name_duplicate`, reports an unknown key (as `unknown_field`) at the key's own path, and, on each sequence `query` (profile `rule`) and each `system: exabeam` hunt (profile `search`), the [Exabeam Query Language](languages/exabeam-1.0.md#diagnostics) errors that need no field catalogue, through the reference checker `scripts/exabeam_language.py`.
 
 On a rule's `configurations.harfanglab` block the checker applies `harfanglab_rule_kind`, `harfanglab_yara_form`, and `harfanglab_yara_section_header`. On any `yara.signature` it applies the [YARA codes](languages/yara-1.0.md#diagnostics) that need no YARA parser: `yara_signature_alias`, `yara_include`, `yara_empty_signature`, and `yara_duplicate_rule`. The other YARA codes are left to the analysis engine.
 
@@ -260,6 +272,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 |---------|------|-------|
 | 1.10 | 2026-11-11 | `graylog` is in the `--live` allowlist through `POST /api/search/validate`, and Graylog queries (Lucene, Graylog dialect) are checked offline ([graylog-1.0](platforms/graylog-1.0.md), [RFC 0017](../rfcs/0017-graylog-platform.md)). Three Graylog advisories, and six Graylog dialect codes for the query. The fixture checker applies nine Graylog constraint codes. |
 | 1.11 | 2026-11-11 | `graylog_open_range` joins the Graylog dialect errors ([graylog-1.0](platforms/graylog-1.0.md#query-diagnostics), version 1.1). |
+| 1.12 | 2026-11-12 | `exabeam` ([RFC 0018](../rfcs/0018-exabeam-platform.md)) joins the `--live` allowlist for its filters, through Exabeam Search, and is checked offline against the [Exabeam Query Language](languages/exabeam-1.0.md). Advisories `exabeam_outcome_silent` and `exabeam_correlation_window`; the language's diagnostics. The fixture checker applies the Exabeam constraint codes and the language errors the reference checker proves. |
 | 1.9 | 2026-11-10 | [Query validation](#query-validation) matches `opentide validate query` as it ships (since opentide 0.19): offline by default with the analysis engine, the `queries` check on its own plus query files; `--live` is the tenant check and its allowlist. HarfangLab and Bitdefender YARA (`.yar`, `.yara`) and the Sysdig Falco condition are checked offline; `--live` stays `supported: false` for `crowdstrike`, `harfanglab`, `sysdig`, and `bitdefender`. Replaces "no offline mode on any platform". |
 | 1.8 | 2026-11-10 | `harfanglab_yara_context` accepts any comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho` ([harfanglab-1.0](platforms/harfanglab-1.0.md#yara-profile) 1.3). |
 | 1.7 | 2026-11-10 | `bitdefender` is excluded from query validation (`supported: false`) and checked offline by `opentide validate` ([bitdefender-1.0](platforms/bitdefender-1.0.md), [RFC 0016](../rfcs/0016-bitdefender-gravityzone-platform.md)). Advisories `bitdefender_registry_full_hive`, `bitdefender_contains_no_wildcard`, and `bitdefender_severity_collapsed`. The fixture checker applies eleven Bitdefender constraint codes. |

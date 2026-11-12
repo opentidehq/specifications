@@ -11,6 +11,9 @@
       "contoso": "12345",
       "fabrikam": "67890"
     },
+    "exabeam": {
+      "exabeam-eu": "016dbc1d-a727-43df-a143-9546dcc81a5a"
+    },
     "graylog": {
       "graylog-prod": "65f1c0de2a3b4c5d6e7f8091"
     },

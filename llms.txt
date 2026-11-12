@@ -31,7 +31,9 @@
 - specs/platforms/sysdig-1.0.md (schema_id: platform::sysdig::1.0)
 - specs/platforms/bitdefender-1.0.md (schema_id: platform::bitdefender::1.0)
 - specs/platforms/graylog-1.0.md (schema_id: platform::graylog::1.0)
+- specs/platforms/exabeam-1.0.md (schema_id: platform::exabeam::1.0)
 - specs/languages/yara-1.0.md (YARA language: YaraSignature, dialect, diagnostics, platform profiles)
+- specs/languages/exabeam-1.0.md (Exabeam Query Language: filter and advanced grammars, rule and search profiles, highlighting, diagnostics)
 - specs/validation.md
 - specs/sharing.md
 - specs/sharing/misp-1.0.md (schema_id: sharing::misp::1.0)

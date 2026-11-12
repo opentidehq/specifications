@@ -374,7 +374,7 @@ class GoldenTests(unittest.TestCase):
 class ListingTests(unittest.TestCase):
     def test_platform_index(self) -> None:
         text = _read(INDEX)
-        self.assertIn("opentide ships eleven detection platform integrations.", text)
+        self.assertIn("opentide ships twelve detection platform integrations.", text)
         self.assertIn("| `graylog` | `platform::graylog::1.0` | [graylog-1.0.md](graylog-1.0.md) |", text)
         self.assertIn("| `graylog` | Graylog | yes* | yes‖ |", text)
         self.assertIn("`sentinel`, `defender_for_endpoint`, `splunk`, `sentinel_one`, `carbon_black_cloud`, `elastic`, `graylog`", text)
