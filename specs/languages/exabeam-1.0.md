@@ -235,7 +235,7 @@ Codes are stable, and the engine reports each with a range. Every code that need
 | `exabeam_legacy_regex` | A value between slashes (`"/…/"`), which may be read as a regular expression. Write `RGX("…")` for a pattern, or drop the slashes for a path |
 | `exabeam_unknown_field` | A field the [catalogue](#field-catalogue) does not have, unless it starts `c_` or `m_` or is an `AS` name defined earlier in the query |
 | `exabeam_string_field_number` | An unquoted number on a field the catalogue types as a string (`event_code:4625`). Exabeam requires `"4625"` |
-| `exabeam_unknown_value` | A literal compared with `activity_type`, `subject`, or `outcome` (after `:`, `=`, `==`, or `!=`, quoted or bare, alone or in a list) that the [catalogue](#field-catalogue) does not list, compared without regard to case (`activity_type:"network-connection"`; the CIM has `network-session`). A wildcard, `WLD` or `RGX`, a value between slashes, `null`, a number, a `@field`, and an `AS` name defined earlier are not checked |
+| `exabeam_unknown_value` | A literal compared with `activity_type`, `subject`, or `outcome` (after `:`, `=`, `==`, or `!=`, quoted or bare, alone or in a list) that the [catalogue](#field-catalogue) does not list, compared without regard to case (`activity_type:"network-connection"`; the CIM has `network-session`). A wildcard, a function (`WLD`, `WLDi`, `RGX`, `RGXi`, or any other), a value between slashes, `null`, an empty value, an unquoted number or IP address, a `@field`, and an `AS` name defined earlier are not checked |
 
 #### Reserved words
 

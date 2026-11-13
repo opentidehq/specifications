@@ -42,7 +42,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | YARA language | 1.5 | — | normative | [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) |
 | Exabeam Query Language | 1.1 | — | normative | [specs/languages/exabeam-1.0.md](specs/languages/exabeam-1.0.md) |
 | YARA-L language | 1.1 | — | normative | [specs/languages/yara-l-1.0.md](specs/languages/yara-l-1.0.md) |
-| Validation | 1.13 | — | normative | [specs/validation.md](specs/validation.md) |
+| Validation | 1.14 | — | normative | [specs/validation.md](specs/validation.md) |
 | Sharing | 1.3 | — | normative | [specs/sharing.md](specs/sharing.md) |
 | MISP connector | 1.0 | `sharing::misp::1.0` | normative | [specs/sharing/misp-1.0.md](specs/sharing/misp-1.0.md) |
 

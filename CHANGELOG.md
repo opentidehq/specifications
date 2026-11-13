@@ -380,7 +380,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## language-exabeam 1.1
 
-- New catalogue warning `exabeam_unknown_value`: a literal compared with `activity_type`, `subject`, or `outcome` that the CIM does not list (opentidehq/language-server#248). Additive; no error added. The hunt example and the Exabeam fixtures (`fixtures/languages/exabeam/`, `fixtures/valid/rule-exabeam-sequence-1.0.yaml`, `fixtures/platforms/exabeam/`) used `activity_type:"network-connection"`, which the CIM lacks; they now use `network-session`, and the highlight golden is regenerated with `scripts/exabeam_language.py`.
+- New catalogue warning `exabeam_unknown_value`: a literal compared with `activity_type`, `subject`, or `outcome` that the CIM does not list ([language-server#248](https://github.com/opentidehq/language-server/pull/248)). Additive; no error added. The hunt example and the Exabeam fixtures (`fixtures/languages/exabeam/`, `fixtures/valid/rule-exabeam-sequence-1.0.yaml`, `fixtures/platforms/exabeam/`) used `activity_type:"network-connection"`, which the CIM lacks; they now use `network-session`, and the highlight golden is regenerated with `scripts/exabeam_language.py`.
 
 ## language-exabeam 1.0
 
@@ -439,6 +439,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.14
+
+- `exabeam_unknown_value` joins the Exabeam Query Language warnings (language-exabeam 1.1, [language-server#248](https://github.com/opentidehq/language-server/pull/248)).
 
 ## validation 1.13
 
