@@ -6,7 +6,8 @@ spec is coherent, that every example in the spec parses, that every diagnostic c
 fixture that triggers it, and that the highlight table yields the token classes the spec
 lists. It is not opentide's engine. The analysis engine (language-server) implements the
 spec in Rust with a tree-sitter grammar and the CIM field catalogue; this checker has no
-catalogue, so it reports neither `exabeam_unknown_field` nor `exabeam_string_field_number`.
+catalogue, so it reports none of `exabeam_unknown_field`, `exabeam_string_field_number` and
+`exabeam_unknown_value`.
 
 Regular expressions are checked against RE2 the way the spec describes: the pattern is the
 string's value (`\\` and `\"` lose a backslash, other escapes stay). `_re2_check` walks it once, refuses
@@ -107,6 +108,7 @@ WARNINGS = {
     "exabeam_single_group",
     "exabeam_unknown_field",
     "exabeam_string_field_number",
+    "exabeam_unknown_value",
 }
 
 

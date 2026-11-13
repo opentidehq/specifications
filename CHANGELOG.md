@@ -378,6 +378,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial field contract ([RFC 0018](rfcs/0018-exabeam-platform.md)): sequences with any-match or threshold conditions, correlation, suppression, delay, schedule, and outcomes; derived name, description (with ATT&CK), and severity; whole-body `PUT`; the rule UUID in deployment state; `--live` filter checks and hunts through Search. Fixtures, a fixture tenant, and request goldens under `fixtures/platforms/exabeam/`.
 
+## language-exabeam 1.1
+
+- New catalogue warning `exabeam_unknown_value`: a literal compared with `activity_type`, `subject`, or `outcome` that the CIM does not list ([language-server#248](https://github.com/opentidehq/language-server/pull/248)). Additive; no error added. The hunt example and the Exabeam fixtures (`fixtures/languages/exabeam/`, `fixtures/valid/rule-exabeam-sequence-1.0.yaml`, `fixtures/platforms/exabeam/`) used `activity_type:"network-connection"`, which the CIM lacks; they now use `network-session`, and the highlight golden is regenerated with `scripts/exabeam_language.py`.
+
 ## language-exabeam 1.0
 
 - First language spec for a SIEM search language, [specs/languages/exabeam-1.0.md](specs/languages/exabeam-1.0.md) ([RFC 0018](rfcs/0018-exabeam-platform.md)): the Exabeam Query Language (language id `exabeam`, never `eql`, which is Elastic EQL), its filter and advanced grammars, `rule` and `search` profiles, the CIM field catalogue, highlighting on the existing HighlightSpec captures, and stable `exabeam_*` diagnostics. Conformance queries and highlight goldens under `fixtures/languages/exabeam/`, checked by `scripts/exabeam_language.py`.
@@ -435,6 +439,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.14
+
+- `exabeam_unknown_value` joins the Exabeam Query Language warnings (language-exabeam 1.1, [language-server#248](https://github.com/opentidehq/language-server/pull/248)).
 
 ## validation 1.13
 

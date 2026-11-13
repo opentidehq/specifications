@@ -1,6 +1,6 @@
 ---
 spec: language-exabeam
-version: "1.0"
+version: "1.1"
 schema_id: null
 status: normative
 supersedes: null
@@ -26,7 +26,7 @@ Exabeam publishes no grammar and no reference parser. The contract is Exabeam's 
 - A query MUST be checked under exactly one profile: `rule` for a correlation-rule sequence `query`, `search` for a hunt search and a `.exabeam` file (unless the host names another).
 - Static validation MUST report every [error](#errors) as a failure and every [warning](#warnings) without failing the rule ([validation](../validation.md#language-diagnostics)).
 - Under the `rule` profile, the advanced operators MUST be refused with `exabeam_advanced_in_rule`. None of the 2,371 correlation rules Exabeam publishes uses them while its saved searches do, Exabeam disables "Convert to Rule" for `RGX_EXTRACT`, and the 1,000-a-month pipe quota cannot carry a rule that runs every four minutes.
-- An implementation MUST NOT report an unknown field, context table, or column as an error. Fields come from the tenant's parsers and custom fields, and context tables exist only in the tenant. An unknown field is the warning `exabeam_unknown_field`.
+- An implementation MUST NOT report an unknown field, context table, or column as an error. Fields come from the tenant's parsers and custom fields, and context tables exist only in the tenant. An unknown field is the warning `exabeam_unknown_field`, and an `activity_type`, `subject`, or `outcome` value the catalogue does not list is the warning `exabeam_unknown_value`: a tenant's parsers may emit values the Common Information Model lacks.
 - Deploy MUST send a query as written: the engine never rewrites one. It MAY trim leading and trailing whitespace.
 - The engine MUST NOT claim that a query matches events or that a context table exists. That is a tenant check ([exabeam-1.0](../platforms/exabeam-1.0.md#query-validation)).
 
@@ -163,7 +163,7 @@ Exabeam's pipe guardrail is the warning `exabeam_pipe_misuse`: a statement after
 
 Field names come from Exabeam's Common Information Model: `Fields_Descriptions.md` and `cim.json` in [ExabeamLabs/CIMLibrary](https://github.com/ExabeamLabs/CIMLibrary). Those hold 1,130 typed fields, 84 subjects, 456 activity types, and the outcomes `success` and `fail`. The language server generates `catalogs/exabeam/` from them with a sync script, pinned by commit, as it generates the Falco and GravityZone catalogues. Platform fields that the CIM table omits (`approxLogTime`, `rawLogIds`, `ingest_time`, `raw_log_time`, `m_*`) are part of the catalogue.
 
-The catalogue drives three things: hover and completion for fields, `activity_type`, `subject`, and `outcome` values; `exabeam_unknown_field`; and `exabeam_string_field_number`. No catalogue finding is an error.
+The catalogue drives four things: hover and completion for fields, `activity_type`, `subject`, and `outcome` values; `exabeam_unknown_field`; `exabeam_string_field_number`; and `exabeam_unknown_value`. No catalogue finding is an error.
 
 ### Highlighting
 
@@ -235,6 +235,7 @@ Codes are stable, and the engine reports each with a range. Every code that need
 | `exabeam_legacy_regex` | A value between slashes (`"/…/"`), which may be read as a regular expression. Write `RGX("…")` for a pattern, or drop the slashes for a path |
 | `exabeam_unknown_field` | A field the [catalogue](#field-catalogue) does not have, unless it starts `c_` or `m_` or is an `AS` name defined earlier in the query |
 | `exabeam_string_field_number` | An unquoted number on a field the catalogue types as a string (`event_code:4625`). Exabeam requires `"4625"` |
+| `exabeam_unknown_value` | A literal compared with `activity_type`, `subject`, or `outcome` (after `:`, `=`, `==`, or `!=`, quoted or bare, alone or in a list) that the [catalogue](#field-catalogue) does not list, compared without regard to case (`activity_type:"network-connection"`; the CIM has `network-session`). A wildcard, a function (`WLD`, `WLDi`, `RGX`, `RGXi`, or any other), a value between slashes, `null`, an empty value, an unquoted number or IP address, a `@field`, and an `AS` name defined earlier are not checked |
 
 #### Reserved words
 
@@ -292,7 +293,7 @@ A hunt (profile `search`):
 
 ```text
 activity_type:"app-login" AND outcome:"success" AND user IN "Privileged Accounts"
-| FOREACH dest_host [ SELECT src_host WHERE src_host: @dest_host AND activity_type:"network-connection" ]
+| FOREACH dest_host [ SELECT src_host WHERE src_host: @dest_host AND activity_type:"network-session" ]
 | SELECT src_host, COUNT(src_host) AS connections GROUP-BY src_host
 ```
 
@@ -305,10 +306,11 @@ activity_type:"app-login" AND outcome:"success" AND user IN "Privileged Accounts
 | `user IN "Executives" OR src_ip IN "Admins"` | `exabeam_context_table_or` (twice) |
 | `SELECT user, COUNT(*) AS logins …` in a rule | `exabeam_advanced_in_rule` |
 
-Fixtures: [fixtures/languages/exabeam/valid/](../../fixtures/languages/exabeam/valid/) (each clean under its profile), [invalid/](../../fixtures/languages/exabeam/invalid/) (one per code the reference checker can prove; `exabeam_unknown_field` and `exabeam_string_field_number` need the catalogue), and [highlight/](../../fixtures/languages/exabeam/highlight/) (token goldens). `scripts/exabeam_language.py` is the reference checker the conformance tests run. It is tooling, not opentide's engine.
+Fixtures: [fixtures/languages/exabeam/valid/](../../fixtures/languages/exabeam/valid/) (each clean under its profile), [invalid/](../../fixtures/languages/exabeam/invalid/) (one per code the reference checker can prove; `exabeam_unknown_field`, `exabeam_string_field_number`, and `exabeam_unknown_value` need the catalogue), and [highlight/](../../fixtures/languages/exabeam/highlight/) (token goldens). `scripts/exabeam_language.py` is the reference checker the conformance tests run. It is tooling, not opentide's engine.
 
 ## History
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-11-12 | Add the catalogue warning `exabeam_unknown_value` for `activity_type`, `subject`, and `outcome` values the CIM does not list, and use the CIM's `network-session` in the hunt example and fixtures, which named `network-connection`. Additive. |
 | 1.0 | 2026-11-12 | Initial normative spec ([RFC 0018](../../rfcs/0018-exabeam-platform.md)): language id `exabeam`, the filter and advanced grammars, `rule` and `search` profiles, CIM field catalogue, highlighting on the existing HighlightSpec, stable `exabeam_*` diagnostics. Checked against Exabeam's 2,371 published correlation rules: every error it reports there is a defect in the rule. |

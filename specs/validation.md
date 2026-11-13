@@ -1,6 +1,6 @@
 ---
 spec: validation
-version: "1.13"
+version: "1.14"
 schema_id: null
 status: normative
 supersedes: null
@@ -104,7 +104,7 @@ The conditions and their reasons are in [elastic-1.0](platforms/elastic-1.0.md#a
 
 ### Language diagnostics
 
-A language spec MAY define diagnostics with stable codes. Its errors fail static validation like a constraint code. Its warnings are reported like advisories and never set `VALIDATION_ERROR_RAISED`. The Graylog dialect of the Lucene engine adds `graylog_leading_wildcard`, `graylog_regex_unsupported`, and `graylog_open_range` (errors) and `graylog_regex_operator`, `graylog_regex_quote`, `graylog_double_backslash`, and `graylog_analyzed_field` (warnings) ([graylog-1.0](platforms/graylog-1.0.md#query-diagnostics)). The YARA codes are in [yara-1.0](languages/yara-1.0.md#diagnostics): every `yara_*` error fails the rule, and the warnings are `yara_x_incompatible`, `yara_slow_pattern`, `yara_entrypoint_deprecated`, `yara_suspicious_expression`, `yara_module_unconfirmed`, and `yara_meta_missing`. The Exabeam Query Language codes are in [exabeam-1.0](languages/exabeam-1.0.md#diagnostics): every `exabeam_*` language error fails the rule, and its warnings are `exabeam_mixed_boolean`, `exabeam_implicit_and`, `exabeam_single_group`, `exabeam_pipe_misuse`, `exabeam_wildcard_in_phrase`, `exabeam_unquoted_value`, `exabeam_legacy_regex`, `exabeam_unknown_field`, and `exabeam_string_field_number`. The YARA-L codes are in [yara-l-1.0](languages/yara-l-1.0.md#diagnostics): every `yaral_*` error fails the rule, and the warnings are `yaral_deprecated_field`, `yaral_unfiltered_event`, `yaral_leading_wildcard_regex`, `yaral_reference_list_deprecated`, and `yaral_string_escape`.
+A language spec MAY define diagnostics with stable codes. Its errors fail static validation like a constraint code. Its warnings are reported like advisories and never set `VALIDATION_ERROR_RAISED`. The Graylog dialect of the Lucene engine adds `graylog_leading_wildcard`, `graylog_regex_unsupported`, and `graylog_open_range` (errors) and `graylog_regex_operator`, `graylog_regex_quote`, `graylog_double_backslash`, and `graylog_analyzed_field` (warnings) ([graylog-1.0](platforms/graylog-1.0.md#query-diagnostics)). The YARA codes are in [yara-1.0](languages/yara-1.0.md#diagnostics): every `yara_*` error fails the rule, and the warnings are `yara_x_incompatible`, `yara_slow_pattern`, `yara_entrypoint_deprecated`, `yara_suspicious_expression`, `yara_module_unconfirmed`, and `yara_meta_missing`. The Exabeam Query Language codes are in [exabeam-1.0](languages/exabeam-1.0.md#diagnostics): every `exabeam_*` language error fails the rule, and its warnings are `exabeam_mixed_boolean`, `exabeam_implicit_and`, `exabeam_single_group`, `exabeam_pipe_misuse`, `exabeam_wildcard_in_phrase`, `exabeam_unquoted_value`, `exabeam_legacy_regex`, `exabeam_unknown_field`, `exabeam_string_field_number`, and `exabeam_unknown_value`. The YARA-L codes are in [yara-l-1.0](languages/yara-l-1.0.md#diagnostics): every `yaral_*` error fails the rule, and the warnings are `yaral_deprecated_field`, `yaral_unfiltered_event`, `yaral_leading_wildcard_regex`, `yaral_reference_list_deprecated`, and `yaral_string_escape`.
 
 ### Query validation
 
@@ -283,6 +283,7 @@ Validation uses merged configuration for vocabulary and status enums. No separat
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.14 | 2026-11-13 | `exabeam_unknown_value` joins the Exabeam Query Language warnings ([exabeam-1.0](languages/exabeam-1.0.md#diagnostics), version 1.1). |
 | 1.13 | 2026-11-12 | `google_secops` joins the `--live` allowlist: `verifyRuleText` compiles the assembled rule without creating it ([google-secops-1.0](platforms/google-secops-1.0.md), [RFC 0019](../rfcs/0019-google-secops-yara-l.md)). YARA-L (`.yaral`) is checked offline ([yara-l-1.0](languages/yara-l-1.0.md)); its codes join [language diagnostics](#language-diagnostics). Advisories `google_secops_risk_score_missing`, `google_secops_rule_id_literal`, and `google_secops_live_frequency_unavailable`. The fixture checker applies five Google SecOps constraint codes and seven YARA-L codes on the block's sections. |
 | 1.10 | 2026-11-11 | `graylog` is in the `--live` allowlist through `POST /api/search/validate`, and Graylog queries (Lucene, Graylog dialect) are checked offline ([graylog-1.0](platforms/graylog-1.0.md), [RFC 0017](../rfcs/0017-graylog-platform.md)). Three Graylog advisories, and six Graylog dialect codes for the query. The fixture checker applies nine Graylog constraint codes. |
 | 1.11 | 2026-11-11 | `graylog_open_range` joins the Graylog dialect errors ([graylog-1.0](platforms/graylog-1.0.md#query-diagnostics), version 1.1). |
