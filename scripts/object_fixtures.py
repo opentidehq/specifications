@@ -731,6 +731,11 @@ SEARCH_LANGUAGES: dict[str, frozenset[str]] = {
 
 
 _YARA_INCLUDE = re.compile(r"^\s*include\s+\"", re.MULTILINE)
+_YARA_IMPORT = re.compile(r'^\s*import\s+"([^"]*)"', re.MULTILINE)
+# specs/languages/yara-1.0.md "Modules": YARA-X 1.23.0's default modules, less `vt`.
+YARA_MODULES = frozenset(
+    {"console", "crx", "cuckoo", "dex", "dotnet", "elf", "hash", "lnk", "macho", "math", "pe", "string", "time", "zip"}
+)
 _YARA_RULE = re.compile(r"^\s*((?:(?:private|global)\s+)*)rule\s+([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE)
 _YARA_SECTION_HEADER = re.compile(r"^\s*(?:strings\s*:|condition\s*:|(?:(?:private|global)\s+)*rule\s+[A-Za-z_])", re.MULTILINE)
 
@@ -742,6 +747,9 @@ def validate_yara_signature(signature: Any, path: str) -> list[CheckError]:
         return [CheckError("yara_empty_signature", "signature MUST be a non-blank YARA text", path)]
     if _YARA_INCLUDE.search(signature):
         errors.append(CheckError("yara_include", "include is not allowed in a signature", path))
+    for module in _YARA_IMPORT.findall(signature):
+        if module not in YARA_MODULES:
+            errors.append(CheckError("yara_unknown_module", f"import of {module!r}, which is not a YARA module", path))
     rules = _YARA_RULE.findall(signature)
     if not any(not modifiers.strip() for modifiers, _ in rules):
         errors.append(CheckError("yara_empty_signature", "no rule that is neither private nor global", path))
@@ -1911,6 +1919,7 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "rule-harfanglab-yara-both-forms.yaml": "harfanglab_yara_form",
     "rule-harfanglab-yara-include.yaml": "yara_include",
     "rule-yara-signature-alias.yaml": "yara_signature_alias",
+    "rule-yara-unknown-module.yaml": "yara_unknown_module",
     "rule-bitdefender-two-kinds.yaml": "bitdefender_rule_kind",
     "rule-bitdefender-criterion-field.yaml": "bitdefender_criterion_field",
     "rule-bitdefender-exclusion.yaml": "bitdefender_rule_kind",

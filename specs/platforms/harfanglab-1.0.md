@@ -1,6 +1,6 @@
 ---
 spec: platform-harfanglab
-version: "1.4"
+version: "1.5"
 schema_id: platform::harfanglab::1.0
 status: normative
 supersedes: null
@@ -145,11 +145,13 @@ Static validation MUST reject a block that breaks any of these, and report the c
 | `harfanglab_yara_form` | A `yara` object sets `signature`, or the decomposed keys, not both. |
 | `harfanglab_yara_section_header` | Decomposed form: `strings` and `condition` contain no `strings:`, `condition:`, or `rule` header. Deploy writes the headers. |
 | `harfanglab_yara_import` | Decomposed form: each `imports` entry is a module the [YARA language](../languages/yara-1.0.md#modules) knows. |
-| `harfanglab_yara_rule_name` | Decomposed form: the YARA rule name deploy derives from the rule `name` is not a YARA keyword, keeps only ASCII letters, digits, and `_`, and is at most 128 characters. A name such as `Condition` derives `condition`, `Détection` keeps `é`, and a 140-character name derives a 140-character identifier; libyara refuses all three. |
+| `harfanglab_yara_rule_name` | Decomposed form: the YARA rule name deploy derives from the rule `name` is not a YARA keyword, keeps only ASCII letters, digits, and `_`, and is at most 128 characters. A name such as `Condition` derives `condition`, `Détection` keeps `é`, and a 140-character name derives a 140-character identifier. YARA-X refuses the first two; the 128-character bound is kept so that the derived name stays one libyara takes too. |
 
 ### YARA profile
 
-The [HarfangLab profile](../languages/yara-1.0.md#platform-profiles) of the YARA language: dialect `libyara4`, UTF-8, no size limit, one or more YARA rules per `signature`, and confirmed modules `pe`, `elf`, `math`, `hash`, and `time`.
+The [HarfangLab profile](../languages/yara-1.0.md#platform-profiles) of the YARA language: `yara_x_syntax: refused`, UTF-8, no size limit, one or more YARA rules per `signature`, and confirmed modules `pe`, `elf`, `math`, `hash`, and `time`.
+
+While `yara_x_syntax` is `refused`, [YARA-X-only syntax](../languages/yara-1.0.md#yara-x-only-syntax) in `yara.signature` or the rule the decomposed form assembles is the error `yara_x_only_syntax`. HarfangLab does not document its YARA engine. The profile moves to `allowed` once a live deploy confirms HarfangLab takes that syntax ([RFC 0020](../../rfcs/0020-yara-x-reference-language.md)). Every other YARA error is YARA-X's, under every profile.
 
 Every non-private rule of a `signature` SHOULD set meta `context`. A missing `context` is `yara_meta_missing`. A value that is not a comma-joined list, without blanks, of `file`, `memory`, `file.pe`, `file.elf`, and `file.macho` is the `harfanglab_yara_context` [advisory](../validation.md#platform-advisories). `file`, `memory`, and `file,memory` are the values HarfangLab's published rules use. `file.pe`, `file.elf`, and `file.macho` are the values the decomposed form's `os` rewrite writes, alone or with others (`file.pe,memory`). The advisory applies to the decomposed form too, on the `context` deploy writes. A present `context` that is not a string is the advisory, not `yara_meta_missing`. No HarfangLab document defines the key ([RFC 0015](../../rfcs/0015-yara-language.md#harfanglab-yara)).
 
@@ -271,3 +273,4 @@ Fixtures: [fixtures/platforms/harfanglab-sigma.yaml](../../fixtures/platforms/ha
 | 1.2 | 2026-11-10 | `yara.signature`: a whole YARA text (`YaraSignature`), deployed as the YaraFile `content` verbatim, beside the decomposed form. A block is one kind: `sigma` and `yara` together fail `harfanglab_rule_kind`, replacing "deploy MUST publish `sigma`". New constraint codes and the HarfangLab YARA profile; YARA is checked offline against [yara-1.0](../languages/yara-1.0.md) ([RFC 0015](../../rfcs/0015-yara-language.md)). The YARA deployer is otherwise unchanged. Schema id unchanged. |
 | 1.3 | 2026-11-10 | Clarifications from the first implementation review: the decomposed form is checked exactly as deploy assembles it, every diagnostic mapped to an authored field and none dropped; `harfanglab_yara_rule_name` also covers a derived name over 128 characters; `harfanglab_yara_context` accepts any comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho`, applies to the decomposed form, and covers a non-string `context`. Schema id unchanged. |
 | 1.4 | 2026-11-10 | Query validation: `opentide validate query` checks YARA offline, `.yar`/`.yara` files included; `--live` stays `supported: false` ([validation 1.9](../validation.md#query-validation)). Schema id unchanged. |
+| 1.5 | 2026-11-16 | YARA profile: `yara_x_syntax: refused` replaces dialect `libyara4`, so YARA-X-only syntax is `yara_x_only_syntax`; the YARA language is YARA-X 1.x ([yara-1.0](../languages/yara-1.0.md) 1.6, [RFC 0020](../../rfcs/0020-yara-x-reference-language.md)). `harfanglab_yara_import` follows the new module set (`crx` and `zip` known, `magic` not). `harfanglab_yara_rule_name` is unchanged. Schema id unchanged. |

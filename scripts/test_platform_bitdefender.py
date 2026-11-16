@@ -249,7 +249,7 @@ class SpecShapeTests(unittest.TestCase):
 
     def test_field_paths_are_fixed(self) -> None:
         text = _read(SPEC)
-        self.assertIn('version: "1.4"', text)
+        self.assertIn('version: "1.5"', text)
         self.assertIn("| `bitdefender_action_scope` | `actions.<key>` |", text)
 
     def test_no_exclusion_and_whole_payload(self) -> None:

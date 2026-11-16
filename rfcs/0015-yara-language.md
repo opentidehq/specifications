@@ -7,6 +7,7 @@
 - **Created:** 2026-11-09
 - **Accepted:** 2026-11-10, with the normative text in [specs/languages/yara-1.0.md](../specs/languages/yara-1.0.md) and [specs/platforms/harfanglab-1.0.md](../specs/platforms/harfanglab-1.0.md) 1.2
 - **Issue:** answers the YARA half of [opentidehq/specifications#68](https://github.com/opentidehq/specifications/issues/68). The Sigma half of #68 stays open.
+- **Amended by:** [RFC 0020](0020-yara-x-reference-language.md) (2026-11-16): YARA-X 1.x replaces libyara 4.5 as the reference language, each profile's `dialect` becomes `yara_x_syntax`, `yara_x_incompatible` is retired, and the modules are YARA-X's default set less `vt`. §3 and §4 below record the original design.
 - **Related:** [RFC 0016](0016-bitdefender-gravityzone-platform.md), the Bitdefender GravityZone platform, which carries the second YARA block
 - **Implementation:** [opentidehq/language-server#165](https://github.com/opentidehq/language-server/issues/165) (YARA engine), widened to whole YARA signatures; the HarfangLab `signature` form and `harfanglab_rule_kind` in opentidehq/opentide
 

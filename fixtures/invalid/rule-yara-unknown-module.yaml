@@ -1,0 +1,32 @@
+# A YARA signature that imports `magic`, which is not a YARA-X default
+# module (yara-1.0 1.6, RFC 0020). libyara 4.5 shipped it.
+# Expected YARA code: yara_unknown_module.
+name: HarfangLab YARA with the magic module
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000045
+  schema: rule::1.0
+  version: 1
+  created: "2026-01-01"
+  modified: "2026-01-02"
+  tlp: clear
+description: |
+  A YARA signature that imports the magic module.
+status: STAGING
+severity: Medium
+configurations:
+  harfanglab:
+    enabled: true
+    schema: platform::harfanglab::1.0
+    status: STAGING
+    yara:
+      signature: |
+        import "magic"
+
+        rule Pdf_Dropper {
+          meta:
+            context = "file"
+          strings:
+            $a = "/JavaScript" ascii
+          condition:
+            magic.mime_type() == "application/pdf" and $a
+        }

@@ -33,7 +33,7 @@
 - specs/platforms/graylog-1.0.md (schema_id: platform::graylog::1.0)
 - specs/platforms/exabeam-1.0.md (schema_id: platform::exabeam::1.0)
 - specs/platforms/google-secops-1.0.md (schema_id: platform::google_secops::1.0)
-- specs/languages/yara-1.0.md (YARA language: YaraSignature, dialect, diagnostics, platform profiles)
+- specs/languages/yara-1.0.md (YARA language, YARA-X 1.x: YaraSignature, YARA-X-only syntax, modules, diagnostics, platform profiles with yara_x_syntax)
 - specs/languages/exabeam-1.0.md (Exabeam Query Language: filter and advanced grammars, rule and search profiles, highlighting, diagnostics)
 - specs/languages/yara-l-1.0.md (YARA-L 2.0 language: YaraLRule, YaraLSections, YaraLMatch, YaraLOptions, YaraLSearch, rule and search profiles, diagnostics, highlighting)
 - specs/validation.md
