@@ -284,6 +284,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - `platform::crowdstrike::1.0`. Correlation rule: filter `query`, `details.trigger` (`verbose` or `summary`), `details.outcome` (`detection` or `incident`), and `schedule`. No query validator.
 
+## platform-harfanglab 1.5
+
+- YARA profile: `yara_x_syntax: refused` replaces dialect `libyara4`. YARA-X-only syntax is `yara_x_only_syntax` until a live deploy confirms HarfangLab takes it; every other YARA error is YARA-X's ([RFC 0020](rfcs/0020-yara-x-reference-language.md)). `harfanglab_yara_import` follows the new module set. Schema id unchanged.
+
 ## platform-harfanglab 1.4
 
 - `opentide validate query` checks YARA offline, `.yar` and `.yara` files included; `--live` stays `supported: false`. Schema id unchanged.
@@ -350,6 +354,16 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial language spec for YARA-L 2.0 ([specs/languages/yara-l-1.0.md](specs/languages/yara-l-1.0.md), [RFC 0019](rfcs/0019-google-secops-yara-l.md)): the `YaraLRule` and `YaraLSearch` text forms and the `YaraLSections` block form (`YaraLMatch`, `YaraLOptions`); `rule` and `search` profiles; sections (including `setup` and `export`), lexical structure, expressions, window bounds, outcome and condition rules, and limits from Google's pages; UDM and function catalogues; 28 error and 4 warning codes; a HighlightSpec mapping that adds no capture.
 
+## language-yara 1.6
+
+- **YARA-X 1.x is the reference language** ([RFC 0020](rfcs/0020-yara-x-reference-language.md), [specifications#93](https://github.com/opentidehq/specifications/issues/93); implementation [opentide#1225](https://github.com/opentidehq/opentide/issues/1225)), replacing libyara 4.5. Breaking for content; no schema id changes, so the spec is revised in place.
+- What libyara compiled and YARA-X refuses is an error under the code of what is wrong: an unknown regexp escape or a `{` outside a repetition (`yara_regexp`), `base64` on a string under 3 bytes (`yara_string_modifier`), a string index below 1 (`yara_number_out_of_range`), `[0-0]` or a jump bound past 2^32 − 1 (`yara_hex_string`), a repeated rule modifier and a rule wildcard in `of` (`yara_parse_error`), a rule named like an imported module (`yara_rule_identifier_conflict`), `entrypoint` (`yara_undefined_identifier`, with `yara_entrypoint_deprecated`), and a module boolean used as a number (`yara_type`).
+- What YARA-X compiles and libyara refused is valid: identifiers have no length limit, and the profiles do not emulate libyara's limits.
+- YARA-X-only syntax (`with`, digit separators, float meta, `"""` strings, booleans in `of` tuples, hex and octal jump bounds, `.len()`, …) is part of the language. Each profile's `yara_x_syntax` (`refused` for both) replaces its `dialect`; new error `yara_x_only_syntax` reports that syntax under a refusing profile.
+- `yara_x_incompatible` is retired (new Retired codes table). `yara_rule_identifier_conflict` no longer covers rule wildcards, which are a parse error.
+- Modules: YARA-X's default module set less `vt` (`console`, `crx`, `cuckoo`, `dex`, `dotnet`, `elf`, `hash`, `lnk`, `macho`, `math`, `pe`, `string`, `time`, `zip`), with YARA-X's members and types. `import "magic"` and `import "vt"` are `yara_unknown_module`; `msi`, `olecf`, and `vba` are experimental in YARA-X and unknown. A module boolean compared `== 1` is `yara_suspicious_expression`; an ordering, `!=`, or arithmetic on it is `yara_type` ([opentide#1438](https://github.com/opentidehq/opentide/pull/1438)).
+- Matching differences (`xor` with `fullword`, `base64`) are informative.
+
 ## language-yara 1.5
 
 - `yara_rule_identifier_conflict` also covers a rule whose name matches a rule wildcard an earlier condition uses (libyara: "matches previously used wildcard rule set"). No code added or removed.
@@ -393,6 +407,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## platform-graylog 1.0
 
 - Initial field contract ([RFC 0017](rfcs/0017-graylog-platform.md)): one `aggregation-v1` event definition per block. The query is in Graylog's search syntax, with an optional aggregation (`group_by` and a condition grammar compiled to Graylog's series and condition tree). Also streams, schedule, event fields (a bare field name, a template, `{template}`, or `{lookup}`), notifications, summary, and remediation. String-or-list fields. Graylog 6.3, 7.0, 7.1, and 7.2, with each request built for the detected version; the event definition id in deployment state; `--live` through `/api/search/validate`. Fixtures, a fixture tenant, and per-version request goldens under `fixtures/platforms/graylog/`.
+
+## platform-bitdefender 1.5
+
+- YARA profile: `yara_x_syntax: refused` replaces dialect `libyara4`. YARA-X-only syntax is `yara_x_only_syntax` until a live deploy confirms GravityZone takes it; every other YARA error is YARA-X's, and the profile does not emulate libyara's limits ([RFC 0020](rfcs/0020-yara-x-reference-language.md)). Schema id unchanged.
 
 ## platform-bitdefender 1.4
 
@@ -439,6 +457,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.15
+
+- YARA is YARA-X 1.x ([RFC 0020](rfcs/0020-yara-x-reference-language.md)): `yara_x_only_syntax` joins the YARA errors, and `yara_x_incompatible` leaves the warnings, retired. The fixture checker applies `yara_unknown_module` to `yara.signature`; new fixture `fixtures/invalid/rule-yara-unknown-module.yaml`.
 
 ## validation 1.14
 

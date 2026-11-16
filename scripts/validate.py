@@ -257,6 +257,7 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "invalid" / "rule-harfanglab-yara-both-forms.yaml",
         FIXTURES / "invalid" / "rule-harfanglab-yara-include.yaml",
         FIXTURES / "invalid" / "rule-yara-signature-alias.yaml",
+        FIXTURES / "invalid" / "rule-yara-unknown-module.yaml",
         FIXTURES / "platforms" / "carbon-black-cloud.yaml",
         FIXTURES / "platforms" / "elastic.yaml",
         FIXTURES / "platforms" / "sysdig.yaml",

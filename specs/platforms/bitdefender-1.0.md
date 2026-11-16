@@ -1,6 +1,6 @@
 ---
 spec: platform-bitdefender
-version: "1.4"
+version: "1.5"
 schema_id: platform::bitdefender::1.0
 status: normative
 supersedes: null
@@ -172,7 +172,9 @@ For a target this table does not cover, the catalogue file is the reference. An 
 
 ### YARA profile
 
-The [Bitdefender profile](../languages/yara-1.0.md#platform-profiles) of the YARA language: dialect `libyara4`, ASCII only, at most 30,000 characters, one or more YARA rules per `signature`, and confirmed modules `pe`, `elf`, `math`, `hash`, and `time`. GravityZone allows at most 50 YARA rules per company.
+The [Bitdefender profile](../languages/yara-1.0.md#platform-profiles) of the YARA language: `yara_x_syntax: refused`, ASCII only, at most 30,000 characters, one or more YARA rules per `signature`, and confirmed modules `pe`, `elf`, `math`, `hash`, and `time`. GravityZone allows at most 50 YARA rules per company.
+
+While `yara_x_syntax` is `refused`, [YARA-X-only syntax](../languages/yara-1.0.md#yara-x-only-syntax) in `yara.signature` is the error `yara_x_only_syntax`. GravityZone's agent ships libyara ([RFC 0016](../../rfcs/0016-bitdefender-gravityzone-platform.md)) and its version is not published. The profile moves to `allowed` once a live deploy confirms GravityZone takes that syntax ([RFC 0020](../../rfcs/0020-yara-x-reference-language.md)). Every other YARA error is YARA-X's: the profile does not emulate libyara, so a signature YARA-X compiles that libyara refuses for a limit (an identifier over 128 characters) passes validation and may fail at the tenant.
 
 ### Advisories
 
@@ -394,3 +396,4 @@ Fixtures:
 | 1.2 | 2026-11-10 | `detection` as a criterion field is `bitdefender_criterion_field` (error) on every target, open ones included: the alert filter is written as `alert`. Found where opentide and the language server disagreed. Schema id unchanged. |
 | 1.3 | 2026-11-10 | Query validation: `--live` is `supported: false`; without `--live`, `validate query` checks YARA offline ([validation 1.9](../validation.md#query-validation)). Schema id unchanged. |
 | 1.4 | 2026-11-10 | `targets` (block and tenant default): when present, exactly one of `endpoint_tags` and `companies`, a non-empty list with no blank alias (`bitdefender_targets_shape`). A tenant `targets` that breaks it fails configuration load and never resolves to the whole company. Clarifies "at most one", which every implementation already read as exactly one. Schema id unchanged. |
+| 1.5 | 2026-11-16 | YARA profile: `yara_x_syntax: refused` replaces dialect `libyara4`, so YARA-X-only syntax is `yara_x_only_syntax`; the YARA language is YARA-X 1.x ([yara-1.0](../languages/yara-1.0.md) 1.6, [RFC 0020](../../rfcs/0020-yara-x-reference-language.md)). Schema id unchanged. |

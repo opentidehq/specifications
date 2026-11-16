@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Consistency tests for specs/languages/yara-1.0.md, harfanglab-1.0 1.2, their fixtures, and the specs that list them."""
+"""Consistency tests for specs/languages/yara-1.0.md, harfanglab-1.0 and bitdefender-1.0, their fixtures, and the specs that list them."""
 
 from __future__ import annotations
 
@@ -15,10 +15,12 @@ from object_fixtures import (
     validate_harfanglab_block,
     validate_yara_signature,
 )
+from object_fixtures import YARA_MODULES
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "specs" / "languages" / "yara-1.0.md"
 HARFANGLAB = ROOT / "specs" / "platforms" / "harfanglab-1.0.md"
+BITDEFENDER = ROOT / "specs" / "platforms" / "bitdefender-1.0.md"
 FIXTURES = ROOT / "fixtures"
 SECTIONS = ["Summary", "Requirements", "Definition", "Relationships", "Defaults & overrides", "Examples", "History"]
 
@@ -42,16 +44,19 @@ ERRORS = [
     "yara_hex_string",
     "yara_string_modifier",
     "yara_number_out_of_range",
+    "yara_x_only_syntax",
 ]
 WARNINGS = [
-    "yara_x_incompatible",
     "yara_slow_pattern",
     "yara_entrypoint_deprecated",
     "yara_suspicious_expression",
     "yara_module_unconfirmed",
     "yara_meta_missing",
 ]
-MODULES = ["pe", "elf", "math", "hash", "time", "dotnet", "macho", "magic", "cuckoo", "console", "string", "lnk", "dex"]
+# YARA-X 1.23.0's default modules, less `vt` (RFC 0020).
+MODULES = ["console", "crx", "cuckoo", "dex", "dotnet", "elf", "hash", "lnk", "macho", "math", "pe", "string", "time", "zip"]
+REFUSED_MODULES = ["magic", "vt", "msi", "olecf", "vba"]
+RETIRED = ["yara_x_incompatible"]
 
 
 def _read(path: Path) -> str:
@@ -74,41 +79,56 @@ class SpecShapeTests(unittest.TestCase):
     def test_frontmatter_and_sections(self) -> None:
         text = _read(SPEC)
         self.assertIn("spec: language-yara", text)
-        self.assertIn('version: "1.5"', text)
+        self.assertIn('version: "1.6"', text)
         self.assertIn("status: normative", text)
         self.assertEqual(re.findall(r"^## (.+)$", text, flags=re.MULTILINE), SECTIONS)
 
-    def test_identifier_limit_covers_every_bare_identifier(self) -> None:
+    def test_yara_x_is_the_reference_language(self) -> None:
         text = _read(SPEC)
-        dialect = text.split("### Dialect", 1)[1].split("### Modules", 1)[0]
-        self.assertIn("Every identifier except a string identifier is at most 128 characters", dialect)
-        self.assertIn("`for` and `with` variables", dialect)
+        language = text.split("### Language", 1)[1].split("### Modules", 1)[0]
+        self.assertIn("**YARA as YARA-X 1.x compiles it**", language)
+        self.assertIn("Identifiers have no length limit.", language)
+        self.assertNotIn("libyara 4.5 compiles it", text)
+        self.assertNotIn("libyara4", text)
+        for heading in ("#### Stricter than libyara", "#### YARA-X-only syntax", "#### Matching differences"):
+            self.assertIn(heading, language)
+
+    def test_retired_codes(self) -> None:
+        text = _read(SPEC)
+        self.assertEqual(_table_codes(text, "#### Retired codes", "### Platform profiles"), RETIRED)
+        self.assertIn("MUST NOT report the retired code `yara_x_incompatible`", text)
 
     def test_diagnostics_tables(self) -> None:
         text = _read(SPEC)
         self.assertEqual(_table_codes(text, "#### Errors", "#### Warnings"), ERRORS)
-        self.assertEqual(_table_codes(text, "#### Warnings", "### Platform profiles"), WARNINGS)
+        self.assertEqual(_table_codes(text, "#### Warnings", "#### Retired codes"), WARNINGS)
 
     def test_validation_lists_the_warnings(self) -> None:
         text = _read(ROOT / "specs" / "validation.md")
         section = text.split("### Language diagnostics", 1)[1].split("###", 1)[0]
         for code in WARNINGS:
             self.assertIn(f"`{code}`", section)
+        self.assertIn("`yara_x_incompatible` is retired and never reported", section)
         self.assertIn("| `harfanglab_yara_context` | warning |", text)
 
     def test_modules_and_dialect(self) -> None:
         text = _read(SPEC)
         modules = text.split("### Modules", 1)[1].split("###", 1)[0]
-        for module in MODULES:
+        for module in MODULES + REFUSED_MODULES:
             self.assertIn(f"`{module}`", modules)
-        self.assertIn("| Dialect | `libyara4` | `libyara4` |", text)
+        self.assertIn("`console`, `crx`, `cuckoo`, `dex`, `dotnet`, `elf`, `hash`, `lnk`, `macho`, `math`, `pe`, `string`, `time`, and `zip`", modules)
+        self.assertEqual(sorted(YARA_MODULES), MODULES)
+        self.assertIn("| `yara_x_syntax` | `refused` | `refused` |", text)
         self.assertIn("| Confirmed modules | `pe`, `elf`, `math`, `hash`, `time` | `pe`, `elf`, `math`, `hash`, `time` |", text)
 
 
 class HarfangLabSpecTests(unittest.TestCase):
     def test_version_and_constraints(self) -> None:
         text = _read(HARFANGLAB)
-        self.assertIn('version: "1.4"', text)
+        self.assertIn('version: "1.5"', text)
+        profile = text.split("### YARA profile", 1)[1].split("###", 1)[0]
+        self.assertIn("`yara_x_syntax: refused`", profile)
+        self.assertNotIn("libyara4", profile)
         self.assertEqual(
             _table_codes(text, "### Constraints", "### YARA profile"),
             [
@@ -132,6 +152,16 @@ class HarfangLabSpecTests(unittest.TestCase):
         self.assertIn("specs/languages/yara-1.0.md", _read(ROOT / "llms.txt"))
         self.assertIn("[0015](0015-yara-language.md)", _read(ROOT / "rfcs" / "README.md"))
         self.assertIn("## language-yara 1.0", _read(ROOT / "CHANGELOG.md"))
+        self.assertIn("## language-yara 1.6", _read(ROOT / "CHANGELOG.md"))
+        self.assertIn("[0020](0020-yara-x-reference-language.md)", _read(ROOT / "rfcs" / "README.md"))
+        self.assertIn("| YARA language | 1.6 |", _read(ROOT / "SPECS.md"))
+
+    def test_bitdefender_profile(self) -> None:
+        text = _read(BITDEFENDER)
+        self.assertIn('version: "1.5"', text)
+        profile = text.split("### YARA profile", 1)[1].split("###", 1)[0]
+        self.assertIn("`yara_x_syntax: refused`", profile)
+        self.assertNotIn("libyara4", profile)
 
 
 class CheckerTests(unittest.TestCase):
@@ -154,6 +184,7 @@ class CheckerTests(unittest.TestCase):
             "rule-harfanglab-yara-both-forms.yaml",
             "rule-harfanglab-yara-include.yaml",
             "rule-yara-signature-alias.yaml",
+            "rule-yara-unknown-module.yaml",
         ):
             with self.subTest(name=name):
                 codes = _codes(validate_fixture_file(FIXTURES / "invalid" / name, self.vocabs))
@@ -165,6 +196,15 @@ class CheckerTests(unittest.TestCase):
         self.assertEqual(_codes(validate_yara_signature(RULE + RULE, "s")), {"yara_duplicate_rule"})
         self.assertEqual(_codes(validate_yara_signature('include "x.yar"\n' + RULE, "s")), {"yara_include"})
         self.assertEqual(_codes(validate_yara_signature("   ", "s")), {"yara_empty_signature"})
+
+    def test_modules(self) -> None:
+        for module in MODULES:
+            with self.subTest(module=module):
+                self.assertEqual(validate_yara_signature(f'import "{module}"\n' + RULE, "s"), [])
+        for module in REFUSED_MODULES:
+            with self.subTest(module=module):
+                codes = _codes(validate_yara_signature(f'import "{module}"\n' + RULE, "s"))
+                self.assertEqual(codes, {"yara_unknown_module"})
 
     def test_decomposed_section_header(self) -> None:
         block = {"yara": {"meta": {"context": ["file"], "os": "Windows"}, "strings": "strings:\n$a = \"x\"", "condition": "$a"}}

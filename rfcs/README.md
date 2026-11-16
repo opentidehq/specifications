@@ -34,6 +34,7 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0017](0017-graylog-platform.md) | Graylog detection platform (native event definitions) | accepted |
 | [0018](0018-exabeam-platform.md) | Exabeam New-Scale SIEM and the Exabeam Query Language | accepted |
 | [0019](0019-google-secops-yara-l.md) | Google Security Operations and the YARA-L language | accepted |
+| [0020](0020-yara-x-reference-language.md) | YARA-X 1.x is the reference YARA language | accepted |
 
 ## Numbering
 
