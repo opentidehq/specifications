@@ -24,7 +24,7 @@ The contract is YARA as YARA-X 1.x compiles it. What YARA-X refuses is an error.
 - Static validation MUST report what YARA-X 1.x refuses to compile as an [error](#errors), and MUST report every [warning](#warnings) without failing the rule.
 - Static validation MUST apply the profile of the platform whose block holds the signature. A signature in two platform blocks is checked once under each profile.
 - Under a profile whose `yara_x_syntax` is `refused`, static validation MUST report [YARA-X-only syntax](#yara-x-only-syntax) as `yara_x_only_syntax`. Under `allowed`, and for a text checked with no profile, it MUST NOT.
-- A profile MUST NOT emulate libyara: what YARA-X compiles and libyara refuses for a value or a limit MUST NOT be an error under any profile.
+- A profile MUST NOT emulate libyara: what YARA-X compiles and libyara refuses for a value or a limit (an identifier over 128 characters, `0% of them`, an unsigned literal above `i64::MAX` compared with a value) MUST NOT be an error under any profile. What YARA-X refuses stays an error under every profile.
 - Static validation MUST NOT report the retired code `yara_x_incompatible`.
 - YARA is checked offline: by `opentide validate`, and by `opentide validate query` without `--live` (a rule's signature, or a `.yar` or `.yara` file under `--platform`'s profile). No platform offers a YARA dry run, so `validate query --live` MUST report `supported: false` for a YARA platform and MUST NOT claim a tenant check.
 
@@ -71,7 +71,7 @@ What libyara 4.5 compiled and YARA-X refuses is an error, under the code of what
 | A rule named like an imported module (`import "pe"` … `rule pe`) | `yara_rule_identifier_conflict` |
 | `entrypoint` | `yara_undefined_identifier`, with the warning `yara_entrypoint_deprecated` |
 | A module member YARA-X types as boolean used as a number (an ordering, `!=`, arithmetic) | `yara_type` |
-| `import "magic"` | `yara_unknown_module` |
+| `import "magic"` (which libyara compiles when built with `--enable-magic`) | `yara_unknown_module` |
 
 What YARA-X compiles and libyara refused is valid: an identifier over 128 characters, a jump bound from 2^31 to 2^32 − 1, a loop variable an enclosing loop also binds, `0% of them`, a constant division by zero, floats in a loop's enumeration, and an unbounded or over-200 jump inside a hex alternative (`( 02 [1-300] 03 | 04 )`).
 
@@ -124,16 +124,16 @@ Each profile names the modules confirmed on its agents. Importing a known module
 | `yara_duplicate_tag` | A rule tag repeated on one rule |
 | `yara_undefined_string` | A `$id`, `#id`, `@id`, `!id`, or `$prefix*` in a condition that matches no string of the rule; `$` outside `for … of`; `them` in a rule with no strings |
 | `yara_unreferenced_string` | A string never used in the condition, when the condition does not use `them`. A string whose identifier starts with `_` (`$_x`) is exempt |
-| `yara_undefined_identifier` | A bare identifier that is neither a rule defined earlier in the `signature`, a loop or `with` variable, nor a module; a call to something that is not a function; `entrypoint` |
+| `yara_undefined_identifier` | A bare identifier that is neither a rule defined earlier in the `signature`, a loop or `with` variable, nor a module; a call to something that is not a function; a module field called as a function (`pe.number_of_sections(0)`); a module function named without a call (`pe.imphash and true`); `entrypoint` |
 | `yara_rule_identifier_conflict` | A rule named like a YARA-X reserved word or built-in (`with` and the 64-bit and float readers among them), or like an imported module |
 | `yara_unknown_module` | `import` of a module outside the language's [modules](#modules) (`magic` and `vt` among them) |
 | `yara_module_not_imported` | A module field or function used without an `import` of the module before the rule |
 | `yara_unknown_module_member` | A field or function YARA-X's module does not have, or arguments no overload takes |
 | `yara_type` | An operator or function applied to the wrong type (`filesize contains "a"`); a module member YARA-X types as boolean where a number is needed (an ordering, `!=`, arithmetic, an offset, an index, a range bound) |
-| `yara_regexp` | An invalid regular expression, as YARA-X reads it: an unknown escape, a `{` outside a repetition, a look-around group, a string's regexp that can match the empty string, nesting past 250 levels |
-| `yara_hex_string` | An invalid hex string: odd nibbles, a `[0-0]` jump, a jump `[a-b]` with a > b, a bound past 2^32 − 1, unbalanced alternatives |
+| `yara_regexp` | An invalid regular expression, as YARA-X reads it: an unknown escape, a `{` outside a repetition, a look-around group, a string's regexp that can match the empty string or that starts with an arbitrary prefix under `/s`, nesting past 250 levels |
+| `yara_hex_string` | An invalid hex string: odd nibbles, a `[0]` or `[0-0]` jump, a jump `[a-b]` with a > b, a bound past 2^32 − 1, unbalanced alternatives |
 | `yara_string_modifier` | A modifier repeated, on the wrong kind of string, or combined as YARA-X refuses (`xor` or `base64` with `nocase`, `base64` with `fullword` or `xor`); an `xor` range or `base64` alphabet YARA-X refuses; `base64` or `base64wide` on a string under 3 bytes |
-| `yara_number_out_of_range` | An integer literal over 64 bits; a percentage above 100; a constant expression that overflows 64 bits; a string index below 1 |
+| `yara_number_out_of_range` | An integer literal over 64 bits; a percentage above 100; a constant sum, difference, product, or negation that overflows 64 bits or has a literal above 2^63 − 1; such a literal as an offset or a range bound; a string index below 1 or above 2^63 − 1. YARA-X reads a literal above 2^63 − 1 (`0xFFFFFFFFFFFFFFFF`) as its two's-complement value only in a comparison, a bitwise operation, or a function argument |
 | `yara_x_only_syntax` | [YARA-X-only syntax](#yara-x-only-syntax) under a profile whose `yara_x_syntax` is `refused`. The message names the construct and the platform. |
 
 #### Warnings
@@ -170,7 +170,7 @@ Codes are stable. opentide's `docs/engine/YARA.md` maps each one to its source (
 
 `yara_x_syntax` is `allowed` or `refused`. Neither vendor documents its YARA engine, and Bitdefender's agent ships libyara by its open-source notices ([RFC 0015](../../rfcs/0015-yara-language.md#bitdefender-yara)), so both profiles start at `refused`. A profile moves to `allowed` in a revision of this spec and of its platform spec, once a live deploy confirms the platform takes YARA-X-only syntax.
 
-The check is syntactic. A profile does not emulate libyara: a signature YARA-X compiles that libyara refuses for a value or a limit (an identifier over 128 characters, an unsigned literal above `i64::MAX`, `0% of them`) passes under both profiles, and may still fail at a libyara tenant.
+The check is syntactic. A profile does not emulate libyara: a signature YARA-X compiles that libyara refuses for a value or a limit (an identifier over 128 characters, `0% of them`, an unsigned literal above `i64::MAX` in a comparison) passes under both profiles, and may still fail at a libyara tenant. The same literal in arithmetic, as an offset, or as a range bound is `yara_number_out_of_range` under every profile, as YARA-X refuses it.
 
 A platform spec states its profile codes. The confirmed module sets are a maintainer decision (2026-11-10): `crx`, `zip`, and every other module outside them get `yara_module_unconfirmed`.
 
@@ -259,4 +259,4 @@ Fixtures: [fixtures/platforms/harfanglab-yara-signature.yaml](../../fixtures/pla
 | 1.3 | 2026-11-10 | Clarification from the third implementation review, checked against libyara 4.5.4 and YARA-X 1.23: the 128-character limit covers every identifier except string identifiers, including `for` and `with` variables, not only rule names, rule tags, and meta keys. No code is added or removed. |
 | 1.4 | 2026-11-10 | `opentide validate query` checks YARA offline (signatures, and `.yar`/`.yara` files under the platform's profile); `--live` stays `supported: false`. Matches [validation 1.9](../validation.md#query-validation). No code is added or removed. |
 | 1.5 | 2026-11-10 | `yara_rule_identifier_conflict` also covers a rule whose name matches a rule wildcard an earlier condition uses, which libyara 4.5.4 refuses ("matches previously used wildcard rule set"). No code is added or removed. |
-| 1.6 | 2026-11-16 | YARA-X 1.x is the reference language ([RFC 0020](../../rfcs/0020-yara-x-reference-language.md), [specifications#93](https://github.com/opentidehq/specifications/issues/93)), replacing libyara 4.5. What libyara compiled and YARA-X refuses is an error under the code of what is wrong; what YARA-X compiles and libyara refused for a value or a limit is valid, and identifiers have no length limit. YARA-X-only syntax is part of the language; each profile's `yara_x_syntax` (`refused` for both) replaces its `dialect`, and new error `yara_x_only_syntax` reports that syntax under a refusing profile. `yara_x_incompatible` is retired. The modules are YARA-X's default set less `vt` (`crx` and `zip` added, `magic` removed), typed as YARA-X types them; a module boolean compared `== 1` warns, and ordered, `!=`, or in arithmetic is `yara_type`. |
+| 1.6 | 2026-11-16 | YARA-X 1.x is the reference language ([RFC 0020](../../rfcs/0020-yara-x-reference-language.md), [specifications#93](https://github.com/opentidehq/specifications/issues/93)), replacing libyara 4.5. What libyara compiled and YARA-X refuses is an error under the code of what is wrong; what YARA-X compiles and libyara refused for a value or a limit is valid, and identifiers have no length limit. YARA-X-only syntax is part of the language; each profile's `yara_x_syntax` (`refused` for both) replaces its `dialect`, and new error `yara_x_only_syntax` reports that syntax under a refusing profile. `yara_x_incompatible` is retired. A rule wildcard in `of` is `yara_parse_error`, so `yara_rule_identifier_conflict` no longer covers a rule whose name matches one (1.5). The modules are YARA-X's default set less `vt` (`crx` and `zip` added, `magic` removed), typed as YARA-X types them; a module boolean compared `== 1` warns, and ordered, `!=`, or in arithmetic is `yara_type`. |

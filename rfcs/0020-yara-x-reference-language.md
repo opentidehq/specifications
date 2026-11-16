@@ -71,7 +71,7 @@ The change is breaking for content (signatures libyara compiled can now fail), s
 
 The `dialect` row is replaced by `yara_x_syntax: allowed | refused`. While it is `refused`, YARA-X-only syntax is `yara_x_only_syntax` (error), naming the construct and the platform. Both profiles start at `refused`: neither vendor documents its engine, and Bitdefender's agent ships libyara ([RFC 0016](0016-bitdefender-gravityzone-platform.md)). A profile flips to `allowed` in a revision of this spec and its platform spec once a live deploy confirms the platform takes the syntax.
 
-The check is syntactic. A profile does not emulate libyara: a signature YARA-X compiles that libyara refuses for a value or a limit (an identifier over 128 characters, an unsigned literal above `i64::MAX`, `0% of them`) passes under both profiles.
+The check is syntactic. A profile does not emulate libyara: a signature YARA-X compiles that libyara refuses for a value or a limit (an identifier over 128 characters, `0% of them`, an unsigned literal above `i64::MAX` in a comparison) passes under both profiles. The same literal in arithmetic, as an offset, or as a range bound is `yara_number_out_of_range`, as YARA-X refuses it.
 
 A text checked with no platform profile (a `.yar` file in an editor) takes YARA-X-only syntax.
 
@@ -79,7 +79,7 @@ A text checked with no platform profile (a `.yar` file in an editor) takes YARA-
 
 The modules are **YARA-X's documented default module set, less `vt`**: `console`, `crx`, `cuckoo`, `dex`, `dotnet`, `elf`, `hash`, `lnk`, `macho`, `math`, `pe`, `string`, `time`, `zip` (VirusTotal/yara-x 1.23.0, `lib/Cargo.toml` `default-modules`). Importing any other module is `yara_unknown_module`:
 
-- `magic` is not a YARA-X default. YARA-X builds it only with its `magic-module` feature and libmagic, because it can be very slow and its output varies across libmagic versions ([YARA-X: magic](https://virustotal.github.io/yara-x/docs/modules/magic/)).
+- `magic` is not a YARA-X default (libyara compiles it only when built with `--enable-magic`). YARA-X builds it only with its `magic-module` feature and libmagic, because it can be very slow and its output varies across libmagic versions ([YARA-X: magic](https://virustotal.github.io/yara-x/docs/modules/magic/)).
 - `vt` is a YARA-X default that this spec excludes: it describes VirusTotal's own scan metadata, which only VirusTotal's scanning fills.
 - `msi`, `olecf`, and `vba` are experimental in YARA-X and not built by default.
 
@@ -98,7 +98,7 @@ Members and their types are YARA-X's. A member YARA-X types as boolean is checke
 - **Rules that compiled can now fail validation.** The fixes are small (escape a `{`, list the rules instead of a wildcard, replace `entrypoint` with `pe.entry_point`), and opentide's changelog lists them.
 - **The one feature loss is rule wildcards in `of`**: a rule that used `any of (family_*)` must list the rules.
 - **A libyara platform may refuse what validation passes.** The profiles check syntax, not libyara's limits, so a 129-character identifier or `0% of them` passes validation and fails at a libyara tenant. Bitdefender's agent ships libyara. This is accepted: emulating libyara is the dual-language checker this RFC removes.
-- **`import "magic"` and `import "vt"` fail.** A rule that imported `magic` (which libyara ships) drops the import and its conditions.
+- **`import "magic"` and `import "vt"` fail.** A rule that imported `magic` (which libyara compiles when built with `--enable-magic`) drops the import and its conditions.
 
 ## Alternatives
 
