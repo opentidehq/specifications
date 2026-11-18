@@ -125,7 +125,10 @@ class SpecShapeTests(unittest.TestCase):
 class HarfangLabSpecTests(unittest.TestCase):
     def test_version_and_constraints(self) -> None:
         text = _read(HARFANGLAB)
-        self.assertIn('version: "1.5"', text)
+        self.assertIn('version: "1.6"', text)
+        deploy = text.split("### Deploy", 1)[1].split("###", 1)[0]
+        self.assertNotIn("tenant `type`", deploy)
+        self.assertIn("A HarfangLab tenant takes both kinds of rule", deploy)
         profile = text.split("### YARA profile", 1)[1].split("###", 1)[0]
         self.assertIn("`yara_x_syntax: refused`", profile)
         self.assertNotIn("libyara4", profile)
