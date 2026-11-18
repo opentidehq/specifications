@@ -1,6 +1,6 @@
 ---
 spec: platform-harfanglab
-version: "1.5"
+version: "1.6"
 schema_id: platform::harfanglab::1.0
 status: normative
 supersedes: null
@@ -163,7 +163,7 @@ Every non-private rule of a `signature` SHOULD set meta `context`. A missing `co
 | `DELETION` | The Sigma or YARA rule deleted by `metadata.uuid`. |
 | any other | Create or update by `metadata.uuid`. |
 
-The tenant `source_id` is sent with the rule. The tenant `type` (`Sigma` or `YARA`) selects which HarfangLab API the workspace is configured for; the block's `sigma` / `yara` keys select which compiler runs.
+The tenant `source_id` is sent with the rule. A HarfangLab tenant takes both kinds of rule: the block's `sigma` or `yara` key alone selects the compiler and the HarfangLab endpoint (`SigmaRule` or `YaraFile`), for create, update, and delete. A tenant configuration carries no rule kind; an implementation MUST NOT skip or fail a rule because of a tenant setting about its kind.
 
 A YARA rule's `content` is `yara.signature` in the signature form, verbatim, and the assembled rule in the decomposed form. Every other part of the YARA deploy is the same for both forms: endpoint, payload fields, name, identity, and the status strategy table above.
 
@@ -274,3 +274,4 @@ Fixtures: [fixtures/platforms/harfanglab-sigma.yaml](../../fixtures/platforms/ha
 | 1.3 | 2026-11-10 | Clarifications from the first implementation review: the decomposed form is checked exactly as deploy assembles it, every diagnostic mapped to an authored field and none dropped; `harfanglab_yara_rule_name` also covers a derived name over 128 characters; `harfanglab_yara_context` accepts any comma-joined list of `file`, `memory`, `file.pe`, `file.elf`, `file.macho`, applies to the decomposed form, and covers a non-string `context`. Schema id unchanged. |
 | 1.4 | 2026-11-10 | Query validation: `opentide validate query` checks YARA offline, `.yar`/`.yara` files included; `--live` stays `supported: false` ([validation 1.9](../validation.md#query-validation)). Schema id unchanged. |
 | 1.5 | 2026-11-16 | YARA profile: `yara_x_syntax: refused` replaces dialect `libyara4`, so YARA-X-only syntax is `yara_x_only_syntax`; the YARA language is YARA-X 1.x ([yara-1.0](../languages/yara-1.0.md) 1.6, [RFC 0020](../../rfcs/0020-yara-x-reference-language.md)). `harfanglab_yara_import` follows the new module set (`crx` and `zip` known, `magic` not). `harfanglab_yara_rule_name` is unchanged. Schema id unchanged. |
+| 1.6 | 2026-11-18 | A tenant takes both Sigma and YARA rules: the block's `sigma` or `yara` key selects the endpoint, and the tenant `type` setting (`Sigma` or `YARA`) is removed. Schema id unchanged. |

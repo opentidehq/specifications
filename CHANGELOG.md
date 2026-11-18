@@ -284,6 +284,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - `platform::crowdstrike::1.0`. Correlation rule: filter `query`, `details.trigger` (`verbose` or `summary`), `details.outcome` (`detection` or `incident`), and `schedule`. No query validator.
 
+## platform-harfanglab 1.6
+
+- A HarfangLab tenant takes both kinds of rule. The block's `sigma` or `yara` key selects the endpoint for create, update, and delete; the tenant `type` setting (`Sigma` or `YARA`) is removed, and an implementation MUST NOT skip or fail a rule because of a tenant setting about its kind. Schema id unchanged.
+
 ## platform-harfanglab 1.5
 
 - YARA profile: `yara_x_syntax: refused` replaces dialect `libyara4`. YARA-X-only syntax is `yara_x_only_syntax` until a live deploy confirms HarfangLab takes it; every other YARA error is YARA-X's ([RFC 0020](rfcs/0020-yara-x-reference-language.md)). `harfanglab_yara_import` follows the new module set. Schema id unchanged.
