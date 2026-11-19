@@ -123,6 +123,8 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - The `att&ck` header `stages` list is the ATT&CK 20.0 enterprise matrix: `Stealth` and `Defense Impairment` replace `Defense Evasion`, and the `Priviledge Escalation` typo is fixed. Generated schema docs render only a key's stages that the header lists, so live keys staged `Stealth`, `Defense Impairment` or `Privilege Escalation` lost those stages. Key data is unchanged.
 - `att&ck.groups` adds 41 groups at `1.1` and 2 at `1.2`; `mitigations` adds 1 at `1.1`; `datasources` adds 4 at `1.1`. No schema pins these vocabularies.
 - `scripts/validate.py` rejects a pin `field::M.m` that no key of `field` is introduced or removed at, so a pin can no longer name an empty minor. A removal-only major (`att&ck::2.0`) stays pinnable.
+- `stakeholders.vocab.toml` is retired. No object schema has a `stakeholders` field and no pin names it, so nothing read it; its keys also carried one organisation's text.
+- `alert_severity` is named "Alert Severity" (was "MDR Alert Severity") and its description no longer names an MDR. Display text only: the field, the keys and their versions are unchanged, so `alert_severity::1.0` is unaffected.
 - `responders.vocab.toml` is retired. It shipped with `keys = []` while `response.responders` was pinned to it, so every authored value failed validation and no instance could fix it (vocabularies are not locally extensible). The alert handling team is per-organisation configuration: the field is free text defaulted from `[deployment] default_responders` (opentide#507).
 - Initial catalog of 36 bundled vocabularies copied from opentide.
 
