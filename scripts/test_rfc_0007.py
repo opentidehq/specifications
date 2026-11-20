@@ -630,7 +630,7 @@ def compile_rule(rule: dict[str, Any], setup: dict[str, Any]) -> dict[str, Any]:
         if lists:
             body["exceptions_list"] = lists
     body["tags"] = list(
-        dict.fromkeys(["OpenTide", *(setup.get("tags") or []), *(block.get("tags") or [])])
+        dict.fromkeys(["opentide", *(setup.get("tags") or []), *(block.get("tags") or [])])
     )
     metadata = rule["metadata"]
     authors = list(dict.fromkeys(filter(None, [metadata.get("author"), *(metadata.get("contributors") or [])])))
@@ -697,7 +697,7 @@ class ExampleCompilationTests(unittest.TestCase):
         staged = compile_rule(_yaml("rule-query"), _staging_setup())
         compiled = compile_rule(_yaml("rule-query"), prod)
         self.assertNotIn("alert_suppression", compiled)
-        self.assertEqual(compiled["tags"], ["OpenTide", "soc-prod", "Windows", "LOLBAS"])
+        self.assertEqual(compiled["tags"], ["opentide", "soc-prod", "Windows", "LOLBAS"])
         self.assertEqual(compiled["index"], staged["index"])
         without = {k: v for k, v in staged.items() if k not in ("alert_suppression", "tags")}
         self.assertEqual({k: v for k, v in compiled.items() if k != "tags"}, without)

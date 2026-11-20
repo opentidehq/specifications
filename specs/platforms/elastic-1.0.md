@@ -1,6 +1,6 @@
 ---
 spec: platform-elastic
-version: "1.1"
+version: "1.2"
 schema_id: platform::elastic::1.0
 status: normative
 supersedes: null
@@ -73,7 +73,7 @@ Query validation:
 | `required_fields` | list[[ElasticRequiredField](#required_fields-elasticrequiredfield)] | optional | null | Fields the rule needs, with their mapping types. |
 | `guide` | [ElasticGuide](#guide-elasticguide) | optional | null | Investigation guide and Setup guide. |
 | `false_positives` | list[string] | optional | null | Known false positives. |
-| `tags` | list[string] | optional | null | Rule tags, after `OpenTide` and the tenant tags. |
+| `tags` | list[string] | optional | null | Rule tags, after `opentide` and the tenant tags. |
 | `exceptions` | [ElasticExceptions](#exceptions-elasticexceptions) | optional | null | Exception lists to attach. |
 | `building_block` | boolean | optional | `false` | Building block rule: alerts are hidden from the default Alerts view. |
 | `overrides` | [ElasticOverrides](#overrides-elasticoverrides) | optional | null | Rule name override and timestamp override. |
@@ -437,7 +437,7 @@ Deploy compiles each rule into one detection-engine create or update body. Kiban
 | `actions` | `actions.notify` | verbatim |
 | `response_actions` | `actions.respond` | [actions](#actions-elasticactions) |
 | `timeline_id`, `timeline_title` | `actions.timeline.id`, `actions.timeline.title` | verbatim, when set |
-| `tags` | `"OpenTide"`, tenant `setup.tags`, block `tags` | in that order, de-duplicated |
+| `tags` | `"opentide"`, tenant `setup.tags`, block `tags` | in that order, de-duplicated |
 | `author` | `metadata.author`, `metadata.contributors` | de-duplicated; omitted when empty |
 | `references` | `references.public` | values in ascending key order |
 | `threat` | resolved techniques | [ATT&CK](#attck) |
@@ -521,7 +521,7 @@ The base path is `<url>/api/detection_engine/rules` in space `default`, and `<ur
 
 **Errors.** HTTP 400 or 409 on one rule, or a failed Elasticsearch check, fails that rule with the server's message, and the batch continues. HTTP 401 or 403 fails the tenant, and deploy moves to the next tenant. HTTP 429 and 5xx are retried up to three times with exponential backoff.
 
-A deployer MAY list managed rules with `GET _find?filter=alert.attributes.tags:"OpenTide"` instead of one `GET` per rule.
+A deployer MAY list managed rules with `GET _find?filter=alert.attributes.tags:"opentide"` instead of one `GET` per rule. A rule deployed under platform-elastic 1.1 or earlier carries `OpenTide` in that place until its next update, and Kibana matches tags case-sensitively, so such a listing also filters on `OpenTide` while those rules remain.
 
 ### Query validation
 
@@ -644,7 +644,7 @@ With rule `name: Rule name`, `metadata.uuid: 00000000-0000-4000-8000-00000000000
   "language": "kuery",
   "query": "event.category : \"process\"",
   "index": ["logs-*"],
-  "tags": ["OpenTide"],
+  "tags": ["opentide"],
   "author": ["Detection Engineering"]
 }
 ```
@@ -729,6 +729,7 @@ RFC 0007 has a complete rule for every rule type, and the compiled body of its E
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.2 | 2026-11-20 | The marker tag that opens `tags` is `opentide`, lower case, as the product is spelt everywhere else (was `OpenTide`). A rule deployed under 1.1 or earlier keeps `OpenTide` until its next update, which replaces it. Schema id unchanged. |
 | 1.1 | 2026-10-23 | Optional tenant `setup.version`: the lowest stack version a tenant reaches, `MAJOR.MINOR` or `serverless` ([Stack version](#stack-version)). Static validation and editors MAY report syntax the lowest declared version across a rule's target tenants lacks; absent means the 8.19 floor. Deploy MUST NOT read the version from the cluster ([specifications#59](https://github.com/opentidehq/specifications/issues/59)). Schema id unchanged. |
 | 1.1 | 2026-10-23 | [Advisories](#advisories) carry stable codes, one per condition: `lookback_zero`, `lookback_long`, `threshold_lookback`, `esql_metadata_id`, `eql_maxspan_window`, `eql_maxspan_lookback`, `risk_band`, and `technique_not_enterprise`. The EQL `maxspan` advisory is split in two. A non-aggregating ES\|QL query is one with no `STATS` step; `INLINE STATS` does not count. Kibana 9.4 and later add `METADATA _id` themselves ([specifications#57](https://github.com/opentidehq/specifications/issues/57)). Schema id unchanged. |
 | 1.0 | 2026-10-19 | The tactic table follows ATT&CK v19 as `att&ck::1.2` (ATT&CK 20.0) publishes it: TA0005 is `Stealth`, and `Defense Impairment` is TA0112. Removed keys still staged `Defense Evasion` map to `Stealth` through the legacy-stage table. Without this, techniques staged only in those tactics emitted no `threat` entry ([opentide#568](https://github.com/opentidehq/opentide/issues/568)). |

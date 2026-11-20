@@ -33,7 +33,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Carbon Black Cloud platform | 1.1 | `platform::carbon_black_cloud::1.0` | normative | [specs/platforms/carbon-black-cloud-1.0.md](specs/platforms/carbon-black-cloud-1.0.md) |
 | CrowdStrike platform | 1.1 | `platform::crowdstrike::1.0` | normative | [specs/platforms/crowdstrike-1.0.md](specs/platforms/crowdstrike-1.0.md) |
 | HarfangLab platform | 1.6 | `platform::harfanglab::1.0` | normative | [specs/platforms/harfanglab-1.0.md](specs/platforms/harfanglab-1.0.md) |
-| Elastic Security platform | 1.1 | `platform::elastic::1.0` | normative | [specs/platforms/elastic-1.0.md](specs/platforms/elastic-1.0.md) |
+| Elastic Security platform | 1.2 | `platform::elastic::1.0` | normative | [specs/platforms/elastic-1.0.md](specs/platforms/elastic-1.0.md) |
 | Sysdig Secure platform | 1.1 | `platform::sysdig::1.0` | normative | [specs/platforms/sysdig-1.0.md](specs/platforms/sysdig-1.0.md) |
 | Bitdefender GravityZone platform | 1.5 | `platform::bitdefender::1.0` | normative | [specs/platforms/bitdefender-1.0.md](specs/platforms/bitdefender-1.0.md) |
 | Graylog platform | 1.1 | `platform::graylog::1.0` | normative | [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md) |

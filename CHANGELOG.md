@@ -119,12 +119,12 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## vocabulary catalog 1.0
 
+- `stakeholders.vocab.toml` is retired. No object schema has a `stakeholders` field and no pin names it, so nothing read it; its keys also carried one organisation's text.
+- `alert_severity` is named "Alert Severity" (was "MDR Alert Severity") and its description no longer names an MDR. Display text only: the field, the keys and their versions are unchanged, so `alert_severity::1.0` is unaffected.
 - `att&ck` restored to ATT&CK 19.2 at `1.1` and refreshed to ATT&CK 20.0 at `1.2` ([opentide#568](https://github.com/opentidehq/opentide/issues/568)). The canonical copy was ATT&CK v17 with no key at `1.1` while every technique pin named `att&ck::1.1`, so T1685–T1690, T1059.013 and the other v18/v19 techniques were rejected. `1.1` adds 60 keys (the set opentide 0.9.0–0.12.1 shipped) and `1.2` adds 19 (T1696–T1701 and sub-techniques, T1685.007, T1608.007, T1476, T0869.001/.002). 27 IDs that ATT&CK revoked or deprecated (T1562 and its sub-techniques, T1070.001/.002, T1656, T1672, eleven ICS techniques) get `removed = "2.0"`, so they still resolve under every `att&ck::1.x` pin. Live keys use the v19 tactics `Stealth` (TA0005, formerly Defense Evasion) and `Defense Impairment` (TA0112); RFC 0007's tactic table follows, and maps the legacy `Defense Evasion` stage of removed keys to `Stealth`. Six techniques take MITRE's renames (for example T1211 "Exploitation for Stealth"). Enterprise sub-technique names keep the `Parent: Sub` form. The header gains `source = "mitre-attack"` and `source_version = "20.0"`.
 - The `att&ck` header `stages` list is the ATT&CK 20.0 enterprise matrix: `Stealth` and `Defense Impairment` replace `Defense Evasion`, and the `Priviledge Escalation` typo is fixed. Generated schema docs render only a key's stages that the header lists, so live keys staged `Stealth`, `Defense Impairment` or `Privilege Escalation` lost those stages. Key data is unchanged.
 - `att&ck.groups` adds 41 groups at `1.1` and 2 at `1.2`; `mitigations` adds 1 at `1.1`; `datasources` adds 4 at `1.1`. No schema pins these vocabularies.
 - `scripts/validate.py` rejects a pin `field::M.m` that no key of `field` is introduced or removed at, so a pin can no longer name an empty minor. A removal-only major (`att&ck::2.0`) stays pinnable.
-- `stakeholders.vocab.toml` is retired. No object schema has a `stakeholders` field and no pin names it, so nothing read it; its keys also carried one organisation's text.
-- `alert_severity` is named "Alert Severity" (was "MDR Alert Severity") and its description no longer names an MDR. Display text only: the field, the keys and their versions are unchanged, so `alert_severity::1.0` is unaffected.
 - `responders.vocab.toml` is retired. It shipped with `keys = []` while `response.responders` was pinned to it, so every authored value failed validation and no instance could fix it (vocabularies are not locally extensible). The alert handling team is per-organisation configuration: the field is free text defaulted from `[deployment] default_responders` (opentide#507).
 - Initial catalog of 36 bundled vocabularies copied from opentide.
 
@@ -313,6 +313,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## platform-harfanglab 1.0
 
 - `platform::harfanglab::1.0`. Sigma or YARA rule. Identity is `metadata.uuid`. No query validator. Deploy requires one of `sigma` or `yara`; validation does not.
+
+## platform-elastic 1.2
+
+- The marker tag that opens a compiled rule's `tags` is `opentide`, lower case, as the product is spelt everywhere else (was `OpenTide`). Tenant and block tags follow it as before. A rule deployed under 1.1 or earlier keeps `OpenTide` until its next update replaces it, and Kibana matches tags case-sensitively, so a listing by tag filters on both while such rules remain. RFC 0007's examples follow. Schema id unchanged.
 
 ## platform-elastic 1.1
 

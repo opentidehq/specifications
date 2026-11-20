@@ -119,10 +119,18 @@ class ElasticSpecShapeTests(unittest.TestCase):
         text = _read(SPEC)
         meta = _frontmatter(text)
         self.assertEqual(meta["spec"], "platform-elastic")
-        self.assertEqual(meta["version"], "1.1")
+        self.assertEqual(meta["version"], "1.2")
         self.assertEqual(meta["schema_id"], "platform::elastic::1.0")
         self.assertEqual(meta["status"], "normative")
         self.assertEqual(re.findall(r"^## (.+)$", text, flags=re.MULTILINE), SECTIONS)
+
+    def test_marker_tag_is_lower_case(self) -> None:
+        """platform-elastic 1.2: the marker tag is `opentide`; only the history names the old spelling."""
+        text = _read(SPEC)
+        self.assertIn('| `tags` | `"opentide"`, tenant `setup.tags`, block `tags` |', text)
+        self.assertIn('"tags": ["opentide"]', text)
+        self.assertIn('alert.attributes.tags:"opentide"', text)
+        self.assertNotIn('"OpenTide"', text)
 
     def test_identity_is_metadata_uuid_and_never_stored(self) -> None:
         text = _read(SPEC)
