@@ -23,7 +23,7 @@ Index of canonical vocabulary files bundled with opentide. Each file lives in `v
 | File | Name | Field |
 |------|------|-------|
 | `actors.vocab.toml` | Threat Actors | `actors` |
-| `alert_severity.vocab.toml` | MDR Alert Severity | `alert_severity` |
+| `alert_severity.vocab.toml` | Alert Severity | `alert_severity` |
 | `att&ck.vocab.toml` | MITRE ATT&CK | `att&ck` |
 | `att&ck.groups.vocab.toml` | MITRE ATT&CK Groups | `att&ck.groups` |
 | `chaining_relations.vocab.toml` | Vector Chaining Relationship | `chaining_relations` |
@@ -51,14 +51,13 @@ Index of canonical vocabulary files bundled with opentide. Each file lives in `v
 | `severity.vocab.toml` | Threat Severity | `severity` |
 | `signal.entities.vocab.toml` | Signal Entities | `signal.entities` |
 | `sophistication.vocab.toml` | Adversary Sophistication | `sophistication` |
-| `stakeholders.vocab.toml` | Stakeholders to Notify | `stakeholders` |
 | `surface.vocab.toml` | Threat Surface | `surface` |
 | `tier.vocab.toml` | Threat Actor Tier | `tier` |
 | `tlp.vocab.toml` | Traffic Light Protocol | `tlp` |
 | `viability.vocab.toml` | Vector Viability | `viability` |
 | `violation.vocab.toml` | Policy, mandate or governance violations | `violation` |
 
-**Total:** 36 vocabulary files.
+**Total:** 34 vocabulary files.
 
 ## Relationships
 

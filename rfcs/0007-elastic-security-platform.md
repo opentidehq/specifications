@@ -8,6 +8,7 @@
 - **Revised:** 2026-09-29 — author blocks follow the Security create-rule screens
 - **Revised:** 2026-10-15 — aligned with the first implementation ([opentidehq/opentide#481](https://github.com/opentidehq/opentide/pull/481)); see [§8](#8-revisions-after-the-first-implementation)
 - **Revised:** 2026-10-19 — tactic table follows ATT&CK v19 and later (Stealth, Defense Impairment) for `att&ck::1.2` ([opentidehq/opentide#568](https://github.com/opentidehq/opentide/issues/568)); see [§8](#8-revisions-after-the-first-implementation)
+- **Revised:** 2026-11-20 — the marker tag is `opentide`, lower case (platform-elastic 1.2); see [§8](#8-revisions-after-the-first-implementation)
 - **Accepted:** 2026-09-29 — design accepted for the first implementation. Normative spec text and fixtures follow ([§7](#7-spec-changes-after-acceptance)).
 - **Landed:** 2026-10-19 — normative text in [specs/platforms/elastic-1.0.md](../specs/platforms/elastic-1.0.md). The spec also accepts compound shorthand durations (`1h10m`) and sends a default `config` for `kill-process` and `suspend-process` without `field`, as opentide does ([opentide#564](https://github.com/opentidehq/opentide/pull/564), [opentide#562](https://github.com/opentidehq/opentide/pull/562)).
 - **Issue:** [opentidehq/specifications#17](https://github.com/opentidehq/specifications/issues/17)
@@ -418,7 +419,7 @@ The deployer compiles each MDR into a detection-engine create or update body:
 | `actions` | `actions.notify` | Rule actions step: connector id, params, and frequency. Omitted keeps the remote value. |
 | `response_actions` | `actions.respond` | `{endpoint: isolate\|kill-process\|suspend-process\|runscript, comment?, field?}` or `{osquery: {...}}`. `field` is the custom process field (overwrite false). Omitted keeps the remote value. |
 | `timeline_id`, `timeline_title` | `actions.timeline.id`, `actions.timeline.title` | Timeline template attached to the rule. Omitted keeps the remote value. |
-| `tags` | `"OpenTide"`, tenant `setup.tags`, block `tags` | in that order, de-duplicated |
+| `tags` | `"opentide"`, tenant `setup.tags`, block `tags` | in that order, de-duplicated |
 | `author` | `metadata.author`, `metadata.contributors` | de-duplicated; omitted if empty |
 | `references` | `references.public` | values in ascending key order |
 | `note` | `guide.investigation`, else `response.procedure.analysis` | Investigation guide, trailing whitespace stripped |
@@ -777,7 +778,7 @@ Compiled for tenant `elastic-staging` and sent as `POST https://soc-staging.kb.e
     }
   ],
   "tags": [
-    "OpenTide",
+    "opentide",
     "Windows",
     "LOLBAS"
   ],
@@ -1721,7 +1722,7 @@ Errors:
 - 401 or 403: that tenant fails, and the deployer moves to the next tenant.
 - 429 and 5xx: retry up to three times with exponential backoff.
 
-A deployer MAY list managed rules with a single `GET _find?filter=alert.attributes.tags:"OpenTide"` instead of one `GET` per rule. It MUST NOT delete a managed rule that has no MDR (orphan pruning is deferred).
+A deployer MAY list managed rules with a single `GET _find?filter=alert.attributes.tags:"opentide"` instead of one `GET` per rule. It MUST NOT delete a managed rule that has no MDR (orphan pruning is deferred).
 
 ### 6. Query validation
 
@@ -1823,6 +1824,7 @@ The first implementation ([opentidehq/opentide#481](https://github.com/opentideh
 | Extra validation warnings | §2 | Look-back over `1h`, threshold look-back over `interval`, and EQL `maxspan` against the window. All are warnings; none rejects a rule. |
 | Bulk path precondition | Unresolved questions | Kibana's `_import` requires `version`, which §3 forbids, so a bulk path needs its own revision. |
 | Stealth and Defense Impairment tactics | §3 Threat | `att&ck::1.2` (ATT&CK 20.0) uses the v19 tactics: TA0005 is Stealth and Defense Impairment is TA0112. Without them, techniques staged only in those tactics would emit no `threat` entry ([opentide#568](https://github.com/opentidehq/opentide/issues/568)). Removed keys still staged `Defense Evasion` map through the alias table. |
+| Lower-case marker tag | §3, §4 Example A, §5, Unresolved questions | Product markers are spelt `opentide` on every platform; Elastic alone wrote `OpenTide` (platform-elastic 1.2). Rules deployed earlier keep `OpenTide` until their next update. |
 
 ## Drawbacks
 
@@ -1858,7 +1860,7 @@ The first implementation ([opentidehq/opentide#481](https://github.com/opentideh
 | Question | Proposed direction |
 |----------|--------------------|
 | Exceptions as code | Separate RFC mapping per-tenant exclusions (as in Sentinel and Defender) to `/api/exception_lists` and rule `exceptions_list`. Until then, exceptions are Kibana-managed and preserved. |
-| Orphan pruning | Report rules tagged `OpenTide` that have no MDR. Deletion stays opt-in in a later revision. |
+| Orphan pruning | Report rules tagged `opentide` that have no MDR. Deletion stays opt-in in a later revision. |
 | Bulk path for large catalogues | `_import` fast path behind a tenant flag, after per-rule semantics are proven. Kibana's `_import` requires `version`, so this needs a revision that allows `version` on that path, and it MUST still copy the preserved fields and refuse prebuilt rules. |
 | Deriving `required_fields` and `related_integrations` | Elastic's `detection-rules` builds both at release time from the query AST, bundled ECS and integration schemas, and a package list (`integration = ["windows"]`). A later revision MAY fill `required_fields` from the query and `_field_caps`, leaving the block optional. |
 | Kibana not parsing ES\|QL on create | Report it upstream. A later revision MAY make the pre-flight optional on Kibana versions that reject invalid ES\|QL on create. |
