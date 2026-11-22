@@ -39,7 +39,6 @@ Index of canonical vocabulary files bundled with opentide. Each file lives in `v
 | `killchain.vocab.toml` | Unified Kill Chain | `killchain` |
 | `level.vocab.toml` | Threat Level to Organization | `level` |
 | `leverage.vocab.toml` | Leverage | `leverage` |
-| `malapi.vocab.toml` | Malicious Window API | `malapi` |
 | `maturity.vocab.toml` | Detection Maturity Level (DML-8) | `maturity` |
 | `mitigations.vocab.toml` | MITRE ATT&CK Mitigations | `mitigations` |
 | `objectives.vocab.toml` | Strategic Objectives | `objectives` |
@@ -57,7 +56,7 @@ Index of canonical vocabulary files bundled with opentide. Each file lives in `v
 | `viability.vocab.toml` | Vector Viability | `viability` |
 | `violation.vocab.toml` | Policy, mandate or governance violations | `violation` |
 
-**Total:** 34 vocabulary files.
+**Total:** 33 vocabulary files.
 
 ## Relationships
 

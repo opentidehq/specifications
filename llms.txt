@@ -55,7 +55,7 @@
 
 ## Data
 
-- vocabularies/*.vocab.toml: Canonical vocabulary TOML (34 files)
+- vocabularies/*.vocab.toml: Canonical vocabulary TOML (33 files)
 - schemas/vocabulary.schema.json: Vocabulary file JSON Schema
 - schemas/inflight.shard.1.0.schema.json: Inflight preview shard envelope JSON Schema
 - schemas/deployment.state.1.0.schema.json: Deployment-state shard JSON Schema

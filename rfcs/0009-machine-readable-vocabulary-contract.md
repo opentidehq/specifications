@@ -12,6 +12,7 @@ created: 2026-10-14
 - **Author:** @behemothsecurity
 - **Status:** draft
 - **Created:** 2026-10-14
+- **Amended:** 2026-11-22: `malapi.vocab.toml` was removed from the repository in 2026-11 for licensing reasons ([opentide#1753](https://github.com/opentidehq/opentide/issues/1753)). The mentions of `malapi` below record the vocabulary set when this RFC was drafted.
 
 ## Summary
 
