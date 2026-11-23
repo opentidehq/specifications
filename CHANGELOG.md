@@ -239,7 +239,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-sentinel 1.3
 
-- `alert.techniques` and `alert.tactics` are sent when the block sets them; otherwise the rule's objective's techniques are sent, and the tactics are those of the techniques sent. The two lists are never merged. They used to be replaced by the objective's ([opentide#1810](https://github.com/opentidehq/opentide/pull/1810)).
+- `alert.techniques` and `alert.tactics` are sent when the block sets them; otherwise the rule's objective's techniques are sent, and the tactics are those of the techniques sent. The two lists are never merged, and an empty list counts as unset. They used to be replaced by the objective's ([opentide#1810](https://github.com/opentidehq/opentide/pull/1810)).
 - A resolved id newer than ATT&CK v18 is sent as the v18 id it replaced (`T1685.002` sends `T1562.008`), a sub-technique with none as its v18 parent or its newer parent's v18 replacement; an id with no v18 equivalent is left out. Deploy warns for each id it maps or leaves out ([opentide#1801](https://github.com/opentidehq/opentide/pull/1801)). Schema id unchanged.
 
 ## platform-sentinel 1.2
@@ -258,7 +258,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-defender-for-endpoint 1.2
 
-- `alert.techniques` is sent as the alert's `mitreTechniques` when set, and the rule's objective's techniques otherwise; deploy used to send an empty list ([opentide#1801](https://github.com/opentidehq/opentide/pull/1801), [opentide#1810](https://github.com/opentidehq/opentide/pull/1810)). Schema id unchanged.
+- `alert.techniques` is sent as the alert's `mitreTechniques` when set, and the rule's objective's Enterprise ATT&CK techniques otherwise (an empty list counts as unset); deploy used to send an empty list ([opentide#1801](https://github.com/opentidehq/opentide/pull/1801), [opentide#1810](https://github.com/opentidehq/opentide/pull/1810)). Schema id unchanged.
 
 ## platform-defender-for-endpoint 1.1
 

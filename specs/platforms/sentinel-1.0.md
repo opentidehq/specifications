@@ -30,7 +30,7 @@ Shared fields (`enabled`, `name`, `schema`, `status`, `flags`, `tenants`, `contr
 - `scheduling.nrt: true` MUST deploy an NRT rule and MUST NOT require `frequency`, `lookback`, or `trigger`.
 - Each `alert.techniques` entry MUST be an [ATT&CK v18](#attck-techniques) technique or sub-technique id. Static validation MUST reject any other value, including an id that a later ATT&CK release added. The `att&ck` vocabulary does not constrain this field.
 - Deploy MUST send parent technique ids in the Sentinel `techniques` property and sub-technique ids in `subTechniques`. It MUST NOT send a sub-technique id in `techniques`.
-- The ids deploy sends MUST be `alert.techniques` when the block sets it, and the rule's resolved techniques (its objective's, from the `att&ck` vocabulary) otherwise. The two MUST NOT be merged. `alert.tactics`, when set, MUST be sent; otherwise the tactics MUST be those of the techniques sent.
+- The ids deploy sends MUST be `alert.techniques` when the block sets it (an empty list counts as unset), and the rule's resolved techniques (its objective's, from the `att&ck` vocabulary) otherwise. The two MUST NOT be merged. `alert.tactics`, when set, MUST be sent; otherwise the tactics MUST be those of the techniques sent.
 - Deploy MUST NOT send an id outside [ATT&CK v18](#attck-techniques). A resolved id that a later ATT&CK release added MUST be sent as the v18 id it replaced; a sub-technique with none as its v18 parent, or as its newer parent's v18 replacement. An id with no v18 equivalent, a retired id with no successor, and an id Sentinel does not know MUST be left out. An implementation SHOULD warn once per rule for each id it maps or leaves out, naming what is sent instead.
 
 ## Definition
@@ -67,8 +67,8 @@ Deploy sends `frequency` as Sentinel `queryFrequency` and `lookback` as `queryPe
 | `severity` | string | optional | null | Sentinel severity. When omitted, deploy uses `response.alert_severity`. `Critical` is sent as `High`. |
 | `suppression` | string \| boolean | optional | `false` | `false` disables suppression and sends a one-hour duration. A [duration](#durations), ISO 8601 or shorthand, enables suppression for that long. Boolean `true` fails deploy. |
 | `create_incident` | boolean | optional | `true` | Whether a firing alert opens an incident. |
-| `tactics` | list[string] | optional | null | Sentinel tactic names (the ARM `AttackTactic` enum), sent when set. Left out, the tactics are those of the techniques that are sent: each `att&ck` stage maps to the tactic of the same name. Stealth, Defense Impairment, and the ICS Evasion tactic map to `DefenseEvasion`. A stage with no Sentinel tactic is dropped. |
-| `techniques` | list[string] | optional | null | [ATT&CK v18](#attck-techniques) technique and sub-technique ids, the ATT&CK version Sentinel is aligned to. A sub-technique is sent in `subTechniques` and its parent in `techniques`. Sent when set; left out, the techniques of the rule's objective are sent. |
+| `tactics` | list[string] | optional | null | Sentinel tactic names (the ARM `AttackTactic` enum), sent when set; an empty list counts as unset. Left out, the tactics are those of the techniques that are sent: each `att&ck` stage maps to the tactic of the same name. Stealth, Defense Impairment, and the ICS Evasion tactic map to `DefenseEvasion`. A stage with no Sentinel tactic is dropped. |
+| `techniques` | list[string] | optional | null | [ATT&CK v18](#attck-techniques) technique and sub-technique ids, the ATT&CK version Sentinel is aligned to. A sub-technique is sent in `subTechniques` and its parent in `techniques`. Sent when set; an empty list counts as unset. Left out, the techniques of the rule's objective are sent. |
 | `custom_details` | list[CustomDetail] | optional | null | Extra alert properties. |
 | `dynamic_properties` | list[DynamicProperty] | optional | null | Column-driven alert properties. |
 
