@@ -237,6 +237,11 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Per-platform field contracts for the seven bundled blocks (`platform::<identifier>::1.0`). Static validation, registry load, and deploy are specified separately. Generated JSON Schema is not the field contract.
 - Initial capability matrix for seven bundled platforms.
 
+## platform-sentinel 1.3
+
+- `alert.techniques` and `alert.tactics` are sent when the block sets them; otherwise the rule's objective's techniques are sent, and the tactics are those of the techniques sent. The two lists are never merged. They used to be replaced by the objective's ([opentide#1810](https://github.com/opentidehq/opentide/pull/1810)).
+- A resolved id newer than ATT&CK v18 is sent as the v18 id it replaced (`T1685.002` sends `T1562.008`), a sub-technique with none as its v18 parent or its newer parent's v18 replacement; an id with no v18 equivalent is left out. Deploy warns for each id it maps or leaves out ([opentide#1801](https://github.com/opentidehq/opentide/pull/1801)). Schema id unchanged.
+
 ## platform-sentinel 1.2
 
 - `alert.techniques` MUST hold ATT&CK v18 technique or sub-technique ids, the version Microsoft Sentinel is aligned to: the techniques and sub-techniques of the ATT&CK 18.1 Enterprise, Mobile, and ICS matrices that are neither revoked nor deprecated (18.0 has the same ids). The list is Sentinel's own, defined by MITRE's 18.1 STIX data; the `att&ck` vocabulary, which follows the current ATT&CK release, does not constrain the field. An id a later release added fails static validation, even when it replaced a v18 id (`T1685` replaced `T1562`, `T1562.001`, `T1562.006`). The field accepted any string before. Narrowing a value set is not a structural change, so the schema id stays `platform::sentinel::1.0`.
@@ -250,6 +255,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## platform-sentinel 1.0
 
 - `platform::sentinel::1.0`. KQL analytics rule: `query`, `scheduling`, `alert`, plus grouping, entities, exclusions, template, and trigger. `grouping` is required at deploy and optional at validation.
+
+## platform-defender-for-endpoint 1.2
+
+- `alert.techniques` is sent as the alert's `mitreTechniques` when set, and the rule's objective's techniques otherwise; deploy used to send an empty list ([opentide#1801](https://github.com/opentidehq/opentide/pull/1801), [opentide#1810](https://github.com/opentidehq/opentide/pull/1810)). Schema id unchanged.
 
 ## platform-defender-for-endpoint 1.1
 

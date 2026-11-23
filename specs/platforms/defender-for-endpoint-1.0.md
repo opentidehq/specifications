@@ -1,6 +1,6 @@
 ---
 spec: platform-defender-for-endpoint
-version: "1.1"
+version: "1.2"
 schema_id: platform::defender_for_endpoint::1.0
 status: normative
 supersedes: null
@@ -51,7 +51,7 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 | `description` | string | optional | null | Alert description. Deploy uses the rule `description` when omitted. |
 | `severity` | string | optional | null | `Informational`, `Low`, `Medium`, `High`, or `Critical`. Deploy uses `response.alert_severity` when omitted. `Critical` is sent as `high`. |
 | `recommendation` | string | optional | null | Recommended actions text. |
-| `techniques` | list[string] | optional | null | Accepted on the block. The current deployer sends an empty technique list. |
+| `techniques` | list[string] | optional | null | MITRE ATT&CK technique or sub-technique ids (`T1528`, `T1059.001`), sent as the alert's `mitreTechniques` when set; left out, the techniques of the rule's objective are sent. `generate extract` imports the tenant's. |
 
 ### `impacted_entities` (DefenderImpactedEntities)
 
@@ -193,3 +193,4 @@ Fixture: [fixtures/platforms/defender-for-endpoint.yaml](../../fixtures/platform
 |---------|------|-------|
 | 1.0 | 2026-09-30 | Initial field contract from the Defender configuration model, loader, and deployer. |
 | 1.1 | 2026-10-16 | `rule_id` and the `rule_id::<tenant>` alias are removed and fail `external_id_in_rule`. Deploy reads and writes the Defender id in [deployment state](../deployment-state.md); `DISABLEMENT` and `DELETION` without a binding report `external_id_missing` ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Schema id unchanged. |
+| 1.2 | 2026-11-23 | `alert.techniques` is sent as `mitreTechniques` when set, and the rule's objective's techniques otherwise; deploy used to send an empty list (opentide#1801, opentide#1810). Schema id unchanged. |

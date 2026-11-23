@@ -1,6 +1,6 @@
 ---
 spec: platform-sentinel
-version: "1.2"
+version: "1.3"
 schema_id: platform::sentinel::1.0
 status: normative
 supersedes: null
@@ -30,7 +30,8 @@ Shared fields (`enabled`, `name`, `schema`, `status`, `flags`, `tenants`, `contr
 - `scheduling.nrt: true` MUST deploy an NRT rule and MUST NOT require `frequency`, `lookback`, or `trigger`.
 - Each `alert.techniques` entry MUST be an [ATT&CK v18](#attck-techniques) technique or sub-technique id. Static validation MUST reject any other value, including an id that a later ATT&CK release added. The `att&ck` vocabulary does not constrain this field.
 - Deploy MUST send parent technique ids in the Sentinel `techniques` property and sub-technique ids in `subTechniques`. It MUST NOT send a sub-technique id in `techniques`.
-- Deploy MUST NOT send a sub-technique outside [ATT&CK v18](#attck-techniques) in `subTechniques`. A rule's resolved techniques follow the `att&ck` vocabulary, so one can be newer; its parent is still sent in `techniques`, and an implementation SHOULD warn that the sub-technique was left out.
+- The ids deploy sends MUST be `alert.techniques` when the block sets it, and the rule's resolved techniques (its objective's, from the `att&ck` vocabulary) otherwise. The two MUST NOT be merged. `alert.tactics`, when set, MUST be sent; otherwise the tactics MUST be those of the techniques sent.
+- Deploy MUST NOT send an id outside [ATT&CK v18](#attck-techniques). A resolved id that a later ATT&CK release added MUST be sent as the v18 id it replaced; a sub-technique with none as its v18 parent, or as its newer parent's v18 replacement. An id with no v18 equivalent, a retired id with no successor, and an id Sentinel does not know MUST be left out. An implementation SHOULD warn once per rule for each id it maps or leaves out, naming what is sent instead.
 
 ## Definition
 
@@ -66,8 +67,8 @@ Deploy sends `frequency` as Sentinel `queryFrequency` and `lookback` as `queryPe
 | `severity` | string | optional | null | Sentinel severity. When omitted, deploy uses `response.alert_severity`. `Critical` is sent as `High`. |
 | `suppression` | string \| boolean | optional | `false` | `false` disables suppression and sends a one-hour duration. A [duration](#durations), ISO 8601 or shorthand, enables suppression for that long. Boolean `true` fails deploy. |
 | `create_incident` | boolean | optional | `true` | Whether a firing alert opens an incident. |
-| `tactics` | list[string] | optional | null | Sentinel tactic names (the ARM `AttackTactic` enum). Replaced when the rule's ATT&CK techniques resolve to tactics: each `att&ck` stage maps to the tactic of the same name. Stealth, Defense Impairment, and the ICS Evasion tactic map to `DefenseEvasion`. A stage with no Sentinel tactic is dropped. |
-| `techniques` | list[string] | optional | null | [ATT&CK v18](#attck-techniques) technique and sub-technique ids, the ATT&CK version Sentinel is aligned to. A sub-technique is sent in `subTechniques` and its parent in `techniques`. Replaced by the rule's resolved techniques when those exist. |
+| `tactics` | list[string] | optional | null | Sentinel tactic names (the ARM `AttackTactic` enum), sent when set. Left out, the tactics are those of the techniques that are sent: each `att&ck` stage maps to the tactic of the same name. Stealth, Defense Impairment, and the ICS Evasion tactic map to `DefenseEvasion`. A stage with no Sentinel tactic is dropped. |
+| `techniques` | list[string] | optional | null | [ATT&CK v18](#attck-techniques) technique and sub-technique ids, the ATT&CK version Sentinel is aligned to. A sub-technique is sent in `subTechniques` and its parent in `techniques`. Sent when set; left out, the techniques of the rule's objective are sent. |
 | `custom_details` | list[CustomDetail] | optional | null | Extra alert properties. |
 | `dynamic_properties` | list[DynamicProperty] | optional | null | Column-driven alert properties. |
 
@@ -159,7 +160,9 @@ Deploy splits the ids it sends. The Sentinel `techniques` property takes `T####`
 | `T1556`, `T1556.009`, `T1078.004` | `T1556`, `T1078` | `T1556.009`, `T1078.004` |
 | `T1059` | `T1059` | omitted |
 
-The ids deploy sends are the rule's resolved techniques (its objective's, from the `att&ck` vocabulary) when any resolve, and `alert.techniques` otherwise. Resolved techniques also replace `alert.tactics`. A resolved sub-technique newer than v18 (`T1027.018`) is left out of `subTechniques`; its parent (`T1027`) is still sent in `techniques`.
+The ids deploy sends are `alert.techniques` when the block sets it, and the rule's resolved techniques (its objective's, from the `att&ck` vocabulary) otherwise; the two are never merged. `alert.tactics`, when set, is sent; otherwise the tactics are those of the ids sent.
+
+A resolved id newer than v18 is sent as the v18 id it replaced (`T1685.002` sends `T1562.008`). A sub-technique with no replacement is sent as its v18 parent (`T1027.018` sends `T1027`), or as its newer parent's v18 replacement (`T1685.007` sends `T1562`). An id with no v18 equivalent, a retired id with no successor, and an id Sentinel does not know are left out. The parents in `techniques` and the derived tactics are taken from what is sent. For a newer parent (`T1685`), the warning SHOULD list where its sub-techniques map in v18.
 
 ### Durations
 
@@ -257,3 +260,4 @@ Fixture: [fixtures/platforms/sentinel.yaml](../../fixtures/platforms/sentinel.ya
 | 1.1 | 2026-10-19 | `tactics`: ATT&CK v19 renamed Defense Evasion (TA0005) to Stealth and split out Defense Impairment (TA0112). Both, and the ICS Evasion tactic, deploy as `DefenseEvasion`, the only Sentinel tactic for them. A stage with no Sentinel tactic is dropped ([opentide#568](https://github.com/opentidehq/opentide/issues/568)). Schema id unchanged. |
 | 1.1 | 2026-10-19 | [Durations](#durations): ISO 8601 stays the documented form; shorthand, single-unit or compound (`30m`, `1h10m`, `1d2h`, `2m30s`), with the grammar of [Elastic Security](elastic-1.0.md#durations), is accepted and converted to ISO 8601 at deploy ([opentide#564](https://github.com/opentidehq/opentide/pull/564) and the opentide 0.16.0 follow-up, which makes shorthand case-sensitive and adds seconds). Applies to `scheduling.frequency`, `scheduling.lookback`, `alert.suppression`, and `grouping.alert.grouping_lookback`. Schema id unchanged. |
 | 1.2 | 2026-11-03 | `alert.techniques` takes [ATT&CK v18](#attck-techniques) technique and sub-technique ids only, the version Sentinel is aligned to: the active techniques and sub-techniques of the ATT&CK 18.1 Enterprise, Mobile, and ICS matrices. The list is Sentinel's, not the `att&ck` vocabulary's. Deploy sends sub-technique ids in `subTechniques` and their parents in `techniques` ([opentide#686](https://github.com/opentidehq/opentide/issues/686)). A non-structural narrowing: schema id unchanged. |
+| 1.3 | 2026-11-23 | [ATT&CK techniques](#attck-techniques): `alert.techniques` and `alert.tactics` are sent when set, and the rule's objective's techniques otherwise; they used to be replaced by the objective's. A resolved id newer than v18 is sent as its v18 replacement or parent instead of being left out, and deploy warns for each id it maps or leaves out (opentide#1801, opentide#1810). Schema id unchanged. |
