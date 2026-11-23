@@ -1,6 +1,6 @@
 ---
 spec: visibility
-version: "1.0"
+version: "1.1"
 schema_id: visibility::1.0
 status: normative
 supersedes: null
@@ -47,7 +47,8 @@ These requirements apply to every query check an implementation runs offline (`v
 | declared | yes | nothing |
 | known to the implementation's catalog, not declared | yes | `kql_table_not_declared`, warning |
 | known to the implementation's catalog | no | nothing |
-| unknown to the catalog, not declared | either | `kql_unknown_table`, at the platform profile's severity: warning under `sentinel`, error under `defender_for_endpoint` |
+| unknown to the catalog, not declared, under the `sentinel` profile, not ending in `_CL`, and a near miss of a declared or catalog table written as a bare KQL identifier (`[A-Za-z_][A-Za-z0-9_]*`): equal to it once ASCII case, `_`, `-` and whitespace are ignored, or within one edit, or two edits when the name is eight characters or longer | either | `kql_table_misspelt`, error, suggesting the nearest such table, a declared table before a catalog one |
+| any other name unknown to the catalog, not declared | either | `kql_unknown_table`, at the platform profile's severity: warning under `sentinel`, error under `defender_for_endpoint` |
 
 - **Splunk and Elastic.** Under opt-in, a sourcetype that is not declared is `spl_dataset_not_declared`, and an index pattern that is not declared is `elastic_dataset_not_declared`, both warnings. Neither has an unknown-dataset error.
 - **Declared columns, KQL.** An implementation MUST check column references against declared columns as it does for a documented table of its catalog: a near miss is `kql_unknown_column`, and an operator the declared type does not support is `kql_type_mismatch`. Hover MUST show a declared column's type and description; completion MUST offer the declared columns. On a table the catalog also knows, declared columns extend the catalog's, and a declared column with a catalog column's name replaces its type and description. A declared table without `columns` is known by name only.
@@ -174,3 +175,4 @@ data:
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-11-03 | First normative spec ([RFC 0013](../rfcs/0013-visibility-logsource-is-a-dataset.md), [#63](https://github.com/opentidehq/specifications/issues/63)). A log source's `name` is its dataset; optional `columns` keyed by column name; query-check semantics. The opentide 0.20.0 plural keys and `ecs` fail validation. `schema_id` stays `visibility::1.0`. Corrected before any implementation released the 2026-11-02 draft of this spec (singular dataset keys, `[[logsources.columns]]`). |
+| 1.1 | 2026-11-23 | [Query checks](#query-checks): under `sentinel`, an unknown, undeclared KQL name that is a near miss of a declared or catalog table (one edit, two for names of eight characters or more; not `_CL`) is the error `kql_table_misspelt` with the table to use, where it was the `kql_unknown_table` warning (opentide#1818). `schema_id` stays `visibility::1.0`. |
