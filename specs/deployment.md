@@ -1,6 +1,6 @@
 ---
 spec: deployment
-version: "1.3"
+version: "1.4"
 schema_id: null
 status: normative
 supersedes: null
@@ -21,6 +21,7 @@ Defines rule deployment statuses, promotion strategy, proxy settings, and debug 
 - Deprecated statuses MUST NOT be used for new rules (opentide emits warnings).
 - Platform-specific `status` on configuration blocks MUST also be valid deployment statuses when set.
 - For Defender for Endpoint, SentinelOne, and CrowdStrike, update, disablement, and deletion MUST use the tenant binding in [deployment state](deployment-state.md). A `RELEASE` or `PREVIEW` action with no binding MUST NOT create a remote rule unless the deployment-state destination is not ignored and the binding can be durably retained.
+- `opentide deploy` MUST NOT retire a rule whose file was deleted unless `--prune` is given on a run that includes the `RELEASE` strategy ([Retiring deleted rules](#retiring-deleted-rules)). Without it, a deploy MUST report the retirable rules and send nothing for them.
 - `opentide deploy` MUST select only the rule files placed directly in the configured rules directory (`paths.objects.rule`, see [workspace layout](workspace.md)). A rule file in a subdirectory of that folder MUST NOT be deployed.
 
 ## Definition
@@ -96,6 +97,32 @@ For Defender for Endpoint, SentinelOne, and CrowdStrike, update, disablement, an
 
 A rule that carries `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>` on any platform block is refused before any platform client is built (`external_id_in_rule`). Deploy continues with independent rules and exits 1 when any selected rule reported an error. The strategies themselves are unchanged. Sentinel, Splunk, HarfangLab, Carbon Black Cloud, and Elastic address rules without a vendor-assigned id and never use deployment state.
 
+### Retiring deleted rules
+
+A **retirable rule** is a rule that `opentide deploy` deployed earlier, whose object file is gone, and whose `metadata.uuid` no object file in the workspace still holds. A moved or renamed file is not retirable. A deploy finds retirable rules only from two kinds of evidence:
+
+1. **Orphan binding.** On a platform that keeps vendor ids in [deployment state](deployment-state.md), each `platforms.<platform>.<tenant>` entry of a shard whose rule is not in the object registry. A change-detection run reads the shards of the rule files its diff deleted; an `--all` run reads every shard. A binding for a tenant that is no longer configured is not retired: it is kept, and the run warns.
+2. **Deleted rule file.** On a platform that keeps no ids (Sentinel, Splunk, Elastic, HarfangLab, Carbon Black Cloud), a rule file deleted in a change-detection run's diff, read as the diff's base commit held it. Each platform block whose status maps to `PREVIEW`, `RELEASE`, `UNIVERSAL` or `DISABLEMENT` is retirable on the configured tenants that status reached. A block whose status maps to `DELETION` or `INERT` is not. An `--all` run cannot find these rules: there is no shard.
+
+**Without `--prune`** (every strategy, dry run or not): nothing is sent and deployment state is unchanged. The run adds a warning naming the retirable rules and, in `--json`, a top-level `retirable` array with one entry per rule and tenant (`platform`, `tenant`, `uuid`, `name`, `status`, `action: "delete"`, and `unsupported` with a reason where the platform cannot retire it). The exit code is unchanged.
+
+**With `--prune`:** the run MUST include the `RELEASE` strategy and MUST NOT be narrowed with `--uuid` or `--file`; otherwise it is a usage error (exit 2). A dry run shows the retirements as plan rows and sends nothing. Otherwise, after each platform's own rules, each tenant is opened as for a deploy (a tenant that cannot be opened leaves its retirements `not_attempted`), and each retirable rule is deleted:
+
+| Platform | Retirement |
+|----------|------------|
+| Platforms that keep ids | Delete of the id the binding records; on success the binding is removed as for `DELETION` |
+| Sentinel | Delete of the analytics rule named by the UUID |
+| Elastic | Delete of the detection rule whose `rule_id` is the UUID |
+| HarfangLab | Delete of the UUID at the endpoint of the deleted block's kind |
+| Splunk | Delete of the saved search named after the deleted file's `name`, then of every saved search of the app whose description ends `opentide rule <uuid>` |
+| Carbon Black Cloud | Not supported: the row is `skipped`; the report is removed from the watchlist by hand |
+
+A delete the tenant answers with HTTP 404, where the connector reports the status, is `skipped` ("already gone from the tenant") and its binding is forgotten. A rule deleted from the diff on a platform that keeps ids, with no binding for that platform, is neither sent nor reported (the binding is the only proof; this is not `external_id_missing`).
+
+A retirement is a `delete` row of the deploy result marked `retired`. A failed retirement fails the run (exit 1, `issues_found`); a skipped one does not. A run whose only work is retirements has completed.
+
+Nothing is retired, and the run warns, when any object file fails to load, when an `--all` run reads no rule, or when the diff's deletions cannot be read. A shallow checkout or a missing diff base fails the run as before; a push that created its branch has no deletions.
+
 ### `[promotion]`
 
 | Field | Type | Default | Description |
@@ -151,4 +178,5 @@ Default rule status in fixtures: `STAGING` — see [fixtures/valid/rule-1.0.yaml
 | 1.0 | 2026-06-25 | Initial spec from opentide `deployment.toml` |
 | 1.1 | 2026-10-16 | Vendor-assigned rule ids: update, disablement, and deletion on Defender for Endpoint, SentinelOne, and CrowdStrike use the binding in [deployment state](deployment-state.md); creates require a destination that is not ignored and a run that can persist state; `external_id_missing` is a warning ([RFC 0010](../rfcs/0010-deployment-external-ids.md)). |
 | 1.2 | 2026-10-19 | `opentide deploy` selects only rule files placed directly in the configured rules directory; a rule file in a subfolder is not deployed ([specifications#16](https://github.com/opentidehq/specifications/pull/16)). |
+| 1.4 | 2026-11-24 | [Retiring deleted rules](#retiring-deleted-rules): a deploy reports rules whose file was deleted (`retirable`) and, with `--prune` on a `RELEASE` run, deletes them from the tenants they reached (opentide#1713, opentide#1849). Additive: without `--prune` nothing is sent. |
 | 1.3 | 2026-10-20 | `UNIVERSAL` joins the strategy table. opentide already accepts it for a status `strategy`; the spec did not list it. Additive. The `deployment_state_unpersisted` condition names a run by its strategies, not a deployment plan. |
