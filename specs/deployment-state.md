@@ -1,6 +1,6 @@
 ---
 spec: deployment-state
-version: "1.9"
+version: "1.10"
 schema_id: deployment.state::1.0
 status: normative
 supersedes: null
@@ -220,6 +220,7 @@ These requirements apply to the production deploy job that `opentide setup` and 
 5. **Replay on conflict.** When the push is rejected because the default branch moved, the job rebases. If the rebase conflicts, the job MUST abort it, reset to the new tip, and replay this run's state delta per platform and tenant onto the tip's shards (`opentide deploy replay-state <state-commit>`), never by copying whole shard files. Bindings this run did not touch, and shards others deleted, keep the tip's value. When the same binding changed on both sides, the replay MUST keep this run's binding, report `deployment_state_conflict` with both values, publish the resulting state, and fail the job so an operator can remove the duplicate remote rule.
 6. **Recover on every terminal failure.** Once the state commit exists, every terminal failure of the write-back (push retries exhausted, fetch failure, replay failure) MUST print the deployment-state diff of that commit and make a best-effort push of the commit to `refs/opentide/deployment-state/<commit>` (for example from a shell `trap` on `EXIT`), then fail the job. One ref per commit, so a later failure does not overwrite an earlier one.
 7. **Ids in the log.** Every binding deploy records MUST be logged as `external_id_recorded` (platform, tenant, id, rule uuid) at `WARNING`, so it is visible at the default console level and the CI log holds every id even when the write-back never ran. `external_id_recorded` is a log record, not a diagnostic: it does not set `DEPLOYMENT_WARNING_RAISED` or change the exit code.
+8. **Retire deleted rules.** The job MUST pass `--prune` on its `--strategy RELEASE` dry run and deploy, so a rule whose file the push deleted is retired from the tenants it reached ([deployment.md](deployment.md#retiring-deleted-rules)). A pipeline generated with `--no-prune` omits it; the choice is recorded in the generated file's header and kept by later regenerations until `--prune` is passed. Staging, pull-request, and merge-request jobs never pass `--prune`.
 
 Staging, pull-request, and merge-request deploy jobs do not commit state. [Row 6](#deploy-decisions) refuses their creates.
 
@@ -340,7 +341,8 @@ Fixtures: [fixtures/deployment/valid/](../fixtures/deployment/valid/) and [fixtu
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.9 | 2026-11-24 | `defender_for_endpoint` is no longer state-backed: [`platform::defender_for_endpoint::2.0`](platforms/defender-for-endpoint-2.0.md) uses `metadata.uuid` as the Defender rule id. A `defender_for_endpoint` binding is a legacy binding: readers accept it, deploy never writes one, and a 2.0 deploy deletes the legacy rule and removes the binding ([Legacy Defender bindings](#legacy-defender-bindings), [RFC 0021](../rfcs/0021-defender-graph-beta-detection-rules.md)). Supersedes RFC 0010 for Defender. Schema id and shard JSON Schema unchanged. |
+| 1.10 | 2026-11-24 | `defender_for_endpoint` is no longer state-backed: [`platform::defender_for_endpoint::2.0`](platforms/defender-for-endpoint-2.0.md) uses `metadata.uuid` as the Defender rule id. A `defender_for_endpoint` binding is a legacy binding: readers accept it, deploy never writes one, and a 2.0 deploy deletes the legacy rule and removes the binding ([Legacy Defender bindings](#legacy-defender-bindings), [RFC 0021](../rfcs/0021-defender-graph-beta-detection-rules.md)). Supersedes RFC 0010 for Defender. Schema id and shard JSON Schema unchanged. |
+| 1.9 | 2026-11-24 | CI requirement 8: the generated production job passes `--prune` on its `RELEASE` dry run and deploy unless it was generated with `--no-prune`, which the file's header records (opentide#1855). Schema id unchanged. |
 | 1.8 | 2026-11-24 | Orphan shards are reported by `deploy` and retired by `deploy --prune` on a `RELEASE` run ([deployment 1.4](deployment.md#retiring-deleted-rules), opentide#1713). Schema id unchanged. |
 | 1.7 | 2026-11-12 | `google_secops` is state-backed: the Google SecOps rule id, `ru_` and a lower-case UUID, under `platforms.google_secops.<tenant>` ([google-secops-1.0](platforms/google-secops-1.0.md), [RFC 0019](../rfcs/0019-google-secops-yara-l.md)). The shard JSON Schema gains `secopsRuleTenants`. Schema id unchanged. |
 | 1.6 | 2026-11-12 | `exabeam` is state-backed: the Exabeam correlation rule id, a lower-case canonical UUID, under `platforms.exabeam.<tenant>` ([exabeam-1.0](platforms/exabeam-1.0.md), [RFC 0018](../rfcs/0018-exabeam-platform.md)). The shard JSON Schema gains `uuidTenants`. Schema id unchanged. |

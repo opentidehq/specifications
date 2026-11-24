@@ -536,7 +536,7 @@ class IndexTests(unittest.TestCase):
             self.assertIn("| `defender_for_endpoint` | DefenderConfig | `platform::defender_for_endpoint::2.0`;", _read(ROOT / "specs" / "objects" / name))
         changelog = _read(ROOT / "CHANGELOG.md")
         for heading in (
-            "## platform-defender-for-endpoint 2.0", "## platform-defender-for-endpoint 1.4", "## deployment-state 1.9",
+            "## platform-defender-for-endpoint 2.0", "## platform-defender-for-endpoint 1.4", "## deployment-state 1.10",
             "## deployment 1.5", "## platforms 1.11", "## validation 1.16", "## workspace 1.6",
         ):
             self.assertIn(heading, changelog)

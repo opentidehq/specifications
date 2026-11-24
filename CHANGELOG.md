@@ -164,9 +164,13 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
 
-## deployment-state 1.9
+## deployment-state 1.10
 
 - `defender_for_endpoint` is no longer state-backed: Defender 2.0 uses `metadata.uuid` as the rule id. A `defender_for_endpoint` binding is a legacy binding: readers accept it, deploy never writes one, and the first 2.0 deploy to its tenant deploys the uuid rule, deletes the legacy rule, and removes the binding (`defender_legacy_retired`, `defender_legacy_delete_failed`). `migrate-state` still moves a pre-RFC-0010 `rule_id` into a legacy binding. Supersedes RFC 0010 for Defender. Schema id and shard JSON Schema unchanged ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
+
+## deployment-state 1.9
+
+- CI requirement 8: the production job `opentide setup ci` generates passes `--prune` on its `RELEASE` dry run and deploy, retiring rules whose file the push deleted; `setup ci --no-prune` opts out, recorded in the generated header and kept across regenerations ([opentide#1855](https://github.com/opentidehq/opentide/pull/1855)). Schema id unchanged.
 
 ## deployment-state 1.8
 

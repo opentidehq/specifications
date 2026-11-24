@@ -161,10 +161,13 @@ class DeploymentStateSpecTests(unittest.TestCase):
         )]
         self.assertEqual(order, sorted(order))
 
-    def test_ci_requirements_one_to_seven(self) -> None:
+    def test_ci_requirements_one_to_eight(self) -> None:
+        # 1-7 from RFC 0010; 8 (retire deleted rules) from opentide#1855.
         section = _section(_read(STATE), "Continuous integration")
         numbers = re.findall(r"^(\d)\. \*\*", section, flags=re.MULTILINE)
-        self.assertEqual(numbers, [str(n) for n in range(1, 8)])
+        self.assertEqual(numbers, [str(n) for n in range(1, 9)])
+        self.assertIn("8. **Retire deleted rules.**", section)
+        self.assertIn("--no-prune", section)
 
     def test_elastic_never_stores_ids(self) -> None:
         for path in (STATE, PLATFORMS / "index.md"):

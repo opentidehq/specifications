@@ -5,7 +5,7 @@
 - **Author:** opentide maintainers
 - **Status:** accepted
 - **Created:** 2026-11-24
-- **Accepted:** 2026-11-24. Moving Defender for Endpoint to the Graph beta custom detection contract, as a major break with the rule's `metadata.uuid` as the Defender rule id, for opentide 1.0.0 GA, is the owner's decision. The design choices below are this RFC's and are open to review on its PR. The normative text is [specs/platforms/defender-for-endpoint-2.0.md](../specs/platforms/defender-for-endpoint-2.0.md) 2.0, [specs/platforms/defender-for-endpoint-1.0.md](../specs/platforms/defender-for-endpoint-1.0.md) 1.4 (deprecated), [specs/deployment-state.md](../specs/deployment-state.md) 1.9, [specs/deployment.md](../specs/deployment.md) 1.5, [specs/platforms/index.md](../specs/platforms/index.md) 1.11, [specs/validation.md](../specs/validation.md) 1.16, and [specs/workspace.md](../specs/workspace.md) 1.6.
+- **Accepted:** 2026-11-24. Moving Defender for Endpoint to the Graph beta custom detection contract, as a major break with the rule's `metadata.uuid` as the Defender rule id, for opentide 1.0.0 GA, is the owner's decision. The design choices below are this RFC's and are open to review on its PR. The normative text is [specs/platforms/defender-for-endpoint-2.0.md](../specs/platforms/defender-for-endpoint-2.0.md) 2.0, [specs/platforms/defender-for-endpoint-1.0.md](../specs/platforms/defender-for-endpoint-1.0.md) 1.4 (deprecated), [specs/deployment-state.md](../specs/deployment-state.md) 1.10, [specs/deployment.md](../specs/deployment.md) 1.5, [specs/platforms/index.md](../specs/platforms/index.md) 1.11, [specs/validation.md](../specs/validation.md) 1.16, and [specs/workspace.md](../specs/workspace.md) 1.6.
 - **Supersedes:** [RFC 0010](0010-deployment-external-ids.md) for Microsoft Defender for Endpoint only
 - **Issue:** none yet. [AGENTS.md](../AGENTS.md) asks for a spec-change issue before an RFC; one should be opened and linked here.
 - **Implementation:** to be tracked in [opentidehq/opentide](https://github.com/opentidehq/opentide) issues, for 1.0.0 GA (1.0.0-rc.5 ships 1.0).
@@ -55,7 +55,7 @@ Who is affected: every workspace with a Defender block. Each block needs `openti
 |------|--------|
 | `specs/platforms/defender-for-endpoint-2.0.md` | **New**, spec version 2.0, `schema_id: platform::defender_for_endpoint::2.0`, `status: normative`. |
 | `specs/platforms/defender-for-endpoint-1.0.md` | 1.3 → **1.4**, `status: deprecated`. Kept, per [AGENTS.md](../AGENTS.md). Requirements for reading a 1.0 block, the warning, and the deploy refusal; the 1.x deploy table kept for the record. |
-| `specs/deployment-state.md` | 1.8 → **1.9**. Defender leaves the state-backed set. A `defender_for_endpoint` binding is a legacy binding: readers accept it, deploy never writes one, a 2.0 deploy retires it. Schema id and shard JSON Schema unchanged. |
+| `specs/deployment-state.md` | 1.9 → **1.10**. Defender leaves the state-backed set. A `defender_for_endpoint` binding is a legacy binding: readers accept it, deploy never writes one, a 2.0 deploy retires it. Schema id and shard JSON Schema unchanged. |
 | `specs/deployment.md` | 1.4 → **1.5**. Defender addresses its rule by uuid; retirement of a deleted 2.0 rule by uuid and of an orphan legacy binding by its id. |
 | `specs/platforms/index.md` | 1.10 → **1.11**. Schema table, capability matrix, static-validation bar, external-id table. |
 | `specs/validation.md` | 1.15 → **1.16**. Advisories `defender_schema_deprecated` and `defender_no_entities`; the fixture checker applies the Defender 2.0 constraints. |
@@ -127,7 +127,7 @@ This RFC chooses **(A)**:
 
 What (A) costs: the alert and incident history stays attached to the legacy rule's alerts, and for the moment between the two calls both rules run and may both alert. Neither is avoidable without (B)'s permanent second identity.
 
-Deployment-state changes ([deployment-state 1.9](../specs/deployment-state.md#legacy-defender-bindings)):
+Deployment-state changes ([deployment-state 1.10](../specs/deployment-state.md#legacy-defender-bindings)):
 
 - `platforms.defender_for_endpoint` stays a valid key of `deployment.state::1.0`, with its decimal pattern, so every shard opentide 1.x wrote still validates. The shard schema and JSON Schema do not change.
 - Deploy never writes a Defender binding. It removes one after retiring `L` (`204` or `404`), and `--prune` retires an orphan one by deleting `L`.
