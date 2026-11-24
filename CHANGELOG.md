@@ -154,6 +154,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
 
+## deployment-state 1.9
+
+- CI requirement 8: the production job `opentide setup ci` generates passes `--prune` on its `RELEASE` dry run and deploy, retiring rules whose file the push deleted; `setup ci --no-prune` opts out, recorded in the generated header and kept across regenerations ([opentide#1855](https://github.com/opentidehq/opentide/pull/1855)). Schema id unchanged.
+
 ## deployment-state 1.8
 
 - Orphan shards are no longer only removed by hand: `opentide deploy --prune` on a `RELEASE` run deletes the remote rule and then the binding, as for `DELETION`; without `--prune`, `deploy` reports them as retirable. Schema id unchanged.
