@@ -1,6 +1,6 @@
 ---
 spec: deployment-state
-version: "1.7"
+version: "1.8"
 schema_id: deployment.state::1.0
 status: normative
 supersedes: null
@@ -68,7 +68,7 @@ A later platform that needs a vendor-assigned id joins this table and the shard'
 
 One file per rule that has at least one binding. A rule never deployed to a state-backed platform has no file. Deploying a rule to Sentinel, Splunk, HarfangLab, Carbon Black Cloud, or Elastic MUST NOT create one.
 
-A shard whose `object_uuid` is no longer in the object registry (an **orphan shard**) is retained. It is the handle for a remote rule that may still exist after its YAML was removed. No command deletes orphan shards automatically.
+A shard whose `object_uuid` is no longer in the object registry (an **orphan shard**) is retained. It is the handle for a remote rule that may still exist after its YAML was removed. `opentide deploy` reports its bindings as retirable; only `opentide deploy --prune` on a run that includes the `RELEASE` strategy deletes the remote rule and then the binding, as for a `DELETION` status ([deployment.md](deployment.md#retiring-deleted-rules)). No other command deletes orphan shards.
 
 ### Shard format
 
@@ -239,7 +239,7 @@ The complete catalogue. `yaml_parse` and `invalid_uuid` are the existing generic
 
 | Command | Exit 0 | Exit 1 |
 |---------|--------|--------|
-| `opentide deploy` | Every selected rule deployed, or reported warnings only (`external_id_missing`, `deployment_state_ignored` on an update or delete). | Any selected rule reported an error-level code above. Deploy continues with independent rules first. |
+| `opentide deploy` | Every selected rule deployed, or reported warnings only (`external_id_missing`, `deployment_state_ignored` on an update or delete); retirable rules reported without `--prune`; retirements `skipped`. | Any selected rule reported an error-level code above, or a `--prune` retirement failed. Deploy continues with independent rules first. |
 | `opentide deploy migrate-state` | Successful migration, a clean idempotent run (no legacy keys, shards in place), or `external_id_unused` warnings only. | Any rule failed, or deployment state is ignored. |
 | Production write-back | Everything committed and pushed, or nothing to commit. | Rule files left out, `deployment_state_conflict`, or a terminal failure of [requirement 6](#continuous-integration). |
 
@@ -261,7 +261,7 @@ The complete catalogue. `yaml_parse` and `invalid_uuid` are the existing generic
 | Shard directory | `.opentide/states/deployment/` | None |
 | Create in CI outside a release run on a push | Refused (`deployment_state_unpersisted`) | `opentide deploy --persist-state-externally` |
 | Setup ignore line | `.opentide/states/sharing.jsonl` | Client `.gitignore`, which MUST NOT ignore `.opentide/states/deployment/` |
-| Orphan shards | Retained | Removed by hand |
+| Orphan shards | Retained and reported by `deploy` (`retirable`) | `opentide deploy --prune` on a `RELEASE` run, or by hand |
 
 There is no configuration key for this spec.
 
@@ -321,6 +321,7 @@ Fixtures: [fixtures/deployment/valid/](../fixtures/deployment/valid/) and [fixtu
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.8 | 2026-11-24 | Orphan shards are reported by `deploy` and retired by `deploy --prune` on a `RELEASE` run ([deployment 1.4](deployment.md#retiring-deleted-rules), opentide#1713). Schema id unchanged. |
 | 1.7 | 2026-11-12 | `google_secops` is state-backed: the Google SecOps rule id, `ru_` and a lower-case UUID, under `platforms.google_secops.<tenant>` ([google-secops-1.0](platforms/google-secops-1.0.md), [RFC 0019](../rfcs/0019-google-secops-yara-l.md)). The shard JSON Schema gains `secopsRuleTenants`. Schema id unchanged. |
 | 1.6 | 2026-11-12 | `exabeam` is state-backed: the Exabeam correlation rule id, a lower-case canonical UUID, under `platforms.exabeam.<tenant>` ([exabeam-1.0](platforms/exabeam-1.0.md), [RFC 0018](../rfcs/0018-exabeam-platform.md)). The shard JSON Schema gains `uuidTenants`. Schema id unchanged. |
 | 1.5 | 2026-11-11 | `graylog` is state-backed: the Graylog event definition id, 24 lower-case hex digits, under `platforms.graylog.<tenant>` ([graylog-1.0](platforms/graylog-1.0.md), [RFC 0017](../rfcs/0017-graylog-platform.md)). The shard JSON Schema maps `graylog` to `objectIdTenants`. Schema id unchanged. |

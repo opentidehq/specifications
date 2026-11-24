@@ -133,6 +133,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - `responders.vocab.toml` is retired. It shipped with `keys = []` while `response.responders` was pinned to it, so every authored value failed validation and no instance could fix it (vocabularies are not locally extensible). The alert handling team is per-organisation configuration: the field is free text defaulted from `[deployment] default_responders` (opentide#507).
 - Initial catalog of 36 bundled vocabularies copied from opentide.
 
+## deployment 1.4
+
+- Retiring deleted rules: `opentide deploy` reports rules whose file was deleted (a warning and the `--json` `retirable` array) and sends nothing for them; `--prune` on a run that includes `RELEASE` deletes them from the tenants they reached, by the recorded id on platforms that keep ids and from the run's diff on Sentinel, Splunk, Elastic and HarfangLab. Carbon Black Cloud reports it cannot. Nothing is retired while an object file fails to load, a UUID is still in the workspace, or an `--all` run reads no rule ([opentide#1713](https://github.com/opentidehq/opentide/issues/1713), [opentide#1849](https://github.com/opentidehq/opentide/pull/1849)).
+
 ## deployment 1.3
 
 - `UNIVERSAL` is listed as a status `strategy`: the rule is deployed to both staging/preview and production targets. opentide already accepted it; the strategy table did not list it. Additive, no bundled status uses it.
@@ -149,6 +153,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## deployment 1.0
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
+
+## deployment-state 1.8
+
+- Orphan shards are no longer only removed by hand: `opentide deploy --prune` on a `RELEASE` run deletes the remote rule and then the binding, as for `DELETION`; without `--prune`, `deploy` reports them as retirable. Schema id unchanged.
 
 ## deployment-state 1.7
 
