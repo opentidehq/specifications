@@ -1,6 +1,6 @@
 ---
 spec: platforms
-version: "1.10"
+version: "1.11"
 schema_id: null
 status: normative
 supersedes: null
@@ -12,12 +12,13 @@ supersedes: null
 
 opentide ships thirteen detection platform integrations. Each platform has bundled TOML configuration, a deployer, an optional query validator, and a typed rule block under `configurations.<platform>`.
 
-The block's schema identifier is `platform::<identifier>::1.0`. This page is the capability matrix and the shared block. The field contract for each block is its own spec:
+The block's schema identifier is `platform::<identifier>::1.0`, except Defender for Endpoint, whose current schema is `platform::defender_for_endpoint::2.0` (1.0 is deprecated). This page is the capability matrix and the shared block. The field contract for each block is its own spec:
 
 | Identifier | Schema | Spec |
 |------------|--------|------|
 | `sentinel` | `platform::sentinel::1.0` | [sentinel-1.0.md](sentinel-1.0.md) |
-| `defender_for_endpoint` | `platform::defender_for_endpoint::1.0` | [defender-for-endpoint-1.0.md](defender-for-endpoint-1.0.md) |
+| `defender_for_endpoint` | `platform::defender_for_endpoint::2.0` | [defender-for-endpoint-2.0.md](defender-for-endpoint-2.0.md) |
+| `defender_for_endpoint` (deprecated) | `platform::defender_for_endpoint::1.0` | [defender-for-endpoint-1.0.md](defender-for-endpoint-1.0.md) |
 | `splunk` | `platform::splunk::1.0` | [splunk-1.0.md](splunk-1.0.md) |
 | `sentinel_one` | `platform::sentinel_one::1.0` | [sentinel-one-1.0.md](sentinel-one-1.0.md) |
 | `carbon_black_cloud` | `platform::carbon_black_cloud::1.0` | [carbon-black-cloud-1.0.md](carbon-black-cloud-1.0.md) |
@@ -38,7 +39,7 @@ These specs describe the blocks as the engine accepts them today, including ever
 - A platform MUST be marked `enabled: true` in merged configuration to appear in `enabled_systems()`.
 - Deploy and validate capabilities MUST be reported honestly. A platform without a query validator MUST NOT claim query validation support.
 - CrowdStrike, HarfangLab, Sysdig, and Bitdefender MUST NOT advertise query validation (`can_validate: false`). Sysdig's Falco condition ([sysdig-1.0](sysdig-1.0.md#query-validation)) and HarfangLab's YARA ([harfanglab-1.0](harfanglab-1.0.md#query-validation), [yara-1.0](../languages/yara-1.0.md)) are checked offline by `opentide validate`, which is not query validation.
-- A typed block SHOULD set `schema` to `platform::<identifier>::1.0`. Implementations MUST accept a missing `schema` and MUST accept a legacy identifier (`sentinel::2.4`, `splunk::2.0`, `splunk::3.0`, `carbon_black_cloud::3.0`, and the same shape for the other platforms). The identifier is not a closed enum.
+- A typed block SHOULD set `schema` to `platform::<identifier>::1.0`; a Defender for Endpoint block MUST set `platform::defender_for_endpoint::2.0` to be a 2.0 block, and is a deprecated 1.0 block otherwise ([defender-for-endpoint-2.0](defender-for-endpoint-2.0.md#requirements)). Implementations MUST accept a missing `schema` and MUST accept a legacy identifier (`sentinel::2.4`, `splunk::2.0`, `splunk::3.0`, `carbon_black_cloud::3.0`, and the same shape for the other platforms). The identifier is not a closed enum.
 - Unknown keys on a block MUST fail static validation. The model forbids them.
 - A block MUST NOT carry a vendor-assigned external id. `rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` at the root of any block, on every platform, MUST fail with `external_id_in_rule` ([External rule ids](#external-rule-ids)).
 - Registry load is stricter or looser depending on the platform. Defender, Splunk, Carbon Black, Elastic, Sysdig, Bitdefender, Graylog, Exabeam, and Google SecOps pass leftover keys on the block into the model, so an unknown key at the block root fails load as well. The Splunk loader still drops unknown keys inside `scheduling` other than `type`, `expires`, `schedule`, and `timerange`. Sentinel, SentinelOne, CrowdStrike, and HarfangLab drop keys the loader does not map, so those keys pass load and fail `opentide validate`. The [Splunk](splunk-1.0.md) aliases and Defender's `quarantine_files` alias are mapped before that check.
@@ -58,7 +59,7 @@ These specs describe the blocks as the engine accepts them today, including ever
 | Identifier | Display name | Deploy | Query validate | Detection language | Schema spec |
 |------------|--------------|--------|----------------|--------------------|-------------|
 | `sentinel` | Microsoft Sentinel | yes* | yes | KQL | [sentinel-1.0](sentinel-1.0.md) |
-| `defender_for_endpoint` | Microsoft Defender for Endpoint | yes* | yes | KQL | [defender-for-endpoint-1.0](defender-for-endpoint-1.0.md) |
+| `defender_for_endpoint` | Microsoft Defender for Endpoint | yes* | yes | KQL | [defender-for-endpoint-2.0](defender-for-endpoint-2.0.md) (1.0 deprecated) |
 | `splunk` | Splunk | yes | yes | SPL | [splunk-1.0](splunk-1.0.md) |
 | `sentinel_one` | SentinelOne | yes* | yes | S1QL | [sentinel-one-1.0](sentinel-one-1.0.md) |
 | `carbon_black_cloud` | VMware Carbon Black Cloud | yes | yes | Lucene | [carbon-black-cloud-1.0](carbon-black-cloud-1.0.md) |
@@ -104,7 +105,7 @@ This is the static-validation bar. Deploy adds the constraints in each platform 
 | Platform | Required when the block is present |
 |----------|-------------------------------------|
 | `sentinel` | `query`, `scheduling`, `alert` |
-| `defender_for_endpoint` | `query`, `alert` (with `category`), `impacted_entities`, `scheduling` |
+| `defender_for_endpoint` | 2.0: `schema`, `query`, and `schedule` (with `frequency`); every block also meets the [Defender constraints](defender-for-endpoint-2.0.md#constraints). 1.0 (deprecated): `query`, `alert`, `impacted_entities`, `scheduling`, and the warning `defender_schema_deprecated` |
 | `splunk` | `query`, or legacy `search` which fills `query` |
 | `sentinel_one` | `condition` (with `type`) |
 | `carbon_black_cloud` | `query` |
@@ -155,12 +156,12 @@ All bundled platforms default to `enabled = false`. Enable one by setting `enabl
 
 ### External rule ids
 
-Platform blocks MUST NOT contain vendor-assigned external identifiers. Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig, Bitdefender, Graylog, Exabeam, and Google SecOps use the committed deployment-state shard defined in [deployment-state.md](../deployment-state.md). Sentinel, HarfangLab, and Elastic use `metadata.uuid`; Carbon Black Cloud uses `metadata.uuid` for the IOC and the title for the report; Splunk uses its saved-search identity.
+Platform blocks MUST NOT contain vendor-assigned external identifiers. SentinelOne, CrowdStrike, Sysdig, Bitdefender, Graylog, Exabeam, and Google SecOps use the committed deployment-state shard defined in [deployment-state.md](../deployment-state.md). Defender for Endpoint (2.0), Sentinel, HarfangLab, and Elastic use `metadata.uuid`; Carbon Black Cloud uses `metadata.uuid` for the IOC and the title for the report; Splunk uses its saved-search identity.
 
 | Platform | How deploy addresses the remote rule | Where a vendor id lives |
 |----------|--------------------------------------|-------------------------|
 | `sentinel` | `metadata.uuid` is the analytics rule id | Nowhere |
-| `defender_for_endpoint` | Defender-assigned rule id | `.opentide/states/deployment/<uuid>.json` |
+| `defender_for_endpoint` | `metadata.uuid` is the Graph detection-rule id (2.0) | Nowhere. A legacy Defender-assigned id from opentide 1.x stays in `.opentide/states/deployment/<uuid>.json` until a 2.0 deploy retires it |
 | `splunk` | The saved search | Nowhere |
 | `sentinel_one` | SentinelOne-assigned STAR rule id | `.opentide/states/deployment/<uuid>.json` |
 | `carbon_black_cloud` | `metadata.uuid` on the IOC; title on the report | Nowhere |
@@ -177,7 +178,7 @@ Elastic Security ([elastic-1.0](elastic-1.0.md), [RFC 0007](../../rfcs/0007-elas
 
 `rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` are legacy keys from before [RFC 0010](../../rfcs/0010-deployment-external-ids.md). Static validation and every deploy path MUST reject them with `external_id_in_rule`, on every platform block, whether or not a shard also holds the id. No loader folds them into a field. `opentide deploy migrate-state` moves Defender, SentinelOne, and CrowdStrike values into shards (Sysdig, Bitdefender, Graylog, Exabeam, and Google SecOps never had a legacy key) and removes the keys from every other platform with an `external_id_unused` warning.
 
-Defender also accepts the alias `quarantine_files` for `actions.files.quarantine_file` on the loader path only.
+Defender 1.0 also accepts the alias `quarantine_files` for `actions.files.quarantine_file` on the loader path only. Defender 2.0 has no alias.
 
 ### Generated schema drift
 
@@ -245,6 +246,7 @@ Vocabulary files are not platform configuration. See [configuration.md](../confi
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.11 | 2026-11-24 | Defender for Endpoint's current schema is `platform::defender_for_endpoint::2.0` ([defender-for-endpoint-2.0](defender-for-endpoint-2.0.md), [RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)): the Graph beta custom detection contract, addressed by `metadata.uuid` with no stored id. `platform::defender_for_endpoint::1.0` is deprecated. The schema table, capability matrix, static-validation bar, and external-id table say so. |
 | 1.10 | 2026-11-12 | Google Security Operations joins the matrix as the thirteenth platform ([google-secops-1.0](google-secops-1.0.md), [RFC 0019](../../rfcs/0019-google-secops-yara-l.md)): YARA-L 2.0 rules through the Chronicle API v1; live query validation with `verifyRuleText` (in the `--live` allowlist) and offline YARA-L checks ([yara-l-1.0](../languages/yara-l-1.0.md)); the rule id lives in deployment state. |
 | 1.9 | 2026-11-12 | Exabeam New-Scale SIEM joins the matrix as the twelfth platform ([exabeam-1.0](exabeam-1.0.md), [RFC 0018](../../rfcs/0018-exabeam-platform.md)): correlation rules through the Correlation Rules API; in the `--live` allowlist for each sequence filter, through Exabeam Search; the [Exabeam Query Language](../languages/exabeam-1.0.md) is checked offline; the rule UUID lives in deployment state. |
 | 1.8 | 2026-11-11 | Graylog joins the matrix as the eleventh platform ([graylog-1.0](graylog-1.0.md), [RFC 0017](../../rfcs/0017-graylog-platform.md)): native event definitions (Filter & Aggregation) on Graylog 6.3 to 7.2; in the `--live` allowlist through `POST /api/search/validate`; the event definition id lives in deployment state. |

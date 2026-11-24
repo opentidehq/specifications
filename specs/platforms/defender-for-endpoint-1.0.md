@@ -1,14 +1,18 @@
 ---
 spec: platform-defender-for-endpoint
-version: "1.3"
+version: "1.4"
 schema_id: platform::defender_for_endpoint::1.0
-status: normative
+status: deprecated
 supersedes: null
 ---
 
 # Microsoft Defender for Endpoint (`platform::defender_for_endpoint::1.0`)
 
 ## Summary
+
+<Callout type="warning">
+**Deprecated.** Use [`platform::defender_for_endpoint::2.0`](defender-for-endpoint-2.0.md). Microsoft Graph removed the custom detection properties this schema deploys to (`isEnabled`, `schedule.period`, `alertTemplate.mitreTechniques`, `alertTemplate.impactedAssets`, `detectionAction.responseActions`) on 2026-10-01. `opentide validate` warns with `defender_schema_deprecated`, deploy refuses the block with `defender_schema_retired`, and `opentide migrate` rewrites it to 2.0 ([Deprecation](#deprecation), [RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)).
+</Callout>
 
 `configurations.defender_for_endpoint` is a Microsoft Defender custom detection rule. The detection text is KQL. Query validation is supported. Defender assigns the remote rule id; opentide stores it per tenant in [deployment state](../deployment-state.md) so the next deploy updates that rule.
 
@@ -25,6 +29,8 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 - The block MUST NOT contain `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>`. Each fails `external_id_in_rule` ([External rule ids](index.md#external-rule-ids)).
 - Registry load MUST require `scope`. A block that validates without `scope` MUST NOT load for deploy.
 - `actions.files.quarantine_files` MAY be used as an alias of `quarantine_file` on the registry-load path.
+- A Defender block whose `schema` is `platform::defender_for_endpoint::1.0`, a legacy identifier (`defender_for_endpoint::2.3` and the same shape), or missing MUST be read as a 1.0 block, validated against this spec, and reported with the warning `defender_schema_deprecated`.
+- Deploy MUST refuse a 1.0 block with the error `defender_schema_retired` before any call to the tenant, and MUST NOT deploy it through the 2.0 mapping.
 
 ## Definition
 
@@ -126,7 +132,27 @@ Same shape and tenant matching as Sentinel exclusions. See [sentinel-1.0.md](sen
 | `tenant` | string | optional | null | Limit the exclusion to one tenant name. |
 | `let` | map[string, scalar] | optional | null | KQL `let` bindings. String, number, or boolean. |
 
-### Deploy
+### Deprecation
+
+This schema is deprecated since spec version 1.4. A 1.0 block is still read: static validation applies every requirement above, and adds the [advisory](defender-for-endpoint-2.0.md#advisories) `defender_schema_deprecated` (warning) at `configurations.defender_for_endpoint.schema`, or at the block when `schema` is missing. Its message MUST say that 1.0 is deprecated, that deploy refuses it, and that `opentide migrate` rewrites it to `platform::defender_for_endpoint::2.0`, and MUST link [the migration table](defender-for-endpoint-2.0.md#migration-from-10).
+
+`opentide migrate` rewrites the block key by key as [defender-for-endpoint-2.0](defender-for-endpoint-2.0.md#migration-from-10) defines. A value with no 2.0 equivalent leaves the block unchanged and is reported as `defender_migrate_unmapped`.
+
+Deploy refuses a 1.0 block, on every deploy path, dry run included: the rule reports `defender_schema_retired` (error) for each selected tenant, no call reaches Defender, deployment state is not touched, and the run exits 1. The rule's other platform blocks still deploy. The message names `opentide migrate`.
+
+Deploy does not translate a 1.0 block on the fly, for three reasons:
+
+1. The wire format this schema maps to no longer exists. A 1.0 deploy can only be a 2.0 deploy in disguise.
+2. The translation is not total. Some `impacted_entities` and file identifiers have no 2.0 equivalent; deploy would drop them, or a response action, without the author seeing it.
+3. The first 2.0 deploy of a rule recreates it under its uuid and deletes the legacy rule ([Legacy rules](defender-for-endpoint-2.0.md#legacy-rules)). That should follow a reviewed change to the YAML, not a CLI upgrade.
+
+`opentide migrate` is one deterministic command and its diff is reviewable, so the refusal costs one commit.
+
+`opentide validate query --live` still runs a 1.0 block's query.
+
+### Deploy (opentide 1.x)
+
+Kept for the record. opentide 1.x deployed a 1.0 block through the Graph custom detection API with a Defender-assigned id:
 
 | Block status strategy | Defender result |
 |-----------------------|-----------------|
@@ -134,14 +160,15 @@ Same shape and tenant matching as Sentinel exclusions. See [sentinel-1.0.md](sen
 | `DELETION` | Delete the bound remote rule and remove the binding after successful deletion; without a binding, report `external_id_missing`. |
 | any other | Update when a binding exists; otherwise create and durably record the returned id. |
 
-The binding is the tenant's entry under `defender_for_endpoint` in `.opentide/states/deployment/<uuid>.json`. A create is refused when the shard directory is gitignored or the run cannot persist state, and the rule file is never written. The decision order and codes are in [deployment-state.md](../deployment-state.md#deploy-decisions).
+The binding is the tenant's entry under `defender_for_endpoint` in `.opentide/states/deployment/<uuid>.json`. A 2.0 deploy retires the rule such a binding names ([Legacy rules](defender-for-endpoint-2.0.md#legacy-rules)).
 
 The display name on the Defender rule is the Tide rule `name`.
 
 ## Relationships
 
+- [defender-for-endpoint-2.0.md](defender-for-endpoint-2.0.md) — the schema that replaces this one
 - [platforms](index.md) — shared fields and external ids
-- [deployment-state.md](../deployment-state.md) — where the Defender rule id is stored
+- [deployment-state.md](../deployment-state.md) — where opentide 1.x stored the Defender rule id
 - [rule-1.0.md](../objects/rule-1.0.md) — parent object
 - [sentinel-1.0.md](sentinel-1.0.md) — shared KQL exclusion shape
 - [validation.md](../validation.md) — KQL query validation
@@ -183,7 +210,7 @@ configurations:
         collect_investigation_package: true
 ```
 
-Fixture: [fixtures/platforms/defender-for-endpoint.yaml](../../fixtures/platforms/defender-for-endpoint.yaml).
+Fixture: [fixtures/platforms/defender-for-endpoint.yaml](../../fixtures/platforms/defender-for-endpoint.yaml). It validates with `defender_schema_deprecated`; its migration is [fixtures/platforms/defender-for-endpoint/migrated-2.0.yaml](../../fixtures/platforms/defender-for-endpoint/migrated-2.0.yaml).
 
 ## History
 
@@ -193,3 +220,4 @@ Fixture: [fixtures/platforms/defender-for-endpoint.yaml](../../fixtures/platform
 | 1.1 | 2026-10-16 | `rule_id` and the `rule_id::<tenant>` alias are removed and fail `external_id_in_rule`. Deploy reads and writes the Defender id in [deployment state](../deployment-state.md); `DISABLEMENT` and `DELETION` without a binding report `external_id_missing` ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Schema id unchanged. |
 | 1.2 | 2026-11-23 | `alert.techniques` is sent as `mitreTechniques` when set, and the rule's objective's Enterprise ATT&CK techniques otherwise (an empty list counts as unset); deploy used to send an empty list (opentide#1801, opentide#1810). Schema id unchanged. |
 | 1.3 | 2026-11-24 | `alert.category` is removed: Microsoft Graph deprecated the custom detection alert template's `category` (use the MITRE tactics) and removed it on 2026-10-01. Static validation rejects the key as unknown, deploy no longer sends it, and `generate extract` no longer writes it. No deprecation period (opentide#1704, opentide#1850). Schema id unchanged. |
+| 1.4 | 2026-11-24 | **Deprecated** in favour of [`platform::defender_for_endpoint::2.0`](defender-for-endpoint-2.0.md) ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)). A 1.0 block still validates, with the warning `defender_schema_deprecated`; deploy refuses it with `defender_schema_retired`; `opentide migrate` rewrites it to 2.0. The file is kept. Schema id unchanged. |

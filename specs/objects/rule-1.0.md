@@ -102,7 +102,7 @@ Typed optional blocks keyed by platform identifier:
 | Key | Model | Schema ID | Spec |
 |-----|-------|-----------|------|
 | `sentinel` | SentinelConfig | `platform::sentinel::1.0` | [sentinel-1.0.md](../platforms/sentinel-1.0.md) |
-| `defender_for_endpoint` | DefenderConfig | `platform::defender_for_endpoint::1.0` | [defender-for-endpoint-1.0.md](../platforms/defender-for-endpoint-1.0.md) |
+| `defender_for_endpoint` | DefenderConfig | `platform::defender_for_endpoint::2.0`; `platform::defender_for_endpoint::1.0` (deprecated) | [defender-for-endpoint-2.0.md](../platforms/defender-for-endpoint-2.0.md); [defender-for-endpoint-1.0.md](../platforms/defender-for-endpoint-1.0.md) |
 | `splunk` | SplunkConfig | `platform::splunk::1.0` | [splunk-1.0.md](../platforms/splunk-1.0.md) |
 | `sentinel_one` | SentinelOneConfig | `platform::sentinel_one::1.0` | [sentinel-one-1.0.md](../platforms/sentinel-one-1.0.md) |
 | `crowdstrike` | CrowdstrikeConfig | `platform::crowdstrike::1.0` | [crowdstrike-1.0.md](../platforms/crowdstrike-1.0.md) |
@@ -197,6 +197,7 @@ configurations:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-11-24 | `configurations.defender_for_endpoint` takes `platform::defender_for_endpoint::2.0` ([defender-for-endpoint-2.0.md](../platforms/defender-for-endpoint-2.0.md), [RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)); `platform::defender_for_endpoint::1.0` still validates, with a deprecation warning, and deploy refuses it. `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-11-12 | `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [exabeam-1.0.md](../platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](../../rfcs/0018-exabeam-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-11-11 | `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [google-secops-1.0.md](../platforms/google-secops-1.0.md)) is added ([RFC 0019](../../rfcs/0019-google-secops-yara-l.md)). A `response.procedure.searches[]` entry with `system: google_secops` is a YARA-L search ([yara-l-1.0](../languages/yara-l-1.0.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |
 | 1.0 | 2026-11-11 | `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [graylog-1.0.md](../platforms/graylog-1.0.md)) is added ([RFC 0017](../../rfcs/0017-graylog-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.0`. |

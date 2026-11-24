@@ -35,6 +35,7 @@ Request for Comments (RFCs) document significant specification changes before th
 | [0018](0018-exabeam-platform.md) | Exabeam New-Scale SIEM and the Exabeam Query Language | accepted |
 | [0019](0019-google-secops-yara-l.md) | Google Security Operations and the YARA-L language | accepted |
 | [0020](0020-yara-x-reference-language.md) | YARA-X 1.x is the reference YARA language | accepted |
+| [0021](0021-defender-graph-beta-detection-rules.md) | Defender for Endpoint on the Graph beta custom detection contract (`platform::defender_for_endpoint::2.0`) | accepted |
 
 ## Numbering
 

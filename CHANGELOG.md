@@ -55,6 +55,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
+- `configurations.defender_for_endpoint` takes `platform::defender_for_endpoint::2.0` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)); `platform::defender_for_endpoint::1.0` still validates, with a deprecation warning, and deploy refuses it. `schema_id` stays `rule::1.1`.
 - `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](rfcs/0018-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md)) is added ([RFC 0019](rfcs/0019-google-secops-yara-l.md)). A hunt with `system: google_secops` is a YARA-L search. Additive; `schema_id` stays `rule::1.1`. New fixture `fixtures/valid/rule-google-secops-spray-1.0.yaml`.
 - `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.1`.
@@ -70,6 +71,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.0
 
+- `configurations.defender_for_endpoint` takes `platform::defender_for_endpoint::2.0` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)); `platform::defender_for_endpoint::1.0` still validates, with a deprecation warning, and deploy refuses it. `schema_id` stays `rule::1.0`.
 - `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](rfcs/0018-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md)) is added ([RFC 0019](rfcs/0019-google-secops-yara-l.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.0`.
@@ -82,6 +84,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Correct `detection_model`: it references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design; a signal reference implements that signal, and its owning objective is the rule's objective. The objective-only wording was wrong. New fixture `fixtures/cross-object/rule-references-signal.yaml`.
 - `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage comes from `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - Initial normative spec bootstrapped from opentide `models/rule.py` (exemplar template).
+
+## workspace 1.6
+
+- The deployment-state directory no longer lists Defender for Endpoint as state-backed: shards hold legacy Defender ids only until a `platform::defender_for_endpoint::2.0` deploy retires them, and staging jobs may create Defender rules ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## workspace 1.5
 
@@ -133,6 +139,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - `responders.vocab.toml` is retired. It shipped with `keys = []` while `response.responders` was pinned to it, so every authored value failed validation and no instance could fix it (vocabularies are not locally extensible). The alert handling team is per-organisation configuration: the field is free text defaulted from `[deployment] default_responders` (opentide#507).
 - Initial catalog of 36 bundled vocabularies copied from opentide.
 
+## deployment 1.5
+
+- Defender for Endpoint addresses its rule by `metadata.uuid` (`platform::defender_for_endpoint::2.0`): no binding is needed to create, update, disable, or delete, and a 1.0 block is refused with `defender_schema_retired`. A legacy binding is retired by the next 2.0 deploy to its tenant, or by `--prune` when the rule file is gone; a deleted 2.0 rule is retired by uuid ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
+
 ## deployment 1.4
 
 - Retiring deleted rules: `opentide deploy` reports rules whose file was deleted (a warning and the `--json` `retirable` array) and sends nothing for them; `--prune` on a run that includes `RELEASE` deletes them from the tenants they reached, by the recorded id on platforms that keep ids and from the run's diff on Sentinel, Splunk, Elastic and HarfangLab. Carbon Black Cloud reports it cannot. Nothing is retired while an object file fails to load, a UUID is still in the workspace, or an `--all` run reads no rule ([opentide#1713](https://github.com/opentidehq/opentide/issues/1713), [opentide#1849](https://github.com/opentidehq/opentide/pull/1849)).
@@ -153,6 +163,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## deployment 1.0
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
+
+## deployment-state 1.9
+
+- `defender_for_endpoint` is no longer state-backed: Defender 2.0 uses `metadata.uuid` as the rule id. A `defender_for_endpoint` binding is a legacy binding: readers accept it, deploy never writes one, and the first 2.0 deploy to its tenant deploys the uuid rule, deletes the legacy rule, and removes the binding (`defender_legacy_retired`, `defender_legacy_delete_failed`). `migrate-state` still moves a pre-RFC-0010 `rule_id` into a legacy binding. Supersedes RFC 0010 for Defender. Schema id and shard JSON Schema unchanged ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## deployment-state 1.8
 
@@ -201,6 +215,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## metaschema-keywords 1.0
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
+
+## platforms 1.11
+
+- Defender for Endpoint's current schema is `platform::defender_for_endpoint::2.0`, addressed by `metadata.uuid` with no stored id; `platform::defender_for_endpoint::1.0` is deprecated. Schema table, capability matrix, static-validation bar, and external-id table updated ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## platforms 1.10
 
@@ -267,6 +285,14 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## platform-sentinel 1.0
 
 - `platform::sentinel::1.0`. KQL analytics rule: `query`, `scheduling`, `alert`, plus grouping, entities, exclusions, template, and trigger. `grouping` is required at deploy and optional at validation.
+
+## platform-defender-for-endpoint 2.0
+
+- New schema `platform::defender_for_endpoint::2.0` ([specs/platforms/defender-for-endpoint-2.0.md](specs/platforms/defender-for-endpoint-2.0.md), [RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)), on the Microsoft Graph beta custom detection API. `schedule` (`frequency` as ISO 8601, beta-only `lookback`) replaces `scheduling`; `alert` sends `tactics` derived from the techniques through the `att&ck` vocabulary (no explicit tactics key) and adds `custom_details` and beta-only `grouping`; `entities` (seventeen Graph entity kinds, columns sent verbatim) replaces `impacted_entities`; `actions` (sixteen automated actions) replaces the response actions; `scope.device_groups`; beta-only `incident`; `status` from the deployment status. The rule id is `metadata.uuid`: `PATCH`, then `POST` on 404; legacy rules are recreated under the uuid and deleted. Constraint codes `defender_frequency`, `defender_lookback`, `defender_severity`, `defender_grouping`, `defender_custom_details`, `defender_entity_kind`, `defender_entity_mapping`, `defender_action_kind`, `defender_action_target`, `defender_column`, `defender_scope`; advisories `defender_schema_deprecated`, `defender_no_entities`. Fixtures `fixtures/platforms/defender-for-endpoint-2.0.yaml`, the request-body and migration goldens under `fixtures/platforms/defender-for-endpoint/`, and four invalid fixtures.
+
+## platform-defender-for-endpoint 1.4
+
+- **Deprecated** in favour of `platform::defender_for_endpoint::2.0` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). A 1.0 block (`schema` 1.0, a legacy identifier, or missing) is still read and validated, with the warning `defender_schema_deprecated`; `opentide migrate` rewrites it to 2.0 key by key (`defender_migrate_unmapped` when a value has no 2.0 equivalent); deploy refuses it with `defender_schema_retired`. The spec file is kept with `status: deprecated`. Schema id unchanged.
 
 ## platform-defender-for-endpoint 1.3
 
@@ -493,6 +519,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.16
+
+- Platform advisories `defender_schema_deprecated` and `defender_no_entities`. The fixture checker applies the Defender 2.0 constraint codes; four invalid Defender fixtures ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## validation 1.15
 
