@@ -1,6 +1,6 @@
 ---
 spec: platform-defender-for-endpoint
-version: "1.2"
+version: "1.3"
 schema_id: platform::defender_for_endpoint::1.0
 status: normative
 supersedes: null
@@ -17,7 +17,7 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 ## Requirements
 
 - Static validation MUST require `query`, `alert`, `impacted_entities`, and `scheduling`.
-- `alert.category` MUST be present. The other alert fields MAY be omitted.
+- Every `alert` field MAY be omitted. `alert.category` MUST NOT be present: it fails static validation as an unknown key.
 - `impacted_entities` MAY be an empty object. At least the object MUST be present.
 - `scheduling` MUST be one of `NRT`, `1H`, `3H`, `12H`, `24H`.
 - `query` MUST be non-blank KQL.
@@ -46,7 +46,6 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `category` | string | yes | — | Defender alert category. Deploy removes spaces (`Suspicious Activity` is sent as `SuspiciousActivity`). |
 | `title` | string | optional | null | Alert title. Deploy uses the rule `name` when omitted. |
 | `description` | string | optional | null | Alert description. Deploy uses the rule `description` when omitted. |
 | `severity` | string | optional | null | `Informational`, `Low`, `Medium`, `High`, or `Critical`. Deploy uses `response.alert_severity` when omitted. `Critical` is sent as `high`. |
@@ -171,7 +170,6 @@ configurations:
       | take 1
     scheduling: 1H
     alert:
-      category: Execution
       title: Suspicious command processor
       severity: High
     impacted_entities:
@@ -194,3 +192,4 @@ Fixture: [fixtures/platforms/defender-for-endpoint.yaml](../../fixtures/platform
 | 1.0 | 2026-09-30 | Initial field contract from the Defender configuration model, loader, and deployer. |
 | 1.1 | 2026-10-16 | `rule_id` and the `rule_id::<tenant>` alias are removed and fail `external_id_in_rule`. Deploy reads and writes the Defender id in [deployment state](../deployment-state.md); `DISABLEMENT` and `DELETION` without a binding report `external_id_missing` ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Schema id unchanged. |
 | 1.2 | 2026-11-23 | `alert.techniques` is sent as `mitreTechniques` when set, and the rule's objective's Enterprise ATT&CK techniques otherwise (an empty list counts as unset); deploy used to send an empty list (opentide#1801, opentide#1810). Schema id unchanged. |
+| 1.3 | 2026-11-24 | `alert.category` is removed: Microsoft Graph deprecated the custom detection alert template's `category` (use the MITRE tactics) and removed it on 2026-10-01. Static validation rejects the key as unknown, deploy no longer sends it, and `generate extract` no longer writes it. No deprecation period (opentide#1704, opentide#1850). Schema id unchanged. |

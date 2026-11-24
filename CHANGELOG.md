@@ -260,6 +260,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - `platform::sentinel::1.0`. KQL analytics rule: `query`, `scheduling`, `alert`, plus grouping, entities, exclusions, template, and trigger. `grouping` is required at deploy and optional at validation.
 
+## platform-defender-for-endpoint 1.3
+
+- `alert.category` removed. Microsoft Graph deprecated it on the custom detection alert template (use the MITRE tactics) and removed it on 2026-10-01. Static validation rejects the key as unknown, deploy no longer sends it, and `generate extract` no longer writes it; every `alert` field is now optional. Removed without a deprecation period ([opentide#1704](https://github.com/opentidehq/opentide/issues/1704), [opentide#1850](https://github.com/opentidehq/opentide/pull/1850)). Schema id unchanged.
+
 ## platform-defender-for-endpoint 1.2
 
 - `alert.techniques` is sent as the alert's `mitreTechniques` when set, and the rule's objective's Enterprise ATT&CK techniques otherwise (an empty list counts as unset); deploy used to send an empty list ([opentide#1801](https://github.com/opentidehq/opentide/pull/1801), [opentide#1810](https://github.com/opentidehq/opentide/pull/1810)). Schema id unchanged.

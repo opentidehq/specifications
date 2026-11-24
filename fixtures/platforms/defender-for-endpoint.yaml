@@ -23,7 +23,6 @@ configurations:
       | take 1
     scheduling: 1H
     alert:
-      category: Execution
       title: Suspicious command processor
       severity: High
     impacted_entities:
