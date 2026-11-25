@@ -8,11 +8,11 @@ supersedes: null
 
 # Microsoft Defender for Endpoint (`platform::defender_for_endpoint::1.0`)
 
-## Summary
-
 <Callout type="warning">
 **Removed.** opentide 1.0 does not have this platform, and this spec defines no behaviour for it. `configurations.defender_for_endpoint` is an unknown key. The file is kept as a record, as [governance](../../GOVERNANCE.md) requires for a withdrawn spec ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)).
 </Callout>
+
+## Summary
 
 `configurations.defender_for_endpoint` is a Microsoft Defender custom detection rule. The detection text is KQL. Query validation is supported. Defender assigns the remote rule id; opentide stores it per tenant in [deployment state](../deployment-state.md) so the next deploy updates that rule.
 
