@@ -36,6 +36,7 @@ RFC = ROOT / "rfcs" / "0021-defender-graph-beta-detection-rules.md"
 FIXTURES = ROOT / "fixtures"
 RULE_V2 = FIXTURES / "platforms" / "defender-for-endpoint-2.0.yaml"
 RULE_V1 = FIXTURES / "platforms" / "defender-for-endpoint.yaml"
+RULE_COMPLETE = FIXTURES / "platforms" / "defender-for-endpoint-2.0-complete.yaml"
 GOLDEN = FIXTURES / "platforms" / "defender-for-endpoint"
 SECTIONS = ["Summary", "Requirements", "Definition", "Relationships", "Defaults & overrides", "Examples", "History"]
 V2 = "platform::defender_for_endpoint::2.0"
@@ -164,9 +165,17 @@ def _duration(value: str) -> str:
     return f"P{value[:-1]}D" if value.endswith("D") else f"PT{value[:-1]}H"
 
 
-def body(rule: dict[str, Any], strategy: str, attack: dict[str, dict[str, Any]], create: bool) -> dict[str, Any]:
-    """specs/platforms/defender-for-endpoint-2.0.md#request-body, with no exclusion."""
+def body(
+    rule: dict[str, Any], strategy: str, attack: dict[str, dict[str, Any]], create: bool, tenant: str = "contoso"
+) -> dict[str, Any]:
+    """specs/platforms/defender-for-endpoint-2.0.md#request-body for `tenant`.
+
+    The spec does not fix how an exclusion is spliced into the query, so a golden may only hold
+    exclusions scoped to another tenant: those are skipped and the query is sent unchanged.
+    """
     block = rule["configurations"]["defender_for_endpoint"]
+    applied = [e for e in block.get("exclusions") or [] if e.get("tenant") in (None, tenant)]
+    assert not applied, "a golden may not apply an exclusion"
     alert = block.get("alert") or {}
     out: dict[str, Any] = {}
     if create:
@@ -452,6 +461,81 @@ class GoldenTests(unittest.TestCase):
             if parent in V1_PROPERTIES:
                 self.assertIn(key, V1_PROPERTIES[parent], (parent, key))
             self.assertNotIn((parent, key), BETA_ONLY)
+
+
+class CompleteBlockTests(unittest.TestCase):
+    """The complete block: every key of every field table, in the spec's Examples and in the fixture."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.rule = _load(RULE_COMPLETE)
+        cls.block = cls.rule["configurations"]["defender_for_endpoint"]
+
+    @staticmethod
+    def _table_keys(heading: str) -> list[str]:
+        section = _section(_read(SPEC), heading)
+        table = section.split("\n\n|", 1)[1] if "\n\n|" in section else section
+        rows = []
+        for line in ("|" + table).splitlines():
+            if not line.startswith("|"):
+                break
+            match = re.match(r"^\| `([a-z_]+)` \|", line)
+            if match:
+                rows.append(match.group(1))
+        return rows
+
+    def test_every_table_key_is_set(self) -> None:
+        missing = []
+        shared = ["enabled", "name", "schema", "status", "flags", "tenants", "contributors"]
+        for key in shared + self._table_keys("Block"):
+            if key not in self.block:
+                missing.append(key)
+        for heading, key in (
+            ("`schedule` (DefenderSchedule)", "schedule"),
+            ("`alert` (DefenderAlert)", "alert"),
+            ("`scope` (DefenderScope)", "scope"),
+            ("`incident` (DefenderIncident)", "incident"),
+        ):
+            fields = self._table_keys(heading)
+            self.assertTrue(fields, heading)
+            missing += [f"{key}.{f}" for f in fields if f not in (self.block.get(key) or {})]
+        exclusion_fields = self._table_keys("`exclusions[]` (DefenderExclusion)")
+        self.assertEqual(exclusion_fields, ["query", "reason", "tenant", "let"])
+        exclusions = self.block.get("exclusions") or [{}]
+        missing += [f"exclusions.{f}" for f in exclusion_fields if not any(f in e for e in exclusions)]
+        for kind, (_, fields) in DEFENDER_ENTITIES.items():
+            mappings = (self.block.get("entities") or {}).get(kind) or [{}]
+            missing += [f"entities.{kind}.{f}" for f in fields if not any(f in m for m in mappings)]
+        for action, (_, fields, _) in DEFENDER_ACTIONS.items():
+            targets = (self.block.get("actions") or {}).get(action) or [{}]
+            missing += [f"actions.{action}.{f}" for f in fields if not any(f in t for t in targets)]
+        self.assertEqual(missing, [])
+
+    def test_valid(self) -> None:
+        self.assertEqual(validate_defender_block(self.block), [])
+        self.assertEqual(validate_fixture_file(RULE_COMPLETE, load_vocabularies(ROOT / "vocabularies")), [])
+
+    def test_spec_example_is_the_fixture(self) -> None:
+        examples = _section(_read(SPEC), "Examples", "##")
+        complete = examples.split("**Complete block.**", 1)[1]
+        snippet = re.search(r"```yaml\n(.*?)```", complete, flags=re.S).group(1)
+        self.assertEqual(yaml.safe_load(snippet)["configurations"], self.rule["configurations"])
+        fixture_text = _read(RULE_COMPLETE)
+        self.assertIn(snippet.split("configurations:\n", 1)[1], fixture_text)
+
+    def test_beta_only_keys_are_commented(self) -> None:
+        text = _read(RULE_COMPLETE)
+        for line in ("lookback: 4H  # beta-only", "grouping: single_alert  # beta-only", "incident:  # beta-only"):
+            self.assertIn(line, text)
+
+    def test_create_golden(self) -> None:
+        golden = json.loads(_read(GOLDEN / "rule-defender-2.0-complete.create.api.json"))
+        self.assertEqual(golden["method"], "POST")
+        self.assertEqual(golden["url"], BASE)
+        self.assertEqual(golden["body"], body(self.rule, "RELEASE", _attack(), create=True, tenant="contoso"))
+        mappings = golden["body"]["detectionAction"]["alertTemplate"]["entityMappings"]
+        self.assertEqual(len(mappings), 17)
+        self.assertEqual(len(golden["body"]["detectionAction"]["automatedActions"]), 16)
 
 
 class MigrationTests(unittest.TestCase):

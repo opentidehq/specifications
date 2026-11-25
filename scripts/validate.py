@@ -247,6 +247,8 @@ def _check_fixtures() -> list[str]:
         FIXTURES / "platforms" / "sentinel.yaml",
         FIXTURES / "platforms" / "defender-for-endpoint.yaml",
         FIXTURES / "platforms" / "defender-for-endpoint-2.0.yaml",
+        FIXTURES / "platforms" / "defender-for-endpoint-2.0-complete.yaml",
+        FIXTURES / "platforms" / "defender-for-endpoint" / "rule-defender-2.0-complete.create.api.json",
         FIXTURES / "platforms" / "defender-for-endpoint" / "rule-defender-2.0.create.api.json",
         FIXTURES / "platforms" / "defender-for-endpoint" / "rule-defender-2.0.update.api.json",
         FIXTURES / "platforms" / "defender-for-endpoint" / "rule-defender-2.0.disable.api.json",

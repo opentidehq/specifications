@@ -428,9 +428,165 @@ configurations:
 
 `alert.techniques` above yields `tactics` `InitialAccess`, `Execution`, `Persistence`, `PrivilegeEscalation`, and `DefenseEvasion` (T1078.004's Stealth stage), with T1059 under `Execution` and T1078 under the other four.
 
+**Complete block.** Every key this spec defines, each set once: every `alert` key, both `schedule` keys, all seventeen entity kinds with every field, all sixteen actions with every target field, `scope`, `incident`, `exclusions`, and the [shared keys](index.md#shared-platform-block). Beta-only keys are marked in comments. It shows the shape, not a rule to deploy: a real rule's query returns only the columns its mappings name, and it picks only the actions it needs (it would not allow and block the same file).
+
+```yaml
+configurations:
+  defender_for_endpoint:
+    enabled: true
+    name: Encoded PowerShell with follow-on activity
+    schema: platform::defender_for_endpoint::2.0
+    status: PRODUCTION
+    tenants: [contoso, fabrikam]
+    flags: [tier0]
+    contributors: [Detection Engineering]
+    # Illustrative: this block sets every key so each one is shown once. A real rule's query
+    # returns exactly the columns its mappings and actions name, and picks only the actions it needs.
+    query: |
+      DeviceProcessEvents
+      | where FileName =~ "powershell.exe" and ProcessCommandLine has "-enc"
+      | join kind=leftouter (DeviceNetworkEvents | project DeviceId, RemoteIP, RemoteIPType, RemoteUrl, LocalIP) on DeviceId
+      | project Timestamp, ReportId, DeviceId, DeviceName, DeviceDnsDomain, DeviceNetBiosName, DeviceNtDomain,
+          AccountObjectId, AccountSid, AccountUpn, AccountUpnSuffix, AccountName, AccountDomain, AccountDnsDomain,
+          FileName, SHA1, SHA256, InitiatingProcessSHA1, InitiatingProcessSHA256, ProcessCommandLine,
+          RemoteIP, RemoteIPType, RemoteUrl, DnsQuery, LocalIP, DnsServerIP, RegistryKey, RegistryValueName,
+          NetworkMessageId, RecipientEmailAddress, SenderFromAddress, Subject, MailClusterQuery, MailClusterSource,
+          ApplicationId, Application, OAuthApplicationId, GroupObjectId, GroupSid, GroupDistinguishedName,
+          AzureResourceId, AmazonResourceName, GcpFullResourceName
+    schedule:
+      frequency: 1H
+      lookback: 4H  # beta-only
+    alert:
+      title: Encoded PowerShell with follow-on activity
+      description: An encoded PowerShell command ran and was followed by network, mail, and identity activity.
+      severity: High
+      recommendation: Review the decoded command line, isolate the device, and reset the account's credentials.
+      techniques: [T1059.001, T1078.004]
+      custom_details:
+        CommandLine: ProcessCommandLine
+        RemoteAddress: RemoteIP
+      grouping: single_alert  # beta-only
+    entities:
+      hosts:
+        - device_id: DeviceId
+          name: DeviceName
+          dns_domain: DeviceDnsDomain
+          netbios_name: DeviceNetBiosName
+          nt_domain: DeviceNtDomain
+      accounts:
+        - aad_user_id: AccountObjectId
+          sid: AccountSid
+          upn: AccountUpn
+          upn_suffix: AccountUpnSuffix
+          name: AccountName
+          nt_domain: AccountDomain
+          dns_domain: AccountDnsDomain
+      mailboxes:
+        - primary_address: RecipientEmailAddress
+      files:
+        - name: FileName
+          sha1: SHA1
+          sha256: SHA256
+      processes:
+        - sha1: InitiatingProcessSHA1
+          sha256: InitiatingProcessSHA256
+      ips:
+        - address: RemoteIP
+          scope: RemoteIPType
+      urls:
+        - address: RemoteUrl
+      dns:
+        - domain_name: DnsQuery
+          host_ip_address: LocalIP
+          server_ip: DnsServerIP
+      registry_values:
+        - key: RegistryKey
+          value_name: RegistryValueName
+      mail_messages:
+        - network_message_id: NetworkMessageId
+          recipient: RecipientEmailAddress
+          sender: SenderFromAddress
+          subject: Subject
+      mail_clusters:
+        - query: MailClusterQuery
+          source: MailClusterSource
+      cloud_applications:
+        - app_id: ApplicationId
+          name: Application
+      oauth_applications:
+        - oauth_app_id: OAuthApplicationId
+      security_groups:
+        - object_id: GroupObjectId
+          sid: GroupSid
+          distinguished_name: GroupDistinguishedName
+      azure_resources:
+        - resource_id: AzureResourceId
+      amazon_resources:
+        - amazon_resource_id: AmazonResourceName
+      google_cloud_resources:
+        - full_resource_name: GcpFullResourceName
+    actions:
+      isolate_devices:
+        - device_id: DeviceId
+          isolation_type: selective
+      collect_investigation_packages:
+        - device_id: DeviceId
+      run_antivirus_scans:
+        - device_id: DeviceId
+      initiate_investigations:
+        - device_id: DeviceId
+      restrict_app_executions:
+        - device_id: DeviceId
+      allow_files:
+        - sha1: SHA1
+          sha256: SHA256
+          device_groups: [Developer workstations]
+      block_files:
+        - sha1: SHA1
+          sha256: SHA256
+          device_groups: [Tier 0, Servers]
+      stop_and_quarantine_files:
+        - device_id: DeviceId
+          sha1: SHA1
+      disable_users:
+        - account_sid: AccountSid
+      force_user_password_resets:
+        - account_sid: AccountSid
+      mark_users_as_compromised:
+        - account_object_id: AccountObjectId
+      soft_delete_emails:
+        - network_message_id: NetworkMessageId
+          recipient: RecipientEmailAddress
+      hard_delete_emails:
+        - network_message_id: NetworkMessageId
+          recipient: RecipientEmailAddress
+      move_emails_to_deleted_items:
+        - network_message_id: NetworkMessageId
+          recipient: RecipientEmailAddress
+      move_emails_to_inbox:
+        - network_message_id: NetworkMessageId
+          recipient: RecipientEmailAddress
+      move_emails_to_junk:
+        - network_message_id: NetworkMessageId
+          recipient: RecipientEmailAddress
+    scope:
+      device_groups: [Tier 0, Servers]
+    incident:  # beta-only
+      exclude_from_correlation: true
+    exclusions:
+      - query: '| where DeviceName != BuildAgent'
+        reason: The build agent runs encoded PowerShell on purpose.
+        tenant: fabrikam
+        let:
+          BuildAgent: build-agent-01
+```
+
+Deployed to tenant `contoso`, the exclusion (scoped to `fabrikam`) is skipped and the query is sent unchanged. Its create body is [rule-defender-2.0-complete.create.api.json](../../fixtures/platforms/defender-for-endpoint/rule-defender-2.0-complete.create.api.json).
+
 Fixtures:
 
 - [fixtures/platforms/defender-for-endpoint-2.0.yaml](../../fixtures/platforms/defender-for-endpoint-2.0.yaml): the rule above, plus a `processes` mapping and a `block_files` action.
+- [fixtures/platforms/defender-for-endpoint-2.0-complete.yaml](../../fixtures/platforms/defender-for-endpoint-2.0-complete.yaml): the complete block above. A test fails when a key of the field tables is missing from it.
 - [fixtures/platforms/defender-for-endpoint/](../../fixtures/platforms/defender-for-endpoint/): its create, update, and disable bodies, and the migration of [fixtures/platforms/defender-for-endpoint.yaml](../../fixtures/platforms/defender-for-endpoint.yaml) (1.0).
 - Invalid: [rule-defender-lookback-nrt.yaml](../../fixtures/invalid/rule-defender-lookback-nrt.yaml) (`defender_lookback`), [rule-defender-entity-field.yaml](../../fixtures/invalid/rule-defender-entity-field.yaml) (`defender_entity_mapping`), [rule-defender-action-target.yaml](../../fixtures/invalid/rule-defender-action-target.yaml) (`defender_action_target`), [rule-defender-1.0-keys.yaml](../../fixtures/invalid/rule-defender-1.0-keys.yaml) (`unknown_field`).
 
@@ -438,4 +594,5 @@ Fixtures:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 2.0 | 2026-11-25 | Examples: a complete block that sets every key, with its fixture and create body. Before release; no contract change. |
 | 2.0 | 2026-11-24 | `platform::defender_for_endpoint::2.0`: the Microsoft Graph beta custom detection contract. `schedule` (frequency as ISO 8601, beta lookback), `alert` with tactics derived from techniques, custom details, and beta event grouping, `entities` (seventeen entity kinds), `actions` (sixteen automated actions), `scope.device_groups`, beta `incident`, `status` from the deployment status. The Defender rule id is `metadata.uuid`; legacy rules are recreated under the uuid and deleted. Supersedes 1.0, which is deprecated ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)). |

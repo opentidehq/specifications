@@ -150,6 +150,7 @@ Why refuse rather than deploy through the 2.0 mapping: the old wire format no lo
 | Path | What it proves |
 |------|----------------|
 | `fixtures/platforms/defender-for-endpoint-2.0.yaml` | A valid 2.0 rule using every block key, beta-only keys included |
+| `fixtures/platforms/defender-for-endpoint-2.0-complete.yaml` and `fixtures/platforms/defender-for-endpoint/rule-defender-2.0-complete.create.api.json` | Every key of every field table set once (all 17 entity kinds and 16 actions with every field), and its create body for tenant `contoso` |
 | `fixtures/platforms/defender-for-endpoint/rule-defender-2.0.create.api.json`, `.update.api.json`, `.disable.api.json` | The Graph bodies deploy sends for it, derived by the tests from the spec's tables |
 | `fixtures/platforms/defender-for-endpoint/migrated-2.0.yaml` | `opentide migrate` of `fixtures/platforms/defender-for-endpoint.yaml` (1.0, kept) |
 | `fixtures/invalid/rule-defender-lookback-nrt.yaml` | `defender_lookback` |
@@ -165,6 +166,7 @@ Why refuse rather than deploy through the 2.0 mapping: the old wire format no lo
 - The deployer: the beta base URL, `PATCH`-then-`POST`, the legacy retirement, no shard writes; `defender_schema_retired` for 1.0.
 - `opentide migrate`: the Defender block rewrite and `defender_migrate_unmapped`.
 - `generate extract` writes 2.0 blocks from the tenant's rules.
+- The bundled Defender 2.0 rule template carries every key the spec defines, in the order and with the column names of the spec's [complete block](../specs/platforms/defender-for-endpoint-2.0.md#examples) (`fixtures/platforms/defender-for-endpoint-2.0-complete.yaml`): the required keys (`schema`, `query`, `schedule.frequency`) set, every optional key present but commented out, and the beta-only keys marked as such.
 - The generated JSON Schema default for the Defender `schema` (`defender_for_endpoint::2.3` today, [platforms/index.md](../specs/platforms/index.md#generated-schema-drift)) and the bundled template become `platform::defender_for_endpoint::2.0`.
 
 ## Drawbacks
