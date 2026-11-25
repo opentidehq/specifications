@@ -5,8 +5,12 @@
 # own CI can still break that job: MDX the website refuses, or a platform
 # field the landing page still shows. The site then stops updating.
 #
-# This workflow runs the website's sync and its checks against this PR's
-# tree, so such a break fails here, in the PR that causes it.
+# This workflow runs the website's `pnpm check:upstream` against this PR's
+# tree: the same command the hourly sync uses to decide whether it accepts
+# an upstream tree, so such a break fails here, in the PR that causes it.
+# The checks themselves are listed only in the website's
+# scripts/check-upstream.mjs (see its AGENTS.md, "Upstream checks"); do not
+# repeat them here.
 #
 # Required-check candidate: "website-sync / website". The workflow starts on
 # every PR, and the `changes` job skips `website` when the PR touches no
@@ -72,9 +76,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.synced == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      NEXT_TELEMETRY_DISABLED: "1"
+    timeout-minutes: 20
     steps:
       - name: Check out opentidehq/website (main)
         uses: actions/checkout@v4
@@ -91,20 +93,13 @@ jobs:
           path: website/vendor/specifications
           persist-credentials: false
 
-      - name: Read the opentide branch the website syncs
-        id: opentide
-        working-directory: website
-        run: |
-          set -euo pipefail
-          branch=$(git config -f .gitmodules --get submodule.vendor/opentide.branch || echo development)
-          echo "branch=$branch" >> "$GITHUB_OUTPUT"
-          echo "opentide docs from $branch (website .gitmodules)"
-
-      - name: Check out opentidehq/opentide as vendor/opentide
+      # opentide needs only docs/; it must stay a git checkout, since
+      # check:docs --worktree compares its HEAD with the sync stamp.
+      - name: Check out opentidehq/opentide (development) as vendor/opentide
         uses: actions/checkout@v4
         with:
           repository: opentidehq/opentide
-          ref: ${{ steps.opentide.outputs.branch }}
+          ref: development
           path: website/vendor/opentide
           sparse-checkout: docs
           persist-credentials: false
@@ -123,47 +118,7 @@ jobs:
         working-directory: website
         run: pnpm install --frozen-lockfile
 
-      # Runs the website's MDX safety check on every synced page; a refusal
-      # ("Refusing to publish MDX ...") fails here with the file and reason.
-      - name: pnpm sync:content
-        working-directory: website
-        run: |
-          set -o pipefail
-          pnpm sync:content 2>&1 | tee "$RUNNER_TEMP/sync.log" || {
-            {
-              echo "## Website sync refused this tree"
-              echo '```'
-              grep -v '^    at ' "$RUNNER_TEMP/sync.log" | tail -n 20
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-            msg=$(grep -v '^    at ' "$RUNNER_TEMP/sync.log" | grep -A2 -E '^Error' | head -n 3 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')
-            echo "::error title=website sync:content::${msg:-pnpm sync:content failed}"
-            exit 1
-          }
-
-      # The website's whole unit suite (~5 s), including lib/landing/integrations.test.ts
-      # (landing fields must exist in the synced platform specs) and the MDX
-      # safety and docs-sync tests. The one test skipped compares the website's
-      # own committed vendor gitlinks with content/docs, which this job replaces
-      # on purpose.
-      - name: pnpm test
-        working-directory: website
-        env:
-          NODE_OPTIONS: --test-skip-pattern="workspace committed docs match vendor gitlinks"
-        run: |
-          set -o pipefail
-          pnpm test 2>&1 | tee "$RUNNER_TEMP/test.log" || {
-            {
-              echo "## Website tests failed on this tree"
-              echo '```'
-              grep -E -A2 '^\s*(AssertionError|Error)' "$RUNNER_TEMP/test.log" | head -n 30
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-            grep -E '^\s*AssertionError' "$RUNNER_TEMP/test.log" | sort -u | head -n 10 \
-              | sed -E 's/^\s*/::error title=website test::/'
-            exit 1
-          }
-
+      # check:upstream runs next build; its cache only speeds that up.
       - name: Cache Next.js build
         uses: actions/cache@v4
         with:
@@ -171,17 +126,28 @@ jobs:
           key: next-${{ hashFiles('website/pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: next-${{ hashFiles('website/pnpm-lock.yaml') }}-
 
-      # next build compiles every synced page through fumadocs-mdx with the
-      # site's frontmatter schema, renders its components, and type-checks.
-      # MDX can pass the sync's parse check and still fail here (an unknown
-      # component, a bad frontmatter value), and verify:docs reads the
-      # exported out/ tree, so the guard needs the build. `next build` is run
-      # directly: `pnpm build` would run prebuild (PyPI and engine downloads,
-      # changelog sync, which do not depend on this tree).
-      - name: next build
+      - name: pnpm check:upstream
         working-directory: website
-        run: pnpm exec next build
-
-      - name: pnpm verify:docs
-        working-directory: website
-        run: pnpm verify:docs
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/check-upstream.json"
+          if pnpm check:upstream --report "$report"; then
+            exit 0
+          fi
+          if [ -s "$report" ]; then
+            failed=$(jq -r '.failed // "unknown"' "$report")
+            {
+              echo "## The website would not accept this tree"
+              echo
+              echo "\`pnpm check:upstream\` failed at **${failed}**."
+              echo
+              echo '```'
+              jq -r '.tail' "$report"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            msg=$(jq -r '.tail' "$report" | tail -n 15 | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
+            echo "::error title=website check:upstream (${failed})::${msg:-pnpm check:upstream failed}"
+          else
+            echo "::error title=website check:upstream::pnpm check:upstream failed before writing its report"
+          fi
+          exit 1
