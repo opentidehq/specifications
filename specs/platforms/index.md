@@ -1,6 +1,6 @@
 ---
 spec: platforms
-version: "1.10"
+version: "1.11"
 schema_id: null
 status: normative
 supersedes: null
@@ -17,7 +17,7 @@ The block's schema identifier is `platform::<identifier>::1.0`. This page is the
 | Identifier | Schema | Spec |
 |------------|--------|------|
 | `sentinel` | `platform::sentinel::1.0` | [sentinel-1.0.md](sentinel-1.0.md) |
-| `defender_for_endpoint` | `platform::defender_for_endpoint::1.0` | [defender-for-endpoint-1.0.md](defender-for-endpoint-1.0.md) |
+| `microsoft_defender` | `platform::microsoft_defender::1.0` | [microsoft-defender-1.0.md](microsoft-defender-1.0.md) |
 | `splunk` | `platform::splunk::1.0` | [splunk-1.0.md](splunk-1.0.md) |
 | `sentinel_one` | `platform::sentinel_one::1.0` | [sentinel-one-1.0.md](sentinel-one-1.0.md) |
 | `carbon_black_cloud` | `platform::carbon_black_cloud::1.0` | [carbon-black-cloud-1.0.md](carbon-black-cloud-1.0.md) |
@@ -41,7 +41,7 @@ These specs describe the blocks as the engine accepts them today, including ever
 - A typed block SHOULD set `schema` to `platform::<identifier>::1.0`. Implementations MUST accept a missing `schema` and MUST accept a legacy identifier (`sentinel::2.4`, `splunk::2.0`, `splunk::3.0`, `carbon_black_cloud::3.0`, and the same shape for the other platforms). The identifier is not a closed enum.
 - Unknown keys on a block MUST fail static validation. The model forbids them.
 - A block MUST NOT carry a vendor-assigned external id. `rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` at the root of any block, on every platform, MUST fail with `external_id_in_rule` ([External rule ids](#external-rule-ids)).
-- Registry load is stricter or looser depending on the platform. Defender, Splunk, Carbon Black, Elastic, Sysdig, Bitdefender, Graylog, Exabeam, and Google SecOps pass leftover keys on the block into the model, so an unknown key at the block root fails load as well. The Splunk loader still drops unknown keys inside `scheduling` other than `type`, `expires`, `schedule`, and `timerange`. Sentinel, SentinelOne, CrowdStrike, and HarfangLab drop keys the loader does not map, so those keys pass load and fail `opentide validate`. The [Splunk](splunk-1.0.md) aliases and Defender's `quarantine_files` alias are mapped before that check.
+- Registry load is stricter or looser depending on the platform. Microsoft Defender, Splunk, Carbon Black, Elastic, Sysdig, Bitdefender, Graylog, Exabeam, and Google SecOps pass leftover keys on the block into the model, so an unknown key at the block root fails load as well. The Splunk loader still drops unknown keys inside `scheduling` other than `type`, `expires`, `schedule`, and `timerange`. Sentinel, SentinelOne, CrowdStrike, and HarfangLab drop keys the loader does not map, so those keys pass load and fail `opentide validate`. The [Splunk](splunk-1.0.md) aliases and Defender's `quarantine_files` alias are mapped before that check.
 - In every field table, **optional** means the key may be omitted at static validation. A later sentence in that platform spec names the keys deploy or registry load still require.
 - `query`, where the platform spec marks it required, MUST be a string and MUST NOT be empty or whitespace.
 - Static validation (`opentide validate`) MUST enforce the **Required** column of each platform spec. It MUST NOT require a field only because generated JSON Schema lists it.
@@ -58,7 +58,7 @@ These specs describe the blocks as the engine accepts them today, including ever
 | Identifier | Display name | Deploy | Query validate | Detection language | Schema spec |
 |------------|--------------|--------|----------------|--------------------|-------------|
 | `sentinel` | Microsoft Sentinel | yes* | yes | KQL | [sentinel-1.0](sentinel-1.0.md) |
-| `defender_for_endpoint` | Microsoft Defender for Endpoint | yes* | yes | KQL | [defender-for-endpoint-1.0](defender-for-endpoint-1.0.md) |
+| `microsoft_defender` | Microsoft Defender | yes* | yes | KQL | [microsoft-defender-1.0](microsoft-defender-1.0.md) |
 | `splunk` | Splunk | yes | yes | SPL | [splunk-1.0](splunk-1.0.md) |
 | `sentinel_one` | SentinelOne | yes* | yes | S1QL | [sentinel-one-1.0](sentinel-one-1.0.md) |
 | `carbon_black_cloud` | VMware Carbon Black Cloud | yes | yes | Lucene | [carbon-black-cloud-1.0](carbon-black-cloud-1.0.md) |
@@ -91,7 +91,7 @@ These specs describe the blocks as the engine accepts them today, including ever
 
 `opentide validate query` supports:
 
-`sentinel`, `defender_for_endpoint`, `splunk`, `sentinel_one`, `carbon_black_cloud`, `elastic`, `graylog`, `exabeam`, `google_secops`
+`sentinel`, `microsoft_defender`, `splunk`, `sentinel_one`, `carbon_black_cloud`, `elastic`, `graylog`, `exabeam`, `google_secops`
 
 This is the `--live` allowlist: a tenant check, `opentide validate query --live`. Without `--live`, `validate query` checks offline with the analysis engine, in each platform's language that the engine parses ([validation](../validation.md#query-validation)).
 
@@ -104,7 +104,7 @@ This is the static-validation bar. Deploy adds the constraints in each platform 
 | Platform | Required when the block is present |
 |----------|-------------------------------------|
 | `sentinel` | `query`, `scheduling`, `alert` |
-| `defender_for_endpoint` | `query`, `alert` (with `category`), `impacted_entities`, `scheduling` |
+| `microsoft_defender` | `query` and `schedule` (with `frequency`). Every block also meets the [Microsoft Defender constraints](microsoft-defender-1.0.md#constraints) |
 | `splunk` | `query`, or legacy `search` which fills `query` |
 | `sentinel_one` | `condition` (with `type`) |
 | `carbon_black_cloud` | `query` |
@@ -155,12 +155,12 @@ All bundled platforms default to `enabled = false`. Enable one by setting `enabl
 
 ### External rule ids
 
-Platform blocks MUST NOT contain vendor-assigned external identifiers. Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig, Bitdefender, Graylog, Exabeam, and Google SecOps use the committed deployment-state shard defined in [deployment-state.md](../deployment-state.md). Sentinel, HarfangLab, and Elastic use `metadata.uuid`; Carbon Black Cloud uses `metadata.uuid` for the IOC and the title for the report; Splunk uses its saved-search identity.
+Platform blocks MUST NOT contain vendor-assigned external identifiers. SentinelOne, CrowdStrike, Sysdig, Bitdefender, Graylog, Exabeam, and Google SecOps use the committed deployment-state shard defined in [deployment-state.md](../deployment-state.md). Microsoft Defender, Sentinel, HarfangLab, and Elastic use `metadata.uuid`; Carbon Black Cloud uses `metadata.uuid` for the IOC and the title for the report; Splunk uses its saved-search identity.
 
 | Platform | How deploy addresses the remote rule | Where a vendor id lives |
 |----------|--------------------------------------|-------------------------|
 | `sentinel` | `metadata.uuid` is the analytics rule id | Nowhere |
-| `defender_for_endpoint` | Defender-assigned rule id | `.opentide/states/deployment/<uuid>.json` |
+| `microsoft_defender` | `metadata.uuid` is the Graph detection-rule id | Nowhere |
 | `splunk` | The saved search | Nowhere |
 | `sentinel_one` | SentinelOne-assigned STAR rule id | `.opentide/states/deployment/<uuid>.json` |
 | `carbon_black_cloud` | `metadata.uuid` on the IOC; title on the report | Nowhere |
@@ -175,9 +175,7 @@ Platform blocks MUST NOT contain vendor-assigned external identifiers. Defender 
 
 Elastic Security ([elastic-1.0](elastic-1.0.md), [RFC 0007](../../rfcs/0007-elastic-security-platform.md)) addresses every rule by `metadata.uuid`. Elastic never stores an external id: Kibana's internal `id` is not recorded in a block or in deployment state.
 
-`rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` are legacy keys from before [RFC 0010](../../rfcs/0010-deployment-external-ids.md). Static validation and every deploy path MUST reject them with `external_id_in_rule`, on every platform block, whether or not a shard also holds the id. No loader folds them into a field. `opentide deploy migrate-state` moves Defender, SentinelOne, and CrowdStrike values into shards (Sysdig, Bitdefender, Graylog, Exabeam, and Google SecOps never had a legacy key) and removes the keys from every other platform with an `external_id_unused` warning.
-
-Defender also accepts the alias `quarantine_files` for `actions.files.quarantine_file` on the loader path only.
+`rule_id`, `rule_id_bundle`, and `rule_id::<tenant>` are legacy keys from before [RFC 0010](../../rfcs/0010-deployment-external-ids.md). Static validation and every deploy path MUST reject them with `external_id_in_rule`, on every platform block, whether or not a shard also holds the id. No loader folds them into a field. `opentide deploy migrate-state` moves SentinelOne and CrowdStrike values into shards (Sysdig, Bitdefender, Graylog, Exabeam, and Google SecOps never had a legacy key) and removes the keys from every other platform with an `external_id_unused` warning.
 
 ### Generated schema drift
 
@@ -198,7 +196,7 @@ Splunk extras also name `threshold`, `throttling`, and `security_domain` on the 
 | Platform | Generated default `schema` |
 |----------|----------------------------|
 | `sentinel` | `sentinel::2.4` |
-| `defender_for_endpoint` | `defender_for_endpoint::2.3` |
+| `microsoft_defender` | `platform::microsoft_defender::1.0` |
 | `splunk` | `splunk::3.0` |
 | `sentinel_one` | `sentinel_one::2.0` |
 | `crowdstrike` | `crowdstrike::2.0` |
@@ -221,7 +219,7 @@ Deployers register via `opentide.platforms` entry points. Validators load from `
 - [configuration.md](../configuration.md) — platform TOML merge
 - [deployment.md](../deployment.md) — `status` strategies
 - [validation.md](../validation.md) — `validate` and `validate query`
-- [deployment-state.md](../deployment-state.md) — where Defender, SentinelOne, CrowdStrike, Sysdig, Bitdefender, Graylog, Exabeam, and Google SecOps ids live
+- [deployment-state.md](../deployment-state.md) — where SentinelOne, CrowdStrike, Sysdig, Bitdefender, Graylog, Exabeam, and Google SecOps ids live
 - [metaschema-keywords.md](../metaschema-keywords.md) — `tide.config.systems::enabled`, `recomposition`
 - Platform specs linked in the [Summary](#summary)
 
@@ -245,6 +243,7 @@ Vocabulary files are not platform configuration. See [configuration.md](../confi
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.11 | 2026-11-25 | Microsoft Defender (`microsoft_defender`, [microsoft-defender-1.0](microsoft-defender-1.0.md), [RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)) replaces Microsoft Defender for Endpoint (`defender_for_endpoint`), which is removed. It is a KQL custom detection on the Microsoft Graph beta API, in the `--live` allowlist, addressed by `metadata.uuid` with no stored id. A `defender_for_endpoint` block is an unknown key. |
 | 1.10 | 2026-11-12 | Google Security Operations joins the matrix as the thirteenth platform ([google-secops-1.0](google-secops-1.0.md), [RFC 0019](../../rfcs/0019-google-secops-yara-l.md)): YARA-L 2.0 rules through the Chronicle API v1; live query validation with `verifyRuleText` (in the `--live` allowlist) and offline YARA-L checks ([yara-l-1.0](../languages/yara-l-1.0.md)); the rule id lives in deployment state. |
 | 1.9 | 2026-11-12 | Exabeam New-Scale SIEM joins the matrix as the twelfth platform ([exabeam-1.0](exabeam-1.0.md), [RFC 0018](../../rfcs/0018-exabeam-platform.md)): correlation rules through the Correlation Rules API; in the `--live` allowlist for each sequence filter, through Exabeam Search; the [Exabeam Query Language](../languages/exabeam-1.0.md) is checked offline; the rule UUID lives in deployment state. |
 | 1.8 | 2026-11-11 | Graylog joins the matrix as the eleventh platform ([graylog-1.0](graylog-1.0.md), [RFC 0017](../../rfcs/0017-graylog-platform.md)): native event definitions (Filter & Aggregation) on Graylog 6.3 to 7.2; in the `--live` allowlist through `POST /api/search/validate`; the event definition id lives in deployment state. |

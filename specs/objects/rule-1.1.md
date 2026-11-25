@@ -93,7 +93,7 @@ A `reviewed` instant equal to `T − W` or later is not unreviewed. `W` is not a
 | `query` | string | yes | Query text |
 | `language` | string | no | Query language, for a `system` with more than one. Omitted with `system: elastic`: unknown. |
 
-`language` names the query language when `system` alone does not. With `system: elastic` it MUST be one of the names [elastic-1.0](../platforms/elastic-1.0.md) uses: `kuery` (KQL), `lucene`, `eql`, or `esql` (ES\|QL). `language` MUST NOT be set with any other `system`, because the system alone names the language: `sentinel` and `defender_for_endpoint` are KQL, `splunk` is SPL, `exabeam` is the Exabeam Query Language ([exabeam-1.0](../languages/exabeam-1.0.md), profile `search`), `google_secops` is a [YARA-L search](../languages/yara-l-1.0.md#text-forms), and no other system has a language in this revision. With `system: elastic`, an omitted `language` (or an empty one, YAML `null`) means the language is unknown and the query is not analysed, as before the field existed.
+`language` names the query language when `system` alone does not. With `system: elastic` it MUST be one of the names [elastic-1.0](../platforms/elastic-1.0.md) uses: `kuery` (KQL), `lucene`, `eql`, or `esql` (ES\|QL). `language` MUST NOT be set with any other `system`, because the system alone names the language: `sentinel` and `microsoft_defender` are KQL, `splunk` is SPL, `exabeam` is the Exabeam Query Language ([exabeam-1.0](../languages/exabeam-1.0.md), profile `search`), `google_secops` is a [YARA-L search](../languages/yara-l-1.0.md#text-forms), and no other system has a language in this revision. With `system: elastic`, an omitted `language` (or an empty one, YAML `null`) means the language is unknown and the query is not analysed, as before the field existed.
 
 ### Platform block (PlatformConfigBase)
 
@@ -116,7 +116,7 @@ Typed optional blocks keyed by platform identifier:
 | Key | Model | Schema ID | Spec |
 |-----|-------|-----------|------|
 | `sentinel` | SentinelConfig | `platform::sentinel::1.0` | [sentinel-1.0.md](../platforms/sentinel-1.0.md) |
-| `defender_for_endpoint` | DefenderConfig | `platform::defender_for_endpoint::1.0` | [defender-for-endpoint-1.0.md](../platforms/defender-for-endpoint-1.0.md) |
+| `microsoft_defender` | MicrosoftDefenderConfig | `platform::microsoft_defender::1.0` | [microsoft-defender-1.0.md](../platforms/microsoft-defender-1.0.md) |
 | `splunk` | SplunkConfig | `platform::splunk::1.0` | [splunk-1.0.md](../platforms/splunk-1.0.md) |
 | `sentinel_one` | SentinelOneConfig | `platform::sentinel_one::1.0` | [sentinel-one-1.0.md](../platforms/sentinel-one-1.0.md) |
 | `crowdstrike` | CrowdstrikeConfig | `platform::crowdstrike::1.0` | [crowdstrike-1.0.md](../platforms/crowdstrike-1.0.md) |
@@ -215,6 +215,7 @@ configurations:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-11-25 | `configurations.microsoft_defender` (`MicrosoftDefenderConfig`, `platform::microsoft_defender::1.0`, [microsoft-defender-1.0.md](../platforms/microsoft-defender-1.0.md)) replaces `configurations.defender_for_endpoint`, which is removed and is now an unknown key ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)). `schema_id` stays `rule::1.1`. |
 | 1.1 | 2026-11-12 | `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [exabeam-1.0.md](../platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](../../rfcs/0018-exabeam-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.1`. |
 | 1.1 | 2026-11-11 | `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [google-secops-1.0.md](../platforms/google-secops-1.0.md)) is added ([RFC 0019](../../rfcs/0019-google-secops-yara-l.md)). A `response.procedure.searches[]` entry with `system: google_secops` is a YARA-L search ([yara-l-1.0](../languages/yara-l-1.0.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.1`. |
 | 1.1 | 2026-11-11 | `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [graylog-1.0.md](../platforms/graylog-1.0.md)) is added ([RFC 0017](../../rfcs/0017-graylog-platform.md)). Additive: every existing rule stays valid, and `schema_id` stays `rule::1.1`. |

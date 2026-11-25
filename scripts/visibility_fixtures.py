@@ -17,7 +17,7 @@ PLURAL_KEYS = {"tables", "indexes", "sourcetypes", "macros", "indices", "data_vi
 KQL_TYPES = {"bool", "datetime", "decimal", "dynamic", "guid", "int", "long", "real", "string", "timespan"}
 COLUMN_TYPES = {
     "sentinel": KQL_TYPES,
-    "defender_for_endpoint": KQL_TYPES,
+    "microsoft_defender": KQL_TYPES,
     "splunk": {"string", "number", "boolean"},
     "elastic": {
         "binary", "boolean", "byte", "constant_keyword", "date", "date_nanos", "double",

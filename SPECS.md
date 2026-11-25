@@ -16,18 +16,19 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Objective object | 1.1 | `objective::1.1` | draft | [specs/objects/objective-1.1.md](specs/objects/objective-1.1.md) |
 | Rule object | 1.0 | `rule::1.0` | normative | [specs/objects/rule-1.0.md](specs/objects/rule-1.0.md) |
 | Rule object | 1.1 | `rule::1.1` | normative | [specs/objects/rule-1.1.md](specs/objects/rule-1.1.md) |
-| Workspace layout | 1.5 | — | normative | [specs/workspace.md](specs/workspace.md) |
+| Workspace layout | 1.6 | — | normative | [specs/workspace.md](specs/workspace.md) |
 | Inflight preview shard | 1.0 | `inflight.shard::1.0` | normative | [specs/workspace.md](specs/workspace.md#inflight-preview-shards) |
 | Configuration | 1.0 | — | normative | [specs/configuration.md](specs/configuration.md) |
-| Visibility | 1.1 | `visibility::1.0` | normative | [specs/visibility.md](specs/visibility.md) |
+| Visibility | 1.2 | `visibility::1.0` | normative | [specs/visibility.md](specs/visibility.md) |
 | Vocabulary format | 1.0 | — | normative | [specs/vocabularies/format.md](specs/vocabularies/format.md) |
 | Vocabulary catalog | 1.0 | — | normative | [specs/vocabularies/catalog.md](specs/vocabularies/catalog.md) |
-| Deployment lifecycle | 1.4 | — | normative | [specs/deployment.md](specs/deployment.md) |
-| Deployment state | 1.9 | `deployment.state::1.0` | normative | [specs/deployment-state.md](specs/deployment-state.md) |
+| Deployment lifecycle | 1.5 | — | normative | [specs/deployment.md](specs/deployment.md) |
+| Deployment state | 1.10 | `deployment.state::1.0` | normative | [specs/deployment-state.md](specs/deployment-state.md) |
 | Metaschema keywords | 1.2 | — | normative | [specs/metaschema-keywords.md](specs/metaschema-keywords.md) |
-| Platforms | 1.10 | — | normative | [specs/platforms/index.md](specs/platforms/index.md) |
+| Platforms | 1.11 | — | normative | [specs/platforms/index.md](specs/platforms/index.md) |
 | Sentinel platform | 1.3 | `platform::sentinel::1.0` | normative | [specs/platforms/sentinel-1.0.md](specs/platforms/sentinel-1.0.md) |
-| Defender for Endpoint platform | 1.3 | `platform::defender_for_endpoint::1.0` | normative | [specs/platforms/defender-for-endpoint-1.0.md](specs/platforms/defender-for-endpoint-1.0.md) |
+| Microsoft Defender platform | 1.0 | `platform::microsoft_defender::1.0` | normative | [specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md) |
+| Defender for Endpoint platform (removed) | 1.4 | `platform::defender_for_endpoint::1.0` | deprecated | [specs/platforms/defender-for-endpoint-1.0.md](specs/platforms/defender-for-endpoint-1.0.md) |
 | Splunk platform | 1.0 | `platform::splunk::1.0` | normative | [specs/platforms/splunk-1.0.md](specs/platforms/splunk-1.0.md) |
 | SentinelOne platform | 1.1 | `platform::sentinel_one::1.0` | normative | [specs/platforms/sentinel-one-1.0.md](specs/platforms/sentinel-one-1.0.md) |
 | Carbon Black Cloud platform | 1.1 | `platform::carbon_black_cloud::1.0` | normative | [specs/platforms/carbon-black-cloud-1.0.md](specs/platforms/carbon-black-cloud-1.0.md) |
@@ -42,7 +43,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | YARA language | 1.6 | — | normative | [specs/languages/yara-1.0.md](specs/languages/yara-1.0.md) |
 | Exabeam Query Language | 1.1 | — | normative | [specs/languages/exabeam-1.0.md](specs/languages/exabeam-1.0.md) |
 | YARA-L language | 1.1 | — | normative | [specs/languages/yara-l-1.0.md](specs/languages/yara-l-1.0.md) |
-| Validation | 1.15 | — | normative | [specs/validation.md](specs/validation.md) |
+| Validation | 1.16 | — | normative | [specs/validation.md](specs/validation.md) |
 | Sharing | 1.3 | — | normative | [specs/sharing.md](specs/sharing.md) |
 | MISP connector | 1.0 | `sharing::misp::1.0` | normative | [specs/sharing/misp-1.0.md](specs/sharing/misp-1.0.md) |
 

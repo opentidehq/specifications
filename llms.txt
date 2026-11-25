@@ -21,7 +21,7 @@
 - specs/metaschema-keywords.md
 - specs/platforms/index.md
 - specs/platforms/sentinel-1.0.md (schema_id: platform::sentinel::1.0)
-- specs/platforms/defender-for-endpoint-1.0.md (schema_id: platform::defender_for_endpoint::1.0)
+- specs/platforms/microsoft-defender-1.0.md (schema_id: platform::microsoft_defender::1.0)
 - specs/platforms/splunk-1.0.md (schema_id: platform::splunk::1.0)
 - specs/platforms/sentinel-one-1.0.md (schema_id: platform::sentinel_one::1.0)
 - specs/platforms/carbon-black-cloud-1.0.md (schema_id: platform::carbon_black_cloud::1.0)

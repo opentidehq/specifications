@@ -1,7 +1,7 @@
 {
   "object_uuid": "00000000-0000-4000-8003-000000000010",
   "platforms": {
-    "defender_for_endpoint": {
+    "sentinel_one": {
       " contoso ": "12345"
     }
   },

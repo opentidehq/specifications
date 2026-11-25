@@ -51,7 +51,8 @@ class DeploymentFixtureTests(unittest.TestCase):
 
 class ShardReaderTests(unittest.TestCase):
     def test_valid_single_binding(self) -> None:
-        self.assertEqual(_codes(_shard({"defender_for_endpoint": {"Contoso": "12345"}})), set())
+        self.assertEqual(_codes(_shard({"sentinel_one": {"Contoso": "12345"}})), set())
+        self.assertEqual(_codes(_shard({"defender_for_endpoint": {"Contoso": "12345"}})), {"deployment_state_platform"})
 
     def test_zero_is_a_canonical_decimal(self) -> None:
         self.assertEqual(_codes(_shard({"sentinel_one": {"s1": "0"}})), set())
@@ -91,20 +92,20 @@ class ShardReaderTests(unittest.TestCase):
 
     def test_tenant_whitespace_and_empty_tenant(self) -> None:
         for tenant in (" contoso", "contoso ", "", "\t"):
-            doc = _shard({"defender_for_endpoint": {tenant: "1"}})
+            doc = _shard({"sentinel_one": {tenant: "1"}})
             self.assertEqual(_codes(doc), {"deployment_state_shape"}, tenant)
 
     def test_inner_tenant_whitespace_is_allowed(self) -> None:
         self.assertEqual(_codes(_shard({"crowdstrike": {"falcon prod": "x"}})), set())
 
     def test_decimal_platforms_reject_non_canonical_ids(self) -> None:
-        for platform in ("defender_for_endpoint", "sentinel_one"):
+        for platform in ("sentinel_one", "sysdig"):
             for value in ("012", "-1", "+1", "1.0", "", " 1", "abc"):
                 doc = _shard({platform: {"t": value}})
                 self.assertEqual(_codes(doc), {"deployment_state_shape"}, (platform, value))
 
     def test_ids_must_be_strings(self) -> None:
-        for platform, value in (("defender_for_endpoint", 12345), ("crowdstrike", 7), ("sentinel_one", None)):
+        for platform, value in (("sysdig", 12345), ("crowdstrike", 7), ("sentinel_one", None)):
             self.assertEqual(_codes(_shard({platform: {"t": value}})), {"deployment_state_shape"})
 
     def test_crowdstrike_is_verbatim_but_not_blank(self) -> None:
@@ -148,11 +149,11 @@ class WriterFormTests(unittest.TestCase):
 
 
 class ExternalIdInRuleTests(unittest.TestCase):
-    def _rule(self, block: dict, platform: str = "defender_for_endpoint") -> dict:
+    def _rule(self, block: dict, platform: str = "sentinel_one") -> dict:
         return {"configurations": {platform: block}}
 
     def test_every_legacy_spelling_on_any_platform(self) -> None:
-        for platform in ("defender_for_endpoint", "sentinel_one", "crowdstrike", "sentinel", "splunk", "elastic"):
+        for platform in ("microsoft_defender", "sentinel_one", "crowdstrike", "sentinel", "splunk", "elastic"):
             for key in ("rule_id", "rule_id_bundle", "rule_id::Contoso"):
                 codes = rule_codes(self._rule({key: {"Contoso": 1}, "enabled": True}, platform))
                 self.assertEqual(codes, ["external_id_in_rule"], (platform, key))

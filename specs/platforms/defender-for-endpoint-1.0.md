@@ -1,14 +1,18 @@
 ---
 spec: platform-defender-for-endpoint
-version: "1.3"
+version: "1.4"
 schema_id: platform::defender_for_endpoint::1.0
-status: normative
+status: deprecated
 supersedes: null
 ---
 
 # Microsoft Defender for Endpoint (`platform::defender_for_endpoint::1.0`)
 
 ## Summary
+
+<Callout type="warning">
+**Removed.** opentide 1.0 does not have this platform, and this spec defines no behaviour for it. `configurations.defender_for_endpoint` is an unknown key. The file is kept as a record, as [governance](../../GOVERNANCE.md) requires for a withdrawn spec ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)).
+</Callout>
 
 `configurations.defender_for_endpoint` is a Microsoft Defender custom detection rule. The detection text is KQL. Query validation is supported. Defender assigns the remote rule id; opentide stores it per tenant in [deployment state](../deployment-state.md) so the next deploy updates that rule.
 
@@ -183,7 +187,7 @@ configurations:
         collect_investigation_package: true
 ```
 
-Fixture: [fixtures/platforms/defender-for-endpoint.yaml](../../fixtures/platforms/defender-for-endpoint.yaml).
+The fixture was removed with the platform.
 
 ## History
 
@@ -193,3 +197,4 @@ Fixture: [fixtures/platforms/defender-for-endpoint.yaml](../../fixtures/platform
 | 1.1 | 2026-10-16 | `rule_id` and the `rule_id::<tenant>` alias are removed and fail `external_id_in_rule`. Deploy reads and writes the Defender id in [deployment state](../deployment-state.md); `DISABLEMENT` and `DELETION` without a binding report `external_id_missing` ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Schema id unchanged. |
 | 1.2 | 2026-11-23 | `alert.techniques` is sent as `mitreTechniques` when set, and the rule's objective's Enterprise ATT&CK techniques otherwise (an empty list counts as unset); deploy used to send an empty list (opentide#1801, opentide#1810). Schema id unchanged. |
 | 1.3 | 2026-11-24 | `alert.category` is removed: Microsoft Graph deprecated the custom detection alert template's `category` (use the MITRE tactics) and removed it on 2026-10-01. Static validation rejects the key as unknown, deploy no longer sends it, and `generate extract` no longer writes it. No deprecation period (opentide#1704, opentide#1850). Schema id unchanged. |
+| 1.4 | 2026-11-25 | **Removed.** opentide 1.0 does not have this platform; the spec is kept as a record and defines no behaviour ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)). Schema id unchanged. |

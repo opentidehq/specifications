@@ -196,7 +196,8 @@ class SpecVersionTests(unittest.TestCase):
             self.assertGreaterEqual(_version_key(current), _version_key(version), rel)
             self.assertIn(f"| {version} | 2026-10-16 |", text, rel)
             self.assertIn(f"## {meta['spec']} {version}", changelog, rel)
-            self.assertRegex(specs, rf"\| {re.escape(current)} \| [^|]+ \| normative \| \[{re.escape(rel)}\]")
+            # A spec RFC 0010 touched may since have been deprecated (defender-for-endpoint-1.0, RFC 0021).
+            self.assertRegex(specs, rf"\| {re.escape(current)} \| [^|]+ \| (normative|deprecated) \| \[{re.escape(rel)}\]")
 
     def test_platform_schema_ids_unchanged(self) -> None:
         for path in sorted(PLATFORMS.glob("*-1.0.md")):

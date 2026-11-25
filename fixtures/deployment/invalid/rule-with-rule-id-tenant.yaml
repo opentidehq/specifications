@@ -1,4 +1,4 @@
-name: Defender rule still carrying the spliced rule_id line
+name: SentinelOne rule still carrying the spliced rule_id line
 metadata:
   uuid: 00000000-0000-4000-8003-000000000021
   schema: rule::1.0
@@ -13,19 +13,15 @@ severity: High
 response:
   alert_severity: High
 configurations:
-  defender_for_endpoint:
-    rule_id::Contoso: 12345
+  sentinel_one:
     enabled: true
-    schema: platform::defender_for_endpoint::1.0
+    schema: platform::sentinel_one::1.0
     status: PRODUCTION
-    query: |
-      DeviceProcessEvents
-      | where FileName =~ "cmd.exe"
-      | take 1
-    scheduling: 1H
-    alert:
-      title: Suspicious command processor
-    impacted_entities:
-      device: DeviceId
-    scope:
-      selection: All
+    rule_id::Contoso: 12345
+    condition:
+      type: Single Event
+      single_event:
+        query: |
+          EventType = "Process Creation" AND TgtProcName Contains "cmd.exe"
+    details:
+      severity: High

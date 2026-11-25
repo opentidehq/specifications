@@ -31,6 +31,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Correct `threat.actors` to `list[ThreatActor]` with scoped `name`; pin path is `threat.actors.name` ([#11](https://github.com/opentidehq/specifications/issues/11)).
 - Initial normative spec bootstrapped from opentide `models/threat.py`.
 
+## visibility 1.2
+
+- The Defender KQL system is `microsoft_defender`, the platform that replaces the removed `defender_for_endpoint` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). `schema_id` stays `visibility::1.0`.
+
 ## visibility 1.1
 
 - Under `sentinel`, an unknown, undeclared KQL name that is a near miss of a declared or catalog table (equal once case, `_`, `-` and whitespace are ignored, or one edit away, two for names of eight characters or more; not `_CL`) is the error `kql_table_misspelt`, suggesting the table; it was the `kql_unknown_table` warning ([opentide#1818](https://github.com/opentidehq/opentide/pull/1818)). `schema_id` stays `visibility::1.0`.
@@ -55,6 +59,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
+- `configurations.microsoft_defender` (`MicrosoftDefenderConfig`, `platform::microsoft_defender::1.0`, [specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md)) replaces `configurations.defender_for_endpoint`, which is removed and is now an unknown key ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). `schema_id` stays `rule::1.1`.
 - `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](rfcs/0018-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md)) is added ([RFC 0019](rfcs/0019-google-secops-yara-l.md)). A hunt with `system: google_secops` is a YARA-L search. Additive; `schema_id` stays `rule::1.1`. New fixture `fixtures/valid/rule-google-secops-spray-1.0.yaml`.
 - `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.1`.
@@ -70,6 +75,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.0
 
+- `configurations.microsoft_defender` (`MicrosoftDefenderConfig`, `platform::microsoft_defender::1.0`, [specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md)) replaces `configurations.defender_for_endpoint`, which is removed and is now an unknown key ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). `schema_id` stays `rule::1.0`.
 - `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](rfcs/0018-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md)) is added ([RFC 0019](rfcs/0019-google-secops-yara-l.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.0`.
@@ -82,6 +88,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Correct `detection_model`: it references an objective UUID or the UUID of any signal defined under an objective. Both are referenceable by design; a signal reference implements that signal, and its owning objective is the rule's objective. The objective-only wording was wrong. New fixture `fixtures/cross-object/rule-references-signal.yaml`.
 - `detection_model` may name `objective::1.0` or `objective::1.1`. Indirect coverage comes from `reuse` ([RFC 0011](rfcs/0011-signal-reuse.md)).
 - Initial normative spec bootstrapped from opentide `models/rule.py` (exemplar template).
+
+## workspace 1.6
+
+- The deployment-state directory no longer lists Defender for Endpoint, which is removed; `microsoft_defender` keeps no shard ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## workspace 1.5
 
@@ -133,6 +143,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - `responders.vocab.toml` is retired. It shipped with `keys = []` while `response.responders` was pinned to it, so every authored value failed validation and no instance could fix it (vocabularies are not locally extensible). The alert handling team is per-organisation configuration: the field is free text defaulted from `[deployment] default_responders` (opentide#507).
 - Initial catalog of 36 bundled vocabularies copied from opentide.
 
+## deployment 1.5
+
+- Defender for Endpoint is removed. `microsoft_defender` addresses the Defender rule by `metadata.uuid`: no binding is needed to create, update, disable, or delete, and `--prune` retires a deleted rule by uuid ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
+
 ## deployment 1.4
 
 - Retiring deleted rules: `opentide deploy` reports rules whose file was deleted (a warning and the `--json` `retirable` array) and sends nothing for them; `--prune` on a run that includes `RELEASE` deletes them from the tenants they reached, by the recorded id on platforms that keep ids and from the run's diff on Sentinel, Splunk, Elastic and HarfangLab. Carbon Black Cloud reports it cannot. Nothing is retired while an object file fails to load, a UUID is still in the workspace, or an `--all` run reads no rule ([opentide#1713](https://github.com/opentidehq/opentide/issues/1713), [opentide#1849](https://github.com/opentidehq/opentide/pull/1849)).
@@ -153,6 +167,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## deployment 1.0
 
 - Initial normative spec bootstrapped from opentide `deployment.toml`.
+
+## deployment-state 1.10
+
+- `defender_for_endpoint` is removed from the state-backed platforms and from the shard: a `defender_for_endpoint` entry now fails `deployment_state_platform`, and `migrate-state` stores only SentinelOne and CrowdStrike ids. `microsoft_defender` keeps no shard. The shard JSON Schema drops the key; schema id unchanged. Fixtures that used a Defender binding use SentinelOne; `leading-zero-defender-id.json` is now `leading-zero-sentinel-one-id.json` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## deployment-state 1.9
 
@@ -205,6 +223,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## metaschema-keywords 1.0
 
 - Initial normative spec bootstrapped from opentide `generation/schema_pipeline.py`.
+
+## platforms 1.11
+
+- Microsoft Defender (`microsoft_defender`) replaces Microsoft Defender for Endpoint (`defender_for_endpoint`), which is removed. It is a KQL custom detection on the Microsoft Graph beta API, in the `--live` allowlist, addressed by `metadata.uuid` with no stored id ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## platforms 1.10
 
@@ -272,6 +294,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - `platform::sentinel::1.0`. KQL analytics rule: `query`, `scheduling`, `alert`, plus grouping, entities, exclusions, template, and trigger. `grouping` is required at deploy and optional at validation.
 
+## platform-defender-for-endpoint 1.4
+
+- **Removed.** opentide 1.0 does not have this platform; `configurations.defender_for_endpoint` is an unknown key. The spec is kept as a record with `status: deprecated` and defines no behaviour; its fixture is removed ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
+
 ## platform-defender-for-endpoint 1.3
 
 - `alert.category` removed. Microsoft Graph deprecated it on the custom detection alert template (use the MITRE tactics) and removed it on 2026-10-01. Static validation rejects the key as unknown, deploy no longer sends it, and `generate extract` no longer writes it; every `alert` field is now optional. Removed without a deprecation period ([opentide#1704](https://github.com/opentidehq/opentide/issues/1704), [opentide#1850](https://github.com/opentidehq/opentide/pull/1850)). Schema id unchanged.
@@ -287,6 +313,17 @@ Per-spec change history. Breaking changes require a new spec file version and an
 ## platform-defender-for-endpoint 1.0
 
 - `platform::defender_for_endpoint::1.0`. KQL custom detection: `query`, `alert.category`, `impacted_entities`, `scheduling` (`NRT`, `1H`, `3H`, `12H`, `24H`), response actions, and exclusions. Registry load requires `scope`.
+
+## platform-microsoft-defender 1.0
+
+- New platform `microsoft_defender` (Microsoft Defender), schema `platform::microsoft_defender::1.0` ([specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md), [RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). Its contract is the Microsoft Graph **beta** custom detection API, and it models every writable beta property. The properties it does not model are listed with their reason (set by deploy, read-only, deprecated), and a test checks the list against a snapshot of the beta docs. The keys:
+  - `schedule`: an ISO 8601 frequency (`NRT`, `<n>H`, `<n>D`) and a beta lookback.
+  - `alert`: tactics derived from techniques through the `att&ck` vocabulary, with no explicit tactics key; `custom_details`; beta `grouping`.
+  - `entities`: seventeen entity kinds, columns sent verbatim. `actions`: sixteen automated actions.
+  - `scope.device_groups`, beta `incident`, and `status` from the deployment status.
+- Constraints are those the Graph docs state (enum values, lookback ≥ frequency, no lookback with NRT), plus opentide shape rules the spec marks. Codes use the `microsoft_defender_` prefix.
+- The rule id is `metadata.uuid`: `PATCH`, then `POST` on 404. No deployment state.
+- Fixtures: `fixtures/platforms/microsoft-defender.yaml`, the complete block `microsoft-defender-complete.yaml` (also in the spec's Examples), request-body goldens, the beta property snapshot under `fixtures/platforms/microsoft-defender/`, and four invalid fixtures.
 
 ## platform-splunk 1.0
 
@@ -430,6 +467,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-exabeam 1.0
 
+- Prose only: Defender for Endpoint, now removed, is no longer cited as state-backed ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 - Initial field contract ([RFC 0018](rfcs/0018-exabeam-platform.md)): sequences with any-match or threshold conditions, correlation, suppression, delay, schedule, and outcomes; derived name, description (with ATT&CK), and severity; whole-body `PUT`; the rule UUID in deployment state; `--live` filter checks and hunts through Search. Fixtures, a fixture tenant, and request goldens under `fixtures/platforms/exabeam/`.
 
 ## language-exabeam 1.1
@@ -497,6 +535,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 - Publishing organisation from the block override, otherwise `metadata.organisation.uuid`. An object with neither fails. No fallback to the API key's organisation.
 - Distribution derived from `metadata.tlp`. `max_tlp = "red"` shares TLP:RED. No sharing groups, file mode, title prefix, or extra tags in 1.0.
 - `content_hash` is the SHA-256 of the verbatim UTF-8 object document, lowercase hex.
+
+## validation 1.16
+
+- `microsoft_defender` replaces `defender_for_endpoint` in the `--live` allowlist. Advisory `microsoft_defender_no_entities`. The fixture checker applies the Microsoft Defender constraint codes; four invalid fixtures. `leading-zero-defender-id.json` is now `leading-zero-sentinel-one-id.json` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## validation 1.15
 
