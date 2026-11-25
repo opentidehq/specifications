@@ -273,7 +273,7 @@ class SpecShapeTests(unittest.TestCase):
         self.assertEqual(meta["spec"], "platform-microsoft-defender")
         self.assertEqual(meta["schema_id"], SCHEMA)
         self.assertEqual(meta["status"], "normative")
-        self.assertEqual(meta["version"], "1.0")
+        self.assertEqual(meta["version"], "1.1")
         self.assertEqual(meta["supersedes"], "null")
         for needle in ("defender_for_endpoint", "defender-for-endpoint", "legacy binding", "opentide migrate"):
             self.assertNotIn(needle, text)
@@ -602,7 +602,7 @@ class CheckerTests(unittest.TestCase):
 class IndexTests(unittest.TestCase):
     def test_rows(self) -> None:
         specs = _read(ROOT / "SPECS.md")
-        self.assertIn("| Microsoft Defender platform | 1.0 | `platform::microsoft_defender::1.0` | normative | [specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md) |", specs)
+        self.assertIn("| Microsoft Defender platform | 1.1 | `platform::microsoft_defender::1.0` | normative | [specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md) |", specs)
         self.assertIn("| Defender for Endpoint platform (removed) | 1.4 | `platform::defender_for_endpoint::1.0` | deprecated | [specs/platforms/defender-for-endpoint-1.0.md](specs/platforms/defender-for-endpoint-1.0.md) |", specs)
         index = _read(PLATFORMS / "index.md")
         self.assertIn("| `microsoft_defender` | `platform::microsoft_defender::1.0` | [microsoft-defender-1.0.md](microsoft-defender-1.0.md) |", index)
@@ -617,7 +617,7 @@ class IndexTests(unittest.TestCase):
             self.assertIn("| `microsoft_defender` | MicrosoftDefenderConfig | `platform::microsoft_defender::1.0` |", _read(ROOT / "specs" / "objects" / name))
         changelog = _read(ROOT / "CHANGELOG.md")
         for heading in (
-            "## platform-microsoft-defender 1.0", "## platform-defender-for-endpoint 1.4", "## deployment-state 1.10",
+            "## platform-microsoft-defender 1.1", "## platform-defender-for-endpoint 1.4", "## deployment-state 1.10",
             "## deployment 1.5", "## platforms 1.11", "## validation 1.16", "## workspace 1.6", "## visibility 1.2",
             "## platform-microsoft-defender 1.0",
         ):
@@ -652,6 +652,55 @@ class IndexTests(unittest.TestCase):
         for needle in ("NRT encoding", "404 on update and delete", "Which entity mappings Defender honours"):
             self.assertIn(needle, questions)
 
+
+class RfcArtefactTests(unittest.TestCase):
+    """RFC 0021 carries the platform-RFC artefacts (.agents/skills/platform-rfc), and they match the fixtures."""
+
+    @staticmethod
+    def _blocks(text: str, lang: str) -> list[str]:
+        return re.findall(rf"```{lang}\n(.*?)```", text, flags=re.S)
+
+    def test_complete_block_is_the_fixture(self) -> None:
+        section = _section(_read(RFC), "2.1 Complete block", "####")
+        snippet = self._blocks(section, "yaml")[0]
+        self.assertEqual(yaml.safe_load(snippet)["configurations"], _load(RULE_COMPLETE)["configurations"])
+
+    def test_minimal_block_is_the_specs_and_valid(self) -> None:
+        rfc_minimal = self._blocks(_section(_read(RFC), "2.2 Minimal block", "####"), "yaml")[0]
+        spec_minimal = self._blocks(_read(SPEC).split("**Minimal block.**", 1)[1], "yaml")[0]
+        self.assertEqual(yaml.safe_load(rfc_minimal), yaml.safe_load(spec_minimal))
+        block = yaml.safe_load(rfc_minimal)["configurations"]["microsoft_defender"]
+        self.assertEqual(validate_microsoft_defender_block(block), [])
+
+    def test_create_body_is_the_golden(self) -> None:
+        text = _read(RFC)
+        body = text.split("<!-- rfc0021:complete-create-body -->\n", 1)[1]
+        sent = json.loads(self._blocks(body, "json")[0])
+        golden = json.loads(_read(GOLDEN / "rule-microsoft-defender-complete.create.api.json"))
+        self.assertEqual(sent, golden["body"])
+        self.assertIn(f"PATCH {BASE}/{golden['body']['id']}", text)
+        self.assertIn(f"POST {BASE}\n", text)
+
+    def test_every_code_is_in_the_validation_table(self) -> None:
+        section = _section(_read(RFC), "4. Validation")
+        codes = set(re.findall(r"^\| `([a-z_]+)` \|", section, flags=re.MULTILINE))
+        for code in CONSTRAINTS + ADVISORIES + DIAGNOSTICS + ["unknown_field", "external_id_in_rule", "tenant_refused"]:
+            self.assertIn(code, codes)
+
+    def test_invalid_fixture_headers_name_their_code(self) -> None:
+        for name, code in EXPECTED_INVALID_CODES.items():
+            if name.startswith("rule-microsoft-defender-"):
+                first = _read(FIXTURES / "invalid" / name).splitlines()[0]
+                self.assertRegex(first, rf"Expected (constraint )?code: {code}\.", name)
+
+    def test_implementation_and_test_plan_are_linked(self) -> None:
+        text = _read(RFC)
+        for number in (1856, 1860, 1861):
+            self.assertIn(f"https://github.com/opentidehq/opentide/pull/{number}", text)
+        self.assertIn(
+            "https://github.com/opentidehq/opentide/blob/integration/unified-core/docs/internal/microsoft-defender-tenant-test.md",
+            text,
+        )
 
 class LinkTests(unittest.TestCase):
     FILES = [
