@@ -1,6 +1,6 @@
 ---
 spec: platform-microsoft-defender
-version: "1.0"
+version: "1.1"
 schema_id: platform::microsoft_defender::1.0
 status: normative
 supersedes: null
@@ -27,6 +27,9 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 - Deploy MUST send the [beta-only](#beta-only-properties) properties only when their key is set, and MUST NOT send a deprecated Graph property.
 - Deploy MUST derive the alert's MITRE tactics from its techniques through the bundled `att&ck` vocabulary ([ATT&CK](#attck)). There is no key that sets tactics.
 - Every writable property of the beta API MUST be modelled by a key of this block or listed in [Beta properties not modelled](#beta-properties-not-modelled), with its reason.
+- A tenant's `[tenants.setup]` MUST hold `tenant_id`, `client_id`, and `client_secret`, and MAY hold `ssl`. Any other setup key MUST fail configuration load ([Tenant setup](#tenant-setup)).
+- Deploy MUST sign in with the OAuth 2.0 client credentials grant and MUST send every rule call to the beta endpoint. No setting changes the endpoint or the API version.
+- Deploy MUST NOT send a `PATCH` or `POST` again after a transient answer (`408`, `429`, `502`, `503`, `504`) ([Errors and retries](#errors-and-retries)). A `401` gets one new token and one resend.
 
 ## Definition
 
@@ -322,6 +325,48 @@ The goldens for the fixture rules are under [fixtures/platforms/microsoft-defend
 
 Defender sets `autoDisabled` on a rule that keeps failing. The next deploy of an enabled status sends `enabled` again.
 
+### Tenant setup
+
+Tenants are configured in `.opentide/configurations/platforms/microsoft_defender.toml`:
+
+```toml
+[platform]
+enabled = true
+name = "Microsoft Defender"
+
+[[tenants]]
+name = "contoso"
+description = "Contoso production tenant"
+strategies = ["PREVIEW", "RELEASE"]
+[tenants.setup]
+ssl = true
+tenant_id = "$MDE_TENANT_ID"
+client_id = "$MDE_CLIENT_ID"
+client_secret = "$MDE_CLIENT_SECRET"
+[tenants.parameters]
+device_groups = ["Tier 0", "Servers", "Developer workstations"]
+```
+
+| `tenants.setup` field | Type | Required | Default | Meaning |
+|-----------------------|------|----------|---------|---------|
+| `tenant_id` | string | yes | — | Microsoft Entra ID tenant (directory) id. |
+| `client_id` | string | yes | — | Application (client) id of the app registration. |
+| `client_secret` | string | yes | — | Client secret of the app registration. SHOULD be a `$ENV` reference. Never written to output. |
+| `ssl` | bool | no | `true` | Shared tenant setup: TLS verification. |
+
+There is no URL key: the endpoint is fixed. `[tenants.parameters] device_groups` MAY list the tenant's device group names; deploy does not read it, and validation does not check `scope` against it.
+
+**App registration.** One Entra ID app registration per tenant, with a client secret and these Microsoft Graph **application** permissions, admin consent granted:
+
+| Permission | Needed for |
+|------------|------------|
+| `CustomDetection.ReadWrite.All` | deploy (`PATCH`, `POST`, `DELETE`), `--prune`, the tenant check, `generate extract` |
+| `ThreatHunting.Read.All` | `opentide validate query --live` and `opentide query` (`runHuntingQuery`) |
+
+**Sign-in.** The client signs in with the client credentials grant at `https://login.microsoftonline.com/<tenant_id>/oauth2/v2.0/token`, scope `https://graph.microsoft.com/.default`, keeps the token until it is due for renewal, and sends it as `Authorization: Bearer <token>` with `Content-Type: application/json`. A `401` from Graph gets one new token and one resend. A refused sign-in fails the tenant; the run continues with the other tenants.
+
+**Tenant check.** `opentide doctor --live` signs in and reads the first page of `GET {base}`, which writes nothing. `200` passes; any other answer fails the check with Graph's status.
+
 ### Deploy
 
 Per rule and per tenant the run selected, with `{base}` = `https://graph.microsoft.com/beta/security/rules/detectionRules` and `{uuid}` the lowercase canonical `metadata.uuid`:
@@ -338,6 +383,24 @@ Per rule and per tenant the run selected, with `{base}` = `https://graph.microso
 - A `404` on `PATCH` is the only signal that the rule is absent. Deploy MUST NOT list remote rules or match display names to find it.
 - No create needs deployment state, so `deployment_state_ignored` and `deployment_state_unpersisted` never refuse a `microsoft_defender` create. A dry run makes no call and shows the call it would make first.
 - `--prune` retires a deleted `microsoft_defender` rule by `DELETE {base}/{uuid}`, as Sentinel and Elastic do ([deployment.md](../deployment.md#retiring-deleted-rules)).
+
+#### Errors and retries
+
+- A connection that could not be made (DNS, refused, proxy tunnel, connect timeout) is retried for every method, up to three times, after 0.5 s, 1 s, and 2 s.
+- A transient answer (`408`, `429`, `502`, `503`, `504`) is retried for `DELETE` only, up to three times, honouring `Retry-After` up to 120 s. A `PATCH` or `POST` is sent once: Graph may have acted on it, and the next deploy's `PATCH` repairs the rule.
+- A request not answered within 120 s is not sent again.
+- Any other non-2xx answer to a rule call fails that rule on that tenant as `tenant_refused`, with the HTTP status and Graph's `error.message`.
+
+#### Plan, dry run, and `--json`
+
+| Output | Active status | `DISABLEMENT` | `DELETION`, `--prune` |
+|--------|---------------|---------------|------------------------|
+| Plan (text) | `create or update` | `disable` | `delete` |
+| `--json` `changes[].action` | `upsert` | `disable` | `delete` |
+| Dry run `api_request` | the `PATCH {base}/{uuid}` with its body | the same, `status: disabled` | the `DELETE {base}/{uuid}` |
+| Real run | `created` or `updated` | `disabled`, or skipped (`microsoft_defender_rule_absent`) | `deleted`, or skipped ("already gone") |
+
+A dry run makes no call and shows only the first request: the `POST` a `404` leads to is not shown. Whether an active rule is created or updated is known only from Graph's answer.
 
 ### Diagnostics
 
@@ -379,6 +442,26 @@ Every code carries the platform identifier, `microsoft_defender_`, as every othe
 There is no setting that changes the Graph API version. Tenants are configured in `.opentide/configurations/platforms/microsoft_defender.toml`.
 
 ## Examples
+
+**Minimal block.** Only `query` and `schedule.frequency` are required. Every other value has a deploy-time default or is not sent; the one `hosts` mapping keeps the advisory `microsoft_defender_no_entities` away.
+
+```yaml
+configurations:
+  microsoft_defender:
+    enabled: true
+    status: STAGING
+    query: |
+      DeviceProcessEvents
+      | where FileName =~ "powershell.exe" and ProcessCommandLine has "-enc"
+      | project Timestamp, ReportId, DeviceId, DeviceName
+    schedule:
+      frequency: 1H
+    entities:
+      hosts:
+        - device_id: DeviceId
+```
+
+**First example.** Beta-only keys, entities, an action, and a scope:
 
 ```yaml
 configurations:
@@ -572,7 +655,7 @@ configurations:
           BuildAgent: build-agent-01
 ```
 
-When this block is deployed to tenant `contoso`, the exclusion (scoped to `fabrikam`) is skipped and the query is sent unchanged. Its create body is [rule-microsoft-defender-complete.create.api.json](../../fixtures/platforms/microsoft-defender/rule-microsoft-defender-complete.create.api.json).
+When this block is deployed to tenant `contoso`, the exclusion (scoped to `fabrikam`) is skipped and the query is sent unchanged. Its create body is [rule-microsoft-defender-complete.create.api.json](../../fixtures/platforms/microsoft-defender/rule-microsoft-defender-complete.create.api.json), shown in full, with the `PATCH` and `POST` requests, in [RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md#62-update-and-create-for-the-complete-block).
 
 Fixtures:
 
@@ -585,4 +668,5 @@ Fixtures:
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.1 | 2026-11-25 | Tenant setup (`tenant_id`, `client_id`, `client_secret`, `ssl`; unknown keys fail), the app registration's Graph permissions, sign-in, and the tenant check; errors and retries (`PATCH` and `POST` never resent after a transient answer); the plan, dry run, and `--json` rows; a minimal example. Written down from the deployer RFC 0021 describes; no block or request change. Schema id unchanged. |
 | 1.0 | 2026-11-25 | `platform::microsoft_defender::1.0`: Microsoft Defender custom detection rules on the Microsoft Graph beta custom detection contract ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)). Every writable beta property is modelled, or listed as not modelled with its reason, and checked against a snapshot of the docs. The keys: `schedule` (an ISO 8601 frequency, and a beta lookback), `alert` (tactics derived from techniques, custom details, beta event grouping), `entities` (seventeen entity kinds), `actions` (sixteen automated actions), `scope.device_groups`, and beta `incident`. `status` follows the deployment status. Constraints are those the Graph docs state, plus marked opentide shape rules. The Defender rule id is `metadata.uuid`; no deployment state. |

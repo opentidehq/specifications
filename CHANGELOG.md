@@ -314,6 +314,10 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 - `platform::defender_for_endpoint::1.0`. KQL custom detection: `query`, `alert.category`, `impacted_entities`, `scheduling` (`NRT`, `1H`, `3H`, `12H`, `24H`), response actions, and exclusions. Registry load requires `scope`.
 
+## platform-microsoft-defender 1.1
+
+- Tenant setup written down: `tenant_id`, `client_id`, `client_secret` (a `$ENV` reference), and `ssl`; an unknown setup key fails configuration load. The app registration needs the Graph application permissions `CustomDetection.ReadWrite.All` (deploy) and `ThreatHunting.Read.All` (`--live`, `opentide query`). Sign-in, the tenant check, errors and retries (a `PATCH` or `POST` is never resent after a transient answer), the plan, dry run, and `--json` rows, and a minimal example. No block or request change ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md), revised). Schema id unchanged.
+
 ## platform-microsoft-defender 1.0
 
 - New platform `microsoft_defender` (Microsoft Defender), schema `platform::microsoft_defender::1.0` ([specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md), [RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). Its contract is the Microsoft Graph **beta** custom detection API, and it models every writable beta property. The properties it does not model are listed with their reason (set by deploy, read-only, deprecated), and a test checks the list against a snapshot of the beta docs. The keys:

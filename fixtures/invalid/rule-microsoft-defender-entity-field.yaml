@@ -1,4 +1,4 @@
-# A host mapping with a field hosts do not have. Expected constraint code: defender_entity_mapping.
+# A host mapping with a field hosts do not have. Expected constraint code: microsoft_defender_entity_mapping.
 name: Microsoft Defender invalid block (rule-microsoft-defender-entity-field.yaml)
 metadata:
   uuid: 00000000-0000-4000-8003-0000000000d2

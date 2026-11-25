@@ -27,7 +27,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Metaschema keywords | 1.2 | — | normative | [specs/metaschema-keywords.md](specs/metaschema-keywords.md) |
 | Platforms | 1.11 | — | normative | [specs/platforms/index.md](specs/platforms/index.md) |
 | Sentinel platform | 1.3 | `platform::sentinel::1.0` | normative | [specs/platforms/sentinel-1.0.md](specs/platforms/sentinel-1.0.md) |
-| Microsoft Defender platform | 1.0 | `platform::microsoft_defender::1.0` | normative | [specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md) |
+| Microsoft Defender platform | 1.1 | `platform::microsoft_defender::1.0` | normative | [specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md) |
 | Defender for Endpoint platform (removed) | 1.4 | `platform::defender_for_endpoint::1.0` | deprecated | [specs/platforms/defender-for-endpoint-1.0.md](specs/platforms/defender-for-endpoint-1.0.md) |
 | Splunk platform | 1.0 | `platform::splunk::1.0` | normative | [specs/platforms/splunk-1.0.md](specs/platforms/splunk-1.0.md) |
 | SentinelOne platform | 1.1 | `platform::sentinel_one::1.0` | normative | [specs/platforms/sentinel-one-1.0.md](specs/platforms/sentinel-one-1.0.md) |

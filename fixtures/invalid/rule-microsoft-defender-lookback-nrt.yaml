@@ -1,4 +1,4 @@
-# A lookback on a near-real-time rule. Expected constraint code: defender_lookback.
+# A lookback on a near-real-time rule. Expected constraint code: microsoft_defender_lookback.
 name: Microsoft Defender invalid block (rule-microsoft-defender-lookback-nrt.yaml)
 metadata:
   uuid: 00000000-0000-4000-8003-0000000000d1
