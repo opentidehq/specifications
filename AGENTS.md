@@ -55,6 +55,19 @@ Non-trivial or breaking changes require an RFC before spec edits:
 
 Breaking object schema changes: create a new spec file (`rule-1.1.md`), mark the old file `status: deprecated`, do not delete it.
 
+### Platform RFCs
+
+An RFC that adds or reworks a platform (anything that creates or changes a file under `specs/platforms/`) MUST follow the [platform-rfc skill](.agents/skills/platform-rfc/SKILL.md) and carry `- **Type:** platform` in its header. Linking to the spec is not enough: the RFC itself shows
+
+- the complete block with every key filled in (equal to the complete fixture), and a minimal block;
+- a field table: key, type, required, default, allowed values, vendor property, notes;
+- every validation code with its trigger, message, failing example, and fixture;
+- the exact vendor request for the complete block (equal to its golden), and the YAML-to-wire mapping;
+- tenant setup and authentication, and the deploy lifecycle per status, with retries and the plan, dry run, and `--json` rows;
+- research with dated sources, the upgrade path, unresolved questions with the position taken, and a test plan.
+
+`scripts/test_rfc_platform_checklist.py` fails CI when a platform RFC lacks one of these.
+
 ## Spec file template
 
 Every spec under `specs/` uses this structure:

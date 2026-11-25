@@ -10,6 +10,8 @@ Request for Comments (RFCs) document significant specification changes before th
 4. Update specs, fixtures, `SPECS.md`, and `CHANGELOG.md` in the same PR as the RFC, unless the request is for an RFC draft only
 5. Implement opentide changes separately
 
+An RFC that adds or reworks a platform also follows the [platform-rfc skill](https://github.com/opentidehq/specifications/blob/main/.agents/skills/platform-rfc/SKILL.md) and is marked `- **Type:** platform`; `scripts/test_rfc_platform_checklist.py` checks it.
+
 ## Index
 
 | RFC | Title | Status |

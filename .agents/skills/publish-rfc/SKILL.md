@@ -27,6 +27,7 @@ Draft a Request for Comments (RFC) for the opentide specifications repository.
    - Save as `rfcs/NNNN-short-title.md`
 
 3. **Fill sections**
+   - **Adding or reworking a platform?** Also follow [platform-rfc](../platform-rfc/SKILL.md): it adds required sections and artefacts (complete and minimal YAML, field table, every code, the vendor request, tenant setup, lifecycle, test plan) and a CI check.
    - **Summary** — one paragraph
    - **Motivation** — problem and stakeholders
    - **Detailed design** — spec text changes, new files, fixture impact
