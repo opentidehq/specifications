@@ -16,7 +16,7 @@ class VisibilityFixtures(unittest.TestCase):
         self.assertEqual(vf.check_visibility_fixtures(), [])
 
     def test_same_name_under_two_systems(self) -> None:
-        doc = {"logsources": [source(), source(system="defender_for_endpoint")]}
+        doc = {"logsources": [source(), source(system="microsoft_defender")]}
         self.assertEqual(vf.errors(doc), [])
 
     def test_columns_on_a_wildcard_name(self) -> None:

@@ -1,6 +1,6 @@
 ---
 spec: visibility
-version: "1.1"
+version: "1.2"
 schema_id: visibility::1.0
 status: normative
 supersedes: null
@@ -24,7 +24,8 @@ A log source's `name` **is its dataset**: the KQL table for Sentinel and Defende
 ### Log sources
 
 - A log source MUST set `name`, `description` and `system`, and MAY set `tenants`, `assets`, `references` and `columns`. Any other key MUST fail validation.
-- `name` MUST NOT be empty or whitespace-only. Names MUST be unique per `system`; the same name MAY appear under two systems (`DeviceEvents` under `sentinel` and `defender_for_endpoint`).
+- `name` MUST NOT be empty or whitespace-only. Names MUST be unique per `system`; the same name MAY appear under two systems (`DeviceEvents` under `sentinel` and `microsoft_defender`).
+- `system = "defender_for_endpoint"` names the platform `microsoft_defender` replaces. It MUST be read as `microsoft_defender` and reported with `defender_platform_renamed`, which no configuration can silence; `opentide migrate` rewrites it ([microsoft-defender-1.0](platforms/microsoft-defender-1.0.md#migration-from-defender_for_endpoint)).
 - The opentide 0.20.0 keys `tables`, `indexes`, `sourcetypes`, `macros`, `indices`, `data_views` and `ecs` MUST fail validation, with a message that says what replaces the key: one log source per table, sourcetype or index pattern, named after it.
 
 ### Columns
@@ -37,7 +38,7 @@ A log source's `name` **is its dataset**: the KQL table for Sentinel and Defende
 
 These requirements apply to every query check an implementation runs offline (`validate`, `validate query`, `lint`, the language server, the MCP server). Each MUST read the same `visibility.toml`, and an editor MUST re-read it when it changes.
 
-- **What is declared.** `sentinel`, `defender_for_endpoint`: each `name` is a declared KQL table (or workspace function). `splunk`: a declared sourcetype. `elastic`: a declared index pattern or data stream. Other systems declare nothing. Splunk indexes and macros and Elastic data views are not declarable.
+- **What is declared.** `sentinel`, `microsoft_defender`: each `name` is a declared KQL table (or workspace function). `splunk`: a declared sourcetype. `elastic`: a declared index pattern or data stream. Other systems declare nothing. Splunk indexes and macros and Elastic data views are not declarable.
 - **Opt-in.** Checking is opt-in per system: a system with at least one log source is checked against its names; a system with none MUST be checked as if nothing were declared.
 - **Matching.** A name matches exactly, or as a glob where `*` matches any run of characters. KQL and Elastic names are case-sensitive; Splunk names are not.
 - **KQL source names.** Every name a KQL query reads from (a pipeline's first source, a `union` leg, a `join` or `lookup` right side) that is not a `let` binding, a query parameter, or a function the engine knows MUST be resolved as below. Under opt-in, a name is checked whatever its case. Without opt-in, a name that starts with a lowercase letter is checked only when it ends in `_CL`.
@@ -48,7 +49,7 @@ These requirements apply to every query check an implementation runs offline (`v
 | known to the implementation's catalog, not declared | yes | `kql_table_not_declared`, warning |
 | known to the implementation's catalog | no | nothing |
 | unknown to the catalog, not declared, under the `sentinel` profile, not ending in `_CL`, and a near miss of a declared or catalog table written as a bare KQL identifier (`[A-Za-z_][A-Za-z0-9_]*`): equal to it once ASCII case, `_`, `-` and whitespace are ignored, or within one edit, or two edits when the name is eight characters or longer | either | `kql_table_misspelt`, error, suggesting the nearest such table, a declared table before a catalog one |
-| any other name unknown to the catalog, not declared | either | `kql_unknown_table`, at the platform profile's severity: warning under `sentinel`, error under `defender_for_endpoint` |
+| any other name unknown to the catalog, not declared | either | `kql_unknown_table`, at the platform profile's severity: warning under `sentinel`, error under `microsoft_defender` |
 
 - **Splunk and Elastic.** Under opt-in, a sourcetype that is not declared is `spl_dataset_not_declared`, and an index pattern that is not declared is `elastic_dataset_not_declared`, both warnings. Neither has an unknown-dataset error.
 - **Declared columns, KQL.** An implementation MUST check column references against declared columns as it does for a documented table of its catalog: a near miss is `kql_unknown_column`, and an operator the declared type does not support is `kql_type_mismatch`. Hover MUST show a declared column's type and description; completion MUST offer the declared columns. On a table the catalog also knows, declared columns extend the catalog's, and a declared column with a catalog column's name replaces its type and description. A declared table without `columns` is known by name only.
@@ -66,7 +67,7 @@ These requirements apply to every query check an implementation runs offline (`v
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | string | yes | The dataset: the KQL table for `sentinel` and `defender_for_endpoint`, the sourcetype for `splunk`, the index pattern or data stream for `elastic`; for other systems, a name. `*` matches any run of characters. Unique per `system`. Signals reference it. |
+| `name` | string | yes | The dataset: the KQL table for `sentinel` and `microsoft_defender`, the sourcetype for `splunk`, the index pattern or data stream for `elastic`; for other systems, a name. `*` matches any run of characters. Unique per `system`. Signals reference it. |
 | `description` | string | yes | What the log source records. |
 | `system` | string | yes | Platform identifier ([platforms/index.md](platforms/index.md)). |
 | `tenants` | list[string] | no | Tenants of `system` that hold the logs. |
@@ -85,7 +86,7 @@ These requirements apply to every query check an implementation runs offline (`v
 
 | `system` | Types |
 |----------|-------|
-| `sentinel`, `defender_for_endpoint` | KQL scalar types: `bool`, `datetime`, `decimal`, `dynamic`, `guid`, `int`, `long`, `real`, `string`, `timespan` |
+| `sentinel`, `microsoft_defender` | KQL scalar types: `bool`, `datetime`, `decimal`, `dynamic`, `guid`, `int`, `long`, `real`, `string`, `timespan` |
 | `splunk` | `string`, `number`, `boolean` |
 | `elastic` | Elasticsearch field types: `binary`, `boolean`, `byte`, `constant_keyword`, `date`, `date_nanos`, `double`, `flattened`, `float`, `geo_point`, `half_float`, `integer`, `ip`, `keyword`, `long`, `match_only_text`, `nested`, `object`, `scaled_float`, `short`, `text`, `unsigned_long`, `version`, `wildcard` |
 | any other | none: `columns` is not allowed |
@@ -175,4 +176,5 @@ data:
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-11-03 | First normative spec ([RFC 0013](../rfcs/0013-visibility-logsource-is-a-dataset.md), [#63](https://github.com/opentidehq/specifications/issues/63)). A log source's `name` is its dataset; optional `columns` keyed by column name; query-check semantics. The opentide 0.20.0 plural keys and `ecs` fail validation. `schema_id` stays `visibility::1.0`. Corrected before any implementation released the 2026-11-02 draft of this spec (singular dataset keys, `[[logsources.columns]]`). |
+| 1.2 | 2026-11-25 | The Defender for Endpoint system is `microsoft_defender`, the platform that replaces `defender_for_endpoint` ([RFC 0021](../rfcs/0021-defender-graph-beta-detection-rules.md)). `system = "defender_for_endpoint"` is read as `microsoft_defender` with the warning `defender_platform_renamed`, and `opentide migrate` rewrites it. `schema_id` stays `visibility::1.0`. |
 | 1.1 | 2026-11-23 | [Query checks](#query-checks): under `sentinel`, an unknown, undeclared KQL name that is a near miss of a declared or catalog table (one edit, two for names of eight characters or more; not `_CL`) is the error `kql_table_misspelt` with the table to use, where it was the `kql_unknown_table` warning (opentide#1818). `schema_id` stays `visibility::1.0`. |

@@ -1,5 +1,5 @@
-# 1.0 keys (scheduling, impacted_entities) on a 2.0 block. Expected code: unknown_field.
-name: Defender invalid block (rule-defender-1.0-keys.yaml)
+# defender_for_endpoint 1.0 keys (scheduling, impacted_entities) on a microsoft_defender block. Expected code: unknown_field.
+name: Microsoft Defender invalid block (rule-microsoft-defender-old-keys.yaml)
 metadata:
   uuid: 00000000-0000-4000-8003-0000000000d4
   schema: rule::1.0
@@ -8,13 +8,13 @@ metadata:
   modified: "2026-11-24"
   tlp: clear
 description: |
-  Invalid Defender 2.0 block fixture.
+  Invalid Microsoft Defender block fixture.
 response:
   alert_severity: Medium
 configurations:
-  defender_for_endpoint:
+  microsoft_defender:
     enabled: true
-    schema: platform::defender_for_endpoint::2.0
+    schema: platform::microsoft_defender::1.0
     status: STAGING
     query: DeviceProcessEvents | take 1
     scheduling: 1H

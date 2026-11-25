@@ -1,4 +1,4 @@
-name: Defender for Endpoint 2.0 block
+name: Microsoft Defender block
 metadata:
   uuid: 00000000-0000-4000-8003-0000000000d0
   schema: rule::1.1
@@ -12,9 +12,9 @@ status: STAGING
 response:
   alert_severity: High
 configurations:
-  defender_for_endpoint:
+  microsoft_defender:
     enabled: true
-    schema: platform::defender_for_endpoint::2.0
+    schema: platform::microsoft_defender::1.0
     status: STAGING
     query: |
       DeviceProcessEvents

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Consistency tests for specs/platforms/defender-for-endpoint-2.0.md (RFC 0021), the deprecated 1.0 spec,
-their fixtures, and the specs that list Defender for Endpoint.
+"""Consistency tests for specs/platforms/microsoft-defender-1.0.md (RFC 0021), the deprecated
+defender-for-endpoint-1.0.md, their fixtures, and the specs that list Microsoft Defender.
 
-The Graph request bodies under fixtures/platforms/defender-for-endpoint/ are the goldens implementations
-compare against, and migrated-2.0.yaml is `opentide migrate` of the 1.0 fixture. These tests derive both
-from the source fixtures by the spec's tables, so a golden cannot drift from the text.
+The Graph request bodies under fixtures/platforms/microsoft-defender/ are the goldens implementations
+compare against, and migrated.yaml is `opentide migrate` of the defender_for_endpoint fixture. These
+tests derive both from the source fixtures by the spec's tables, so a golden cannot drift from the
+text. graph-beta-properties.json is a snapshot of the Graph beta docs' Properties tables; every
+property in it must be modelled by the block or listed in the spec's "Beta properties not modelled".
 """
 
 from __future__ import annotations
@@ -21,51 +23,57 @@ import yaml
 from object_fixtures import (
     DEFENDER_ACTIONS,
     DEFENDER_ENTITIES,
+    DEFENDER_GROUPING,
+    DEFENDER_ISOLATION_TYPES,
     EXPECTED_INVALID_CODES,
-    defender_lookback_hours,
+    defender_duration_hours,
     load_vocabularies,
-    validate_defender_block,
+    validate_microsoft_defender_block,
     validate_fixture_file,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
 PLATFORMS = ROOT / "specs" / "platforms"
-SPEC = PLATFORMS / "defender-for-endpoint-2.0.md"
-SPEC_V1 = PLATFORMS / "defender-for-endpoint-1.0.md"
+SPEC = PLATFORMS / "microsoft-defender-1.0.md"
+SPEC_OLD = PLATFORMS / "defender-for-endpoint-1.0.md"
 RFC = ROOT / "rfcs" / "0021-defender-graph-beta-detection-rules.md"
 FIXTURES = ROOT / "fixtures"
-RULE_V2 = FIXTURES / "platforms" / "defender-for-endpoint-2.0.yaml"
-RULE_V1 = FIXTURES / "platforms" / "defender-for-endpoint.yaml"
-RULE_COMPLETE = FIXTURES / "platforms" / "defender-for-endpoint-2.0-complete.yaml"
-GOLDEN = FIXTURES / "platforms" / "defender-for-endpoint"
+RULE = FIXTURES / "platforms" / "microsoft-defender.yaml"
+RULE_OLD = FIXTURES / "platforms" / "defender-for-endpoint.yaml"
+RULE_COMPLETE = FIXTURES / "platforms" / "microsoft-defender-complete.yaml"
+GOLDEN = FIXTURES / "platforms" / "microsoft-defender"
+SNAPSHOT = GOLDEN / "graph-beta-properties.json"
 SECTIONS = ["Summary", "Requirements", "Definition", "Relationships", "Defaults & overrides", "Examples", "History"]
-V2 = "platform::defender_for_endpoint::2.0"
+SCHEMA = "platform::microsoft_defender::1.0"
 BASE = "https://graph.microsoft.com/beta/security/rules/detectionRules"
 
 CONSTRAINTS = [
-    "defender_frequency",
-    "defender_lookback",
-    "defender_severity",
-    "defender_grouping",
-    "defender_custom_details",
-    "defender_entity_kind",
-    "defender_entity_mapping",
-    "defender_action_kind",
-    "defender_action_target",
-    "defender_column",
-    "defender_scope",
+    "microsoft_defender_schema",
+    "microsoft_defender_frequency",
+    "microsoft_defender_lookback",
+    "microsoft_defender_severity",
+    "microsoft_defender_grouping",
+    "microsoft_defender_custom_details",
+    "microsoft_defender_entity_kind",
+    "microsoft_defender_entity_mapping",
+    "microsoft_defender_action_kind",
+    "microsoft_defender_action_target",
+    "microsoft_defender_isolation_type",
+    "microsoft_defender_column",
+    "microsoft_defender_scope",
+    "microsoft_defender_incident",
 ]
-ADVISORIES = ["defender_schema_deprecated", "defender_no_entities"]
+ADVISORIES = ["defender_platform_renamed", "microsoft_defender_no_entities"]
 DIAGNOSTICS = [
-    "defender_schema_deprecated",
-    "defender_schema_retired",
+    "defender_platform_renamed",
+    "defender_platform_retired",
+    "defender_platform_conflict",
     "defender_migrate_unmapped",
-    "defender_rule_absent",
-    "defender_legacy_delete_failed",
-    "defender_legacy_retired",
+    "microsoft_defender_rule_absent",
+    "microsoft_defender_legacy_delete_failed",
+    "microsoft_defender_legacy_retired",
 ]
 
-FREQUENCY = {"NRT": "PT0S", "1H": "PT1H", "3H": "PT3H", "12H": "PT12H", "24H": "P1D"}
 STATUS = {"PREVIEW": "enabled", "RELEASE": "enabled", "UNIVERSAL": "enabled", "DISABLEMENT": "disabled"}
 TACTICS = [
     (("Reconnaissance",), "Reconnaissance"),
@@ -85,7 +93,7 @@ TACTICS = [
 ]
 BETA_ONLY = {("schedule", "lookback"), ("alertTemplate", "eventGroupingKind"), ("detectionAction", "incidentConfiguration")}
 
-# Graph v1.0 detectionRule properties the body may hold (api-reference/v1.0, 2026-11-24).
+# Graph v1.0 detectionRule properties (api-reference/v1.0, 2026-11-24), for the informational note only.
 V1_PROPERTIES = {
     "": {"id", "displayName", "description", "status", "queryCondition", "schedule", "detectionAction"},
     "queryCondition": {"queryText"},
@@ -95,6 +103,20 @@ V1_PROPERTIES = {
     "organizationalScope": {"deviceGroups"},
 }
 DEPRECATED = {"isEnabled", "period", "category", "mitreTechniques", "impactedAssets", "responseActions", "scopeType", "scopeNames"}
+
+# The Graph paths the block's own keys model (schedule, alert, scope, incident tables' Graph column).
+MODELLED_PATHS = [
+    "queryCondition", "schedule", "detectionAction",
+    "schedule.frequency", "schedule.lookback",
+    "detectionAction.alertTemplate", "detectionAction.automatedActions",
+    "detectionAction.organizationalScope", "detectionAction.incidentConfiguration",
+    "detectionAction.alertTemplate.title", "detectionAction.alertTemplate.description",
+    "detectionAction.alertTemplate.severity", "detectionAction.alertTemplate.recommendedActions",
+    "detectionAction.alertTemplate.customDetails", "detectionAction.alertTemplate.eventGroupingKind",
+    "detectionAction.alertTemplate.entityMappings",
+    "detectionAction.organizationalScope.deviceGroups",
+    "detectionAction.incidentConfiguration.isExcludedFromIncidentCorrelation",
+]
 
 
 def _read(path: Path) -> str:
@@ -127,11 +149,20 @@ def _attack() -> dict[str, dict[str, Any]]:
     return {key["id"]: key for key in doc["keys"]}
 
 
+def _snapshot() -> dict[str, Any]:
+    return json.loads(_read(SNAPSHOT))
+
+
+def _type_of(prop: dict[str, Any]) -> str | None:
+    match = re.search(r"security\.(\w+)", prop["type"])
+    return match.group(1) if match else None
+
+
 # --- the spec's derivations ------------------------------------------------------------------------
 
 
 def tactics(ids: list[str], attack: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
-    """specs/platforms/defender-for-endpoint-2.0.md#attck."""
+    """specs/platforms/microsoft-defender-1.0.md#attck."""
     grouped: dict[str, dict[str, set[str]]] = {}
     for tid in ids:
         key = attack.get(tid)
@@ -160,20 +191,22 @@ def tactics(ids: list[str], attack: dict[str, dict[str, Any]]) -> list[dict[str,
 
 
 def _duration(value: str) -> str:
-    hours = defender_lookback_hours(value)
-    assert hours is not None
+    """specs/platforms/microsoft-defender-1.0.md#schedule-defenderschedule."""
+    if value == "NRT":
+        return "PT0S"
+    assert defender_duration_hours(value) is not None
     return f"P{value[:-1]}D" if value.endswith("D") else f"PT{value[:-1]}H"
 
 
 def body(
     rule: dict[str, Any], strategy: str, attack: dict[str, dict[str, Any]], create: bool, tenant: str = "contoso"
 ) -> dict[str, Any]:
-    """specs/platforms/defender-for-endpoint-2.0.md#request-body for `tenant`.
+    """specs/platforms/microsoft-defender-1.0.md#request-body for `tenant`.
 
     The spec does not fix how an exclusion is spliced into the query, so a golden may only hold
     exclusions scoped to another tenant: those are skipped and the query is sent unchanged.
     """
-    block = rule["configurations"]["defender_for_endpoint"]
+    block = rule["configurations"]["microsoft_defender"]
     applied = [e for e in block.get("exclusions") or [] if e.get("tenant") in (None, tenant)]
     assert not applied, "a golden may not apply an exclusion"
     alert = block.get("alert") or {}
@@ -184,7 +217,7 @@ def body(
     out["description"] = rule["description"]
     out["status"] = STATUS[strategy]
     out["queryCondition"] = {"queryText": block["query"]}
-    schedule = {"frequency": FREQUENCY[block["schedule"]["frequency"]]}
+    schedule = {"frequency": _duration(block["schedule"]["frequency"])}
     if block["schedule"].get("lookback"):
         schedule["lookback"] = _duration(block["schedule"]["lookback"])
     out["schedule"] = schedule
@@ -263,12 +296,12 @@ class Unmapped(Exception):
 
 
 def migrate(block: dict[str, Any]) -> dict[str, Any]:
-    """specs/platforms/defender-for-endpoint-2.0.md#migration-from-10. Raises Unmapped (defender_migrate_unmapped)."""
+    """specs/platforms/microsoft-defender-1.0.md#migration-from-defender_for_endpoint: the block. Raises Unmapped (defender_migrate_unmapped)."""
     out: dict[str, Any] = {}
     for key in ("enabled", "name"):
         if key in block:
             out[key] = block[key]
-    out["schema"] = V2
+    out["schema"] = SCHEMA
     for key in ("status", "flags", "tenants", "contributors", "query"):
         if key in block:
             out[key] = block[key]
@@ -355,45 +388,52 @@ class SpecShapeTests(unittest.TestCase):
     def test_frontmatter_and_sections(self) -> None:
         text = _read(SPEC)
         meta = _frontmatter(text)
-        self.assertEqual(meta["schema_id"], V2)
+        self.assertEqual(meta["spec"], "platform-microsoft-defender")
+        self.assertEqual(meta["schema_id"], SCHEMA)
         self.assertEqual(meta["status"], "normative")
-        self.assertEqual(meta["version"], "2.0")
+        self.assertEqual(meta["version"], "1.0")
         self.assertEqual(meta["supersedes"], "platform::defender_for_endpoint::1.0")
         self.assertEqual(re.findall(r"^## (.+)$", text, flags=re.MULTILINE), SECTIONS)
+        self.assertFalse((PLATFORMS / "defender-for-endpoint-2.0.md").exists())
 
-    def test_v1_is_deprecated_and_kept(self) -> None:
-        text = _read(SPEC_V1)
+    def test_old_platform_is_deprecated_and_kept(self) -> None:
+        text = _read(SPEC_OLD)
         meta = _frontmatter(text)
         self.assertEqual(meta["status"], "deprecated")
         self.assertEqual(meta["schema_id"], "platform::defender_for_endpoint::1.0")
         self.assertEqual(meta["version"], "1.4")
         self.assertEqual(re.findall(r"^## (.+)$", text, flags=re.MULTILINE), SECTIONS)
         deprecation = _section(text, "Deprecation")
-        for needle in ("`defender_schema_deprecated`", "`defender_schema_retired`", "`opentide migrate`", "defender-for-endpoint-2.0.md#migration-from-10"):
+        for needle in (
+            "`defender_platform_renamed`", "`defender_platform_retired`", "`opentide migrate`",
+            "microsoft-defender-1.0.md#migration-from-defender_for_endpoint", "renamed to `microsoft_defender`",
+        ):
             self.assertIn(needle, deprecation)
-
-    def test_constraint_advisory_and_diagnostic_codes(self) -> None:
-        text = _read(SPEC)
-        self.assertEqual(re.findall(r"^\| `(defender_[a-z_]+)` \|", _section(text, "Constraints"), flags=re.MULTILINE), CONSTRAINTS)
-        self.assertEqual(re.findall(r"^\| `(defender_[a-z_]+)` \|", _section(text, "Advisories"), flags=re.MULTILINE), ADVISORIES)
-        self.assertEqual(re.findall(r"^\| `(defender_[a-z_]+)` \|", _section(text, "Diagnostics"), flags=re.MULTILINE), DIAGNOSTICS)
-        validation = _read(ROOT / "specs" / "validation.md")
-        self.assertIn("| `defender_schema_deprecated` | warning, not configurable | Defender for Endpoint:", validation)
-        self.assertIn("| `defender_no_entities` | warning | Defender for Endpoint:", validation)
+        self.assertNotIn("defender_schema_", text)
 
     def test_hard_deprecation_is_strong_and_unsilenceable(self) -> None:
-        """Owner direction (2026-11-25): 1.0 is hard deprecated; the warning cannot be lowered or silenced."""
-        deprecation = _section(_read(SPEC_V1), "Deprecation")
+        deprecation = _section(_read(SPEC_OLD), "Deprecation")
         advisories = _section(_read(ROOT / "specs" / "validation.md"), "Platform advisories")
         for text in (deprecation, advisories):
             self.assertIn("`lint.toml`", text)
-            self.assertRegex(text, r"No configuration MAY lower, disable, or suppress it")
+            self.assertIn("No configuration MAY lower, disable, or suppress it", text)
         for needle in ("hard deprecated", "2026-10-01", "`opentide deploy` refuses this block", "Run `opentide migrate` now"):
             self.assertIn(needle, deprecation)
         self.assertIn("never sets `VALIDATION_ERROR_RAISED`", advisories)
         rfc = _read(RFC)
         self.assertIn("The owner approved the four decisions of this RFC on 2026-11-25", rfc)
         self.assertNotIn("open to review", rfc)
+
+    def test_codes(self) -> None:
+        text = _read(SPEC)
+        self.assertEqual(re.findall(r"^\| `([a-z_]+)` \|", _section(text, "Constraints"), flags=re.MULTILINE), CONSTRAINTS)
+        self.assertEqual(re.findall(r"^\| `([a-z_]+)` \|", _section(text, "Advisories"), flags=re.MULTILINE), ADVISORIES)
+        self.assertEqual(re.findall(r"^\| `([a-z_]+)` \|", _section(text, "Diagnostics"), flags=re.MULTILINE), DIAGNOSTICS)
+        for code in CONSTRAINTS + ADVISORIES + DIAGNOSTICS:
+            self.assertRegex(code, r"^(microsoft_defender_|defender_(platform|migrate)_)")
+        validation = _read(ROOT / "specs" / "validation.md")
+        self.assertIn("| `defender_platform_renamed` | warning, not configurable | Defender for Endpoint:", validation)
+        self.assertIn("| `microsoft_defender_no_entities` | warning | Microsoft Defender:", validation)
 
     def test_entity_table_is_the_checker_table(self) -> None:
         section = _section(_read(SPEC), "`entities` (DefenderEntities)")
@@ -404,11 +444,11 @@ class SpecShapeTests(unittest.TestCase):
 
     def test_action_table_is_the_checker_table(self) -> None:
         section = _section(_read(SPEC), "`actions` (DefenderActions)")
-        rows = re.findall(r"^\| `([a-z_]+)` \| `([A-Za-z]+)` \| ([^|]+) \| ([^|]+) \|$", section, flags=re.MULTILINE)
+        rows = re.findall(r"^\| `([a-z_]+)` \| `([A-Za-z]+)` \| ([^|]+) \|$", section, flags=re.MULTILINE)
         self.assertEqual([r[0] for r in rows], list(DEFENDER_ACTIONS))
         email = None
-        for action, graph, fields, _ in rows:
-            expected_graph, expected_fields, _ = DEFENDER_ACTIONS[action]
+        for action, graph, fields in rows:
+            expected_graph, expected_fields = DEFENDER_ACTIONS[action]
             self.assertEqual(graph, expected_graph, action)
             parsed = dict(re.findall(r"`([a-z_0-9]+)` → `([A-Za-z0-9]+)`", fields))
             if fields.startswith("same as"):
@@ -417,42 +457,119 @@ class SpecShapeTests(unittest.TestCase):
                 email = parsed
             self.assertEqual(parsed, expected_fields, action)
 
-    def test_frequency_and_beta_tables(self) -> None:
+    def test_schedule_tactic_and_beta_tables(self) -> None:
         text = _read(SPEC)
-        schedule = _section(text, "`schedule` (DefenderSchedule)")
-        self.assertEqual(dict(re.findall(r"^\| `([0-9A-Z]+)` \| `([0-9A-Z]+)`", schedule, flags=re.MULTILINE)), FREQUENCY)
-        beta = _section(text, "Beta-only keys")
-        self.assertEqual(re.findall(r"^\| `([a-z_.]+)` \|", beta, flags=re.MULTILINE), ["schedule.lookback", "alert.grouping", "incident"])
+        coverage = _section(text, "Beta-only properties", "####")
+        self.assertEqual(re.findall(r"^\| `([a-z_.]+)` \|", coverage, flags=re.MULTILINE), ["schedule.lookback", "alert.grouping", "incident"])
+        self.assertIn("opentide does not target v1.0", coverage)
+        self.assertNotIn("later minor", text)
         attack = _section(text, "ATT&CK")
         for stages, tactic in TACTICS:
-            self.assertRegex(attack, rf"\| {re.escape(', '.join(stages) if len(stages) == 1 else stages[0])}[^|]* \| `{tactic}` \|")
+            self.assertRegex(attack, rf"\| {re.escape(stages[0])}[^|]* \| `{tactic}` \|")
+
+
+class BetaCoverageTests(unittest.TestCase):
+    """Every property of the Graph beta docs snapshot is modelled or listed as not modelled, with its reason."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.snapshot = _snapshot()
+        cls.types = cls.snapshot["types"]
+
+    def _modelled(self) -> set[str]:
+        out: set[str] = set()
+
+        def walk(path: str) -> None:
+            current = "detectionRule"
+            for part in path.split("."):
+                props = self.types[current]
+                self.assertIn(part, props, f"{current}.{part}")
+                out.add(f"{current}.{part}")
+                current = _type_of(props[part]) or ""
+
+        for path in MODELLED_PATHS:
+            walk(path)
+        for graph_kind, fields in DEFENDER_ENTITIES.values():
+            walk(f"detectionAction.alertTemplate.entityMappings.{graph_kind}")
+            mapping_type = _type_of(self.types["entityMappingConfiguration"][graph_kind])
+            out.update(f"{mapping_type}.{prop}" for prop in fields.values())
+        for graph_action, fields in DEFENDER_ACTIONS.values():
+            walk(f"detectionAction.automatedActions.{graph_action}")
+            action_type = _type_of(self.types["automatedActionSet"][graph_action])
+            out.update(f"{action_type}.{prop}" for prop in fields.values())
+        return out
+
+    def _not_modelled(self) -> dict[str, str]:
+        section = _section(_read(SPEC), "Beta properties not modelled", "####")
+        table = section.split("Enum values not accepted", 1)[0]
+        return dict(re.findall(r"^\| `(\w+\.\w+)` \| ([^|]+) \|$", table, flags=re.MULTILINE))
+
+    def test_snapshot_is_the_beta_docs(self) -> None:
+        self.assertIn("api-reference/beta", self.snapshot["source"])
+        self.assertEqual(len(self.types), 36)
+        self.assertEqual(self.snapshot["enums"]["alertTemplate.severity"], ["informational", "low", "medium", "high"])
+
+    def test_every_property_is_modelled_or_listed(self) -> None:
+        everything = {f"{name}.{prop}" for name, props in self.types.items() for prop in props}
+        modelled, listed = self._modelled(), self._not_modelled()
+        self.assertEqual(modelled & set(listed), set())
+        self.assertEqual(sorted(everything - modelled - set(listed)), [])
+        self.assertEqual(sorted(set(listed) - everything), [])
+        self.assertEqual(sorted(modelled - everything), [])
+
+    def test_reasons_match_the_docs(self) -> None:
+        for key, reason in self._not_modelled().items():
+            name, prop = key.split(".")
+            flags = self.types[name][prop]
+            with self.subTest(key=key):
+                self.assertRegex(reason, r"^(Set by deploy|Read-only|Deprecated)")
+                if flags["deprecated"]:
+                    self.assertTrue(reason.startswith("Deprecated"))
+                elif flags["readOnly"]:
+                    self.assertTrue(reason.startswith("Read-only"))
+                else:
+                    self.assertTrue(reason.startswith("Set by deploy"))
+        for name, props in self.types.items():
+            for prop, flags in props.items():
+                if flags["deprecated"] or flags["readOnly"]:
+                    self.assertIn(f"{name}.{prop}", self._not_modelled(), f"{name}.{prop}")
+
+    def test_every_enum_value_is_accepted_or_explained(self) -> None:
+        enums = self.snapshot["enums"]
+        section = _section(_read(SPEC), "Beta properties not modelled", "####")
+        self.assertEqual(set(DEFENDER_GROUPING.values()), set(enums["eventGroupingKind"]) - {"unknownFutureValue"})
+        self.assertEqual(set(DEFENDER_ISOLATION_TYPES), set(enums["isolationType"]) - {"unknownFutureValue"})
+        self.assertEqual({"enabled", "disabled"} | {"autoDisabled"}, set(enums["detectionRuleStatus"]) - {"unknownFutureValue"})
+        self.assertEqual(set(STATUS.values()), {"enabled", "disabled"})
+        self.assertIn("| `detectionRuleStatus.autoDisabled` |", section)
+        self.assertIn("| `unknownFutureValue` (every enum) |", section)
+        sent = {"high" if s == "Critical" else s.lower() for s in ("Informational", "Low", "Medium", "High", "Critical")}
+        self.assertEqual(sent, set(enums["alertTemplate.severity"]))
 
 
 class GoldenTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.attack = _attack()
-        cls.rule = _load(RULE_V2)
+        cls.rule = _load(RULE)
 
     def _golden(self, name: str) -> dict[str, Any]:
         return json.loads(_read(GOLDEN / name))
 
     def test_create(self) -> None:
-        golden = self._golden("rule-defender-2.0.create.api.json")
-        self.assertEqual(golden["method"], "POST")
-        self.assertEqual(golden["url"], BASE)
+        golden = self._golden("rule-microsoft-defender.create.api.json")
+        self.assertEqual((golden["method"], golden["url"]), ("POST", BASE))
         self.assertEqual(golden["body"], body(self.rule, "RELEASE", self.attack, create=True))
 
     def test_update_is_create_without_id(self) -> None:
-        golden = self._golden("rule-defender-2.0.update.api.json")
+        golden = self._golden("rule-microsoft-defender.update.api.json")
         uuid = self.rule["metadata"]["uuid"]
-        self.assertEqual(golden["method"], "PATCH")
-        self.assertEqual(golden["url"], f"{BASE}/{uuid}")
+        self.assertEqual((golden["method"], golden["url"]), ("PATCH", f"{BASE}/{uuid}"))
         self.assertEqual(golden["body"], body(self.rule, "RELEASE", self.attack, create=False))
         self.assertNotIn("id", golden["body"])
 
     def test_disable(self) -> None:
-        golden = self._golden("rule-defender-2.0.disable.api.json")
+        golden = self._golden("rule-microsoft-defender.disable.api.json")
         self.assertEqual(golden["method"], "PATCH")
         self.assertEqual(golden["body"]["status"], "disabled")
         self.assertEqual(golden["body"], body(self.rule, "DISABLEMENT", self.attack, create=False))
@@ -463,13 +580,16 @@ class GoldenTests(unittest.TestCase):
         self.assertEqual(derived[1]["techniques"], [{"technique": "T1059", "subTechniques": ["T1059.001"]}])
         self.assertEqual(tactics(["T1078"], self.attack)[0]["techniques"], [{"technique": "T1078"}])
 
-    def test_no_deprecated_property_and_v1_without_beta_keys(self) -> None:
+    def test_durations(self) -> None:
+        self.assertEqual([_duration(v) for v in ("NRT", "1H", "24H", "1D", "7D")], ["PT0S", "PT1H", "PT24H", "P1D", "P7D"])
+
+    def test_no_deprecated_property_and_v1_note(self) -> None:
         full = body(self.rule, "RELEASE", self.attack, create=True)
         keys = _walk(full)
         self.assertFalse({k for _, k in keys} & DEPRECATED)
         self.assertTrue(BETA_ONLY & set(keys))
         plain = json.loads(json.dumps(self.rule))
-        block = plain["configurations"]["defender_for_endpoint"]
+        block = plain["configurations"]["microsoft_defender"]
         del block["schedule"]["lookback"], block["alert"]["grouping"], block["incident"]
         for parent, key in _walk(body(plain, "RELEASE", self.attack, create=True)):
             if parent in V1_PROPERTIES:
@@ -483,12 +603,12 @@ class CompleteBlockTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.rule = _load(RULE_COMPLETE)
-        cls.block = cls.rule["configurations"]["defender_for_endpoint"]
+        cls.block = cls.rule["configurations"]["microsoft_defender"]
 
     @staticmethod
     def _table_keys(heading: str) -> list[str]:
         section = _section(_read(SPEC), heading)
-        table = section.split("\n\n|", 1)[1] if "\n\n|" in section else section
+        table = section.split("\n\n|", 1)[1]
         rows = []
         for line in ("|" + table).splitlines():
             if not line.startswith("|"):
@@ -501,9 +621,7 @@ class CompleteBlockTests(unittest.TestCase):
     def test_every_table_key_is_set(self) -> None:
         missing = []
         shared = ["enabled", "name", "schema", "status", "flags", "tenants", "contributors"]
-        for key in shared + self._table_keys("Block"):
-            if key not in self.block:
-                missing.append(key)
+        missing += [key for key in shared + self._table_keys("Block") if key not in self.block]
         for heading, key in (
             ("`schedule` (DefenderSchedule)", "schedule"),
             ("`alert` (DefenderAlert)", "alert"),
@@ -520,13 +638,13 @@ class CompleteBlockTests(unittest.TestCase):
         for kind, (_, fields) in DEFENDER_ENTITIES.items():
             mappings = (self.block.get("entities") or {}).get(kind) or [{}]
             missing += [f"entities.{kind}.{f}" for f in fields if not any(f in m for m in mappings)]
-        for action, (_, fields, _) in DEFENDER_ACTIONS.items():
+        for action, (_, fields) in DEFENDER_ACTIONS.items():
             targets = (self.block.get("actions") or {}).get(action) or [{}]
             missing += [f"actions.{action}.{f}" for f in fields if not any(f in t for t in targets)]
         self.assertEqual(missing, [])
 
     def test_valid(self) -> None:
-        self.assertEqual(validate_defender_block(self.block), [])
+        self.assertEqual(validate_microsoft_defender_block(self.block), [])
         self.assertEqual(validate_fixture_file(RULE_COMPLETE, load_vocabularies(ROOT / "vocabularies")), [])
 
     def test_spec_example_is_the_fixture(self) -> None:
@@ -534,8 +652,7 @@ class CompleteBlockTests(unittest.TestCase):
         complete = examples.split("**Complete block.**", 1)[1]
         snippet = re.search(r"```yaml\n(.*?)```", complete, flags=re.S).group(1)
         self.assertEqual(yaml.safe_load(snippet)["configurations"], self.rule["configurations"])
-        fixture_text = _read(RULE_COMPLETE)
-        self.assertIn(snippet.split("configurations:\n", 1)[1], fixture_text)
+        self.assertIn(snippet.split("configurations:\n", 1)[1], _read(RULE_COMPLETE))
 
     def test_beta_only_keys_are_commented(self) -> None:
         text = _read(RULE_COMPLETE)
@@ -543,27 +660,26 @@ class CompleteBlockTests(unittest.TestCase):
             self.assertIn(line, text)
 
     def test_create_golden(self) -> None:
-        golden = json.loads(_read(GOLDEN / "rule-defender-2.0-complete.create.api.json"))
-        self.assertEqual(golden["method"], "POST")
-        self.assertEqual(golden["url"], BASE)
+        golden = json.loads(_read(GOLDEN / "rule-microsoft-defender-complete.create.api.json"))
+        self.assertEqual((golden["method"], golden["url"]), ("POST", BASE))
         self.assertEqual(golden["body"], body(self.rule, "RELEASE", _attack(), create=True, tenant="contoso"))
-        mappings = golden["body"]["detectionAction"]["alertTemplate"]["entityMappings"]
-        self.assertEqual(len(mappings), 17)
+        self.assertEqual(len(golden["body"]["detectionAction"]["alertTemplate"]["entityMappings"]), 17)
         self.assertEqual(len(golden["body"]["detectionAction"]["automatedActions"]), 16)
 
 
 class MigrationTests(unittest.TestCase):
-    def test_v1_fixture_migrates_to_the_golden(self) -> None:
-        source, migrated = _load(RULE_V1), _load(GOLDEN / "migrated-2.0.yaml")
+    def test_old_fixture_migrates_to_the_golden(self) -> None:
+        source, migrated = _load(RULE_OLD), _load(GOLDEN / "migrated.yaml")
         block = source["configurations"].pop("defender_for_endpoint")
-        target = migrated["configurations"].pop("defender_for_endpoint")
+        target = migrated["configurations"].pop("microsoft_defender")
+        self.assertNotIn("defender_for_endpoint", migrated["configurations"])
         self.assertEqual(target, migrate(block))
         self.assertEqual(source, migrated)
-        self.assertEqual(validate_defender_block(target), [])
+        self.assertEqual(validate_microsoft_defender_block(target), [])
 
     def test_only_the_block_changes(self) -> None:
-        before = _read(RULE_V1).split("  defender_for_endpoint:\n")[0]
-        self.assertTrue(_read(GOLDEN / "migrated-2.0.yaml").startswith(before))
+        before = _read(RULE_OLD).split("  defender_for_endpoint:\n")[0]
+        self.assertTrue(_read(GOLDEN / "migrated.yaml").startswith(before + "  microsoft_defender:\n"))
 
     def test_unmapped_values(self) -> None:
         base = {"schema": "platform::defender_for_endpoint::1.0", "query": "T", "scheduling": "1H", "alert": {}}
@@ -582,76 +698,112 @@ class MigrationTests(unittest.TestCase):
         block = {"query": "T", "scheduling": "NRT", "impacted_entities": {"device": "deviceId", "user": "InitiatingProcessAccountUpn"}}
         self.assertEqual(migrate(block)["entities"], {"hosts": [{"device_id": "DeviceId"}], "accounts": [{"upn": "InitiatingProcessAccountUpn"}]})
 
+    def test_rewritten_files_are_listed(self) -> None:
+        section = _section(_read(SPEC), "Migration from `defender_for_endpoint`")
+        for needle in (
+            "`configurations.defender_for_endpoint` block", "`system: defender_for_endpoint`",
+            "`.opentide/configurations/platforms/defender_for_endpoint.toml`", "`.opentide/configurations/visibility.toml`",
+            "does not touch deployment state",
+        ):
+            self.assertIn(needle, section)
+
 
 class CheckerTests(unittest.TestCase):
     def _block(self, **keys: Any) -> dict[str, Any]:
-        return {"schema": V2, "query": "DeviceEvents", "schedule": {"frequency": "1H"}, **keys}
+        return {"schema": SCHEMA, "query": "DeviceEvents", "schedule": {"frequency": "1H"}, **keys}
 
     def test_fixtures(self) -> None:
         vocabs = load_vocabularies(ROOT / "vocabularies")
-        for path in (RULE_V2, RULE_V1, GOLDEN / "migrated-2.0.yaml"):
+        for path in (RULE, RULE_OLD, RULE_COMPLETE, GOLDEN / "migrated.yaml"):
             self.assertEqual(validate_fixture_file(path, vocabs), [], path.name)
-        for name in ("rule-defender-lookback-nrt.yaml", "rule-defender-entity-field.yaml", "rule-defender-action-target.yaml", "rule-defender-1.0-keys.yaml"):
+        for name in (
+            "rule-microsoft-defender-lookback-nrt.yaml", "rule-microsoft-defender-entity-field.yaml",
+            "rule-microsoft-defender-action-target.yaml", "rule-microsoft-defender-old-keys.yaml",
+            "rule-defender-both-platforms.yaml",
+        ):
             self.assertIn(EXPECTED_INVALID_CODES[name], _codes(validate_fixture_file(FIXTURES / "invalid" / name, vocabs)), name)
 
     def test_codes(self) -> None:
         cases = [
-            (self._block(schedule={"frequency": "2H"}), "defender_frequency"),
-            (self._block(schedule={"frequency": "3H", "lookback": "2H"}), "defender_lookback"),
-            (self._block(schedule={"frequency": "1H", "lookback": "04H"}), "defender_lookback"),
-            (self._block(alert={"severity": "Severe"}), "defender_severity"),
-            (self._block(alert={"grouping": "per_run"}), "defender_grouping"),
-            (self._block(alert={"custom_details": {" ": "Col"}}), "defender_custom_details"),
-            (self._block(entities={"devices": [{"device_id": "DeviceId"}]}), "defender_entity_kind"),
-            (self._block(entities={"hosts": [{}]}), "defender_entity_mapping"),
-            (self._block(entities={"hosts": [{"device_id": "Device Id"}]}), "defender_column"),
-            (self._block(actions={"quarantine": [{"device_id": "DeviceId"}]}), "defender_action_kind"),
-            (self._block(actions={"block_files": [{"device_groups": ["A"]}]}), "defender_action_target"),
-            (self._block(actions={"isolate_devices": [{"device_id": "DeviceId", "isolation_type": "Full"}]}), "defender_action_target"),
-            (self._block(scope={"device_groups": []}), "defender_scope"),
-            (self._block(scope={"selection": "All"}), "defender_scope"),
+            (self._block(schema="platform::defender_for_endpoint::1.0"), "microsoft_defender_schema"),
+            (self._block(schedule={"frequency": "90M"}), "microsoft_defender_frequency"),
+            (self._block(schedule={"frequency": "3H", "lookback": "2H"}), "microsoft_defender_lookback"),
+            (self._block(schedule={"frequency": "1H", "lookback": "04H"}), "microsoft_defender_lookback"),
+            (self._block(schedule={"frequency": "NRT", "lookback": "1H"}), "microsoft_defender_lookback"),
+            (self._block(alert={"severity": "Severe"}), "microsoft_defender_severity"),
+            (self._block(alert={"grouping": "per_run"}), "microsoft_defender_grouping"),
+            (self._block(alert={"custom_details": {" ": "Col"}}), "microsoft_defender_custom_details"),
+            (self._block(entities={"devices": [{"device_id": "DeviceId"}]}), "microsoft_defender_entity_kind"),
+            (self._block(entities={"hosts": [{}]}), "microsoft_defender_entity_mapping"),
+            (self._block(entities={"hosts": [{"device_id": " "}]}), "microsoft_defender_column"),
+            (self._block(actions={"quarantine": [{"device_id": "DeviceId"}]}), "microsoft_defender_action_kind"),
+            (self._block(actions={"block_files": [{"device_groups": []}]}), "microsoft_defender_action_target"),
+            (self._block(actions={"isolate_devices": [{}]}), "microsoft_defender_action_target"),
+            (self._block(actions={"isolate_devices": [{"device_id": "DeviceId", "isolation_type": "Full"}]}), "microsoft_defender_isolation_type"),
+            (self._block(scope={"device_groups": []}), "microsoft_defender_scope"),
+            (self._block(scope={"selection": "All"}), "microsoft_defender_scope"),
+            (self._block(incident={"exclude_from_correlation": "yes"}), "microsoft_defender_incident"),
             (self._block(rule_id=1), "external_id_in_rule"),
         ]
         for block, code in cases:
             with self.subTest(code=code, block=block):
-                self.assertIn(code, _codes(validate_defender_block(block)))
-        self.assertEqual(validate_defender_block(self._block(schedule={"frequency": "24H", "lookback": "1D"})), [])
-        self.assertEqual(validate_defender_block({"schema": "platform::defender_for_endpoint::1.0", "scheduling": "2H"}), [])
+                self.assertIn(code, _codes(validate_microsoft_defender_block(block)))
+        for ok in (
+            self._block(schedule={"frequency": "24H", "lookback": "1D"}),
+            self._block(schedule={"frequency": "2H", "lookback": "30D"}),
+            self._block(actions={"isolate_devices": [{"device_id": "DeviceId", "isolation_type": "selective"}]}),
+            self._block(actions={"block_files": [{"sha1": "SHA1"}]}),
+            {"query": "DeviceEvents", "schedule": {"frequency": "NRT"}},
+        ):
+            self.assertEqual(validate_microsoft_defender_block(ok), [], ok)
 
 
 class IndexTests(unittest.TestCase):
     def test_rows(self) -> None:
         specs = _read(ROOT / "SPECS.md")
-        self.assertIn("| Defender for Endpoint platform | 2.0 | `platform::defender_for_endpoint::2.0` | normative | [specs/platforms/defender-for-endpoint-2.0.md](specs/platforms/defender-for-endpoint-2.0.md) |", specs)
-        self.assertIn("| Defender for Endpoint platform | 1.4 | `platform::defender_for_endpoint::1.0` | deprecated | [specs/platforms/defender-for-endpoint-1.0.md](specs/platforms/defender-for-endpoint-1.0.md) |", specs)
+        self.assertIn("| Microsoft Defender platform | 1.0 | `platform::microsoft_defender::1.0` | normative | [specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md) |", specs)
+        self.assertIn("| 1.4 | `platform::defender_for_endpoint::1.0` | deprecated | [specs/platforms/defender-for-endpoint-1.0.md](specs/platforms/defender-for-endpoint-1.0.md) |", specs)
         index = _read(PLATFORMS / "index.md")
-        self.assertIn("| `defender_for_endpoint` | `platform::defender_for_endpoint::2.0` | [defender-for-endpoint-2.0.md](defender-for-endpoint-2.0.md) |", index)
-        self.assertIn("| `defender_for_endpoint` (deprecated) | `platform::defender_for_endpoint::1.0` |", index)
-        self.assertIn("specs/platforms/defender-for-endpoint-2.0.md (schema_id: platform::defender_for_endpoint::2.0)", _read(ROOT / "llms.txt"))
+        self.assertIn("| `microsoft_defender` | `platform::microsoft_defender::1.0` | [microsoft-defender-1.0.md](microsoft-defender-1.0.md) |", index)
+        self.assertIn("| `microsoft_defender` | Microsoft Defender | yes* | yes | KQL |", index)
+        self.assertIn("`sentinel`, `microsoft_defender`, `splunk`", index)
+        self.assertIn("| `microsoft_defender` | yes |", _read(ROOT / "specs" / "validation.md"))
+        self.assertIn("specs/platforms/microsoft-defender-1.0.md (schema_id: platform::microsoft_defender::1.0)", _read(ROOT / "llms.txt"))
         self.assertIn("[0021](0021-defender-graph-beta-detection-rules.md)", _read(ROOT / "rfcs" / "README.md"))
-        self.assertIn("specs/platforms/defender-for-endpoint-2.0", json.loads(_read(ROOT / "site" / "meta.json"))["pages"])
+        pages = json.loads(_read(ROOT / "site" / "meta.json"))["pages"]
+        self.assertIn("specs/platforms/microsoft-defender-1.0", pages)
         for name in ("rule-1.0.md", "rule-1.1.md"):
-            self.assertIn("| `defender_for_endpoint` | DefenderConfig | `platform::defender_for_endpoint::2.0`;", _read(ROOT / "specs" / "objects" / name))
+            self.assertIn("| `microsoft_defender` | MicrosoftDefenderConfig | `platform::microsoft_defender::1.0` |", _read(ROOT / "specs" / "objects" / name))
         changelog = _read(ROOT / "CHANGELOG.md")
         for heading in (
-            "## platform-defender-for-endpoint 2.0", "## platform-defender-for-endpoint 1.4", "## deployment-state 1.10",
-            "## deployment 1.5", "## platforms 1.11", "## validation 1.16", "## workspace 1.6",
+            "## platform-microsoft-defender 1.0", "## platform-defender-for-endpoint 1.4", "## deployment-state 1.10",
+            "## deployment 1.5", "## platforms 1.11", "## validation 1.16", "## workspace 1.6", "## visibility 1.2",
         ):
             self.assertIn(heading, changelog)
+        self.assertNotIn("platform-defender-for-endpoint 2.0", changelog)
 
-    def test_defender_left_the_state_backed_set(self) -> None:
+    def test_no_trace_of_the_unshipped_2_0(self) -> None:
+        for path in [*ROOT.joinpath("specs").rglob("*.md"), ROOT / "SPECS.md", ROOT / "CHANGELOG.md", ROOT / "llms.txt"]:
+            # The RFC names the rejected 2.0 draft under Alternatives; nothing normative does.
+            text = _read(path)
+            self.assertNotIn("defender_for_endpoint::2.0", text, path)
+            self.assertNotIn("defender-for-endpoint-2.0", text, path)
+
+    def test_legacy_binding_key_unchanged(self) -> None:
         state = _read(ROOT / "specs" / "deployment-state.md")
         decisions = _section(state, "Deploy decisions")
         self.assertNotIn("`defender_for_endpoint`, `sentinel_one`", decisions)
         self.assertIn("#### Legacy Defender bindings", decisions)
         schema = json.loads(_read(ROOT / "schemas" / "deployment.state.1.0.schema.json"))
         self.assertIn("defender_for_endpoint", schema["properties"]["platforms"]["properties"])
+        self.assertNotIn("microsoft_defender", schema["properties"]["platforms"]["properties"])
         self.assertIn("**Superseded in part:** for Microsoft Defender for Endpoint by [RFC 0021]", _read(ROOT / "rfcs" / "0010-deployment-external-ids.md"))
 
     def test_rfc_header_and_questions(self) -> None:
         text = _read(RFC)
-        self.assertTrue(text.startswith("# RFC 0021: Defender for Endpoint on the Graph beta custom detection contract\n"))
+        self.assertTrue(text.startswith("# RFC 0021: Microsoft Defender on the Graph beta custom detection contract\n"))
         self.assertIn("- **Status:** accepted", text)
+        self.assertIn("- **Issue:** [#104](https://github.com/opentidehq/specifications/issues/104)", text)
         questions = _section(text, "Unresolved questions", "##")
         for needle in ("NRT encoding", "404 on update and delete", "Which entity mappings Defender honours"):
             self.assertIn(needle, questions)
@@ -659,9 +811,10 @@ class IndexTests(unittest.TestCase):
 
 class LinkTests(unittest.TestCase):
     FILES = [
-        SPEC, SPEC_V1, RFC,
-        ROOT / "specs" / "deployment-state.md", ROOT / "specs" / "deployment.md", ROOT / "specs" / "platforms" / "index.md",
-        ROOT / "specs" / "validation.md", ROOT / "specs" / "workspace.md", ROOT / "SPECS.md", ROOT / "CHANGELOG.md",
+        SPEC, SPEC_OLD, RFC,
+        ROOT / "specs" / "deployment-state.md", ROOT / "specs" / "deployment.md", PLATFORMS / "index.md",
+        ROOT / "specs" / "validation.md", ROOT / "specs" / "workspace.md", ROOT / "specs" / "visibility.md",
+        ROOT / "SPECS.md", ROOT / "CHANGELOG.md",
     ]
 
     @staticmethod

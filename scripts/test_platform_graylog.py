@@ -377,7 +377,7 @@ class ListingTests(unittest.TestCase):
         self.assertIn("opentide ships thirteen detection platform integrations.", text)
         self.assertIn("| `graylog` | `platform::graylog::1.0` | [graylog-1.0.md](graylog-1.0.md) |", text)
         self.assertIn("| `graylog` | Graylog | yes* | yes‖ |", text)
-        self.assertIn("`sentinel`, `defender_for_endpoint`, `splunk`, `sentinel_one`, `carbon_black_cloud`, `elastic`, `graylog`", text)
+        self.assertIn("`sentinel`, `microsoft_defender`, `splunk`, `sentinel_one`, `carbon_black_cloud`, `elastic`, `graylog`", text)
 
     def test_spec_index_and_llms(self) -> None:
         self.assertIn("[specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)", _read(ROOT / "SPECS.md"))

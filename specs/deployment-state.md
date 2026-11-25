@@ -14,7 +14,7 @@ SentinelOne, CrowdStrike, Sysdig Secure, Bitdefender GravityZone, Graylog, Exabe
 
 A platform block that still carries `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>` is invalid, and deploy refuses the rule. `opentide deploy migrate-state` moves the ids of an existing catalogue into shards once. Losing a shard, or never committing it, loses the only handle on the remote rule: the next deploy creates a second live rule beside the first. Every requirement below exists to prevent that.
 
-Microsoft Defender for Endpoint is no longer state-backed. [`platform::defender_for_endpoint::2.0`](platforms/defender-for-endpoint-2.0.md) creates the Defender rule with the rule's `metadata.uuid` as its id. A shard may still hold a **legacy Defender binding**, the id opentide 1.x recorded under `platforms.defender_for_endpoint`; deploy reads it only to delete that rule, then removes it ([Legacy Defender bindings](#legacy-defender-bindings)).
+Microsoft Defender is not state-backed. The platform `defender_for_endpoint` was, and is replaced by [`microsoft_defender`](platforms/microsoft-defender-1.0.md), which creates the Defender rule with the rule's `metadata.uuid` as its id. A shard may still hold a **legacy Defender binding**, the id recorded under `platforms.defender_for_endpoint` before opentide 1.0; deploy reads it only to delete that rule, then removes it ([Legacy Defender bindings](#legacy-defender-bindings)).
 
 This spec is the normative text of accepted [RFC 0010](../rfcs/0010-deployment-external-ids.md), as amended for Defender by [RFC 0021](../rfcs/0021-defender-graph-beta-detection-rules.md).
 
@@ -52,7 +52,7 @@ A **state-backed platform** is one whose deployer addresses the remote rule by a
 | `graylog` ([graylog-1.0](platforms/graylog-1.0.md)) | Event definition `id` returned by `POST /api/events/definitions` | **Shard** |
 | `exabeam` ([exabeam-1.0](platforms/exabeam-1.0.md)) | Correlation rule `id` returned by `POST /correlation-rules/v2/rules` | **Shard** |
 | `google_secops` ([google-secops-1.0](platforms/google-secops-1.0.md)) | Rule id, the last segment of the `name` returned by `rules.create` | **Shard** |
-| `defender_for_endpoint` ([defender-for-endpoint-2.0](platforms/defender-for-endpoint-2.0.md)) | Graph detection-rule `id` is `metadata.uuid` | None. A **legacy** binding from opentide 1.x may remain until deploy retires it |
+| `microsoft_defender` ([microsoft-defender-1.0](platforms/microsoft-defender-1.0.md)) | Graph detection-rule `id` is `metadata.uuid` | None. A **legacy** binding under the former platform key `defender_for_endpoint` may remain until deploy retires it |
 | `sentinel` | Analytics rule id is `metadata.uuid` | None |
 | `splunk` | The saved search; no vendor-assigned id | None |
 | `harfanglab` | Sigma id and YARA meta `id` are `metadata.uuid` | None |
@@ -69,7 +69,7 @@ A later platform that needs a vendor-assigned id joins this table and the shard'
 | `.opentide/states/sharing.jsonl` | Sharing cache ([sharing.md](sharing.md#workspace-paths)). Unchanged. | No. SHOULD be gitignored |
 | `.opentide/inflight/<uuid>.json` | Preview overlay ([workspace.md](workspace.md#inflight-preview-shards)). Unchanged by this spec. | Unchanged |
 
-One file per rule that has at least one binding. A rule never deployed to a state-backed platform has no file. Deploying a rule to Defender for Endpoint, Sentinel, Splunk, HarfangLab, Carbon Black Cloud, or Elastic MUST NOT create one.
+One file per rule that has at least one binding. A rule never deployed to a state-backed platform has no file. Deploying a rule to Microsoft Defender, Sentinel, Splunk, HarfangLab, Carbon Black Cloud, or Elastic MUST NOT create one.
 
 A shard whose `object_uuid` is no longer in the object registry (an **orphan shard**) is retained. It is the handle for a remote rule that may still exist after its YAML was removed. `opentide deploy` reports its bindings as retirable; only `opentide deploy --prune` on a run that includes the `RELEASE` strategy deletes the remote rule and then the binding, as for a `DELETION` status ([deployment.md](deployment.md#retiring-deleted-rules)). No other command deletes orphan shards.
 
@@ -87,7 +87,7 @@ Inside `platforms`:
 
 | Platform key | External id |
 |--------------|-------------|
-| `defender_for_endpoint` | Legacy binding only. Canonical decimal integer as a string: no sign, no leading zero (`"12345"`, `"0"`). Readers MUST accept it, so a shard opentide 1.x wrote stays valid; deploy never writes one. |
+| `defender_for_endpoint` | Legacy binding only, under the former platform name; there is no `microsoft_defender` key. Canonical decimal integer as a string: no sign, no leading zero (`"12345"`, `"0"`). Readers MUST accept it, so a shard written before opentide 1.0 stays valid; deploy never writes one. |
 | `sentinel_one` | Canonical decimal integer as a string. |
 | `crowdstrike` | The create-response id, verbatim, as a string. MUST contain a non-whitespace character. It is not parsed as an integer. |
 | `sysdig` | Canonical decimal integer as a string. |
@@ -157,17 +157,17 @@ Updates, disablements, and deletes that have a binding are always allowed. Only 
 
 #### Legacy Defender bindings
 
-A `defender_for_endpoint` binding is the id of a rule opentide 1.x created. Deploy of a [2.0 block](platforms/defender-for-endpoint-2.0.md) addresses the rule by `metadata.uuid` and never consults the binding to update, disable, or create. Row 1 and row 2 still apply: a rule whose shard is unreadable is refused on Defender too.
+A `defender_for_endpoint` binding is the id of a rule opentide created before 1.0, under the former platform name. Deploy of a [`microsoft_defender` block](platforms/microsoft-defender-1.0.md) addresses the rule by `metadata.uuid` and never consults the binding to update, disable, or create. Row 1 and row 2 still apply: a rule whose shard is unreadable is refused on Defender too.
 
-For a tenant the run deploys the 2.0 block to, with any strategy but `INERT`, and a binding on that tenant, deploy MUST, after the uuid rule's own calls succeeded:
+For a tenant the run deploys the `microsoft_defender` block to, with any strategy but `INERT`, and a binding on that tenant, deploy MUST, after the uuid rule's own calls succeeded:
 
 1. delete the legacy id;
-2. on success or HTTP 404, remove the binding (then an empty platform map, then the file) and log `defender_legacy_retired`;
-3. on any other answer, keep the binding and report `defender_legacy_delete_failed` (error).
+2. on success or HTTP 404, remove the binding (then an empty platform map, then the file) and log `microsoft_defender_legacy_retired`;
+3. on any other answer, keep the binding and report `microsoft_defender_legacy_delete_failed` (error).
 
-When the uuid rule's calls fail, the binding and the legacy rule are kept. A removal that fails after the delete is `deployment_state_write_failed` (row 7a). None of these steps is a create, so rows 5 and 6 never refuse them: in a run that cannot persist state the removal is lost, and the next run's delete answers 404 and removes the binding again. The full table is in [defender-for-endpoint-2.0](platforms/defender-for-endpoint-2.0.md#legacy-rules).
+When the uuid rule's calls fail, the binding and the legacy rule are kept. A removal that fails after the delete is `deployment_state_write_failed` (row 7a). None of these steps is a create, so rows 5 and 6 never refuse them: in a run that cannot persist state the removal is lost, and the next run's delete answers 404 and removes the binding again. The full table is in [microsoft-defender-1.0](platforms/microsoft-defender-1.0.md#legacy-rules).
 
-A 1.0 block is refused before any of this (`defender_schema_retired`), so its legacy binding is untouched. `external_id_missing`, `deployment_state_ignored` before a create, and `deployment_state_unpersisted` are never reported for Defender.
+A `defender_for_endpoint` block is refused before any of this (`defender_platform_retired`), so its legacy binding is untouched. `external_id_missing`, `deployment_state_ignored` before a create, and `deployment_state_unpersisted` are never reported for Defender.
 
 ### Migration
 
@@ -186,7 +186,7 @@ The command MUST:
 1. **Refuse an ignored destination.** If deployment state is ignored, exit 1 with `deployment_state_ignored` and edit no rule. The message names the ignore source and the replacement: ignore `.opentide/states/sharing.jsonl` only. The command does not edit `.gitignore`.
 2. **Scan every rule file**: every `.yaml` and `.yml` file under the configured rule directory, recursively, including subfolders deploy itself skips.
 3. **Collect bindings** from the keys above on every platform block.
-4. **Store state-backed bindings first.** For `defender_for_endpoint`, `sentinel_one`, and `crowdstrike`, copy each valid binding into the shard and make that write durable before the YAML changes. A `defender_for_endpoint` binding is a [legacy binding](#legacy-defender-bindings): the next 2.0 deploy deletes the rule it names. A crash between the two leaves both copies; they agree, and the next run strips the YAML.
+4. **Store state-backed bindings first.** For `defender_for_endpoint`, `sentinel_one`, and `crowdstrike`, copy each valid binding into the shard and make that write durable before the YAML changes. A `defender_for_endpoint` binding is a [legacy binding](#legacy-defender-bindings): the next `microsoft_defender` deploy deletes the rule it names. A crash between the two leaves both copies; they agree, and the next run strips the YAML.
 5. **Drop every other platform's keys loudly.** For every other platform, including Sentinel, Splunk, HarfangLab, Carbon Black Cloud, and Elastic, remove the legacy key without storing it and emit `external_id_unused` (warning) with platform, tenant, value, and source file. Those deployers never read the value.
 6. **Edit YAML surgically.** Delete the external-id lines and the `rule_id` / `rule_id_bundle` mapping blocks without rewriting the rest. Comments, key order, and unrelated whitespace stay. The edited document MUST parse to the original minus those keys, or the rule is left untouched.
 7. **Leave a failing rule untouched.** On `external_id_shape`, `external_id_conflict`, `yaml_parse`, or `invalid_uuid`, that rule's YAML and shard are not modified. Other rules still migrate.
@@ -266,7 +266,7 @@ The complete catalogue. `yaml_parse` and `invalid_uuid` are the existing generic
 - [RFC 0010](../rfcs/0010-deployment-external-ids.md) — accepted proposal
 - [platforms/index.md](platforms/index.md) — platform blocks carry no external ids
 - [platforms/sentinel-one-1.0.md](platforms/sentinel-one-1.0.md), [platforms/crowdstrike-1.0.md](platforms/crowdstrike-1.0.md) — state-backed deploy tables
-- [platforms/defender-for-endpoint-2.0.md](platforms/defender-for-endpoint-2.0.md) — Defender addressed by `metadata.uuid`; retiring legacy bindings
+- [platforms/microsoft-defender-1.0.md](platforms/microsoft-defender-1.0.md) — Defender addressed by `metadata.uuid`; retiring legacy bindings
 - [RFC 0021](../rfcs/0021-defender-graph-beta-detection-rules.md) — Defender leaves the state-backed set
 - [deployment.md](deployment.md) — status strategies
 - [validation.md](validation.md) — `external_id_in_rule` and shard validation
@@ -333,7 +333,7 @@ configurations:
     schema: platform::defender_for_endpoint::1.0
 ```
 
-After migration the `rule_id::Contoso` line is gone, the rest of the file is byte-identical, and the shard holds the legacy binding `"defender_for_endpoint": {"Contoso": "12345"}`. The rule still fails deploy with `defender_schema_retired` until `opentide migrate` rewrites its block to 2.0; the first 2.0 deploy to `Contoso` then creates the rule under the uuid, deletes rule `12345`, and removes the binding.
+After migration the `rule_id::Contoso` line is gone, the rest of the file is byte-identical, and the shard holds the legacy binding `"defender_for_endpoint": {"Contoso": "12345"}`. The rule still fails deploy with `defender_platform_retired` until `opentide migrate` moves its block to `configurations.microsoft_defender`; the first `microsoft_defender` deploy to `Contoso` then creates the rule under the uuid, deletes rule `12345`, and removes the binding.
 
 Fixtures: [fixtures/deployment/valid/](../fixtures/deployment/valid/) and [fixtures/deployment/invalid/](../fixtures/deployment/invalid/), checked by `scripts/deployment_state_fixtures.py`.
 
@@ -341,7 +341,7 @@ Fixtures: [fixtures/deployment/valid/](../fixtures/deployment/valid/) and [fixtu
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.10 | 2026-11-24 | `defender_for_endpoint` is no longer state-backed: [`platform::defender_for_endpoint::2.0`](platforms/defender-for-endpoint-2.0.md) uses `metadata.uuid` as the Defender rule id. A `defender_for_endpoint` binding is a legacy binding: readers accept it, deploy never writes one, and a 2.0 deploy deletes the legacy rule and removes the binding ([Legacy Defender bindings](#legacy-defender-bindings), [RFC 0021](../rfcs/0021-defender-graph-beta-detection-rules.md)). Supersedes RFC 0010 for Defender. Schema id and shard JSON Schema unchanged. |
+| 1.10 | 2026-11-25 | `defender_for_endpoint` is no longer state-backed, and is replaced by [`microsoft_defender`](platforms/microsoft-defender-1.0.md), which uses `metadata.uuid` as the Defender rule id. A `defender_for_endpoint` binding is a legacy binding: readers accept it, deploy never writes one, and a `microsoft_defender` deploy deletes the legacy rule and removes the binding ([Legacy Defender bindings](#legacy-defender-bindings), [RFC 0021](../rfcs/0021-defender-graph-beta-detection-rules.md)). Supersedes RFC 0010 for Defender. The shard key stays `defender_for_endpoint`; there is no `microsoft_defender` key. Schema id and shard JSON Schema unchanged. |
 | 1.9 | 2026-11-24 | CI requirement 8: the generated production job passes `--prune` on its `RELEASE` dry run and deploy unless it was generated with `--no-prune`, which the file's header records (opentide#1855). Schema id unchanged. |
 | 1.8 | 2026-11-24 | Orphan shards are reported by `deploy` and retired by `deploy --prune` on a `RELEASE` run ([deployment 1.4](deployment.md#retiring-deleted-rules), opentide#1713). Schema id unchanged. |
 | 1.7 | 2026-11-12 | `google_secops` is state-backed: the Google SecOps rule id, `ru_` and a lower-case UUID, under `platforms.google_secops.<tenant>` ([google-secops-1.0](platforms/google-secops-1.0.md), [RFC 0019](../rfcs/0019-google-secops-yara-l.md)). The shard JSON Schema gains `secopsRuleTenants`. Schema id unchanged. |

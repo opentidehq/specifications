@@ -19,7 +19,7 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Workspace layout | 1.6 | — | normative | [specs/workspace.md](specs/workspace.md) |
 | Inflight preview shard | 1.0 | `inflight.shard::1.0` | normative | [specs/workspace.md](specs/workspace.md#inflight-preview-shards) |
 | Configuration | 1.0 | — | normative | [specs/configuration.md](specs/configuration.md) |
-| Visibility | 1.1 | `visibility::1.0` | normative | [specs/visibility.md](specs/visibility.md) |
+| Visibility | 1.2 | `visibility::1.0` | normative | [specs/visibility.md](specs/visibility.md) |
 | Vocabulary format | 1.0 | — | normative | [specs/vocabularies/format.md](specs/vocabularies/format.md) |
 | Vocabulary catalog | 1.0 | — | normative | [specs/vocabularies/catalog.md](specs/vocabularies/catalog.md) |
 | Deployment lifecycle | 1.5 | — | normative | [specs/deployment.md](specs/deployment.md) |
@@ -27,8 +27,8 @@ One-page index of active normative spec versions. There is no framework-wide ver
 | Metaschema keywords | 1.2 | — | normative | [specs/metaschema-keywords.md](specs/metaschema-keywords.md) |
 | Platforms | 1.11 | — | normative | [specs/platforms/index.md](specs/platforms/index.md) |
 | Sentinel platform | 1.3 | `platform::sentinel::1.0` | normative | [specs/platforms/sentinel-1.0.md](specs/platforms/sentinel-1.0.md) |
-| Defender for Endpoint platform | 2.0 | `platform::defender_for_endpoint::2.0` | normative | [specs/platforms/defender-for-endpoint-2.0.md](specs/platforms/defender-for-endpoint-2.0.md) |
-| Defender for Endpoint platform | 1.4 | `platform::defender_for_endpoint::1.0` | deprecated | [specs/platforms/defender-for-endpoint-1.0.md](specs/platforms/defender-for-endpoint-1.0.md) |
+| Microsoft Defender platform | 1.0 | `platform::microsoft_defender::1.0` | normative | [specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md) |
+| Defender for Endpoint platform (renamed to Microsoft Defender) | 1.4 | `platform::defender_for_endpoint::1.0` | deprecated | [specs/platforms/defender-for-endpoint-1.0.md](specs/platforms/defender-for-endpoint-1.0.md) |
 | Splunk platform | 1.0 | `platform::splunk::1.0` | normative | [specs/platforms/splunk-1.0.md](specs/platforms/splunk-1.0.md) |
 | SentinelOne platform | 1.1 | `platform::sentinel_one::1.0` | normative | [specs/platforms/sentinel-one-1.0.md](specs/platforms/sentinel-one-1.0.md) |
 | Carbon Black Cloud platform | 1.1 | `platform::carbon_black_cloud::1.0` | normative | [specs/platforms/carbon-black-cloud-1.0.md](specs/platforms/carbon-black-cloud-1.0.md) |

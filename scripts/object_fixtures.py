@@ -1819,18 +1819,18 @@ def validate_searches(doc: dict[str, Any]) -> list[CheckError]:
     return errors
 
 
-# --- platform::defender_for_endpoint::2.0 (specs/platforms/defender-for-endpoint-2.0.md) ------------
+# --- platform::microsoft_defender::1.0 (specs/platforms/microsoft-defender-1.0.md) -----------------
 
-DEFENDER_V2_SCHEMA = "platform::defender_for_endpoint::2.0"
+MICROSOFT_DEFENDER_SCHEMA = "platform::microsoft_defender::1.0"
 DEFENDER_BLOCK_KEYS = frozenset(
     {
         "enabled", "name", "schema", "status", "flags", "tenants", "contributors",
         "query", "schedule", "alert", "entities", "actions", "scope", "incident", "exclusions",
     }
 )
-DEFENDER_FREQUENCIES = {"NRT": 0, "1H": 1, "3H": 3, "12H": 12, "24H": 24}
 DEFENDER_SEVERITIES = ("Informational", "Low", "Medium", "High", "Critical")
 DEFENDER_GROUPING = {"alert_per_event": "alertPerEvent", "single_alert": "singleAlert"}
+DEFENDER_ISOLATION_TYPES = ("full", "selective")
 DEFENDER_ALERT_KEYS = frozenset({"title", "description", "severity", "recommendation", "techniques", "custom_details", "grouping"})
 # entity kind -> (Graph kind, {field: Graph property})
 DEFENDER_ENTITIES: dict[str, tuple[str, dict[str, str]]] = {
@@ -1860,36 +1860,32 @@ DEFENDER_ENTITIES: dict[str, tuple[str, dict[str, str]]] = {
 _DEVICE = {"device_id": "deviceIdColumn"}
 _FILE = {"sha1": "sha1Column", "sha256": "sha256Column", "device_groups": "deviceGroupNames"}
 _EMAIL = {"network_message_id": "networkMessageIdColumn", "recipient": "recipientColumn"}
-# action -> (Graph action, {field: Graph property}, required: list of alternatives, each a set of fields)
-DEFENDER_ACTIONS: dict[str, tuple[str, dict[str, str], list[frozenset[str]]]] = {
-    "isolate_devices": ("isolateDevices", {"device_id": "deviceIdColumn", "isolation_type": "isolationType"},
-                        [frozenset({"device_id", "isolation_type"})]),
-    "collect_investigation_packages": ("collectInvestigationPackages", _DEVICE, [frozenset({"device_id"})]),
-    "run_antivirus_scans": ("runAntivirusScans", _DEVICE, [frozenset({"device_id"})]),
-    "initiate_investigations": ("initiateInvestigations", _DEVICE, [frozenset({"device_id"})]),
-    "restrict_app_executions": ("restrictAppExecutions", _DEVICE, [frozenset({"device_id"})]),
-    "allow_files": ("allowFiles", _FILE, [frozenset({"sha1"}), frozenset({"sha256"})]),
-    "block_files": ("blockFiles", _FILE, [frozenset({"sha1"}), frozenset({"sha256"})]),
-    "stop_and_quarantine_files": ("stopAndQuarantineFiles", {"device_id": "deviceIdColumn", "sha1": "sha1Column"},
-                                  [frozenset({"device_id", "sha1"})]),
-    "disable_users": ("disableUsers", {"account_sid": "accountSidColumn"}, [frozenset({"account_sid"})]),
-    "force_user_password_resets": ("forceUserPasswordResets", {"account_sid": "accountSidColumn"}, [frozenset({"account_sid"})]),
-    "mark_users_as_compromised": ("markUsersAsCompromised", {"account_object_id": "accountObjectIdColumn"},
-                                  [frozenset({"account_object_id"})]),
-    "soft_delete_emails": ("softDeleteEmails", _EMAIL, [frozenset(_EMAIL)]),
-    "hard_delete_emails": ("hardDeleteEmails", _EMAIL, [frozenset(_EMAIL)]),
-    "move_emails_to_deleted_items": ("moveEmailsToDeletedItems", _EMAIL, [frozenset(_EMAIL)]),
-    "move_emails_to_inbox": ("moveEmailsToInbox", _EMAIL, [frozenset(_EMAIL)]),
-    "move_emails_to_junk": ("moveEmailsToJunk", _EMAIL, [frozenset(_EMAIL)]),
+# action -> (Graph action, {field: Graph property}). The Graph docs name no required target field.
+DEFENDER_ACTIONS: dict[str, tuple[str, dict[str, str]]] = {
+    "isolate_devices": ("isolateDevices", {"device_id": "deviceIdColumn", "isolation_type": "isolationType"}),
+    "collect_investigation_packages": ("collectInvestigationPackages", _DEVICE),
+    "run_antivirus_scans": ("runAntivirusScans", _DEVICE),
+    "initiate_investigations": ("initiateInvestigations", _DEVICE),
+    "restrict_app_executions": ("restrictAppExecutions", _DEVICE),
+    "allow_files": ("allowFiles", _FILE),
+    "block_files": ("blockFiles", _FILE),
+    "stop_and_quarantine_files": ("stopAndQuarantineFiles", {"device_id": "deviceIdColumn", "sha1": "sha1Column"}),
+    "disable_users": ("disableUsers", {"account_sid": "accountSidColumn"}),
+    "force_user_password_resets": ("forceUserPasswordResets", {"account_sid": "accountSidColumn"}),
+    "mark_users_as_compromised": ("markUsersAsCompromised", {"account_object_id": "accountObjectIdColumn"}),
+    "soft_delete_emails": ("softDeleteEmails", _EMAIL),
+    "hard_delete_emails": ("hardDeleteEmails", _EMAIL),
+    "move_emails_to_deleted_items": ("moveEmailsToDeletedItems", _EMAIL),
+    "move_emails_to_inbox": ("moveEmailsToInbox", _EMAIL),
+    "move_emails_to_junk": ("moveEmailsToJunk", _EMAIL),
 }
 DEFENDER_NON_COLUMN_FIELDS = frozenset({"isolation_type", "device_groups"})
-DEFENDER_COLUMN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-DEFENDER_LOOKBACK = re.compile(r"^([1-9][0-9]*)([HD])$")
+DEFENDER_DURATION = re.compile(r"^([1-9][0-9]*)([HD])$")
 
 
-def defender_lookback_hours(value: Any) -> int | None:
-    """Hours of a specs/platforms/defender-for-endpoint-2.0.md `schedule.lookback`, or None when malformed."""
-    match = DEFENDER_LOOKBACK.match(value) if isinstance(value, str) else None
+def defender_duration_hours(value: Any) -> int | None:
+    """Hours of a `<n>H` or `<n>D` duration (specs/platforms/microsoft-defender-1.0.md#schedule-defenderschedule)."""
+    match = DEFENDER_DURATION.match(value) if isinstance(value, str) else None
     if not match:
         return None
     return int(match.group(1)) * (24 if match.group(2) == "D" else 1)
@@ -1900,26 +1896,23 @@ def _defender_names(value: Any) -> bool:
 
 
 def _defender_column(value: Any, path: str) -> list[CheckError]:
-    if isinstance(value, str) and DEFENDER_COLUMN.match(value):
+    if isinstance(value, str) and value.strip():
         return []
-    return [CheckError("defender_column", "a column name is a KQL identifier", path)]
+    return [CheckError("microsoft_defender_column", "a column name is a non-blank string", path)]
 
 
-def validate_defender_block(block: dict[str, Any]) -> list[CheckError]:
-    """The platform::defender_for_endpoint::2.0 constraint codes (specs/platforms/defender-for-endpoint-2.0.md#constraints).
-
-    A block whose schema is not platform::defender_for_endpoint::2.0 is a deprecated 1.0 block and is not checked.
-    """
-    if block.get("schema") != DEFENDER_V2_SCHEMA:
-        return []
-    base = "configurations.defender_for_endpoint"
+def validate_microsoft_defender_block(block: dict[str, Any]) -> list[CheckError]:
+    """The platform::microsoft_defender::1.0 constraint codes (specs/platforms/microsoft-defender-1.0.md#constraints)."""
+    base = "configurations.microsoft_defender"
     errors: list[CheckError] = []
     for key in sorted(set(block) - DEFENDER_BLOCK_KEYS):
         if key in ("rule_id", "rule_id_bundle") or key.startswith("rule_id::"):
             errors.append(CheckError("external_id_in_rule", "the Defender rule id is metadata.uuid", f"{base}.{key}"))
         else:
-            errors.append(CheckError("unknown_field", f"{key!r} is not a {DEFENDER_V2_SCHEMA} key", f"{base}.{key}"))
+            errors.append(CheckError("unknown_field", f"{key!r} is not a {MICROSOFT_DEFENDER_SCHEMA} key", f"{base}.{key}"))
     block = _present(block)
+    if "schema" in block and block["schema"] != MICROSOFT_DEFENDER_SCHEMA:
+        errors.append(CheckError("microsoft_defender_schema", f"schema is {MICROSOFT_DEFENDER_SCHEMA}", f"{base}.schema"))
     query = block.get("query")
     if not isinstance(query, str) or not query.strip():
         errors.append(CheckError("missing_field", "query is non-blank KQL", f"{base}.query"))
@@ -1930,31 +1923,32 @@ def validate_defender_block(block: dict[str, Any]) -> list[CheckError]:
     else:
         errors.extend(_unknown_keys(schedule, {"frequency", "lookback"}, f"{base}.schedule"))
         frequency = schedule.get("frequency")
-        if frequency not in DEFENDER_FREQUENCIES:
-            errors.append(CheckError("defender_frequency", "frequency is NRT, 1H, 3H, 12H, or 24H", f"{base}.schedule.frequency"))
+        frequency_hours = 0 if frequency == "NRT" else defender_duration_hours(frequency)
+        if frequency_hours is None:
+            errors.append(CheckError("microsoft_defender_frequency", "frequency is NRT, <n>H, or <n>D", f"{base}.schedule.frequency"))
         if schedule.get("lookback") is not None:
-            hours = defender_lookback_hours(schedule["lookback"])
+            hours = defender_duration_hours(schedule["lookback"])
             path = f"{base}.schedule.lookback"
             if hours is None:
-                errors.append(CheckError("defender_lookback", "lookback is <n>H or <n>D", path))
+                errors.append(CheckError("microsoft_defender_lookback", "lookback is <n>H or <n>D", path))
             elif frequency == "NRT":
-                errors.append(CheckError("defender_lookback", "a near-real-time rule takes no lookback", path))
-            elif frequency in DEFENDER_FREQUENCIES and hours < DEFENDER_FREQUENCIES[frequency]:
-                errors.append(CheckError("defender_lookback", "lookback is shorter than frequency", path))
+                errors.append(CheckError("microsoft_defender_lookback", "a near-real-time rule takes no lookback", path))
+            elif frequency_hours is not None and hours < frequency_hours:
+                errors.append(CheckError("microsoft_defender_lookback", "lookback is shorter than frequency", path))
 
     alert = block.get("alert")
     if isinstance(alert, dict):
         errors.extend(_unknown_keys(alert, DEFENDER_ALERT_KEYS, f"{base}.alert"))
         alert = _present(alert)
         if "severity" in alert and alert["severity"] not in DEFENDER_SEVERITIES:
-            errors.append(CheckError("defender_severity", f"severity is one of {DEFENDER_SEVERITIES}", f"{base}.alert.severity"))
+            errors.append(CheckError("microsoft_defender_severity", f"severity is one of {DEFENDER_SEVERITIES}", f"{base}.alert.severity"))
         if "grouping" in alert and alert["grouping"] not in DEFENDER_GROUPING:
-            errors.append(CheckError("defender_grouping", "grouping is alert_per_event or single_alert", f"{base}.alert.grouping"))
+            errors.append(CheckError("microsoft_defender_grouping", "grouping is alert_per_event or single_alert", f"{base}.alert.grouping"))
         details = alert.get("custom_details")
         if details is not None:
             path = f"{base}.alert.custom_details"
             if not isinstance(details, dict) or not all(isinstance(k, str) and k.strip() for k in details):
-                errors.append(CheckError("defender_custom_details", "custom_details maps non-blank names to columns", path))
+                errors.append(CheckError("microsoft_defender_custom_details", "custom_details maps non-blank names to columns", path))
             else:
                 for name, column in details.items():
                     errors.extend(_defender_column(column, f"{path}.{name}"))
@@ -1964,16 +1958,16 @@ def validate_defender_block(block: dict[str, Any]) -> list[CheckError]:
         for kind, mappings in entities.items():
             path = f"{base}.entities.{kind}"
             if kind not in DEFENDER_ENTITIES:
-                errors.append(CheckError("defender_entity_kind", f"{kind!r} is not an entity kind", path))
+                errors.append(CheckError("microsoft_defender_entity_kind", f"{kind!r} is not an entity kind", path))
                 continue
             fields = DEFENDER_ENTITIES[kind][1]
             if not isinstance(mappings, list):
-                errors.append(CheckError("defender_entity_mapping", "an entity kind holds a list of mappings", path))
+                errors.append(CheckError("microsoft_defender_entity_mapping", "an entity kind holds a list of mappings", path))
                 continue
             for index, mapping in enumerate(mappings):
                 mpath = f"{path}.{index}"
                 if not isinstance(mapping, dict) or not mapping or set(mapping) - set(fields):
-                    errors.append(CheckError("defender_entity_mapping", f"a {kind} mapping uses {sorted(fields)}", mpath))
+                    errors.append(CheckError("microsoft_defender_entity_mapping", f"a {kind} mapping uses {sorted(fields)}", mpath))
                     continue
                 for name, column in mapping.items():
                     errors.extend(_defender_column(column, f"{mpath}.{name}"))
@@ -1983,23 +1977,24 @@ def validate_defender_block(block: dict[str, Any]) -> list[CheckError]:
         for action, targets in actions.items():
             path = f"{base}.actions.{action}"
             if action not in DEFENDER_ACTIONS:
-                errors.append(CheckError("defender_action_kind", f"{action!r} is not an automated action", path))
+                errors.append(CheckError("microsoft_defender_action_kind", f"{action!r} is not an automated action", path))
                 continue
-            _, fields, required = DEFENDER_ACTIONS[action]
+            fields = DEFENDER_ACTIONS[action][1]
             if not isinstance(targets, list) or not targets:
-                errors.append(CheckError("defender_action_target", "an action holds a non-empty list of targets", path))
+                errors.append(CheckError("microsoft_defender_action_target", "an action holds a non-empty list of targets", path))
                 continue
             for index, target in enumerate(targets):
                 tpath = f"{path}.{index}"
                 if (
                     not isinstance(target, dict)
+                    or not target
                     or set(target) - set(fields)
-                    or not any(alternative <= set(target) for alternative in required)
-                    or ("isolation_type" in target and target["isolation_type"] not in ("full", "selective"))
                     or ("device_groups" in target and not _defender_names(target["device_groups"]))
                 ):
-                    errors.append(CheckError("defender_action_target", f"a {action} target needs {[sorted(r) for r in required]}", tpath))
+                    errors.append(CheckError("microsoft_defender_action_target", f"a {action} target uses {sorted(fields)}", tpath))
                     continue
+                if "isolation_type" in target and target["isolation_type"] not in DEFENDER_ISOLATION_TYPES:
+                    errors.append(CheckError("microsoft_defender_isolation_type", "isolation_type is full or selective", f"{tpath}.isolation_type"))
                 for name, column in target.items():
                     if name not in DEFENDER_NON_COLUMN_FIELDS:
                         errors.extend(_defender_column(column, f"{tpath}.{name}"))
@@ -2007,12 +2002,12 @@ def validate_defender_block(block: dict[str, Any]) -> list[CheckError]:
     scope = block.get("scope")
     if scope is not None:
         if not isinstance(scope, dict) or set(scope) != {"device_groups"} or not _defender_names(scope["device_groups"]):
-            errors.append(CheckError("defender_scope", "scope.device_groups is a non-empty list of names", f"{base}.scope"))
+            errors.append(CheckError("microsoft_defender_scope", "scope.device_groups is a non-empty list of names", f"{base}.scope"))
 
     incident = block.get("incident")
     if incident is not None:
         if not isinstance(incident, dict) or set(incident) != {"exclude_from_correlation"} or not isinstance(incident["exclude_from_correlation"], bool):
-            errors.append(CheckError("unknown_field", "incident is {exclude_from_correlation: bool}", f"{base}.incident"))
+            errors.append(CheckError("microsoft_defender_incident", "incident is {exclude_from_correlation: <boolean>}", f"{base}.incident"))
     return errors
 
 
@@ -2044,8 +2039,10 @@ def validate_rule(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[CheckEr
         errors.extend(validate_graylog_block(configurations["graylog"]))
     if isinstance(configurations, dict) and isinstance(configurations.get("google_secops"), dict):
         errors.extend(validate_google_secops_block(configurations["google_secops"]))
-    if isinstance(configurations, dict) and isinstance(configurations.get("defender_for_endpoint"), dict):
-        errors.extend(validate_defender_block(configurations["defender_for_endpoint"]))
+    if isinstance(configurations, dict) and isinstance(configurations.get("microsoft_defender"), dict):
+        errors.extend(validate_microsoft_defender_block(configurations["microsoft_defender"]))
+        if "defender_for_endpoint" in configurations:
+            errors.append(CheckError("defender_platform_conflict", "a rule has either a defender_for_endpoint or a microsoft_defender block, not both", "configurations"))
     if isinstance(configurations, dict) and isinstance(configurations.get("exabeam"), dict):
         errors.extend(validate_exabeam_block(configurations["exabeam"], doc.get("name")))
     errors.extend(validate_searches(doc))
@@ -2138,8 +2135,9 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "rule-exabeam-context-table-threshold.yaml": "exabeam_context_table_trigger",
     "rule-exabeam-delay.yaml": "exabeam_duration",
     "rule-exabeam-advanced-query.yaml": "exabeam_advanced_in_rule",
-    "rule-defender-lookback-nrt.yaml": "defender_lookback",
-    "rule-defender-entity-field.yaml": "defender_entity_mapping",
-    "rule-defender-action-target.yaml": "defender_action_target",
-    "rule-defender-1.0-keys.yaml": "unknown_field",
+    "rule-microsoft-defender-lookback-nrt.yaml": "microsoft_defender_lookback",
+    "rule-microsoft-defender-entity-field.yaml": "microsoft_defender_entity_mapping",
+    "rule-microsoft-defender-action-target.yaml": "microsoft_defender_action_target",
+    "rule-microsoft-defender-old-keys.yaml": "unknown_field",
+    "rule-defender-both-platforms.yaml": "defender_platform_conflict",
 }

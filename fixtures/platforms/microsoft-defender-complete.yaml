@@ -1,6 +1,6 @@
-# Every key platform::defender_for_endpoint::2.0 defines, each set once.
-# Mirrors the "Complete block" example in specs/platforms/defender-for-endpoint-2.0.md.
-name: Defender for Endpoint 2.0 complete block
+# Every key platform::microsoft_defender::1.0 defines, each set once.
+# Mirrors the "Complete block" example in specs/platforms/microsoft-defender-1.0.md.
+name: Microsoft Defender complete block
 metadata:
   uuid: 00000000-0000-4000-8003-0000000000d5
   schema: rule::1.1
@@ -9,15 +9,15 @@ metadata:
   modified: "2026-11-25"
   tlp: clear
 description: |
-  Encoded PowerShell followed by network, mail, and identity activity: every Defender 2.0 key set.
+  Encoded PowerShell followed by network, mail, and identity activity: every Microsoft Defender key set.
 status: PRODUCTION
 response:
   alert_severity: High
 configurations:
-  defender_for_endpoint:
+  microsoft_defender:
     enabled: true
     name: Encoded PowerShell with follow-on activity
-    schema: platform::defender_for_endpoint::2.0
+    schema: platform::microsoft_defender::1.0
     status: PRODUCTION
     tenants: [contoso, fabrikam]
     flags: [tier0]

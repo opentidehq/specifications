@@ -4,7 +4,7 @@
   "body": {
     "id": "00000000-0000-4000-8003-0000000000d5",
     "displayName": "Encoded PowerShell with follow-on activity",
-    "description": "Encoded PowerShell followed by network, mail, and identity activity: every Defender 2.0 key set.\n",
+    "description": "Encoded PowerShell followed by network, mail, and identity activity: every Microsoft Defender key set.\n",
     "status": "enabled",
     "queryCondition": {
       "queryText": "DeviceProcessEvents\n| where FileName =~ \"powershell.exe\" and ProcessCommandLine has \"-enc\"\n| join kind=leftouter (DeviceNetworkEvents | project DeviceId, RemoteIP, RemoteIPType, RemoteUrl, LocalIP) on DeviceId\n| project Timestamp, ReportId, DeviceId, DeviceName, DeviceDnsDomain, DeviceNetBiosName, DeviceNtDomain,\n    AccountObjectId, AccountSid, AccountUpn, AccountUpnSuffix, AccountName, AccountDomain, AccountDnsDomain,\n    FileName, SHA1, SHA256, InitiatingProcessSHA1, InitiatingProcessSHA256, ProcessCommandLine,\n    RemoteIP, RemoteIPType, RemoteUrl, DnsQuery, LocalIP, DnsServerIP, RegistryKey, RegistryValueName,\n    NetworkMessageId, RecipientEmailAddress, SenderFromAddress, Subject, MailClusterQuery, MailClusterSource,\n    ApplicationId, Application, OAuthApplicationId, GroupObjectId, GroupSid, GroupDistinguishedName,\n    AzureResourceId, AmazonResourceName, GcpFullResourceName\n"
