@@ -11,7 +11,7 @@
 - **PR:** [#32](https://github.com/opentidehq/specifications/pull/32)
 - **Implementation issue:** [opentide#396](https://github.com/opentidehq/opentide/issues/396)
 - **Implementation PR:** [opentide#555](https://github.com/opentidehq/opentide/pull/555)
-- **Superseded in part:** for Microsoft Defender for Endpoint by [RFC 0021](0021-defender-graph-beta-detection-rules.md) (2026-11-25). The platform is renamed `microsoft_defender` (`platform::microsoft_defender::1.0`), which addresses the Defender rule by `metadata.uuid` and is not state-backed; a Defender binding in a shard is a legacy binding that deploy retires. Everything this RFC says about Defender ids (create, update, disable, delete by binding; `external_id_missing`; create guards) describes opentide 1.x. The rest of this RFC is unchanged.
+- **Superseded in part:** for Microsoft Defender for Endpoint by [RFC 0021](0021-defender-graph-beta-detection-rules.md) (2026-11-25), which removes that platform. Its replacement, `microsoft_defender`, addresses the Defender rule by `metadata.uuid` and keeps no shard, and the shard has no Defender key. Everything this RFC says about Defender ids describes the removed platform. The rest of this RFC is unchanged.
 - **Deferred:** inflight moves to `.opentide/states/inflight/` in [#31](https://github.com/opentidehq/specifications/issues/31). This RFC does not move it.
 
 ## Summary

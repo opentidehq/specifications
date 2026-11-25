@@ -269,7 +269,7 @@ The API key needs the **Correlation Rules** permission at Read Write Delete. `--
 
 ### Deploy
 
-Exabeam is **state-backed**, like Defender for Endpoint, SentinelOne, CrowdStrike, Sysdig, and Bitdefender:
+Exabeam is **state-backed**, like SentinelOne, CrowdStrike, Sysdig, and Bitdefender:
 
 - **Where.** `platforms.exabeam.<tenant>` in `.opentide/states/deployment/<uuid>.json`. The tenant key is the configured tenant `name`, whitespace-stripped.
 - **Shape.** The `id` of the create response, a UUID, stored lower-case and canonical. It matches `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`.
@@ -404,4 +404,5 @@ Invalid fixtures: [rule-exabeam-correlation-single.yaml](../../fixtures/invalid/
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 1.0 | 2026-11-25 | Prose only: Defender for Endpoint, now removed, is no longer cited as state-backed ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)). No contract change. |
 | 1.0 | 2026-11-12 | Initial normative contract ([RFC 0018](../../rfcs/0018-exabeam-platform.md)): one correlation rule per block; sequences with any-match or threshold (`more_than`, `less_than`, `in`, `not_in`) conditions, in creation order; correlation, suppression, delay, schedule, outcomes; derived name, description (with ATT&CK), and severity; unique names (`exabeam_name_duplicate`) and a name check before create; whole-body `PUT`; the rule UUID in deployment state; `--live` filter checks and hunts through Search. |

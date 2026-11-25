@@ -18,7 +18,6 @@ KQL_TYPES = {"bool", "datetime", "decimal", "dynamic", "guid", "int", "long", "r
 COLUMN_TYPES = {
     "sentinel": KQL_TYPES,
     "microsoft_defender": KQL_TYPES,
-    "defender_for_endpoint": KQL_TYPES,  # renamed to microsoft_defender; read as it (defender_platform_renamed)
     "splunk": {"string", "number", "boolean"},
     "elastic": {
         "binary", "boolean", "byte", "constant_keyword", "date", "date_nanos", "double",

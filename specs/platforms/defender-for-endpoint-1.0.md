@@ -11,7 +11,7 @@ supersedes: null
 ## Summary
 
 <Callout type="warning">
-**Platform renamed and hard deprecated.** opentide 1.0 does not ship `defender_for_endpoint`. Use [`microsoft_defender`](microsoft-defender-1.0.md) (`platform::microsoft_defender::1.0`); every `defender_for_endpoint` block must be migrated. Microsoft dropped the "for Endpoint" name, and Microsoft Graph removed the custom detection properties this platform deploys to (`isEnabled`, `schedule.period`, `alertTemplate.mitreTechniques`, `alertTemplate.impactedAssets`, `detectionAction.responseActions`) on 2026-10-01. `opentide validate` gives the strong warning `defender_platform_renamed`, which no configuration can lower or silence. Deploy refuses the block with the error `defender_platform_retired`. `opentide migrate` moves it to `configurations.microsoft_defender` ([Deprecation](#deprecation), [RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)).
+**Removed.** opentide 1.0 does not have this platform, and this spec defines no behaviour for it. `configurations.defender_for_endpoint` is an unknown key. The file is kept as a record, as [governance](../../GOVERNANCE.md) requires for a withdrawn spec ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)).
 </Callout>
 
 `configurations.defender_for_endpoint` is a Microsoft Defender custom detection rule. The detection text is KQL. Query validation is supported. Defender assigns the remote rule id; opentide stores it per tenant in [deployment state](../deployment-state.md) so the next deploy updates that rule.
@@ -29,9 +29,6 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 - The block MUST NOT contain `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>`. Each fails `external_id_in_rule` ([External rule ids](index.md#external-rule-ids)).
 - Registry load MUST require `scope`. A block that validates without `scope` MUST NOT load for deploy.
 - `actions.files.quarantine_files` MAY be used as an alias of `quarantine_file` on the registry-load path.
-- A `configurations.defender_for_endpoint` block, whatever its `schema` (`platform::defender_for_endpoint::1.0`, a legacy identifier such as `defender_for_endpoint::2.3`, or none), MUST be read, validated against this spec, and reported with the warning `defender_platform_renamed`. That warning MUST be emitted under every validation setting: no configuration (a `lint.toml` severity override, a quiet or minimal profile, an ignore list, or a per-rule suppression) may lower, disable, or suppress it.
-- Deploy MUST refuse a `defender_for_endpoint` block with the error `defender_platform_retired` before any call to the tenant, and MUST NOT deploy it through the `microsoft_defender` mapping.
-- A rule MUST NOT carry both a `defender_for_endpoint` and a `microsoft_defender` block (`defender_platform_conflict`, an error in validate and deploy).
 
 ## Definition
 
@@ -133,35 +130,7 @@ Same shape and tenant matching as Sentinel exclusions. See [sentinel-1.0.md](sen
 | `tenant` | string | optional | null | Limit the exclusion to one tenant name. |
 | `let` | map[string, scalar] | optional | null | KQL `let` bindings. String, number, or boolean. |
 
-### Deprecation
-
-This platform is **renamed and hard deprecated** since spec version 1.4. opentide 1.0 does not ship it: it no longer matches any API Microsoft serves, and its successor is [`microsoft_defender`](microsoft-defender-1.0.md), which carries the active Graph beta contract. Every `defender_for_endpoint` block must be migrated. A block is still read so that a workspace can validate and migrate it: static validation applies every requirement above, and adds `defender_platform_renamed` at `configurations.defender_for_endpoint`.
-
-`defender_platform_renamed` is a warning, so `opentide validate` still exits 0 and a CI pipeline keeps running until the workspace has migrated. It is a strong one:
-
-- It MUST be emitted under every validation setting and on every surface that validates (CLI, editor, language server, MCP). No configuration MAY lower, disable, or suppress it: not a `lint.toml` severity override, a quiet or minimal profile, an ignore list, or a per-rule suppression.
-- Its message MUST say, in substance:
-
-  > The platform `defender_for_endpoint` is renamed to `microsoft_defender` and is hard deprecated. Microsoft removed its wire format from the Graph custom detection API on 2026-10-01, and `opentide deploy` refuses this block (`defender_platform_retired`). Run `opentide migrate` now to move it to `configurations.microsoft_defender`: <link to the migration table>.
-
-  The link is [the migration table](microsoft-defender-1.0.md#migration-from-defender_for_endpoint).
-- It is reported once per block, never folded into a summary count.
-
-`opentide migrate` moves the block to `configurations.microsoft_defender`, key by key, and rewrites the workspace's other references to the platform ([microsoft-defender-1.0](microsoft-defender-1.0.md#migration-from-defender_for_endpoint)). A value with no `microsoft_defender` equivalent leaves the rule unchanged and is reported as `defender_migrate_unmapped`.
-
-Deploy refuses a `defender_for_endpoint` block, on every deploy path, dry run included: the rule reports `defender_platform_retired` (error) for each selected tenant, no call reaches Defender, deployment state is not touched, and the run exits 1. The rule's other platform blocks still deploy. The message names `opentide migrate`. Enabling or selecting the platform (`--platform defender_for_endpoint`) is a usage error that names `microsoft_defender`.
-
-Deploy does not translate a block on the fly, for three reasons:
-
-1. The wire format this platform maps to no longer exists. A `defender_for_endpoint` deploy could only be a `microsoft_defender` deploy in disguise.
-2. The translation is not total. Some `impacted_entities` and file identifiers have no equivalent; deploy would drop them, or a response action, without the author seeing it.
-3. The first `microsoft_defender` deploy of a rule recreates it under its uuid and deletes the legacy rule ([Legacy rules](microsoft-defender-1.0.md#legacy-rules)). That should follow a reviewed change to the YAML, not a CLI upgrade.
-
-`opentide migrate` is one deterministic command and its diff is reviewable, so the refusal costs one commit.
-
-### Deploy (opentide 1.x)
-
-Kept for the record. opentide 1.x deployed a 1.0 block through the Graph custom detection API with a Defender-assigned id:
+### Deploy
 
 | Block status strategy | Defender result |
 |-----------------------|-----------------|
@@ -169,15 +138,14 @@ Kept for the record. opentide 1.x deployed a 1.0 block through the Graph custom 
 | `DELETION` | Delete the bound remote rule and remove the binding after successful deletion; without a binding, report `external_id_missing`. |
 | any other | Update when a binding exists; otherwise create and durably record the returned id. |
 
-The binding is the tenant's entry under `defender_for_endpoint` in `.opentide/states/deployment/<uuid>.json`. A `microsoft_defender` deploy retires the rule such a binding names ([Legacy rules](microsoft-defender-1.0.md#legacy-rules)).
+The binding is the tenant's entry under `defender_for_endpoint` in `.opentide/states/deployment/<uuid>.json`. A create is refused when the shard directory is gitignored or the run cannot persist state, and the rule file is never written. The decision order and codes are in [deployment-state.md](../deployment-state.md#deploy-decisions).
 
 The display name on the Defender rule is the Tide rule `name`.
 
 ## Relationships
 
-- [microsoft-defender-1.0.md](microsoft-defender-1.0.md) — the platform that replaces this one
 - [platforms](index.md) — shared fields and external ids
-- [deployment-state.md](../deployment-state.md) — where opentide 1.x stored the Defender rule id
+- [deployment-state.md](../deployment-state.md) — where the Defender rule id is stored
 - [rule-1.0.md](../objects/rule-1.0.md) — parent object
 - [sentinel-1.0.md](sentinel-1.0.md) — shared KQL exclusion shape
 - [validation.md](../validation.md) — KQL query validation
@@ -219,7 +187,7 @@ configurations:
         collect_investigation_package: true
 ```
 
-Fixture: [fixtures/platforms/defender-for-endpoint.yaml](../../fixtures/platforms/defender-for-endpoint.yaml). It validates with `defender_platform_renamed`; its migration is [fixtures/platforms/microsoft-defender/migrated.yaml](../../fixtures/platforms/microsoft-defender/migrated.yaml).
+The fixture was removed with the platform.
 
 ## History
 
@@ -229,4 +197,4 @@ Fixture: [fixtures/platforms/defender-for-endpoint.yaml](../../fixtures/platform
 | 1.1 | 2026-10-16 | `rule_id` and the `rule_id::<tenant>` alias are removed and fail `external_id_in_rule`. Deploy reads and writes the Defender id in [deployment state](../deployment-state.md); `DISABLEMENT` and `DELETION` without a binding report `external_id_missing` ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Schema id unchanged. |
 | 1.2 | 2026-11-23 | `alert.techniques` is sent as `mitreTechniques` when set, and the rule's objective's Enterprise ATT&CK techniques otherwise (an empty list counts as unset); deploy used to send an empty list (opentide#1801, opentide#1810). Schema id unchanged. |
 | 1.3 | 2026-11-24 | `alert.category` is removed: Microsoft Graph deprecated the custom detection alert template's `category` (use the MITRE tactics) and removed it on 2026-10-01. Static validation rejects the key as unknown, deploy no longer sends it, and `generate extract` no longer writes it. No deprecation period (opentide#1704, opentide#1850). Schema id unchanged. |
-| 1.4 | 2026-11-25 | **Renamed and hard deprecated**: the platform's successor is [`microsoft_defender`](microsoft-defender-1.0.md) (`platform::microsoft_defender::1.0`, [RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)), and opentide 1.0 does not ship `defender_for_endpoint`. A block still validates, with the strong warning `defender_platform_renamed`, which no configuration can silence. Deploy refuses it with `defender_platform_retired`, a rule with both blocks is `defender_platform_conflict`, and `opentide migrate` moves it to `microsoft_defender`. The file is kept. Schema id unchanged. |
+| 1.4 | 2026-11-25 | **Removed.** opentide 1.0 does not have this platform; the spec is kept as a record and defines no behaviour ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)). Schema id unchanged. |

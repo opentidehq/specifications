@@ -21,7 +21,7 @@ RULE_FIXTURE_DIRS = (
     ROOT / "fixtures" / "cross-object",
 )
 
-STATE_PLATFORMS = ("bitdefender", "crowdstrike", "defender_for_endpoint", "exabeam", "google_secops", "graylog", "sentinel_one", "sysdig")
+STATE_PLATFORMS = ("bitdefender", "crowdstrike", "exabeam", "google_secops", "graylog", "sentinel_one", "sysdig")
 LEGACY_MAP_KEYS = ("rule_id", "rule_id_bundle")
 LEGACY_TENANT_PREFIX = "rule_id::"
 
@@ -33,7 +33,7 @@ EXPECTED_INVALID_SHARDS = {
     "uuid-mismatch.json": ("00000000-0000-4000-8003-000000000011.json", "deployment_state_uuid_mismatch"),
     "noncanonical-uuid.json": ("00000000-0000-4000-8003-0000000000AB.json", "deployment_state_uuid_mismatch"),
     "numeric-id.json": (_VALID_NAME, "deployment_state_shape"),
-    "leading-zero-defender-id.json": (_VALID_NAME, "deployment_state_shape"),
+    "leading-zero-sentinel-one-id.json": (_VALID_NAME, "deployment_state_shape"),
     "empty-id.json": (_VALID_NAME, "deployment_state_shape"),
     "whitespace-tenant.json": (_VALID_NAME, "deployment_state_shape"),
     "unsupported-platform.json": (_VALID_NAME, "deployment_state_platform"),

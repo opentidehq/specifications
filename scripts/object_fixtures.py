@@ -2041,8 +2041,6 @@ def validate_rule(doc: dict[str, Any], vocabs: dict[str, Vocab]) -> list[CheckEr
         errors.extend(validate_google_secops_block(configurations["google_secops"]))
     if isinstance(configurations, dict) and isinstance(configurations.get("microsoft_defender"), dict):
         errors.extend(validate_microsoft_defender_block(configurations["microsoft_defender"]))
-        if "defender_for_endpoint" in configurations:
-            errors.append(CheckError("defender_platform_conflict", "a rule has either a defender_for_endpoint or a microsoft_defender block, not both", "configurations"))
     if isinstance(configurations, dict) and isinstance(configurations.get("exabeam"), dict):
         errors.extend(validate_exabeam_block(configurations["exabeam"], doc.get("name")))
     errors.extend(validate_searches(doc))
@@ -2138,6 +2136,5 @@ EXPECTED_INVALID_CODES: dict[str, str] = {
     "rule-microsoft-defender-lookback-nrt.yaml": "microsoft_defender_lookback",
     "rule-microsoft-defender-entity-field.yaml": "microsoft_defender_entity_mapping",
     "rule-microsoft-defender-action-target.yaml": "microsoft_defender_action_target",
-    "rule-microsoft-defender-old-keys.yaml": "unknown_field",
-    "rule-defender-both-platforms.yaml": "defender_platform_conflict",
+    "rule-microsoft-defender-unknown-key.yaml": "unknown_field",
 }

@@ -33,7 +33,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## visibility 1.2
 
-- The Defender system is `microsoft_defender`, the platform that replaces `defender_for_endpoint`. A log source with `system = "defender_for_endpoint"` is read as `microsoft_defender`, with the warning `defender_platform_renamed`, and `opentide migrate` rewrites it ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). `schema_id` stays `visibility::1.0`.
+- The Defender KQL system is `microsoft_defender`, the platform that replaces the removed `defender_for_endpoint` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). `schema_id` stays `visibility::1.0`.
 
 ## visibility 1.1
 
@@ -59,7 +59,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.1
 
-- `configurations.microsoft_defender` (`MicrosoftDefenderConfig`, `platform::microsoft_defender::1.0`, [specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md)) is added, replacing `configurations.defender_for_endpoint` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). A `defender_for_endpoint` block still validates, with a warning that cannot be silenced (`defender_platform_renamed`); deploy refuses it, and a rule with both blocks is `defender_platform_conflict`. `schema_id` stays `rule::1.1`.
+- `configurations.microsoft_defender` (`MicrosoftDefenderConfig`, `platform::microsoft_defender::1.0`, [specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md)) replaces `configurations.defender_for_endpoint`, which is removed and is now an unknown key ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). `schema_id` stays `rule::1.1`.
 - `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](rfcs/0018-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.1`.
 - `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md)) is added ([RFC 0019](rfcs/0019-google-secops-yara-l.md)). A hunt with `system: google_secops` is a YARA-L search. Additive; `schema_id` stays `rule::1.1`. New fixture `fixtures/valid/rule-google-secops-spray-1.0.yaml`.
 - `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.1`.
@@ -75,7 +75,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## rule 1.0
 
-- `configurations.microsoft_defender` (`MicrosoftDefenderConfig`, `platform::microsoft_defender::1.0`, [specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md)) is added, replacing `configurations.defender_for_endpoint` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). A `defender_for_endpoint` block still validates, with a warning that cannot be silenced (`defender_platform_renamed`); deploy refuses it, and a rule with both blocks is `defender_platform_conflict`. `schema_id` stays `rule::1.0`.
+- `configurations.microsoft_defender` (`MicrosoftDefenderConfig`, `platform::microsoft_defender::1.0`, [specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md)) replaces `configurations.defender_for_endpoint`, which is removed and is now an unknown key ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). `schema_id` stays `rule::1.0`.
 - `configurations.exabeam` (`ExabeamConfig`, `platform::exabeam::1.0`, [specs/platforms/exabeam-1.0.md](specs/platforms/exabeam-1.0.md)) is added, and a `system: exabeam` hunt is in the Exabeam Query Language ([RFC 0018](rfcs/0018-exabeam-platform.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.google_secops` (`GoogleSecopsConfig`, `platform::google_secops::1.0`, [specs/platforms/google-secops-1.0.md](specs/platforms/google-secops-1.0.md)) is added ([RFC 0019](rfcs/0019-google-secops-yara-l.md)). Additive; `schema_id` stays `rule::1.0`.
 - `configurations.graylog` (`GraylogConfig`, `platform::graylog::1.0`, [specs/platforms/graylog-1.0.md](specs/platforms/graylog-1.0.md)) is added ([RFC 0017](rfcs/0017-graylog-platform.md)). Additive; `schema_id` stays `rule::1.0`.
@@ -91,7 +91,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## workspace 1.6
 
-- The deployment-state directory no longer lists Defender as state-backed: shards hold legacy `defender_for_endpoint` ids only until a `microsoft_defender` deploy retires them, and staging jobs may create Defender rules. The platform's tenants live in `.opentide/configurations/platforms/microsoft_defender.toml` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
+- The deployment-state directory no longer lists Defender for Endpoint, which is removed; `microsoft_defender` keeps no shard ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## workspace 1.5
 
@@ -145,7 +145,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## deployment 1.5
 
-- Microsoft Defender (`microsoft_defender`, replacing `defender_for_endpoint`) addresses its rule by `metadata.uuid`: no binding is needed to create, update, disable, or delete, and a `defender_for_endpoint` block is refused with `defender_platform_retired`. A legacy binding is retired by the next `microsoft_defender` deploy to its tenant, or by `--prune` when the rule file is gone; a deleted `microsoft_defender` rule is retired by uuid ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
+- Defender for Endpoint is removed. `microsoft_defender` addresses the Defender rule by `metadata.uuid`: no binding is needed to create, update, disable, or delete, and `--prune` retires a deleted rule by uuid ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## deployment 1.4
 
@@ -170,7 +170,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## deployment-state 1.10
 
-- `defender_for_endpoint` is no longer state-backed and is replaced by `microsoft_defender`, which uses `metadata.uuid` as the Defender rule id. A `defender_for_endpoint` binding is a legacy binding, and the shard key keeps that name; there is no `microsoft_defender` key. Readers accept it, deploy never writes one, and the first `microsoft_defender` deploy to its tenant deploys the uuid rule, deletes the legacy rule, and removes the binding (`microsoft_defender_legacy_retired`, `microsoft_defender_legacy_delete_failed`). `migrate-state` still moves a pre-RFC-0010 `rule_id` into a legacy binding. Supersedes RFC 0010 for Defender. Schema id and shard JSON Schema unchanged ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
+- `defender_for_endpoint` is removed from the state-backed platforms and from the shard: a `defender_for_endpoint` entry now fails `deployment_state_platform`, and `migrate-state` stores only SentinelOne and CrowdStrike ids. `microsoft_defender` keeps no shard. The shard JSON Schema drops the key; schema id unchanged. Fixtures that used a Defender binding use SentinelOne; `leading-zero-defender-id.json` is now `leading-zero-sentinel-one-id.json` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## deployment-state 1.9
 
@@ -226,7 +226,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platforms 1.11
 
-- `microsoft_defender` (Microsoft Defender, `platform::microsoft_defender::1.0`) replaces `defender_for_endpoint`, which is renamed and deprecated: read only to be migrated. Schema table, capability matrix, `--live` allowlist, static-validation bar, external-id table, and generated defaults updated ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
+- Microsoft Defender (`microsoft_defender`) replaces Microsoft Defender for Endpoint (`defender_for_endpoint`), which is removed. It is a KQL custom detection on the Microsoft Graph beta API, in the `--live` allowlist, addressed by `metadata.uuid` with no stored id ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## platforms 1.10
 
@@ -296,7 +296,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-defender-for-endpoint 1.4
 
-- **Renamed and hard deprecated.** opentide 1.0 does not ship `defender_for_endpoint`; its successor is `microsoft_defender` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). A `configurations.defender_for_endpoint` block, of any schema, is still read and validated, with the strong warning `defender_platform_renamed`. Validate still exits 0, and no configuration, `lint.toml` included, can lower or silence the warning. `opentide migrate` moves it to `configurations.microsoft_defender` (`defender_migrate_unmapped` when a value has no equivalent). Deploy refuses it with `defender_platform_retired`, and a rule with both blocks is `defender_platform_conflict`. The spec file is kept with `status: deprecated`. Schema id unchanged.
+- **Removed.** opentide 1.0 does not have this platform; `configurations.defender_for_endpoint` is an unknown key. The spec is kept as a record with `status: deprecated` and defines no behaviour; its fixture is removed ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## platform-defender-for-endpoint 1.3
 
@@ -316,15 +316,14 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-microsoft-defender 1.0
 
-- New platform `microsoft_defender` (Microsoft Defender), schema `platform::microsoft_defender::1.0` ([specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md), [RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)), replacing `defender_for_endpoint`. Its contract is the Microsoft Graph **beta** custom detection API, and it models every writable beta property. The properties it does not model are listed with their reason (set by deploy, read-only, deprecated), and a test checks the list against a snapshot of the beta docs. The keys:
+- New platform `microsoft_defender` (Microsoft Defender), schema `platform::microsoft_defender::1.0` ([specs/platforms/microsoft-defender-1.0.md](specs/platforms/microsoft-defender-1.0.md), [RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). Its contract is the Microsoft Graph **beta** custom detection API, and it models every writable beta property. The properties it does not model are listed with their reason (set by deploy, read-only, deprecated), and a test checks the list against a snapshot of the beta docs. The keys:
   - `schedule`: an ISO 8601 frequency (`NRT`, `<n>H`, `<n>D`) and a beta lookback.
   - `alert`: tactics derived from techniques through the `att&ck` vocabulary, with no explicit tactics key; `custom_details`; beta `grouping`.
   - `entities`: seventeen entity kinds, columns sent verbatim. `actions`: sixteen automated actions.
   - `scope.device_groups`, beta `incident`, and `status` from the deployment status.
 - Constraints are those the Graph docs state (enum values, lookback ≥ frequency, no lookback with NRT), plus opentide shape rules the spec marks. Codes use the `microsoft_defender_` prefix.
-- The rule id is `metadata.uuid`: `PATCH`, then `POST` on 404. A legacy rule is recreated under the uuid and then deleted.
-- `opentide migrate` moves `defender_for_endpoint` blocks, `system: defender_for_endpoint` searches, `platforms/defender_for_endpoint.toml`, and visibility log sources.
-- Fixtures: `fixtures/platforms/microsoft-defender.yaml`, the complete block `microsoft-defender-complete.yaml` (also in the spec's Examples), request-body and migration goldens, the beta property snapshot under `fixtures/platforms/microsoft-defender/`, and five invalid fixtures.
+- The rule id is `metadata.uuid`: `PATCH`, then `POST` on 404. No deployment state.
+- Fixtures: `fixtures/platforms/microsoft-defender.yaml`, the complete block `microsoft-defender-complete.yaml` (also in the spec's Examples), request-body goldens, the beta property snapshot under `fixtures/platforms/microsoft-defender/`, and four invalid fixtures.
 
 ## platform-splunk 1.0
 
@@ -468,6 +467,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-exabeam 1.0
 
+- Prose only: Defender for Endpoint, now removed, is no longer cited as state-backed ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 - Initial field contract ([RFC 0018](rfcs/0018-exabeam-platform.md)): sequences with any-match or threshold conditions, correlation, suppression, delay, schedule, and outcomes; derived name, description (with ATT&CK), and severity; whole-body `PUT`; the rule UUID in deployment state; `--live` filter checks and hunts through Search. Fixtures, a fixture tenant, and request goldens under `fixtures/platforms/exabeam/`.
 
 ## language-exabeam 1.1
@@ -538,7 +538,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## validation 1.16
 
-- Platform advisories `defender_platform_renamed` and `microsoft_defender_no_entities`. `defender_platform_renamed` is always emitted: no configuration, `lint.toml` included, can lower or silence it. `microsoft_defender` replaces `defender_for_endpoint` in the `--live` allowlist. The fixture checker applies the Microsoft Defender constraint codes and `defender_platform_conflict`; five invalid fixtures ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
+- `microsoft_defender` replaces `defender_for_endpoint` in the `--live` allowlist. Advisory `microsoft_defender_no_entities`. The fixture checker applies the Microsoft Defender constraint codes; four invalid fixtures. `leading-zero-defender-id.json` is now `leading-zero-sentinel-one-id.json` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## validation 1.15
 

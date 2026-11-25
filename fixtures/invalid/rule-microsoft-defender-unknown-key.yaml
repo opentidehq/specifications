@@ -1,5 +1,5 @@
-# defender_for_endpoint 1.0 keys (scheduling, impacted_entities) on a microsoft_defender block. Expected code: unknown_field.
-name: Microsoft Defender invalid block (rule-microsoft-defender-old-keys.yaml)
+# Keys the block does not define (scheduling, impacted_entities). Expected code: unknown_field.
+name: Microsoft Defender invalid block (rule-microsoft-defender-unknown-key.yaml)
 metadata:
   uuid: 00000000-0000-4000-8003-0000000000d4
   schema: rule::1.0

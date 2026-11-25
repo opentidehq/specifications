@@ -3,7 +3,7 @@ spec: platform-microsoft-defender
 version: "1.0"
 schema_id: platform::microsoft_defender::1.0
 status: normative
-supersedes: platform::defender_for_endpoint::1.0
+supersedes: null
 ---
 
 # Microsoft Defender (`platform::microsoft_defender::1.0`)
@@ -12,9 +12,7 @@ supersedes: platform::defender_for_endpoint::1.0
 
 `configurations.microsoft_defender` is a Microsoft Defender XDR custom detection rule. opentide's contract is the Microsoft Graph **beta** custom detection API, `https://graph.microsoft.com/beta/security/rules/detectionRules`. The block models every writable property of that API ([Beta API coverage](#beta-api-coverage)). The detection text is KQL (advanced hunting). Query validation is supported.
 
-The Defender rule id is the rule's `metadata.uuid`. Graph takes a client-provided `id` on create, so opentide addresses the rule as Sentinel and Elastic do, and keeps no Defender id in [deployment state](../deployment-state.md). The first deploy retires a tenant rule that opentide created under a Defender-assigned id before 1.0 ([Legacy rules](#legacy-rules)).
-
-`microsoft_defender` replaces the platform `defender_for_endpoint`. Microsoft dropped the "for Endpoint" name, and opentide 1.0 does not ship `defender_for_endpoint`. A [`defender_for_endpoint` block](defender-for-endpoint-1.0.md) is still read so that it can be migrated. Validation warns with `defender_platform_renamed`, deploy refuses it, and `opentide migrate` moves it here ([Migration from `defender_for_endpoint`](#migration-from-defender_for_endpoint)). The proposal is [RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md).
+The Defender rule id is the rule's `metadata.uuid`. Graph takes a client-provided `id` on create, so opentide addresses the rule as Sentinel and Elastic do, and keeps no Defender id in [deployment state](../deployment-state.md). The proposal is [RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md).
 
 Shared fields are defined in [platforms](index.md#shared-platform-block).
 
@@ -22,11 +20,10 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 
 - The configuration key MUST be `microsoft_defender`. `schema` MAY be omitted; when set it MUST be `platform::microsoft_defender::1.0` (`microsoft_defender_schema`).
 - Static validation MUST require `query` and `schedule.frequency`. `query` MUST be non-blank KQL. Every other key MAY be omitted.
-- Unknown keys MUST fail static validation, at any level of the block. The `defender_for_endpoint` keys `scheduling`, `impacted_entities`, and `alert.category` are unknown keys here.
+- Unknown keys MUST fail static validation, at any level of the block.
 - The block MUST NOT contain `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>`. Each fails `external_id_in_rule` ([External rule ids](index.md#external-rule-ids)).
-- A rule MUST NOT carry both a `defender_for_endpoint` and a `microsoft_defender` block (`defender_platform_conflict`, an error in validate and deploy).
 - Static validation MUST reject a block that breaks a [constraint](#constraints), under its code. Every value a Graph beta enum lists for a modelled property, other than the `unknownFutureValue` sentinel, MUST be accepted.
-- Deploy MUST address the Defender rule by the lowercase canonical `metadata.uuid`: the create body's `id` and the `{id}` of every update and delete. Deploy MUST NOT read, write, or create a binding in deployment state, except to retire a [legacy rule](#legacy-rules).
+- Deploy MUST address the Defender rule by the lowercase canonical `metadata.uuid`: the create body's `id` and the `{id}` of every update and delete. Deploy MUST NOT read, write, or create a binding in deployment state.
 - Deploy MUST send the [beta-only](#beta-only-properties) properties only when their key is set, and MUST NOT send a deprecated Graph property.
 - Deploy MUST derive the alert's MITRE tactics from its techniques through the bundled `att&ck` vocabulary ([ATT&CK](#attck)). There is no key that sets tactics.
 - Every writable property of the beta API MUST be modelled by a key of this block or listed in [Beta properties not modelled](#beta-properties-not-modelled), with its reason.
@@ -118,9 +115,7 @@ There is no `alert.tactics` key. Graph nests techniques inside tactics, and the 
 
 ### Column names
 
-Every value that names a result column (entity mappings, action targets, custom details) is the column as the query's output spells it, and is sent verbatim. Deploy MUST NOT change its case. The docs say only that it is the "name of the detection query column". Static validation requires a non-blank string (`microsoft_defender_column`); whether the column exists in the query's output is checked by Defender at deploy.
-
-`defender_for_endpoint` lower-cased a column's first character because Graph then took an identifier enum (`deviceId`). `microsoft_defender` sends the column name itself (`DeviceId`).
+Every value that names a result column (entity mappings, action targets, custom details) is the column as the query's output spells it (`DeviceId`), and is sent verbatim. Deploy MUST NOT change its case. The docs say only that it is the "name of the detection query column". Static validation requires a non-blank string (`microsoft_defender_column`); whether the column exists in the query's output is checked by Defender at deploy.
 
 ### `entities` (DefenderEntities)
 
@@ -293,7 +288,6 @@ Advisories are [warnings](../validation.md#platform-advisories): validation repo
 
 | Code | When | Why |
 |------|------|-----|
-| `defender_platform_renamed` | A rule has a [`defender_for_endpoint` block](defender-for-endpoint-1.0.md#deprecation), of any schema version. | The platform is renamed to `microsoft_defender`. Its wire format is gone and deploy refuses it. No configuration can lower or silence it ([defender-for-endpoint-1.0](defender-for-endpoint-1.0.md#deprecation)). |
 | `microsoft_defender_no_entities` | The block maps no entity (`entities` unset, empty, or every kind empty). | The alert names no device, user, or mailbox, so it cannot be triaged or acted on by entity. |
 
 ### Request body
@@ -335,7 +329,7 @@ Per rule and per tenant the run selected, with `{base}` = `https://graph.microso
 | Strategy | Calls | Result |
 |----------|-------|--------|
 | `PREVIEW`, `RELEASE`, `UNIVERSAL` | `PATCH {base}/{uuid}` with the body. On `404`, `POST {base}` with the body and `id`. | `update`, or `create` after a `404`. |
-| `DISABLEMENT` | `PATCH {base}/{uuid}` with the body (`status: disabled`). On `404`: `POST` with `id` only when the tenant has a [legacy binding](#legacy-rules); otherwise no create. | `update`; `create` when adopting; otherwise `skipped` with `microsoft_defender_rule_absent`. |
+| `DISABLEMENT` | `PATCH {base}/{uuid}` with the body (`status: disabled`). On `404`, no create. | `update`; `skipped` with `microsoft_defender_rule_absent` after a `404`. |
 | `DELETION` | `DELETE {base}/{uuid}`. | `delete` on `204`; `skipped` ("already gone") on `404`. |
 | `INERT` | none | not deployed |
 
@@ -343,104 +337,24 @@ Per rule and per tenant the run selected, with `{base}` = `https://graph.microso
 - Any other non-2xx answer fails that rule on that tenant. Deploy continues with other tenants and rules and exits 1.
 - A `404` on `PATCH` is the only signal that the rule is absent. Deploy MUST NOT list remote rules or match display names to find it.
 - No create needs deployment state, so `deployment_state_ignored` and `deployment_state_unpersisted` never refuse a `microsoft_defender` create. A dry run makes no call and shows the call it would make first.
-- `--prune` retires a deleted `microsoft_defender` rule by `DELETE {base}/{uuid}`, as Sentinel and Elastic do, and each orphan legacy binding by its id ([deployment.md](../deployment.md#retiring-deleted-rules)).
-- A `defender_for_endpoint` block is refused with `defender_platform_retired` before any call ([defender-for-endpoint-1.0](defender-for-endpoint-1.0.md#deprecation)).
-
-### Legacy rules
-
-Before 1.0, opentide created Defender rules under a Defender-assigned decimal id and recorded it as a binding under `platforms.defender_for_endpoint.<tenant>` in the rule's [deployment-state shard](../deployment-state.md). Graph does not let a client change a rule's `id`, so such a rule can never become the UUID-addressed rule. Deploy of the rule's `microsoft_defender` block replaces it: it deploys the UUID rule first, then deletes the legacy rule, then forgets the binding.
-
-For a rule with a `microsoft_defender` block and a legacy binding `L` on a tenant the run deploys to, with any strategy but `INERT`, after the [Deploy](#deploy) calls:
-
-| # | Situation | Calls | Result |
-|---|-----------|-------|--------|
-| 1 | The UUID rule's calls failed | none | `L` and its binding are kept. The legacy rule keeps running. The next run retries. |
-| 2 | They succeeded, or the UUID rule was already gone (`DELETION`) | `DELETE {base}/L` | — |
-| 2a | `204` or `404` | — | The binding is removed (then an empty platform map, then the shard), and `microsoft_defender_legacy_retired` is logged at `WARNING` with tenant, `L`, and the uuid. |
-| 2b | Any other answer | — | `microsoft_defender_legacy_delete_failed` (error). The binding is kept; both rules run until the next deploy retries the delete. |
-| 2c | The binding removal fails after `2a` | — | `deployment_state_write_failed` ([deployment-state.md](../deployment-state.md#deploy-decisions)). |
-
-- The UUID rule is deployed before the legacy rule is deleted, so the tenant is never without the detection. Between the two calls both rules run, and each may raise an alert.
-- Alert and incident history stay on the legacy rule's alerts; the new rule starts its own.
-- Retiring a legacy rule needs no persisted state. If a run cannot commit the shard, the binding stays on the default branch; the next run's `DELETE` answers `404` and removes it.
-- A legacy binding on a tenant the run does not deploy to is left alone. `opentide deploy migrate-state` still moves a pre-RFC-0010 `rule_id` into a legacy binding, so that the next deploy can retire that rule.
-- A `defender_for_endpoint` block never retires a legacy rule: deploy refuses the block first.
+- `--prune` retires a deleted `microsoft_defender` rule by `DELETE {base}/{uuid}`, as Sentinel and Elastic do ([deployment.md](../deployment.md#retiring-deleted-rules)).
 
 ### Diagnostics
 
 | Code | Level | Raised by | Meaning |
 |------|-------|-----------|---------|
-| `defender_platform_renamed` | warning, not configurable | validate | A [`defender_for_endpoint` block](defender-for-endpoint-1.0.md#deprecation). Always emitted; the message names `opentide migrate`. |
-| `defender_platform_retired` | error | deploy | Deploy of a `defender_for_endpoint` block, refused before any call to that tenant. The rule's other platform blocks still deploy. |
-| `defender_platform_conflict` | error | validate, deploy | A rule has both a `defender_for_endpoint` and a `microsoft_defender` block. |
-| `defender_migrate_unmapped` | error | migrate | A `defender_for_endpoint` value with no `microsoft_defender` equivalent ([Migration](#migration-from-defender_for_endpoint)). The rule is left unchanged. |
-| `microsoft_defender_rule_absent` | warning | deploy | `DISABLEMENT` found no rule with the uuid on the tenant, and the tenant has no legacy binding. Nothing is created. |
-| `microsoft_defender_legacy_delete_failed` | error | deploy | The legacy rule could not be deleted after the UUID rule deployed. |
-| `microsoft_defender_legacy_retired` | log record | deploy | A legacy rule was deleted and its binding removed. Like `external_id_recorded`, it is not a diagnostic: it does not set `DEPLOYMENT_WARNING_RAISED` or change the exit code. |
+| `microsoft_defender_rule_absent` | warning | deploy | `DISABLEMENT` found no rule with the uuid on the tenant. Nothing is created. |
 
-Codes about this platform's block and deploy carry the platform identifier, `microsoft_defender_`, as every other platform's codes do (`google_secops_`, `bitdefender_`). The four codes about the retired platform start with `defender_`, so a search for the old name finds them.
-
-### Migration from `defender_for_endpoint`
-
-`opentide migrate` moves a workspace from `defender_for_endpoint` to `microsoft_defender`. It calls no API, deploys nothing, and does not touch deployment state: the legacy binding key stays `defender_for_endpoint`. It rewrites:
-
-| File | Rewrite |
-|------|---------|
-| Each rule file with a `configurations.defender_for_endpoint` block | The block becomes `configurations.microsoft_defender`, key by key as in the table below, in place. The rest of the file stays byte-identical. |
-| Each rule file's `response.procedure.searches[]` entry with `system: defender_for_endpoint` | `system: microsoft_defender` |
-| `.opentide/configurations/platforms/defender_for_endpoint.toml` | Renamed to `microsoft_defender.toml`; `[platform] identifier` becomes `microsoft_defender` and `name` becomes `Microsoft Defender`. Tenant tables, credentials, and modifiers are kept as they are. |
-| `.opentide/configurations/visibility.toml`, each `[[logsources]]` entry with `system = "defender_for_endpoint"` | `system = "microsoft_defender"` ([visibility.md](../visibility.md)) |
-
-The tenant names in a block's `tenants` and in the platform TOML are unchanged, so legacy bindings still match. Generated CI files name no platform and are not rewritten. A rule whose block holds a value with no equivalent here is left unchanged and reported as `defender_migrate_unmapped`, naming each value; other rules still migrate. A rule that already has a `microsoft_defender` block is not touched; `defender_platform_conflict` reports it.
-
-A `defender_for_endpoint` column value `C` names Graph's former identifier `c`, `C` with its first character lower-cased. Migration writes the column with its first character upper-cased (`deviceId` and `DeviceId` both become `DeviceId`), the column `defender_for_endpoint` deploy made Defender read.
-
-| `defender_for_endpoint` key | `microsoft_defender` |
-|-----------------------------|----------------------|
-| `schema` (any form, or missing) | `schema: platform::microsoft_defender::1.0` |
-| `enabled`, `name`, `status`, `flags`, `tenants`, `contributors` | unchanged |
-| `query`, `exclusions` | unchanged |
-| `scheduling: X` | `schedule: {frequency: X}` |
-| `alert.title`, `alert.description`, `alert.severity`, `alert.recommendation`, `alert.techniques` | unchanged |
-| `alert.category` | dropped (already invalid since `defender_for_endpoint` 1.3) |
-| `impacted_entities.device` | `entities.hosts: [{<field>: C}]`: `device_id` for `deviceId`; `name` for `deviceName`, `remoteDeviceName`, `targetDeviceName`, `destinationDeviceName` |
-| `impacted_entities.user` | `entities.accounts: [{<field>: C}]`: `aad_user_id` for `accountObjectId`, `recipientObjectId`, `processAccountObjectId`; `sid` for `accountSid`, `requestAccountSid`, `initiatingAccountSid`; `upn` for `accountUpn`, `initiatingProcessAccountUpn`, `targetAccountUpn`; `name` for `accountName`, `requestAccountName`, `initiatingAccountName`; `nt_domain` for `accountDomain`, `requestAccountDomain`, `initiatingAccountDomain` |
-| `impacted_entities.mailbox` | `entities.mailboxes: [{primary_address: C}]` for `accountUpn`, `fileOwnerUpn`, `initiatingProcessAccountUpn`, `lastModifyingAccountUpn`, `targetAccountUpn`, `senderFromAddress`, `senderMailFromAddress`, `recipientEmailAddress` |
-| `impacted_entities: {}` | no `entities` |
-| `scope.selection: All` | no `scope` |
-| `scope.selection: Specific`, `scope.device_groups: G` | `scope: {device_groups: G}` |
-| `actions.devices.isolate_device: T` | `actions.isolate_devices: [{device_id: DeviceId, isolation_type: t}]`, `t` lower-cased |
-| `actions.devices.collect_investigation_package: true` | `actions.collect_investigation_packages: [{device_id: DeviceId}]` |
-| `actions.devices.run_antivirus_scan: true` | `actions.run_antivirus_scans: [{device_id: DeviceId}]` |
-| `actions.devices.initiate_investigation: true` | `actions.initiate_investigations: [{device_id: DeviceId}]` |
-| `actions.devices.restrict_app_execution: true` | `actions.restrict_app_executions: [{device_id: DeviceId}]` |
-| a device flag `false` | nothing |
-| `actions.files.allow_block` (`action: Allow` or `Block`, `identifier: C`) | `actions.allow_files` or `actions.block_files`: `[{sha1: C}]` for `sha1`, `initiatingProcessSHA1`; `[{sha256: C}]` for `sha256`, `initiatingProcessSHA256`; with `device_groups: G` when `groups.selection` is `Specific` |
-| `actions.files.quarantine_file: C` (or the alias `quarantine_files`) | `actions.stop_and_quarantine_files: [{device_id: DeviceId, sha1: C}]` for `sha1`, `initiatingProcessSHA1` |
-| `actions.users.mark_as_compromised: C` | `actions.mark_users_as_compromised: [{account_object_id: C}]` |
-| `actions.users.disable_user: C` | `actions.disable_users: [{account_sid: C}]` |
-| `actions.users.force_password_reset: C` | `actions.force_user_password_resets: [{account_sid: C}]` |
-| an empty `actions`, `actions.devices`, `actions.files`, or `actions.users` | nothing |
-
-The device actions of `defender_for_endpoint` named no column: Graph took the identifier `deviceId`, which is the `DeviceId` column. Migration writes `DeviceId`.
-
-What cannot be mapped, so `defender_migrate_unmapped` leaves the rule unchanged:
-
-- An `impacted_entities` value whose identifier is not in its row above: `accountId`, `servicePrincipalId`, `servicePrincipalName`, `senderDisplayName`, or any value outside Graph's former identifier enums. No entity mapping takes them.
-- A file identifier other than a SHA-1 or SHA-256 one for `allow_block`, or other than a SHA-1 one for `quarantine_file`.
-- `scope.selection: Specific` with no `device_groups`, and `groups.selection: Specific` with no `device_groups`.
-
-Migration never writes the keys `defender_for_endpoint` lacked: `schedule.lookback`, `alert.custom_details`, `alert.grouping`, `incident`, and the email and file actions.
+Every code carries the platform identifier, `microsoft_defender_`, as every other platform's codes do (`google_secops_`, `bitdefender_`).
 
 ### Query validation
 
-`opentide validate query --platform microsoft_defender --live` runs the compiled query against the tenant's advanced hunting. It sends no detection rule. `--platform defender_for_endpoint` is a usage error (exit 2) whose message names `microsoft_defender`.
+`opentide validate query --platform microsoft_defender --live` runs the compiled query against the tenant's advanced hunting. It sends no detection rule.
 
 ## Relationships
 
 - [platforms](index.md) — shared fields and external ids
-- [defender-for-endpoint-1.0.md](defender-for-endpoint-1.0.md) — the deprecated platform this one replaces
-- [deployment-state.md](../deployment-state.md) — legacy Defender bindings, read only to retire them
+- [deployment-state.md](../deployment-state.md) — Microsoft Defender keeps no shard
 - [deployment.md](../deployment.md) — strategies and retirement
 - [visibility.md](../visibility.md) — `system = "microsoft_defender"` log sources
 - [rule-1.1.md](../objects/rule-1.1.md) — parent object
@@ -664,11 +578,11 @@ Fixtures:
 
 - [fixtures/platforms/microsoft-defender.yaml](../../fixtures/platforms/microsoft-defender.yaml): the first example, plus a `processes` mapping and a `block_files` action.
 - [fixtures/platforms/microsoft-defender-complete.yaml](../../fixtures/platforms/microsoft-defender-complete.yaml): the complete block. A test fails when a key of the field tables is missing from it.
-- [fixtures/platforms/microsoft-defender/](../../fixtures/platforms/microsoft-defender/): the create, update, and disable bodies; the complete block's create body; the beta property snapshot; and `migrated.yaml`, the migration of [fixtures/platforms/defender-for-endpoint.yaml](../../fixtures/platforms/defender-for-endpoint.yaml).
-- Invalid: [rule-microsoft-defender-lookback-nrt.yaml](../../fixtures/invalid/rule-microsoft-defender-lookback-nrt.yaml) (`microsoft_defender_lookback`), [rule-microsoft-defender-entity-field.yaml](../../fixtures/invalid/rule-microsoft-defender-entity-field.yaml) (`microsoft_defender_entity_mapping`), [rule-microsoft-defender-action-target.yaml](../../fixtures/invalid/rule-microsoft-defender-action-target.yaml) (`microsoft_defender_action_target`), [rule-microsoft-defender-old-keys.yaml](../../fixtures/invalid/rule-microsoft-defender-old-keys.yaml) (`unknown_field`), [rule-defender-both-platforms.yaml](../../fixtures/invalid/rule-defender-both-platforms.yaml) (`defender_platform_conflict`).
+- [fixtures/platforms/microsoft-defender/](../../fixtures/platforms/microsoft-defender/): the create, update, and disable bodies, the complete block's create body, and the beta property snapshot.
+- Invalid: [rule-microsoft-defender-lookback-nrt.yaml](../../fixtures/invalid/rule-microsoft-defender-lookback-nrt.yaml) (`microsoft_defender_lookback`), [rule-microsoft-defender-entity-field.yaml](../../fixtures/invalid/rule-microsoft-defender-entity-field.yaml) (`microsoft_defender_entity_mapping`), [rule-microsoft-defender-action-target.yaml](../../fixtures/invalid/rule-microsoft-defender-action-target.yaml) (`microsoft_defender_action_target`), [rule-microsoft-defender-unknown-key.yaml](../../fixtures/invalid/rule-microsoft-defender-unknown-key.yaml) (`unknown_field`).
 
 ## History
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.0 | 2026-11-25 | `platform::microsoft_defender::1.0`, replacing the `defender_for_endpoint` platform, on the Microsoft Graph beta custom detection contract ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)). It models every writable beta property, listing those it does not model in a coverage table checked against a snapshot of the docs. The keys: `schedule` (an ISO 8601 frequency, and a beta lookback), `alert` (tactics derived from techniques, custom details, beta event grouping), `entities` (seventeen entity kinds), `actions` (sixteen automated actions), `scope.device_groups`, and beta `incident`. `status` follows the deployment status. Constraints are those the Graph docs state, plus marked opentide shape rules. The Defender rule id is `metadata.uuid`; legacy rules are recreated under the uuid and then deleted. `opentide migrate` moves `defender_for_endpoint` blocks, searches, platform configuration, and visibility log sources here. |
+| 1.0 | 2026-11-25 | `platform::microsoft_defender::1.0`: Microsoft Defender custom detection rules on the Microsoft Graph beta custom detection contract ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)). Every writable beta property is modelled, or listed as not modelled with its reason, and checked against a snapshot of the docs. The keys: `schedule` (an ISO 8601 frequency, and a beta lookback), `alert` (tactics derived from techniques, custom details, beta event grouping), `entities` (seventeen entity kinds), `actions` (sixteen automated actions), `scope.device_groups`, and beta `incident`. `status` follows the deployment status. Constraints are those the Graph docs state, plus marked opentide shape rules. The Defender rule id is `metadata.uuid`; no deployment state. |

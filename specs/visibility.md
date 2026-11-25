@@ -25,7 +25,6 @@ A log source's `name` **is its dataset**: the KQL table for Sentinel and Defende
 
 - A log source MUST set `name`, `description` and `system`, and MAY set `tenants`, `assets`, `references` and `columns`. Any other key MUST fail validation.
 - `name` MUST NOT be empty or whitespace-only. Names MUST be unique per `system`; the same name MAY appear under two systems (`DeviceEvents` under `sentinel` and `microsoft_defender`).
-- `system = "defender_for_endpoint"` names the platform `microsoft_defender` replaces. It MUST be read as `microsoft_defender` and reported with `defender_platform_renamed`, which no configuration can silence; `opentide migrate` rewrites it ([microsoft-defender-1.0](platforms/microsoft-defender-1.0.md#migration-from-defender_for_endpoint)).
 - The opentide 0.20.0 keys `tables`, `indexes`, `sourcetypes`, `macros`, `indices`, `data_views` and `ecs` MUST fail validation, with a message that says what replaces the key: one log source per table, sourcetype or index pattern, named after it.
 
 ### Columns
@@ -176,5 +175,5 @@ data:
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | 2026-11-03 | First normative spec ([RFC 0013](../rfcs/0013-visibility-logsource-is-a-dataset.md), [#63](https://github.com/opentidehq/specifications/issues/63)). A log source's `name` is its dataset; optional `columns` keyed by column name; query-check semantics. The opentide 0.20.0 plural keys and `ecs` fail validation. `schema_id` stays `visibility::1.0`. Corrected before any implementation released the 2026-11-02 draft of this spec (singular dataset keys, `[[logsources.columns]]`). |
-| 1.2 | 2026-11-25 | The Defender for Endpoint system is `microsoft_defender`, the platform that replaces `defender_for_endpoint` ([RFC 0021](../rfcs/0021-defender-graph-beta-detection-rules.md)). `system = "defender_for_endpoint"` is read as `microsoft_defender` with the warning `defender_platform_renamed`, and `opentide migrate` rewrites it. `schema_id` stays `visibility::1.0`. |
+| 1.2 | 2026-11-25 | The Defender KQL system is `microsoft_defender`, the platform that replaces the removed `defender_for_endpoint` ([RFC 0021](../rfcs/0021-defender-graph-beta-detection-rules.md)). `schema_id` stays `visibility::1.0`. |
 | 1.1 | 2026-11-23 | [Query checks](#query-checks): under `sentinel`, an unknown, undeclared KQL name that is a near miss of a declared or catalog table (one edit, two for names of eight characters or more; not `_CL`) is the error `kql_table_misspelt` with the table to use, where it was the `kql_unknown_table` warning (opentide#1818). `schema_id` stays `visibility::1.0`. |

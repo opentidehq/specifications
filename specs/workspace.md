@@ -44,7 +44,7 @@ Registered objects list: `threat`, `objective`, `rule`.
 | `.opentide/configurations/platforms/` | Per-platform TOML | Yes |
 | `.opentide/configurations/sharing.toml` | Every sharing integration block (`[[misp]]`) | Yes |
 | `.opentide/states/sharing.jsonl` | Current sharing synchronization ledger. One JSON object per line. Regenerable cache; SHOULD be gitignored. | No |
-| `.opentide/states/deployment/` | Deployment state: one `<uuid>.json` shard (`deployment.state::1.0`) per rule holding the vendor-assigned rule ids per platform and tenant (SentinelOne, CrowdStrike, Sysdig, Bitdefender, Graylog, Exabeam, Google SecOps), and legacy `defender_for_endpoint` ids until a `microsoft_defender` deploy retires them. Authoritative; MUST be committed. | No |
+| `.opentide/states/deployment/` | Deployment state: one `<uuid>.json` shard (`deployment.state::1.0`) per rule holding the vendor-assigned rule ids per platform and tenant (SentinelOne, CrowdStrike, Sysdig, Bitdefender, Graylog, Exabeam, Google SecOps). Authoritative; MUST be committed. | No |
 | `.opentide/schemas/` | Generated JSON Schema | No |
 | `.opentide/templates/` | Generated YAML templates | No |
 | `.opentide/exports/` | Generated exports | No |
@@ -199,7 +199,7 @@ Object fixtures assume the default layout: rules under `objects/rules/`, etc.
 
 | Version | Date | Notes |
 |---------|------|-------|
-| 1.6 | 2026-11-25 | Microsoft Defender (`microsoft_defender`, replacing `defender_for_endpoint`) is not state-backed ([RFC 0021](../rfcs/0021-defender-graph-beta-detection-rules.md)): shards hold legacy `defender_for_endpoint` ids only until a `microsoft_defender` deploy retires them, and staging jobs may create Defender rules. The platform's tenants live in `.opentide/configurations/platforms/microsoft_defender.toml`. |
+| 1.6 | 2026-11-25 | The shard directory no longer lists Microsoft Defender for Endpoint, which is removed; its replacement, `microsoft_defender`, keeps no shard ([RFC 0021](../rfcs/0021-defender-graph-beta-detection-rules.md)). |
 | 1.5 | 2026-10-20 | The production deploy job runs `opentide deploy --strategy RELEASE`; opentide 0.17.0 removed `--plan`. |
 | 1.4 | 2026-10-19 | `objective::1.1` schema and template artifacts beside `objective::1.0` ([RFC 0011](../rfcs/0011-signal-reuse.md)). |
 | 1.3 | 2026-10-19 | Object instances are the YAML files placed directly in each family directory. A file in a subfolder is not an instance and is neither deployed nor shared ([specifications#16](https://github.com/opentidehq/specifications/pull/16), [opentide#312](https://github.com/opentidehq/opentide/issues/312)). |
