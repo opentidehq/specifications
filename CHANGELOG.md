@@ -296,7 +296,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## platform-defender-for-endpoint 1.4
 
-- **Deprecated** in favour of `platform::defender_for_endpoint::2.0` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). A 1.0 block (`schema` 1.0, a legacy identifier, or missing) is still read and validated, with the warning `defender_schema_deprecated`; `opentide migrate` rewrites it to 2.0 key by key (`defender_migrate_unmapped` when a value has no 2.0 equivalent); deploy refuses it with `defender_schema_retired`. The spec file is kept with `status: deprecated`. Schema id unchanged.
+- **Hard deprecated** in favour of `platform::defender_for_endpoint::2.0` ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)). A 1.0 block (`schema` 1.0, a legacy identifier, or missing) is still read and validated, with the strong warning `defender_schema_deprecated` (validate still exits 0; no configuration, `lint.toml` included, can lower or silence it); `opentide migrate` rewrites it to 2.0 key by key (`defender_migrate_unmapped` when a value has no 2.0 equivalent); deploy refuses it with `defender_schema_retired`. The spec file is kept with `status: deprecated`. Schema id unchanged.
 
 ## platform-defender-for-endpoint 1.3
 
@@ -526,7 +526,7 @@ Per-spec change history. Breaking changes require a new spec file version and an
 
 ## validation 1.16
 
-- Platform advisories `defender_schema_deprecated` and `defender_no_entities`. The fixture checker applies the Defender 2.0 constraint codes; four invalid Defender fixtures ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
+- Platform advisories `defender_schema_deprecated` and `defender_no_entities`. `defender_schema_deprecated` is always emitted: no configuration, `lint.toml` included, can lower or silence it. The fixture checker applies the Defender 2.0 constraint codes; four invalid Defender fixtures ([RFC 0021](rfcs/0021-defender-graph-beta-detection-rules.md)).
 
 ## validation 1.15
 

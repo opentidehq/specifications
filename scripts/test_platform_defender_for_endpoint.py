@@ -378,8 +378,22 @@ class SpecShapeTests(unittest.TestCase):
         self.assertEqual(re.findall(r"^\| `(defender_[a-z_]+)` \|", _section(text, "Advisories"), flags=re.MULTILINE), ADVISORIES)
         self.assertEqual(re.findall(r"^\| `(defender_[a-z_]+)` \|", _section(text, "Diagnostics"), flags=re.MULTILINE), DIAGNOSTICS)
         validation = _read(ROOT / "specs" / "validation.md")
-        for code in ADVISORIES:
-            self.assertIn(f"| `{code}` | warning | Defender for Endpoint:", validation)
+        self.assertIn("| `defender_schema_deprecated` | warning, not configurable | Defender for Endpoint:", validation)
+        self.assertIn("| `defender_no_entities` | warning | Defender for Endpoint:", validation)
+
+    def test_hard_deprecation_is_strong_and_unsilenceable(self) -> None:
+        """Owner direction (2026-11-25): 1.0 is hard deprecated; the warning cannot be lowered or silenced."""
+        deprecation = _section(_read(SPEC_V1), "Deprecation")
+        advisories = _section(_read(ROOT / "specs" / "validation.md"), "Platform advisories")
+        for text in (deprecation, advisories):
+            self.assertIn("`lint.toml`", text)
+            self.assertRegex(text, r"No configuration MAY lower, disable, or suppress it")
+        for needle in ("hard deprecated", "2026-10-01", "`opentide deploy` refuses this block", "Run `opentide migrate` now"):
+            self.assertIn(needle, deprecation)
+        self.assertIn("never sets `VALIDATION_ERROR_RAISED`", advisories)
+        rfc = _read(RFC)
+        self.assertIn("The owner approved the four decisions of this RFC on 2026-11-25", rfc)
+        self.assertNotIn("open to review", rfc)
 
     def test_entity_table_is_the_checker_table(self) -> None:
         section = _section(_read(SPEC), "`entities` (DefenderEntities)")

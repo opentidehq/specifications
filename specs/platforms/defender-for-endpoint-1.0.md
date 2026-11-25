@@ -11,7 +11,7 @@ supersedes: null
 ## Summary
 
 <Callout type="warning">
-**Deprecated.** Use [`platform::defender_for_endpoint::2.0`](defender-for-endpoint-2.0.md). Microsoft Graph removed the custom detection properties this schema deploys to (`isEnabled`, `schedule.period`, `alertTemplate.mitreTechniques`, `alertTemplate.impactedAssets`, `detectionAction.responseActions`) on 2026-10-01. `opentide validate` warns with `defender_schema_deprecated`, deploy refuses the block with `defender_schema_retired`, and `opentide migrate` rewrites it to 2.0 ([Deprecation](#deprecation), [RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)).
+**Hard deprecated.** Every Defender 1.0 block must be migrated. Use [`platform::defender_for_endpoint::2.0`](defender-for-endpoint-2.0.md). Microsoft Graph removed the custom detection properties this schema deploys to (`isEnabled`, `schedule.period`, `alertTemplate.mitreTechniques`, `alertTemplate.impactedAssets`, `detectionAction.responseActions`) on 2026-10-01. `opentide validate` gives the strong warning `defender_schema_deprecated`, which no configuration can lower or silence; deploy refuses the block with the error `defender_schema_retired`; and `opentide migrate` rewrites it to 2.0 ([Deprecation](#deprecation), [RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)).
 </Callout>
 
 `configurations.defender_for_endpoint` is a Microsoft Defender custom detection rule. The detection text is KQL. Query validation is supported. Defender assigns the remote rule id; opentide stores it per tenant in [deployment state](../deployment-state.md) so the next deploy updates that rule.
@@ -29,7 +29,7 @@ Shared fields are defined in [platforms](index.md#shared-platform-block).
 - The block MUST NOT contain `rule_id`, `rule_id_bundle`, or `rule_id::<tenant>`. Each fails `external_id_in_rule` ([External rule ids](index.md#external-rule-ids)).
 - Registry load MUST require `scope`. A block that validates without `scope` MUST NOT load for deploy.
 - `actions.files.quarantine_files` MAY be used as an alias of `quarantine_file` on the registry-load path.
-- A Defender block whose `schema` is `platform::defender_for_endpoint::1.0`, a legacy identifier (`defender_for_endpoint::2.3` and the same shape), or missing MUST be read as a 1.0 block, validated against this spec, and reported with the warning `defender_schema_deprecated`.
+- A Defender block whose `schema` is `platform::defender_for_endpoint::1.0`, a legacy identifier (`defender_for_endpoint::2.3` and the same shape), or missing MUST be read as a 1.0 block, validated against this spec, and reported with the warning `defender_schema_deprecated`. That warning MUST be emitted under every validation setting: no configuration (a `lint.toml` severity override, a quiet or minimal profile, an ignore list, or a per-rule suppression) may lower, disable, or suppress it.
 - Deploy MUST refuse a 1.0 block with the error `defender_schema_retired` before any call to the tenant, and MUST NOT deploy it through the 2.0 mapping.
 
 ## Definition
@@ -134,7 +134,17 @@ Same shape and tenant matching as Sentinel exclusions. See [sentinel-1.0.md](sen
 
 ### Deprecation
 
-This schema is deprecated since spec version 1.4. A 1.0 block is still read: static validation applies every requirement above, and adds the [advisory](defender-for-endpoint-2.0.md#advisories) `defender_schema_deprecated` (warning) at `configurations.defender_for_endpoint.schema`, or at the block when `schema` is missing. Its message MUST say that 1.0 is deprecated, that deploy refuses it, and that `opentide migrate` rewrites it to `platform::defender_for_endpoint::2.0`, and MUST link [the migration table](defender-for-endpoint-2.0.md#migration-from-10).
+This schema is **hard deprecated** since spec version 1.4: it no longer matches any API Microsoft serves, and every Defender 1.0 block must be migrated to 2.0, the active API's contract. A 1.0 block is still read, so a workspace can validate and migrate it: static validation applies every requirement above, and adds the [advisory](defender-for-endpoint-2.0.md#advisories) `defender_schema_deprecated` at `configurations.defender_for_endpoint.schema`, or at the block when `schema` is missing.
+
+`defender_schema_deprecated` is a warning, so `opentide validate` still exits 0 and a CI pipeline keeps running until the workspace has migrated. It is a strong one:
+
+- It MUST be emitted under every validation setting and on every surface that validates (CLI, editor, language server, MCP). No configuration MAY lower, disable, or suppress it: not a `lint.toml` severity override, a quiet or minimal profile, an ignore list, or a per-rule suppression.
+- Its message MUST say, in substance:
+
+  > `platform::defender_for_endpoint::1.0` is hard deprecated. Microsoft removed its wire format from the Graph custom detection API on 2026-10-01, and `opentide deploy` refuses this block (`defender_schema_retired`). Run `opentide migrate` now to rewrite it to `platform::defender_for_endpoint::2.0`: <link to the migration table>.
+
+  The link is [the migration table](defender-for-endpoint-2.0.md#migration-from-10).
+- It is reported once per 1.0 block, never folded into a summary count.
 
 `opentide migrate` rewrites the block key by key as [defender-for-endpoint-2.0](defender-for-endpoint-2.0.md#migration-from-10) defines. A value with no 2.0 equivalent leaves the block unchanged and is reported as `defender_migrate_unmapped`.
 
@@ -220,4 +230,4 @@ Fixture: [fixtures/platforms/defender-for-endpoint.yaml](../../fixtures/platform
 | 1.1 | 2026-10-16 | `rule_id` and the `rule_id::<tenant>` alias are removed and fail `external_id_in_rule`. Deploy reads and writes the Defender id in [deployment state](../deployment-state.md); `DISABLEMENT` and `DELETION` without a binding report `external_id_missing` ([RFC 0010](../../rfcs/0010-deployment-external-ids.md)). Schema id unchanged. |
 | 1.2 | 2026-11-23 | `alert.techniques` is sent as `mitreTechniques` when set, and the rule's objective's Enterprise ATT&CK techniques otherwise (an empty list counts as unset); deploy used to send an empty list (opentide#1801, opentide#1810). Schema id unchanged. |
 | 1.3 | 2026-11-24 | `alert.category` is removed: Microsoft Graph deprecated the custom detection alert template's `category` (use the MITRE tactics) and removed it on 2026-10-01. Static validation rejects the key as unknown, deploy no longer sends it, and `generate extract` no longer writes it. No deprecation period (opentide#1704, opentide#1850). Schema id unchanged. |
-| 1.4 | 2026-11-24 | **Deprecated** in favour of [`platform::defender_for_endpoint::2.0`](defender-for-endpoint-2.0.md) ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)). A 1.0 block still validates, with the warning `defender_schema_deprecated`; deploy refuses it with `defender_schema_retired`; `opentide migrate` rewrites it to 2.0. The file is kept. Schema id unchanged. |
+| 1.4 | 2026-11-24 | **Hard deprecated** in favour of [`platform::defender_for_endpoint::2.0`](defender-for-endpoint-2.0.md) ([RFC 0021](../../rfcs/0021-defender-graph-beta-detection-rules.md)). A 1.0 block still validates, with the strong warning `defender_schema_deprecated`, which no configuration can silence; deploy refuses it with `defender_schema_retired`; `opentide migrate` rewrites it to 2.0. The file is kept. Schema id unchanged. |

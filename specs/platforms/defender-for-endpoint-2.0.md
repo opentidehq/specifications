@@ -230,7 +230,7 @@ Advisories are [warnings](../validation.md#platform-advisories): validation repo
 
 | Code | When | Why |
 |------|------|-----|
-| `defender_schema_deprecated` | A Defender block is a [1.0 block](defender-for-endpoint-1.0.md#deprecation). | 1.0 is deprecated and deploy refuses it. The message MUST name `opentide migrate` and this spec. |
+| `defender_schema_deprecated` | A Defender block is a [1.0 block](defender-for-endpoint-1.0.md#deprecation). | 1.0 is hard deprecated: Microsoft removed its wire format on 2026-10-01 and deploy refuses it. The message MUST say so and tell the author to run `opentide migrate` now. No configuration can lower or silence it ([defender-for-endpoint-1.0](defender-for-endpoint-1.0.md#deprecation)). |
 | `defender_no_entities` | A 2.0 block maps no entity (`entities` unset, empty, or every kind empty). | The alert names no device, user, or mailbox, so it cannot be triaged or acted on by entity. |
 
 ### Request body
@@ -306,7 +306,7 @@ For a rule with a 2.0 block and a legacy binding `L` on a tenant the run deploys
 
 | Code | Level | Raised by | Meaning |
 |------|-------|-----------|---------|
-| `defender_schema_deprecated` | warning | validate | A [1.0 block](defender-for-endpoint-1.0.md#deprecation). The message names `opentide migrate`. |
+| `defender_schema_deprecated` | warning, not configurable | validate | A [1.0 block](defender-for-endpoint-1.0.md#deprecation), which is hard deprecated. Always emitted; the message names `opentide migrate`. |
 | `defender_schema_retired` | error | deploy | Deploy of a 1.0 block, refused before any call to that tenant. The rule's other platform blocks still deploy. |
 | `defender_migrate_unmapped` | error | migrate | A 1.0 value with no 2.0 equivalent ([Migration from 1.0](#migration-from-10)). The block is left unchanged. |
 | `defender_rule_absent` | warning | deploy | `DISABLEMENT` found no rule with the uuid on the tenant, and the tenant has no legacy binding. Nothing is created. |
