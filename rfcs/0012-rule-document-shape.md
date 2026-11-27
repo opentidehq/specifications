@@ -3,11 +3,11 @@
 - **RFC:** 0012
 - **Title:** Rules should read like the other objects
 - **Author:** opentide maintainers
-- **Status:** draft (revision 4, open for comments)
+- **Status:** draft (revision 5, open for comments)
 - **Created:** 2026-09-30
-- **Revised:** 2026-11-27. Revision 4 rewrites the October draft against opentide 1.0 (the Rust core, thirteen platforms). After two rounds of maintainer review it now covers:
+- **Revised:** 2026-11-27. Revisions 4 and 5 rewrite the October draft against opentide 1.0 (the Rust core, thirteen platforms). After three rounds of maintainer review it now covers:
   - an identity-only root
-  - one `rule` block
+  - one `rule` block, with platform blocks grouped under `rule.detection`
   - severity on each platform block
   - one `signals` list
   - `mitre_attack`
@@ -25,7 +25,7 @@ A `rule::2.0` file is an envelope (`name`, `metadata`, `references`) plus one `r
 - **What the rule detects:** `description`, `signals`, `mitre_attack`.
 - **How far to trust it:** `fidelity` (false positives and blind spots, as structured entries).
 - **How to handle its alerts:** `response`, organised by stage. Each stage holds its guidance, its searches and its actions.
-- **One key per platform.** Each platform block carries its own operational state: `enabled`, `status` and `severity`.
+- **How it is implemented:** `detection`, one block per platform. Each block carries its own operational state: `enabled`, `status` and `severity`.
 
 `rule::1.0` and `rule::1.1` files keep their layout and keep working ([versioning 1.1](../specs/versioning.md)). One explicit command moves a file to 2.0.
 
@@ -161,26 +161,27 @@ rule:
           target: Host::Hostname
         - action: reset_credentials
           target: Host::Account
-  sentinel:
-    enabled: true
-    status: STAGING
-    severity: High
-    query: |
-      DeviceEvents
-      | where ActionType == "OpenProcessApiCall"
-      | where FileName =~ "lsass.exe"
-    scheduling:
-      frequency: PT1H
-      lookback: PT2H
-    alert:
-      title: LSASS memory read
-      suppression: false
-  splunk:
-    enabled: true
-    status: DEVELOPMENT
-    severity: Medium
-    query: |
-      index=edr EventCode=10 TargetImage="*lsass.exe"
+  detection:
+    sentinel:
+      enabled: true
+      status: STAGING
+      severity: High
+      query: |
+        DeviceEvents
+        | where ActionType == "OpenProcessApiCall"
+        | where FileName =~ "lsass.exe"
+      scheduling:
+        frequency: PT1H
+        lookback: PT2H
+      alert:
+        title: LSASS memory read
+        suppression: false
+    splunk:
+      enabled: true
+      status: DEVELOPMENT
+      severity: Medium
+      query: |
+        index=edr EventCode=10 TargetImage="*lsass.exe"
 ```
 
 ### The anatomy of a rule
@@ -191,8 +192,8 @@ rule:
 | Intent | What does it detect, and why? | `rule.description`, `rule.signals`, `rule.mitre_attack` | root `description`, `techniques`, `detection_model` |
 | Fidelity | When is it wrong, and what can it not see? | `rule.fidelity` | none (two platform blocks improvise) |
 | Response | Who handles an alert, and what do they look at and do, at each stage? | `rule.response` | `response`, `response.procedure` |
-| Implementation | How is it expressed on each platform? | `rule.<platform>`: the payload | `configurations.<platform>` |
-| Operation | Is it live, where, and how loud? | `rule.<platform>`: the envelope (`enabled`, `status`, `severity`, `tenants`, `flags`) | root `status` and `severity`, `response.alert_severity`, block `status` |
+| Implementation | How is it expressed on each platform? | `rule.detection.<platform>`: the payload | `configurations.<platform>` |
+| Operation | Is it live, where, and how loud? | `rule.detection.<platform>`: the envelope (`enabled`, `status`, `severity`, `tenants`, `flags`) | root `status` and `severity`, `response.alert_severity`, block `status` |
 
 ### The root
 
@@ -204,7 +205,7 @@ The root of a `rule::2.0` file holds `name`, `metadata` and optional `references
 | `metadata` | Identity, revision, dates, TLP and authorship, shared by all objects. |
 | `references` | Provenance of the object, the same `ObjectReferences` as on threats and objectives. Sharing and exports read it in one place for every family. |
 
-The root MUST NOT carry `description`, `status`, `severity`, `techniques`, `mitre_attack`, `detection_model`, `signals`, `response`, `configurations`, `platforms` or `file`. Those keys identify a 1.x file. The error names the 2.0 path, for example "`configurations` is not a `rule::2.0` key; platform blocks are keys of `rule`".
+The root MUST NOT carry `description`, `status`, `severity`, `techniques`, `mitre_attack`, `detection_model`, `signals`, `response`, `configurations`, `platforms` or `file`. Those keys identify a 1.x file. The error names the 2.0 path, for example "`configurations` is not a `rule::2.0` key; platform blocks are keys of `rule.detection`".
 
 ### The `rule` block
 
@@ -215,11 +216,11 @@ The root MUST NOT carry `description`, `status`, `severity`, `techniques`, `mitr
 | `mitre_attack` | no | `[]` | ATT&CK technique ids, `att&ck::1.2`, as on threats and objectives ([ATT&CK](#attck)). |
 | `fidelity` | no | — | False positives and blind spots ([Fidelity](#fidelity)). |
 | `response` | no | — | Who handles an alert, and how, by stage ([Response](#response)). |
-| `<platform>` | no | — | One key per platform in the registry ([Platform blocks](#platform-blocks)). |
+| `detection` | no | — | One block per platform the rule is implemented on ([Detection](#detection)). |
 
-Unknown keys MUST fail. A platform identifier MUST NOT equal a field of the `rule` block, and the registry enforces this.
+Unknown keys MUST fail. The set of `rule` fields is closed; the set of platforms is open, and lives in `detection`.
 
-A rule with no platform key is a valid draft.
+A rule with no `detection`, or an empty one, is a valid draft.
 
 ### Signals
 
@@ -357,7 +358,13 @@ An action is a step taken at a stage, typed so that a SOAR or an agent can map i
 
 Like every vocabulary, it is extended by RFC. An action documents intent. Automated response stays where the platforms define it: the Microsoft Defender block's `actions`, Elastic's response actions, and Bitdefender's and HarfangLab's actions.
 
-### Platform blocks
+### Detection
+
+`rule.detection` maps a platform identifier to that platform's block. Its keys MUST be platforms of the registry, or platforms a loaded plugin declares; any other key is an unknown key that names the registry's platforms. Order is the author's and has no meaning.
+
+Grouping the blocks under one key keeps the `rule` block's own fields a closed set while the platforms grow with the registry and with plugins, so neither can shadow the other. Every consumer that walks the platforms (deploy, promotion, sharing, documentation, the outline, query validation) reads one map.
+
+#### Platform blocks
 
 A platform block has two parts:
 
@@ -382,7 +389,7 @@ The 1.x envelope's `contributors` is not part of 2.0. Authorship is `metadata.au
 
 **The rule's severity is derived, never authored.** It is the highest `severity` among enabled blocks, or `Informational` with no enabled block. Sharing (MISP `threat_level_id`), documentation and catalogue sorting use it.
 
-A new platform is a new optional key and does not bump `rule::2.0`. Blocks carry no external ids ([RFC 0010](0010-deployment-external-ids.md)). Deployment-state shards are keyed by `metadata.uuid`, so moving a block does not touch `.opentide/states/deployment/`.
+A new platform is a new optional key of `detection` and does not bump `rule::2.0`. Blocks carry no external ids ([RFC 0010](0010-deployment-external-ids.md)). Deployment-state shards are keyed by `metadata.uuid`, so moving a block does not touch `.opentide/states/deployment/`.
 
 ### Status outside deploy
 
@@ -400,7 +407,7 @@ A `rule::2.0` rule matches a sharing block's `rule_statuses` when at least one e
 "rule.response.*.actions.action" = "response.actions::1.0"
 "rule.response.*.actions.target" = "signal.entities::1.0"
 "rule.response.*.searches.parameters.*" = "signal.entities::1.0"
-"rule.<platform>.severity" = "alert_severity::1.0"   # one row per platform in the file
+"rule.detection.<platform>.severity" = "alert_severity::1.0"   # one row per platform in the file
 ```
 
 `rule.signals` binds the `objective` model vocabulary (objectives, and every signal defined under one). `rule.fidelity.blind_spots.covered_by` binds the rule and signal model vocabularies. `rule.response.responders` binds `tide.config.responders`, as on 1.x.
@@ -419,7 +426,7 @@ A `rule::2.0` rule matches a sharing block's `rule_statuses` when at least one e
 | `response.procedure.analysis` | `rule.response.triage.guide` | never |
 | `response.procedure.containment` | `rule.response.containment.guide` | never |
 | `response.procedure.searches[i]` | `rule.response.investigation.searches[i]`: `name` = `purpose` (made unique with a suffix), `platform` from `system`, `language` and `query` kept, no parameters | a `system` that names no platform (`SIEM`, `EDR console`): the file is left unchanged (exit 2, `needs_human_decision`) |
-| `configurations.<p>`, or `platforms.<p>` when it is the only copy | `rule.<p>` | the same platform in both: refused |
+| `configurations.<p>`, or `platforms.<p>` when it is the only copy | `rule.detection.<p>` | the same platform in both: refused |
 | a block's `contributors` | merged into `metadata.contributors` | never (reported) |
 | a legacy block `schema` | `platform::<p>::1.0` | never |
 | root `status` | removed | a rule with no enabled block is reported: it stops matching `rule_statuses` |
@@ -431,7 +438,7 @@ The migration writes no `fidelity`, and it writes no parameters, windows or acti
 The rewrite preserves text:
 
 - Root entries move under an inserted `rule:` with two more spaces of indentation, and their comments move with them. A block scalar keeps its content, because every line gains the same indentation.
-- Platform blocks keep their lines (indentation 2 under `configurations:`, then under `rule:`), with one `severity:` line inserted after `status:`.
+- `configurations:` becomes `detection:` and moves under `rule:` like the other root entries, so each platform block gains the same two spaces of indentation and keeps its content. One `severity:` line is inserted after `status:`.
 - Keys are renamed in place.
 - Each rewritten file is parsed again and compared with the intended document. A file that differs is left unchanged.
 - BOM, line endings, quoting and key order are kept.
@@ -441,13 +448,13 @@ Migration is forward-only and idempotent.
 ### Other specs that name rule fields
 
 - `specs/metadata.md`: `metadata.reviewed` is defined for `rule::1.1` and `rule::2.0`.
-- `specs/platforms/index.md`: the block envelope for 2.0 is defined here, and a block lives at `rule.<platform>`. Each platform spec's severity section names the envelope `severity` as the default for its native field. The Elastic and HarfangLab specs name `fidelity.false_positives` as the default for their `false_positives`.
+- `specs/platforms/index.md`: the block envelope for 2.0 is defined here, and a block lives at `rule.detection.<platform>`. Each platform spec's severity section names the envelope `severity` as the default for its native field. The Elastic and HarfangLab specs name `fidelity.false_positives` as the default for their `false_positives`.
 - `specs/sharing.md`, `specs/sharing/misp-1.0.md`:
   - the status match above
   - relations from `rule.signals`
   - `threat_level_id` from the derived rule severity
   - techniques by the ATT&CK policy
-- `specs/deployment.md`: promotion rewrites block statuses (`configurations.*` on 1.x, `rule.*` on 2.0).
+- `specs/deployment.md`: promotion rewrites block statuses (`configurations.*` on 1.x, `rule.detection.*` on 2.0).
 - `specs/validation.md`: the codes above.
 - `specs/metaschema-keywords.md`: model vocabularies for `signals` and `covered_by`.
 - `specs/objects/objective-1.0.md` and `objective-1.1.md`: drop the top-level `composition`, which opentide 1.0 already reports as an unknown key. This fixes spec drift in the same change, because this RFC is about objects reading alike.
@@ -487,6 +494,7 @@ A rule that relied on the root `severity` for its MISP threat level, or on Splun
 ## Alternatives
 
 - **Rename `configurations` only.** Rules stay the odd object, and severity, status and searches stay where they are.
+- **Platform keys directly on `rule`** (revisions 2 to 4 of this RFC). One level less, but it mixes the rule's closed set of fields with an open set of platforms that grows with the registry and with plugins. It needs a rule that no platform may be named like a field, editor completion offers both kinds of key at once, and plugin platforms would force the `rule` block open to unknown keys.
 - **One rule-level severity that blocks override.** Two sources of truth again, which this RFC removes for status.
 - **Only the vendors' native severity fields.** Splunk, Carbon Black and HarfangLab would need new payload fields, and sharing would need an inverse mapping from thirteen vendor scales.
 - **`objective` plus `signals` fields.** Cannot link a rule to signals of several objectives.
@@ -513,6 +521,7 @@ A rule that relied on the root `severity` for its MISP threat level, or on Splun
 6. Severity belongs to each platform block. The rule's severity is derived.
 7. Searches stay in `response`, organised by stage.
 8. 1.x is "superseded", not "deprecated", in the release that ships 2.0. `validate` adds a `rule_revision_superseded` hint. 1.x keeps validating and deploying.
+9. Platform blocks are grouped under `rule.detection`, not flat on `rule`.
 
 ## References
 
