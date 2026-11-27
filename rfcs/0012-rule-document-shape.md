@@ -3,16 +3,16 @@
 - **RFC:** 0012
 - **Title:** Rules should read like the other objects
 - **Author:** opentide maintainers
-- **Status:** draft (revision 5, open for comments)
+- **Status:** draft (revision 6, open for comments)
 - **Created:** 2026-09-30
-- **Revised:** 2026-11-27. Revisions 4 and 5 rewrite the October draft against opentide 1.0 (the Rust core, thirteen platforms). After three rounds of maintainer review it now covers:
+- **Revised:** 2026-11-27. Revisions 4 to 6 rewrite the October draft against opentide 1.0 (the Rust core, thirteen platforms). After four rounds of maintainer review it now covers:
   - an identity-only root
   - one `rule` block, with platform blocks grouped under `rule.detection`
   - severity on each platform block
   - one `signals` list
   - `mitre_attack`
   - a `fidelity` block for false positives and blind spots
-  - a `response` organised by stage, with typed, validated and runnable searches
+  - an `analysis` block: how to work out whether an alert is real, as ordered steps with typed, validated and runnable searches
 - **Issue:** [opentidehq/specifications#24](https://github.com/opentidehq/specifications/issues/24)
 - **Implementation plan:** [opentide `docs/internal/rule-2.0.md`](https://github.com/opentidehq/opentide/blob/claude/wonderful-faraday-n0gfwa/docs/internal/rule-2.0.md). The earlier tracker, opentidehq/opentide#394, was closed because it described the retired Python code.
 
@@ -24,7 +24,7 @@ A `rule::2.0` file is an envelope (`name`, `metadata`, `references`) plus one `r
 
 - **What the rule detects:** `description`, `signals`, `mitre_attack`.
 - **How far to trust it:** `fidelity` (false positives and blind spots, as structured entries).
-- **How to handle its alerts:** `response`, organised by stage. Each stage holds its guidance, its searches and its actions.
+- **How to analyse its alerts:** `analysis`, ordered steps a person or an agent follows. Each step gives the searches that answer it and what each verdict looks like.
 - **How it is implemented:** `detection`, one block per platform. Each block carries its own operational state: `enabled`, `status` and `severity`.
 
 `rule::1.0` and `rule::1.1` files keep their layout and keep working ([versioning 1.1](../specs/versioning.md)). One explicit command moves a file to 2.0.
@@ -48,7 +48,7 @@ A rule is not "High". Its Sentinel analytics rule can be High while its noisier 
 **A response that is a bag.** `response` holds deployment data (`alert_severity`), routing (`responders`), a playbook link, and a `procedure` with free prose (`analysis`, `containment`) and `searches`.
 
 - A search names its target in free text (`system: Microsoft Sentinel`), which the documentation renderer matches loosely to guess a language.
-- A search has no stage, no inputs and no time window.
+- A search has no question it answers, no inputs and no time window.
 - It cannot be run by name.
 - Nothing ties it to the alert it serves.
 
@@ -63,12 +63,12 @@ How established practice places these concerns, and what this RFC takes from eac
 | Source | Where investigation searches live | False positives and blind spots | Taken here |
 |---|---|---|---|
 | [Splunk Enterprise Security](https://help.splunk.com/en/splunk-enterprise-security-8/administer/8.6/investigations/investigate-findings-using-drilldown-searches-and-dashboards-in-splunk-enterprise-security) detections | In the detection: `drilldown_searches`, a list of a name, a search and an earliest and latest offset around the finding's time, with `$field$` tokens from the finding. Since ES 8.1, two drilldowns of one detection cannot share a name. | `known_false_positives` (text) in the content's detection YAML | Searches belong to the rule, attached to its alert. They have a unique name, parameters bound from the alert, and a time window around it. |
-| [Elastic Security](https://www.elastic.co/docs/solutions/security/detect-and-alert/write-investigation-guides) rules | In the investigation guide (`note`): query buttons (`!{investigate{…}}`) whose values come from alert fields (`{{kibana.alert.…}}`) | `false_positives` (list of strings) | Searches sit inside the response guidance, and their inputs come from the alert. |
-| [Palantir's ADS framework](https://github.com/palantir/alerting-detection-strategy-framework) | Response is a section of the detection strategy | "Blind Spots and Assumptions", "False Positives", and "Validation" are separate sections that must be complete before production | A parent block for how far to trust the rule, and response as part of the rule |
-| [RE&CT](https://github.com/atc-project/atc-react) (Atomic Threat Coverage) | Response actions grouped by incident-response stage (preparation, identification, containment, eradication, recovery, lessons learned). Detection rules link to response playbooks. | — | A response organised by stage, with typed actions |
+| [Elastic Security](https://www.elastic.co/docs/solutions/security/detect-and-alert/write-investigation-guides) rules | In the investigation guide (`note`): query buttons (`!{investigate{…}}`) whose values come from alert fields (`{{kibana.alert.…}}`) | `false_positives` (list of strings) | Searches sit inside the analysis guidance, and their inputs come from the alert. |
+| [Palantir's ADS framework](https://github.com/palantir/alerting-detection-strategy-framework) | Response is a section of the detection strategy | "Blind Spots and Assumptions", "False Positives", and "Validation" are separate sections that must be complete before production | A parent block for how far to trust the rule, and the analysis as part of the rule |
+| [RE&CT](https://github.com/atc-project/atc-react) (Atomic Threat Coverage) | Response actions grouped by incident-response stage (preparation, identification, containment, eradication, recovery, lessons learned). Detection rules link to response playbooks. | — | Not taken: containment and recovery are incident response, which playbooks own, not a rule |
 | Sigma | none | `falsepositives` (list of strings) | — |
 
-The pattern is consistent. A rule's searches are run because the rule fired, take the alert's values as input, and serve a stage of the response. They belong in `response`, placed by stage. Proactive hunts, run without an alert, are not part of a rule's response. They stay with the objective's signals (`examples`) or a future hunting object, and are out of scope here.
+The pattern is consistent. A rule's searches are run because the rule fired, take the alert's values as input, and answer a question about that alert. They belong in the rule's analysis guidance, attached to the question they answer. What happens after the alert is confirmed (containment, eradication, recovery) is incident response, owned by playbooks, not by the rule. Proactive hunts, run without an alert, are not part of a rule either. They stay with the objective's signals (`examples`) or a future hunting object, and are out of scope here.
 
 ## Detailed design
 
@@ -84,7 +84,7 @@ The pattern is consistent. A rule's searches are run because the rule fired, tak
   - `specs/validation.md`
   - `specs/metaschema-keywords.md`
   - `specs/objects/objective-1.0.md` and `objective-1.1.md` (drift, below)
-- New vocabularies: `response.actions`, `fidelity.frequency`, `fidelity.blind_spot`.
+- New vocabularies: `fidelity.frequency`, `fidelity.blind_spot`.
 - Pins: a `["rule::2.0"]` section in `schemas/pins/rule.toml`.
 
 ### The document
@@ -123,44 +123,41 @@ rule:
         kind: evasion
         covered_by: [9b8a7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d]   # the vulnerable-driver load rule
         mitigations: [M1038]
-  response:
+  analysis:
     responders: soc-l2
-    playbook: https://soar.example.net/playbooks/credential-dumping
-    triage:
-      guide: |
-        Check the signer and the parent of the process. A known agent is a false positive.
-      searches:
-        - name: Process tree of the reader
-          platform: microsoft_defender
-          parameters:
-            device: Host::Hostname
-            process: Host::Process
-          window: {before: PT1H, after: PT15M}
-          query: |
-            DeviceProcessEvents
-            | where DeviceName == {{device}}
-            | where FileName == {{process}} or InitiatingProcessFileName == {{process}}
-    investigation:
-      guide: |
-        Find other hosts where the binary ran, and logons that followed on this host.
-      searches:
-        - name: Same binary elsewhere
-          platform: microsoft_defender
-          parameters:
-            sha256: Host::File Hash
-          window: {before: P7D}
-          query: |
-            DeviceProcessEvents
-            | where SHA256 == {{sha256}}
-            | summarize by DeviceName
-    containment:
-      guide: |
-        Isolate the host, then reset the credentials of every account logged on to it.
-      actions:
-        - action: isolate_host
-          target: Host::Hostname
-        - action: reset_credentials
-          target: Host::Account
+    summary: |
+      A process read LSASS memory. Most alerts are backup or EDR agents; rule those out first.
+    steps:
+      - question: Is the reading process a known agent?
+        guide: Check who signed the process and where it runs from.
+        searches:
+          - name: Signer and path of the reader
+            platform: microsoft_defender
+            parameters:
+              device: Host::Hostname
+              process: Host::Process
+            window: {before: PT1H, after: PT15M}
+            query: |
+              DeviceProcessEvents
+              | where DeviceName == {{device}} and FileName == {{process}}
+              | project Timestamp, FolderPath, ProcessVersionInfoCompanyName, InitiatingProcessFileName
+        verdicts:
+          benign: Signed by a backup or EDR vendor, running from its install directory.
+          malicious: Unsigned, or running from a user-writable path.
+        false_positive: Backup and endpoint agents
+      - question: Did the same binary run on other hosts?
+        searches:
+          - name: Same binary elsewhere
+            platform: microsoft_defender
+            parameters:
+              sha256: Host::File Hash
+            window: {before: P7D}
+            query: |
+              DeviceProcessEvents
+              | where SHA256 == {{sha256}}
+              | summarize by DeviceName
+        verdicts:
+          suspicious: Other hosts ran it in the last week.
   detection:
     sentinel:
       enabled: true
@@ -191,7 +188,7 @@ rule:
 | Identity | Which object is this? | root: `name`, `metadata`, `references` | the same |
 | Intent | What does it detect, and why? | `rule.description`, `rule.signals`, `rule.mitre_attack` | root `description`, `techniques`, `detection_model` |
 | Fidelity | When is it wrong, and what can it not see? | `rule.fidelity` | none (two platform blocks improvise) |
-| Response | Who handles an alert, and what do they look at and do, at each stage? | `rule.response` | `response`, `response.procedure` |
+| Analysis | Is this alert real? Who looks, what do they check, and what does each answer mean? | `rule.analysis` | `response`, `response.procedure` |
 | Implementation | How is it expressed on each platform? | `rule.detection.<platform>`: the payload | `configurations.<platform>` |
 | Operation | Is it live, where, and how loud? | `rule.detection.<platform>`: the envelope (`enabled`, `status`, `severity`, `tenants`, `flags`) | root `status` and `severity`, `response.alert_severity`, block `status` |
 
@@ -205,7 +202,7 @@ The root of a `rule::2.0` file holds `name`, `metadata` and optional `references
 | `metadata` | Identity, revision, dates, TLP and authorship, shared by all objects. |
 | `references` | Provenance of the object, the same `ObjectReferences` as on threats and objectives. Sharing and exports read it in one place for every family. |
 
-The root MUST NOT carry `description`, `status`, `severity`, `techniques`, `mitre_attack`, `detection_model`, `signals`, `response`, `configurations`, `platforms` or `file`. Those keys identify a 1.x file. The error names the 2.0 path, for example "`configurations` is not a `rule::2.0` key; platform blocks are keys of `rule.detection`".
+The root MUST NOT carry `description`, `status`, `severity`, `techniques`, `mitre_attack`, `detection_model`, `signals`, `response`, `analysis`, `configurations`, `platforms` or `file`. Those keys identify a 1.x file. The error names the 2.0 path, for example "`configurations` is not a `rule::2.0` key; platform blocks are keys of `rule.detection`".
 
 ### The `rule` block
 
@@ -215,7 +212,7 @@ The root MUST NOT carry `description`, `status`, `severity`, `techniques`, `mitr
 | `signals` | no | `[]` | UUIDs of the objectives and signals the rule implements ([Signals](#signals)). |
 | `mitre_attack` | no | `[]` | ATT&CK technique ids, `att&ck::1.2`, as on threats and objectives ([ATT&CK](#attck)). |
 | `fidelity` | no | — | False positives and blind spots ([Fidelity](#fidelity)). |
-| `response` | no | — | Who handles an alert, and how, by stage ([Response](#response)). |
+| `analysis` | no | — | How to work out whether an alert is real ([Analysis](#analysis)). |
 | `detection` | no | — | One block per platform the rule is implemented on ([Detection](#detection)). |
 
 Unknown keys MUST fail. The set of `rule` fields is closed; the set of platforms is open, and lives in `detection`.
@@ -262,7 +259,7 @@ Explicit beats inherited, and the lists are never merged. A rule usually detects
 | `tuning` | no | How it is excluded, or could be. Markdown. |
 | `platforms` | no | Platform identifiers where it occurs. Default: every platform of the rule. Each entry MUST be a registry platform. |
 
-The Elastic and HarfangLab blocks have their own `false_positives` (lists of strings). When a block sets none, deploy sends the `name` of each false positive that applies to that platform. Documentation renders the full entries, and triage shows `identify` next to the alert.
+The Elastic and HarfangLab blocks have their own `false_positives` (lists of strings). When a block sets none, deploy sends the `name` of each false positive that applies to that platform. Documentation renders the full entries. An analysis step names the false positive its `benign` verdict identifies, so `identify` is read next to the evidence that settles it.
 
 #### `fidelity.blind_spots[]`
 
@@ -276,38 +273,41 @@ The Elastic and HarfangLab blocks have their own `false_positives` (lists of str
 
 `covered_by` becomes a `compensates` edge in the catalogue, so coverage reports can show a technique as covered with a known gap and a compensating detection. A blind spot with no `covered_by` and no `mitigations` is an open gap, and reports list it.
 
-### Response
+### Analysis
 
-`rule.response` says who handles an alert from this rule and what they do, by stage. Severity is no longer here: each platform block carries its own.
+`rule.analysis` is how to work out whether an alert from this rule is real. It is one object, written for a person and an agent alike: a short summary, then ordered steps. Each step asks one question, gives the searches that answer it, and says what each answer means. Containment, remediation and other incident response are out of scope: they belong to the playbooks and the case-management tooling that take over once the alert is confirmed.
 
 | Field | Required | Meaning | 1.x |
 |---|---|---|---|
-| `responders` | no | The team that handles the alert: a `[[responders]]` name from `deployment.toml`, defaulted from `[deployment] default_responders` | `response.responders` |
-| `playbook` | no | Link or identifier of the SOAR playbook | `response.playbook` |
-| `triage` | no | Stage: decide whether the alert is real | `procedure.analysis` |
-| `investigation` | no | Stage: establish scope and cause once it is real | `procedure.searches` |
-| `containment` | no | Stage: stop it spreading | `procedure.containment` |
-| `remediation` | no | Stage: remove it and recover | none |
+| `responders` | no | The team that analyses the alert: a `[[responders]]` name from `deployment.toml`, defaulted from `[deployment] default_responders` | `response.responders` |
+| `summary` | no | What an alert means and how to approach it. Markdown. | `response.procedure.analysis` |
+| `steps` | no | The ordered questions to answer ([Steps](#steps)) | `response.procedure.searches`, one step per search |
 
-The stages follow incident-response practice: identification (split into triage and investigation, as SOC tiers work), containment, then eradication and recovery (here one `remediation` stage). Every stage has the same shape:
+An `analysis` with neither `summary` nor `steps` is `empty_analysis`.
 
-| Stage field | Required | Meaning |
+Elastic sends `summary` and the steps, rendered as Markdown with their searches as code blocks, as the investigation guide (Kibana `note`), unless the block sets `guide.investigation`. Documentation renders the same.
+
+#### Steps
+
+| Field | Required | Meaning |
 |---|---|---|
-| `guide` | no | What to do at this stage. Markdown. |
-| `searches` | no | Queries to run at this stage ([Searches](#searches)). |
-| `actions` | no | Typed actions to take at this stage ([Actions](#actions)). |
+| `question` | yes | What this step establishes, as a question. Unique among the rule's steps. |
+| `guide` | no | How to answer it. Markdown. |
+| `searches` | no | Queries that answer it ([Searches](#searches)). When there are several, they are alternatives on different platforms: run the one for the platform you work in. |
+| `verdicts` | no | What each answer means: `benign`, `suspicious` and `malicious`, each a Markdown description of the evidence. At least one when present. |
+| `false_positive` | no | The `name` of the `fidelity.false_positives` entry that a `benign` verdict at this step identifies. It MUST name one (`unknown_false_positive`). |
 
-A stage with none of the three fields is an error (`empty_response_stage`).
+A step with neither `guide` nor `searches` is `empty_analysis_step`.
 
-Elastic sends `triage.guide` and `investigation.guide` as the investigation guide (Kibana `note`), with the searches of those stages rendered below as Markdown code blocks, unless the block sets `guide.investigation`.
+Steps are read in order, and a decisive verdict ends the analysis. That is how an analyst works through an alert, and it is what lets an agent follow the same procedure: run each step's search with the alert's values, compare the result with the verdicts, and stop or go on. Branching between steps is not part of this revision.
 
 #### Searches
 
-A search is a query an analyst or an agent runs because the rule fired. Its inputs come from the alert.
+A search is a query that someone analysing the alert runs. Its inputs come from the alert.
 
 | Field | Required | Meaning | 1.x |
 |---|---|---|---|
-| `name` | yes | Unique across all stages of the rule. It is the search's handle (`opentide query --rule <uuid> --search "<name>"`). | `purpose` |
+| `name` | yes | Unique across the rule. It is the search's handle (`opentide query --rule <uuid> --search "<name>"`). | `purpose` |
 | `description` | no | What the result shows. Markdown. | none |
 | `platform` | yes | A platform identifier from the registry: where the search runs, and so its language. | `system` (free text) |
 | `language` | no | Required when the platform has several query languages (Elastic: `kuery`, `lucene`, `eql`, `esql`). MUST NOT be set otherwise. | `language` |
@@ -333,30 +333,9 @@ A placeholder stands for one complete literal value of the query's language, so 
 
 `opentide validate query --live` also sends searches, placeholders substituted the same way, to the tenants of platforms that have a live check.
 
-**Running.** `opentide query --rule <uuid> --search "<name>" --param device=WS-0142 --at <alert time>` substitutes the parameters, applies `window` around `--at`, and runs the search on the platform's tenant. The MCP `run_query` tool takes the same inputs, so an agent working an alert can run the rule's triage searches with the alert's values.
+**Running.** `opentide query --rule <uuid> --search "<name>" --param device=WS-0142 --at <alert time>` substitutes the parameters, applies `window` around `--at`, and runs the search on the platform's tenant. The MCP server exposes the analysis as data (steps, searches, verdicts), and its `run_query` tool takes the same inputs. An agent working an alert can therefore follow the steps with the alert's values.
 
-**Platforms.** Splunk detections MAY receive the triage and investigation searches whose `platform` is `splunk` as `drilldown_searches`: the `name`, the query with `{{x}}` written as `$x$`, and `window` as the earliest and latest offsets. That export is an implementation choice and is not required by this RFC.
-
-#### Actions
-
-An action is a step taken at a stage, typed so that a SOAR or an agent can map it.
-
-| Field | Required | Meaning |
-|---|---|---|
-| `action` | yes | A `response.actions::1.0` value |
-| `target` | no | The entity type it applies to, a `signal.entities::1.0` value |
-| `description` | no | Detail for this rule. Markdown. |
-
-`response.actions::1.0` starts with the actions the supported EDR and identity platforms expose:
-
-- `isolate_host`, `release_host`
-- `kill_process`, `quarantine_file`
-- `block_indicator`
-- `collect_forensics`
-- `disable_account`, `reset_credentials`, `revoke_sessions`
-- `escalate`, `notify_owner`
-
-Like every vocabulary, it is extended by RFC. An action documents intent. Automated response stays where the platforms define it: the Microsoft Defender block's `actions`, Elastic's response actions, and Bitdefender's and HarfangLab's actions.
+**Platforms.** Splunk detections MAY receive the searches whose `platform` is `splunk` as `drilldown_searches`: the `name`, the query with `{{x}}` written as `$x$`, and `window` as the earliest and latest offsets. That export is an implementation choice and is not required by this RFC.
 
 ### Detection
 
@@ -404,13 +383,11 @@ A `rule::2.0` rule matches a sharing block's `rule_statuses` when at least one e
 "rule.fidelity.false_positives.frequency" = "fidelity.frequency::1.0"
 "rule.fidelity.blind_spots.kind" = "fidelity.blind_spot::1.0"
 "rule.fidelity.blind_spots.mitigations" = "mitigations::1.0"
-"rule.response.*.actions.action" = "response.actions::1.0"
-"rule.response.*.actions.target" = "signal.entities::1.0"
-"rule.response.*.searches.parameters.*" = "signal.entities::1.0"
+"rule.analysis.steps.searches.parameters.*" = "signal.entities::1.0"
 "rule.detection.<platform>.severity" = "alert_severity::1.0"   # one row per platform in the file
 ```
 
-`rule.signals` binds the `objective` model vocabulary (objectives, and every signal defined under one). `rule.fidelity.blind_spots.covered_by` binds the rule and signal model vocabularies. `rule.response.responders` binds `tide.config.responders`, as on 1.x.
+`rule.signals` binds the `objective` model vocabulary (objectives, and every signal defined under one). `rule.fidelity.blind_spots.covered_by` binds the rule and signal model vocabularies. `rule.analysis.responders` binds `tide.config.responders`, as on 1.x.
 
 ### Migrating a file
 
@@ -422,10 +399,11 @@ A `rule::2.0` rule matches a sharing block's `rule_statuses` when at least one e
 | `detection_model: X` | `rule.signals: [X]` | never |
 | `techniques` | `rule.mitre_attack` (omitted when empty) | never |
 | `response.alert_severity` (or root `severity` without a `response`, or `Informational`) | `severity` on every platform block | a root `severity` that differs from `response.alert_severity` is reported: MISP's threat level changes |
-| `response.responders`, `response.playbook` | `rule.response.responders`, `rule.response.playbook` | never |
-| `response.procedure.analysis` | `rule.response.triage.guide` | never |
-| `response.procedure.containment` | `rule.response.containment.guide` | never |
-| `response.procedure.searches[i]` | `rule.response.investigation.searches[i]`: `name` = `purpose` (made unique with a suffix), `platform` from `system`, `language` and `query` kept, no parameters | a `system` that names no platform (`SIEM`, `EDR console`): the file is left unchanged (exit 2, `needs_human_decision`) |
+| `response.responders` | `rule.analysis.responders` | never |
+| `response.playbook` | `references.internal.playbook` | never (reported) |
+| `response.procedure.analysis` | `rule.analysis.summary` | never |
+| `response.procedure.containment` | appended to `rule.analysis.summary` under a "Containment" heading, so nothing is lost | never (reported: move it to the playbook) |
+| `response.procedure.searches[i]` | `rule.analysis.steps[i]`: `question` = `purpose`, with one search: `name` = `purpose` (made unique with a suffix), `platform` from `system`, `language` and `query` kept, no parameters | a `system` that names no platform (`SIEM`, `EDR console`): the file is left unchanged (exit 2, `needs_human_decision`) |
 | `configurations.<p>`, or `platforms.<p>` when it is the only copy | `rule.detection.<p>` | the same platform in both: refused |
 | a block's `contributors` | merged into `metadata.contributors` | never (reported) |
 | a legacy block `schema` | `platform::<p>::1.0` | never |
@@ -433,7 +411,7 @@ A `rule::2.0` rule matches a sharing block's `rule_statuses` when at least one e
 | `file` | removed | never (reported) |
 | `metadata.reviewed`, `version`, `modified` | unchanged | never |
 
-The migration writes no `fidelity`, and it writes no parameters, windows or actions. 1.x has nothing to derive them from. It refuses a file that fails validation as declared, so it never turns an invalid 1.x file into a different invalid 2.0 file.
+The migration writes no `fidelity`, and it writes no parameters, windows or verdicts. 1.x has nothing to derive them from. It refuses a file that fails validation as declared, so it never turns an invalid 1.x file into a different invalid 2.0 file.
 
 The rewrite preserves text:
 
@@ -475,8 +453,7 @@ Migration is forward-only and idempotent.
   - a block `contributors`
   - a legacy block `schema`
   - each search code above
-  - an empty stage
-  - an unknown action
+  - an empty analysis, an empty step, an unknown `false_positive`
   - a `covered_by` that resolves to nothing
   - a false positive with an unknown platform
 - Migration: 1.0 and 1.1 inputs with their 2.0 outputs. They cover comments, block scalars, a severity conflict, searches, legacy `platforms`, and a `system` that needs a person.
@@ -487,7 +464,9 @@ Two layouts exist until people migrate. Every consumer reads both, as the versio
 
 `severity` is written once per block instead of once per rule. That cost is the point: the platforms can disagree on purpose.
 
-The response is deeper than 1.x (`response.triage.searches[]` instead of `response.procedure.searches[]`), and placeholders add a small syntax to query text. In return, searches are checked, runnable and tied to the alert.
+A search sits one level deeper than on 1.x (`analysis.steps[].searches[]` instead of `response.procedure.searches[]`), and placeholders add a small syntax to query text. In return, every search answers a stated question, and is checked, runnable and tied to the alert.
+
+A rule no longer carries containment guidance or a playbook field. Migration keeps both (the prose in the summary, the link in `references`) and reports them, so a team can move them to its playbooks.
 
 A rule that relied on the root `severity` for its MISP threat level, or on Splunk's or Elastic's merge of techniques, changes payload when migrated. The migration report lists each one.
 
@@ -498,16 +477,16 @@ A rule that relied on the root `severity` for its MISP threat level, or on Splun
 - **One rule-level severity that blocks override.** Two sources of truth again, which this RFC removes for status.
 - **Only the vendors' native severity fields.** Splunk, Carbon Black and HarfangLab would need new payload fields, and sharing would need an inverse mapping from thirteen vendor scales.
 - **`objective` plus `signals` fields.** Cannot link a rule to signals of several objectives.
-- **Searches as a sibling of `response` (revision 3 of this RFC).** The research above shows searches are run because the rule fired, take the alert's values, and serve a stage. Separating them from the guidance of that stage loses the reason they exist.
-- **Searches as one list with a `stage` field.** Equivalent data, but a stage's guide, searches and actions would no longer read together.
+- **Searches as a sibling of the guidance (revision 3 of this RFC).** Searches are run because the rule fired and answer a question about the alert. Separated from that question, they lose the reason they exist.
+- **A response by stage: triage, investigation, containment, remediation, with typed actions (revisions 4 and 5 of this RFC).** It spread one procedure over four objects and turned the rule into an incident-response playbook. Containment and recovery depend on the asset, the incident and the organisation, not on the rule that fired. The rule's job is to say how to judge its alert.
 - **`false_positives` and `blind_spots` as strings on `rule`.** Cheaper, but triage, tuning and coverage could not use them, and a compensating detection could not be linked.
-- **Response actions from RE&CT ids.** A large catalogue, unmaintained since 2022 as far as public listings show, whose stages this RFC already follows. A small opentide vocabulary is enough to start.
 
 ## Unresolved questions
 
 - **The name of the parent block.** `fidelity` (precision and recall: false positives and blind spots), `limitations`, or `assessment`?
 - **A third `fidelity` child, `validation`.** The ADS framework requires true-positive validation. A sketch: `validation[]` with `name`, `method` (manual, or an emulation test reference), and the platforms expected to alert. Add it now, or in a later additive change?
-- **The first `response.actions` values.** Are the eleven above the right start?
+- **Branching steps.** Should a verdict be able to name the next step, or is an ordered list with a decisive verdict enough?
+- **The playbook link.** Is `references.internal.playbook` the right home for 1.x `response.playbook`, or should `analysis` keep a `playbook` field as the hand-off once an alert is confirmed?
 - **Splunk drilldown export.** Should the platform spec make it a SHOULD?
 - **`metadata.reviewed` on threats and objectives,** and the root `criticality` on threats: for their next revisions, not this one.
 
@@ -519,9 +498,10 @@ A rule that relied on the root `severity` for its MISP threat level, or on Splun
 4. `techniques` becomes `mitre_attack`, inside `rule`.
 5. `enabled` stays on blocks.
 6. Severity belongs to each platform block. The rule's severity is derived.
-7. Searches stay in `response`, organised by stage.
+7. Searches belong to the analysis, attached to the question they answer.
 8. 1.x is "superseded", not "deprecated", in the release that ships 2.0. `validate` adds a `rule_revision_superseded` hint. 1.x keeps validating and deploying.
 9. Platform blocks are grouped under `rule.detection`, not flat on `rule`.
+10. The rule says how to analyse its alert, in one `analysis` object. Containment and remediation are not part of a rule.
 
 ## References
 
